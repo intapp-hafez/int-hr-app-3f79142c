@@ -36,7 +36,7 @@ function dateInRange(d: string, start: string, end: string) {
   return d >= start && d <= end;
 }
 
-export function AttendancePage() {
+function AttendancePage() {
   const { t } = useI18n();
   const att = useServerFn(listMyAttendance);
   const lv = useServerFn(listMyLeaves);

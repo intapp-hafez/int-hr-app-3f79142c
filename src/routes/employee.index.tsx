@@ -14,7 +14,7 @@ export const Route = createFileRoute("/employee/")({
   component: EmployeeDashboard,
 });
 
-export function EmployeeDashboard() {
+function EmployeeDashboard() {
   const { t, lang } = useI18n();
   const { tName, tDept, tBranch, tHoliday } = useTranslators();
   const qc = useQueryClient();

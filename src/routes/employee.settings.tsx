@@ -20,7 +20,7 @@ export const Route = createFileRoute("/employee/settings")({
   component: SettingsPage,
 });
 
-export function SettingsPage() {
+function SettingsPage() {
   const { t, lang, setLang } = useI18n();
   const { tBranch, tDept } = useTranslators();
   const me = useStore((s) => s.employees.find((e) => e.id === s.currentEmployeeId));
