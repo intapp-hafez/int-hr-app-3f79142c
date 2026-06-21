@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react";
-import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import {
   getState,
@@ -34,7 +33,10 @@ function downloadCsv(rows: TaskActivityExportRow[], file: string) {
   a.href = url; a.download = file; a.click();
   URL.revokeObjectURL(url);
 }
-function downloadXlsx(rows: TaskActivityExportRow[], file: string) {
+async function downloadXlsx(rows: TaskActivityExportRow[], file: string) {
+  // Lazy-load the heavy `xlsx` bundle only when an actual export runs,
+  // so admin layout mount doesn't pull ~600KB of parsing code.
+  const XLSX = await import("xlsx");
   const data = rows.map((r) => ({
     Time: new Date(r.ts).toLocaleString(),
     Date: new Date(r.ts).toISOString().slice(0, 10),
@@ -67,7 +69,7 @@ export function runSchedule(sch: ExportSchedule, opts?: { manual?: boolean }) {
     return;
   }
   if (sch.format === "csv") downloadCsv(rows, file);
-  else downloadXlsx(rows, file);
+  else void downloadXlsx(rows, file);
   recordExportDelivery(sch, rows.length, file, "sent");
   markScheduleRan(sch.id, today, "sent");
   toast.success(`Auto-export "${sch.name}" sent to ${sch.recipients.length || 1} recipient(s)`);
