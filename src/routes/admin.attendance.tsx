@@ -1,9 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Download, Upload, FileDown, FileText, Printer, Plus, Pencil, Trash2, Loader2, MapPin } from "lucide-react";
-import { useRef, useState, useMemo, useEffect } from "react";
+import { lazy, Suspense, useRef, useState, useMemo, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
 import { useStore } from "@/lib/store";
@@ -21,9 +20,10 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LeafletMap } from "@/components/LeafletMap";
 import { listAllGeofences } from "@/backend/functions/network-assignments.functions";
-import { EgyptMap } from "@/components/admin/EgyptMap";
+
+const LeafletMap = lazy(() => import("@/components/LeafletMap").then((mod) => ({ default: mod.LeafletMap })));
+const EgyptMap = lazy(() => import("@/components/admin/EgyptMap").then((mod) => ({ default: mod.EgyptMap })));
 
 export const Route = createFileRoute("/admin/attendance")({
   component: AdminAttendance,
@@ -239,7 +239,8 @@ function exportTaskActivityCsv(rows: TaskActivityRow[]) {
   a.href = url; a.download = `task-activity-${new Date().toISOString().slice(0, 10)}.csv`; a.click();
   URL.revokeObjectURL(url);
 }
-function exportTaskActivityXlsx(rows: TaskActivityRow[]) {
+async function exportTaskActivityXlsx(rows: TaskActivityRow[]) {
+  const XLSX = await import("xlsx");
   const data = rows.map((r) => ({
     Time: new Date(r.ts).toLocaleString(), Date: new Date(r.ts).toISOString().slice(0, 10),
     Employee: r.name, Task: r.taskTitle, City: r.city ?? "", District: r.district ?? "",
@@ -396,7 +397,8 @@ function AdminAttendance() {
     setErrs({}); upsertM.mutate(form);
   }
 
-  function downloadTemplate() {
+  async function downloadTemplate() {
+    const XLSX = await import("xlsx");
     const ws = XLSX.utils.aoa_to_sheet([
       ["employee_id", "date", "in_time", "out_time", "branch", "status", "note"],
       ["<uuid>", "2026-05-29", "08:32", "17:18", "Cairo HQ", "present", ""],
@@ -406,7 +408,8 @@ function AdminAttendance() {
     XLSX.utils.book_append_sheet(wb, ws, "Attendance");
     XLSX.writeFile(wb, "attendance-template.xlsx");
   }
-  function exportXlsx() {
+  async function exportXlsx() {
+    const XLSX = await import("xlsx");
     const data = rows.map((r) => ({
       employee_id: r.employee_id,
       employee: r.employee_name,
@@ -428,6 +431,7 @@ function AdminAttendance() {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
+      const XLSX = await import("xlsx");
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
       const ws = wb.Sheets[wb.SheetNames[0]];
@@ -505,7 +509,9 @@ function AdminAttendance() {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-5">
-          <EgyptMap />
+          <Suspense fallback={<div className="h-[420px] rounded-3xl border border-border bg-card" />}>
+            <EgyptMap />
+          </Suspense>
         </TabsContent>
 
         <TabsContent value="records" className="space-y-5">
@@ -654,14 +660,16 @@ function AdminAttendance() {
             <span className="inline-flex items-center gap-1 text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> updating</span>
           )}
         </div>
-        <LeafletMap
-          markers={fences.map((f) => ({
-            id: f.id, name: f.name, lat: f.lat, lng: f.lng, radius: f.radius_m, active: f.active,
-          }))}
-          points={points}
-          height={420}
-          zoom={mapZoom}
-        />
+        <Suspense fallback={<div className="h-[420px] bg-muted/30" />}>
+          <LeafletMap
+            markers={fences.map((f) => ({
+              id: f.id, name: f.name, lat: f.lat, lng: f.lng, radius: f.radius_m, active: f.active,
+            }))}
+            points={points}
+            height={420}
+            zoom={mapZoom}
+          />
+        </Suspense>
           </section>
         </TabsContent>
 
