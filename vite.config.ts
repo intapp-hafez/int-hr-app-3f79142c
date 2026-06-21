@@ -11,7 +11,11 @@ export default defineConfig({
   plugins: [
     tsConfigPaths({ projects: ["./tsconfig.json"] }),
     tailwindcss(),
-    TanStackRouterVite({ target: "react", autoCodeSplitting: false }),
+    // autoCodeSplitting splits each route's component/loader into a lazy chunk
+    // so visiting /admin no longer eagerly loads every admin sub-route's
+    // heavy deps (xlsx, jspdf, leaflet, recharts, etc.) — which used to
+    // freeze the dev page after sign-in.
+    TanStackRouterVite({ target: "react", autoCodeSplitting: true }),
     viteReact(),
   ],
   resolve: {
