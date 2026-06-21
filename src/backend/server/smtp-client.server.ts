@@ -13,7 +13,7 @@ type CfConnect = (
 ) => any;
 async function loadConnect(): Promise<CfConnect> {
   // @ts-expect-error - Workers runtime built-in
-  const mod = await import(/* @vite-ignore */ "cloudflare:sockets");
+  const mod = await import("cloudflare:sockets");
   return mod.connect as CfConnect;
 }
 
