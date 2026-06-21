@@ -1,12 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import * as XLSX from "xlsx";
 import { Download, Wallet, TrendingUp, AlertTriangle, Search, Filter, Award, Lock, Unlock, FileText, Loader2, RefreshCw, ChevronLeft, ChevronRight, FileDown, ArrowUp, ArrowDown, ArrowUpDown, Columns3 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import { useI18n } from "@/lib/i18n";
 import { getPayrollPeriod, lockPayrollRun, unlockPayrollRun, type PayrollRow } from "@/backend/functions/payroll.functions";
 import { SubTabs } from "@/components/SubTabs";
@@ -145,7 +142,8 @@ function AdminPayroll() {
   const workingDays = data?.working_days ?? 22;
   const periodLabel = `${MONTHS[month - 1]} ${year}`;
 
-  function exportXlsx() {
+  async function exportXlsx() {
+    const XLSX = await import("xlsx");
     const data = paginated.map((r) => ({
       "Employee Code": r.emp_code ?? "",
       Name: r.employee_name,
@@ -212,7 +210,11 @@ function AdminPayroll() {
     URL.revokeObjectURL(url);
   }
 
-  function downloadPayslip(r: PayrollRow) {
+  async function downloadPayslip(r: PayrollRow) {
+    const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+      import("jspdf"),
+      import("jspdf-autotable"),
+    ]);
     const doc = new jsPDF({ unit: "pt", format: "a4" });
     doc.setFontSize(16);
     doc.text("Payslip", 40, 50);
