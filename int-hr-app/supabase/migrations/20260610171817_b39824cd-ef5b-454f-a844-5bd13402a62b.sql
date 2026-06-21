@@ -1,0 +1,2 @@
+ALTER TABLE public.leave_types ADD COLUMN IF NOT EXISTS requires_proof boolean NOT NULL DEFAULT false;
+UPDATE public.leave_types SET requires_proof = true WHERE lower(name) LIKE '%sick%' AND requires_proof = false;

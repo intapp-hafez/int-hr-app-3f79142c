@@ -1,0 +1,62 @@
+IIS Configuration Guide for Single Page Applications (SPA)
+
+Based on the current web.config in public/web.config:
+
+Current Configuration:
+The application uses a URL Rewrite rule called "SPA Fallback".
+This rule is essential for Single Page Applications (like React, Vue, or Angular) running on IIS. It ensures that when a user refreshes the page or directly accesses a route (e.g., /admin/offers), the IIS server doesn't look for a physical folder named "admin/offers". Instead, if the requested file or directory is not found, the server rewrites the request to `/index.html`, allowing the frontend router to handle the path.
+
+## Handling Common IIS Errors
+
+### 1. HTTP Error 500.19 - Internal Server Error
+This error indicates that the configuration data in your `web.config` is invalid or cannot be read.
+- **Most Common Cause**: The `<rewrite>` tag is present in your `web.config`, but the **IIS URL Rewrite Module is NOT installed** on the server. Because IIS doesn't understand the `<rewrite>` section by default, it considers the file invalid.
+- **Fix**: Download and install the "URL Rewrite" extension for IIS from the official Microsoft website (https://www.iis.net/downloads/microsoft/url-rewrite).
+- **Other Causes**: A typo or syntax error in `web.config` (e.g., unclosed tags), or insufficient file permissions (ensure the `IIS_IUSRS` group has Read permissions to the folder).
+
+### 2. HTTP Error 403.14 - Forbidden
+Error 403.14 means "Directory listing denied."
+- **Cause**: This happens when the web server receives a request for a directory, but directory browsing is disabled, and the server doesn't know how to handle the request. This usually occurs when the URL Rewrite module failed to route the request to `index.html`, or `index.html` is completely missing from the directory.
+- **Fix**: 
+  1. Ensure `index.html` exists in your deployed folder.
+  2. Verify that the URL Rewrite module is installed.
+  3. Go to IIS Manager -> Your Site -> Default Document, and ensure `index.html` is added to the list.
+  4. Do NOT enable Directory Browsing to "fix" this, as it exposes your files and bypasses the frontend router.
+
+### 3. HTTP Error 404 - Not Found
+- **Cause**: The requested file or route doesn't exist. In an SPA, this frequently happens when a user refreshes a page (e.g., `/admin/projects`). IIS looks for a physical folder named `admin/projects`, which doesn't exist, leading to a 404.
+- **Fix**: Ensure your `web.config` is placed in the root of your published directory (usually `dist/` or `build/`). The `web.config` must contain the "SPA Fallback" rule to catch these routes and redirect them to `index.html`.
+
+## Standard SPA web.config Template
+
+Below is the standard `web.config` that should be placed in your deployment folder alongside `index.html`. It includes the necessary URL Rewrite rules to handle frontend routing (404/403 fixes):
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <system.webServer>
+    <rewrite>
+      <rules>
+        <rule name="SPA Fallback" stopProcessing="true">
+          <match url=".*" />
+          <conditions logicalGrouping="MatchAll">
+            <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" />
+            <add input="{REQUEST_FILENAME}" matchType="IsDirectory" negate="true" />
+          </conditions>
+          <action type="Rewrite" url="/index.html" />
+        </rule>
+      </rules>
+    </rewrite>
+    <staticContent>
+      <!-- Optional: Add MIME types if needed, e.g., for JSON or WebP -->
+      <remove fileExtension=".json" />
+      <mimeMap fileExtension=".json" mimeType="application/json" />
+    </staticContent>
+  </system.webServer>
+</configuration>
+```
+
+Summary:
+Almost all 404, 403.14, and 500.19 errors for a React/Vite SPA hosted on IIS can be resolved by confirming two things:
+1. The **IIS URL Rewrite Module** is installed on the Windows Server.
+2. The `web.config` file (with the SPA Fallback rule) is successfully copied to the production folder.

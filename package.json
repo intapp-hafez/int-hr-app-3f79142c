@@ -6,9 +6,7 @@
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
-    "postbuild": "node scripts/merge-dist.mjs",
     "build:dev": "vite build --mode development",
-    "postbuild:dev": "node scripts/merge-dist.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "lint": "eslint .",
@@ -60,6 +58,7 @@
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
     "embla-carousel-react": "^8.6.0",
+    "express": "^5.2.1",
     "face-api.js": "^0.22.2",
     "input-otp": "^1.4.2",
     "jspdf": "^4.2.1",
