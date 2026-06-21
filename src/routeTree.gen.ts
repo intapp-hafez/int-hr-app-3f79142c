@@ -34,6 +34,7 @@ import { Route as EmployeeMessagesRouteImport } from './routes/employee.messages
 import { Route as EmployeeLeavesRouteImport } from './routes/employee.leaves'
 import { Route as EmployeeCheckRouteImport } from './routes/employee.check'
 import { Route as EmployeeBiometricsRouteImport } from './routes/employee.biometrics'
+import { Route as EmployeeAttendanceRouteImport } from './routes/employee.attendance'
 import { Route as AdminTargetsOvertimeRouteImport } from './routes/admin.targets-overtime'
 import { Route as AdminShiftsRouteImport } from './routes/admin.shifts'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
@@ -186,6 +187,11 @@ const EmployeeCheckRoute = EmployeeCheckRouteImport.update({
 const EmployeeBiometricsRoute = EmployeeBiometricsRouteImport.update({
   id: '/biometrics',
   path: '/biometrics',
+  getParentRoute: () => EmployeeRoute,
+} as any)
+const EmployeeAttendanceRoute = EmployeeAttendanceRouteImport.update({
+  id: '/attendance',
+  path: '/attendance',
   getParentRoute: () => EmployeeRoute,
 } as any)
 const AdminTargetsOvertimeRoute = AdminTargetsOvertimeRouteImport.update({
@@ -363,6 +369,7 @@ export interface FileRoutesByFullPath {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/shifts': typeof AdminShiftsRoute
   '/admin/targets-overtime': typeof AdminTargetsOvertimeRoute
+  '/employee/attendance': typeof EmployeeAttendanceRoute
   '/employee/biometrics': typeof EmployeeBiometricsRoute
   '/employee/check': typeof EmployeeCheckRoute
   '/employee/leaves': typeof EmployeeLeavesRoute
@@ -413,6 +420,7 @@ export interface FileRoutesByTo {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/shifts': typeof AdminShiftsRoute
   '/admin/targets-overtime': typeof AdminTargetsOvertimeRoute
+  '/employee/attendance': typeof EmployeeAttendanceRoute
   '/employee/biometrics': typeof EmployeeBiometricsRoute
   '/employee/check': typeof EmployeeCheckRoute
   '/employee/leaves': typeof EmployeeLeavesRoute
@@ -469,6 +477,7 @@ export interface FileRoutesById {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/shifts': typeof AdminShiftsRoute
   '/admin/targets-overtime': typeof AdminTargetsOvertimeRoute
+  '/employee/attendance': typeof EmployeeAttendanceRoute
   '/employee/biometrics': typeof EmployeeBiometricsRoute
   '/employee/check': typeof EmployeeCheckRoute
   '/employee/leaves': typeof EmployeeLeavesRoute
@@ -526,6 +535,7 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/shifts'
     | '/admin/targets-overtime'
+    | '/employee/attendance'
     | '/employee/biometrics'
     | '/employee/check'
     | '/employee/leaves'
@@ -576,6 +586,7 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/shifts'
     | '/admin/targets-overtime'
+    | '/employee/attendance'
     | '/employee/biometrics'
     | '/employee/check'
     | '/employee/leaves'
@@ -631,6 +642,7 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/shifts'
     | '/admin/targets-overtime'
+    | '/employee/attendance'
     | '/employee/biometrics'
     | '/employee/check'
     | '/employee/leaves'
@@ -840,6 +852,13 @@ declare module '@tanstack/react-router' {
       path: '/biometrics'
       fullPath: '/employee/biometrics'
       preLoaderRoute: typeof EmployeeBiometricsRouteImport
+      parentRoute: typeof EmployeeRoute
+    }
+    '/employee/attendance': {
+      id: '/employee/attendance'
+      path: '/attendance'
+      fullPath: '/employee/attendance'
+      preLoaderRoute: typeof EmployeeAttendanceRouteImport
       parentRoute: typeof EmployeeRoute
     }
     '/admin/targets-overtime': {
@@ -1116,6 +1135,7 @@ const AdminRouteChildren: AdminRouteChildren = {
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 interface EmployeeRouteChildren {
+  EmployeeAttendanceRoute: typeof EmployeeAttendanceRoute
   EmployeeBiometricsRoute: typeof EmployeeBiometricsRoute
   EmployeeCheckRoute: typeof EmployeeCheckRoute
   EmployeeLeavesRoute: typeof EmployeeLeavesRoute
@@ -1127,6 +1147,7 @@ interface EmployeeRouteChildren {
 }
 
 const EmployeeRouteChildren: EmployeeRouteChildren = {
+  EmployeeAttendanceRoute: EmployeeAttendanceRoute,
   EmployeeBiometricsRoute: EmployeeBiometricsRoute,
   EmployeeCheckRoute: EmployeeCheckRoute,
   EmployeeLeavesRoute: EmployeeLeavesRoute,
