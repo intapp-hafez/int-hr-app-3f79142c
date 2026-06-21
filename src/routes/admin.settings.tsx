@@ -1,8 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Save, RotateCcw, Plus, Trash2, Clock, Wallet, Target, AlertTriangle, Gauge, CalendarDays, Sparkles, Pencil, X, Check, Wifi, Building2, Briefcase, MapPin, Mail, Bell, BellRing, Send, CalendarClock, Play, Timer, Coins, Tag, ChevronRight, Shield, Eye, EyeOff, Copy, KeyRound } from "lucide-react";
-import { SecurityPanel } from "@/components/admin/SecurityPanel";
 import { getVapidStatus } from "@/backend/functions/vapid-status.functions";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
@@ -46,6 +45,8 @@ import {
   type ExportSchedule,
 } from "@/lib/store";
 import { runSchedule } from "@/lib/export-scheduler";
+
+const SecurityPanel = lazy(() => import("@/components/admin/SecurityPanel").then((mod) => ({ default: mod.SecurityPanel })));
 
 export const Route = createFileRoute("/admin/settings")({
   component: AdminSettings,
@@ -827,7 +828,11 @@ function AdminSettings() {
           </div>
         )}
 
-        {section === "security" && <SecurityPanel />}
+        {section === "security" && (
+          <Suspense fallback={<div className="h-40 rounded-2xl bg-muted/30" />}>
+            <SecurityPanel />
+          </Suspense>
+        )}
       </div>
     </div>
   );
