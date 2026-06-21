@@ -31,6 +31,7 @@ import { Route as EmployeeTasksRouteImport } from './routes/employee.tasks'
 import { Route as EmployeeSettingsRouteImport } from './routes/employee.settings'
 import { Route as EmployeeNotificationsRouteImport } from './routes/employee.notifications'
 import { Route as EmployeeMessagesRouteImport } from './routes/employee.messages'
+import { Route as EmployeeLeavesRouteImport } from './routes/employee.leaves'
 import { Route as EmployeeCheckRouteImport } from './routes/employee.check'
 import { Route as EmployeeBiometricsRouteImport } from './routes/employee.biometrics'
 import { Route as EmployeeAttendanceRouteImport } from './routes/employee.attendance'
@@ -171,6 +172,11 @@ const EmployeeNotificationsRoute = EmployeeNotificationsRouteImport.update({
 const EmployeeMessagesRoute = EmployeeMessagesRouteImport.update({
   id: '/messages',
   path: '/messages',
+  getParentRoute: () => EmployeeRoute,
+} as any)
+const EmployeeLeavesRoute = EmployeeLeavesRouteImport.update({
+  id: '/leaves',
+  path: '/leaves',
   getParentRoute: () => EmployeeRoute,
 } as any)
 const EmployeeCheckRoute = EmployeeCheckRouteImport.update({
@@ -366,6 +372,7 @@ export interface FileRoutesByFullPath {
   '/employee/attendance': typeof EmployeeAttendanceRoute
   '/employee/biometrics': typeof EmployeeBiometricsRoute
   '/employee/check': typeof EmployeeCheckRoute
+  '/employee/leaves': typeof EmployeeLeavesRoute
   '/employee/messages': typeof EmployeeMessagesRoute
   '/employee/notifications': typeof EmployeeNotificationsRoute
   '/employee/settings': typeof EmployeeSettingsRoute
@@ -416,6 +423,7 @@ export interface FileRoutesByTo {
   '/employee/attendance': typeof EmployeeAttendanceRoute
   '/employee/biometrics': typeof EmployeeBiometricsRoute
   '/employee/check': typeof EmployeeCheckRoute
+  '/employee/leaves': typeof EmployeeLeavesRoute
   '/employee/messages': typeof EmployeeMessagesRoute
   '/employee/notifications': typeof EmployeeNotificationsRoute
   '/employee/settings': typeof EmployeeSettingsRoute
@@ -472,6 +480,7 @@ export interface FileRoutesById {
   '/employee/attendance': typeof EmployeeAttendanceRoute
   '/employee/biometrics': typeof EmployeeBiometricsRoute
   '/employee/check': typeof EmployeeCheckRoute
+  '/employee/leaves': typeof EmployeeLeavesRoute
   '/employee/messages': typeof EmployeeMessagesRoute
   '/employee/notifications': typeof EmployeeNotificationsRoute
   '/employee/settings': typeof EmployeeSettingsRoute
@@ -529,6 +538,7 @@ export interface FileRouteTypes {
     | '/employee/attendance'
     | '/employee/biometrics'
     | '/employee/check'
+    | '/employee/leaves'
     | '/employee/messages'
     | '/employee/notifications'
     | '/employee/settings'
@@ -579,6 +589,7 @@ export interface FileRouteTypes {
     | '/employee/attendance'
     | '/employee/biometrics'
     | '/employee/check'
+    | '/employee/leaves'
     | '/employee/messages'
     | '/employee/notifications'
     | '/employee/settings'
@@ -634,6 +645,7 @@ export interface FileRouteTypes {
     | '/employee/attendance'
     | '/employee/biometrics'
     | '/employee/check'
+    | '/employee/leaves'
     | '/employee/messages'
     | '/employee/notifications'
     | '/employee/settings'
@@ -819,6 +831,13 @@ declare module '@tanstack/react-router' {
       path: '/messages'
       fullPath: '/employee/messages'
       preLoaderRoute: typeof EmployeeMessagesRouteImport
+      parentRoute: typeof EmployeeRoute
+    }
+    '/employee/leaves': {
+      id: '/employee/leaves'
+      path: '/leaves'
+      fullPath: '/employee/leaves'
+      preLoaderRoute: typeof EmployeeLeavesRouteImport
       parentRoute: typeof EmployeeRoute
     }
     '/employee/check': {
@@ -1119,6 +1138,7 @@ interface EmployeeRouteChildren {
   EmployeeAttendanceRoute: typeof EmployeeAttendanceRoute
   EmployeeBiometricsRoute: typeof EmployeeBiometricsRoute
   EmployeeCheckRoute: typeof EmployeeCheckRoute
+  EmployeeLeavesRoute: typeof EmployeeLeavesRoute
   EmployeeMessagesRoute: typeof EmployeeMessagesRoute
   EmployeeNotificationsRoute: typeof EmployeeNotificationsRoute
   EmployeeSettingsRoute: typeof EmployeeSettingsRoute
@@ -1130,6 +1150,7 @@ const EmployeeRouteChildren: EmployeeRouteChildren = {
   EmployeeAttendanceRoute: EmployeeAttendanceRoute,
   EmployeeBiometricsRoute: EmployeeBiometricsRoute,
   EmployeeCheckRoute: EmployeeCheckRoute,
+  EmployeeLeavesRoute: EmployeeLeavesRoute,
   EmployeeMessagesRoute: EmployeeMessagesRoute,
   EmployeeNotificationsRoute: EmployeeNotificationsRoute,
   EmployeeSettingsRoute: EmployeeSettingsRoute,
