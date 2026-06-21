@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useI18n, useTranslators } from "@/lib/i18n";
@@ -15,10 +15,6 @@ import { useServerFn } from "@tanstack/react-start";
 import { getMe, getMyProfileDetails } from "@/backend/functions/auth.functions";
 import { listMyDevices, registerMyDevice, removeMyDevice } from "@/backend/functions/devices.functions";
 import { AvatarUploader } from "@/components/AvatarUploader";
-
-export const Route = createFileRoute("/employee/settings")({
-  component: SettingsPage,
-});
 
 export function SettingsPage() {
   const { t, lang, setLang } = useI18n();

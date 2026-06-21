@@ -1,4 +1,3 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo } from "react";
@@ -6,10 +5,6 @@ import { MapPin, Wifi, WifiOff, CalendarDays, Clock } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { listMyAttendance } from "@/backend/functions/attendance.functions";
 import { listMyLeaves } from "@/backend/functions/leaves.functions";
-
-export const Route = createFileRoute("/employee/attendance")({
-  component: AttendancePage,
-});
 
 const statusStyle: Record<string, string> = {
   present: "bg-success/15 text-success",

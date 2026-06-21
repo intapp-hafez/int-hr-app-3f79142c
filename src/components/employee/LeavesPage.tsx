@@ -1,4 +1,3 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { useState, useRef } from "react";
 import { Plus, X, Loader2, Trash2, Paperclip, FileText } from "lucide-react";
 import { toast } from "sonner";
@@ -13,10 +12,6 @@ const statusTone: Record<string, string> = {
   rejected: "bg-destructive/15 text-destructive",
   cancelled: "bg-muted text-muted-foreground",
 };
-
-export const Route = createFileRoute("/employee/leaves")({
-  component: LeavesPage,
-});
 
 export function LeavesPage() {
   const { t } = useI18n();

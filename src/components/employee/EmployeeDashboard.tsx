@@ -1,4 +1,3 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -9,10 +8,6 @@ import { getMe } from "@/backend/functions/auth.functions";
 import { checkIn, checkOut, listMyAttendance, listMyAccess } from "@/backend/functions/attendance.functions";
 import { listMyLeaves } from "@/backend/functions/leaves.functions";
 import { listHolidays } from "@/backend/functions/holidays.functions";
-
-export const Route = createFileRoute("/employee/")({
-  component: EmployeeDashboard,
-});
 
 export function EmployeeDashboard() {
   const { t, lang } = useI18n();
