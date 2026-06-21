@@ -14,6 +14,7 @@ import appCss from "../styles.css?url";
 import { LanguageProvider } from "@/lib/i18n";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
+import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 
 function NotFoundComponent() {
   return (
@@ -76,7 +77,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { title: "INT-HR App — Employee Attendance Management" },
       { name: "description", content: "Secure mobile attendance with GPS geo-fencing, authorized network validation, leave management, and real-time reporting." },
       { name: "author", content: "INT-HR App" },
@@ -84,19 +85,32 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:description", content: "Secure mobile attendance with GPS geo-fencing and authorized network validation." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
+      // Chrome / Android
       { name: "theme-color", content: "#EA7A2C" },
+      { name: "mobile-web-app-capable", content: "yes" },
+      { name: "application-name", content: "INT-HR" },
+      // Safari / iOS
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
-      { name: "apple-mobile-web-app-title", content: "INT-HR App" },
-      { name: "mobile-web-app-capable", content: "yes" },
-      { name: "application-name", content: "INT-HR App" },
+      { name: "apple-mobile-web-app-title", content: "INT-HR" },
+      // Windows / Edge
+      { name: "msapplication-TileColor", content: "#EA7A2C" },
+      { name: "msapplication-TileImage", content: "/android-chrome-192x192.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "manifest", href: "/app.webmanifest" },
-      { rel: "icon", type: "image/png", sizes: "192x192", href: "/icon-192.png" },
-      { rel: "icon", type: "image/png", sizes: "512x512", href: "/icon-512.png" },
-      { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png" },
+      // Favicons
+      { rel: "icon", type: "image/x-icon", href: "/favicon.ico" },
+      { rel: "icon", type: "image/png", sizes: "16x16", href: "/favicon-16x16.png" },
+      { rel: "icon", type: "image/png", sizes: "32x32", href: "/favicon-32x32.png" },
+      { rel: "icon", type: "image/png", sizes: "192x192", href: "/android-chrome-192x192.png" },
+      { rel: "icon", type: "image/png", sizes: "512x512", href: "/android-chrome-512x512.png" },
+      // Apple touch icons for iOS Safari
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
+      { rel: "apple-touch-icon", sizes: "192x192", href: "/android-chrome-192x192.png" },
+      { rel: "apple-touch-icon", sizes: "512x512", href: "/android-chrome-512x512.png" },
+      // Fonts
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" },
@@ -131,6 +145,7 @@ function RootComponent() {
         <AuthSessionWatcher />
         <Outlet />
         <Toaster position="top-center" richColors />
+        <PwaInstallBanner />
       </LanguageProvider>
     </QueryClientProvider>
   );

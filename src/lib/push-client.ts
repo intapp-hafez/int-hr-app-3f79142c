@@ -10,9 +10,10 @@ export function getPushSupport(): PushSupport {
 }
 
 async function getRegistration(): Promise<ServiceWorkerRegistration> {
-  const existing = await navigator.serviceWorker.getRegistration("/sw-push.js");
+  // Use the unified PWA service worker (sw.js handles both caching and push)
+  const existing = await navigator.serviceWorker.getRegistration("/");
   if (existing) return existing;
-  return navigator.serviceWorker.register("/sw-push.js", { scope: "/" });
+  return navigator.serviceWorker.register("/sw.js", { scope: "/" });
 }
 
 function b64encode(buf: ArrayBuffer | null): string {
@@ -55,7 +56,7 @@ export async function enablePush(): Promise<{ ok: true } | { ok: false; reason: 
 
 export async function disablePush(): Promise<void> {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
-  const reg = await navigator.serviceWorker.getRegistration("/sw-push.js");
+  const reg = await navigator.serviceWorker.getRegistration("/");
   const sub = reg ? await reg.pushManager.getSubscription() : null;
   if (sub) {
     const endpoint = sub.endpoint;
@@ -67,7 +68,7 @@ export async function disablePush(): Promise<void> {
 export async function isPushSubscribed(): Promise<boolean> {
   if (getPushSupport() === "unsupported") return false;
   if (Notification.permission !== "granted") return false;
-  const reg = await navigator.serviceWorker.getRegistration("/sw-push.js");
+  const reg = await navigator.serviceWorker.getRegistration("/");
   if (!reg) return false;
   const sub = await reg.pushManager.getSubscription();
   return !!sub;

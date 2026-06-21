@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
+    "postbuild": "node scripts/merge-dist.mjs",
     "build:dev": "vite build --mode development",
+    "postbuild:dev": "node scripts/merge-dist.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "lint": "eslint .",
