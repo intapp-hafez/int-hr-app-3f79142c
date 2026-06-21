@@ -366,9 +366,19 @@ function EmployeesPage() {
                 <Td>
                   <div className="flex flex-wrap gap-1">
                     {e.roles.length === 0 && <span className="text-[10px] text-muted-foreground">—</span>}
-                    {e.roles.map((r) => (
-                      <span key={r} className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider">{r}</span>
-                    ))}
+                    {e.roles.map((r) => {
+                      const rc: Record<string, string> = {
+                        admin:    "bg-red-100 text-red-700 ring-1 ring-red-300",
+                        hr:       "bg-purple-100 text-purple-700 ring-1 ring-purple-300",
+                        manager:  "bg-blue-100 text-blue-700 ring-1 ring-blue-300",
+                        employee: "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-300",
+                        staff:    "bg-amber-100 text-amber-700 ring-1 ring-amber-300",
+                        user:     "bg-slate-100 text-slate-600 ring-1 ring-slate-300",
+                      };
+                      return (
+                        <span key={r} className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${rc[r] ?? "bg-muted text-muted-foreground"}`}>{r}</span>
+                      );
+                    })}
                   </div>
                 </Td>
                 <Td>
@@ -422,7 +432,7 @@ function EmployeesPage() {
         </div>
       </div>
 
-      {open && <AddEmployeeModal departments={departments} positions={positions} cities={cities} districts={districts} onClose={() => setOpen(false)} />}
+      {open && <AddEmployeeModal departments={departments} positions={positions} cities={cities} districts={districts} managers={geo?.managers ?? []} onClose={() => setOpen(false)} />}
       {bulkAssignOpen && (
         <BulkAssignModal
           employeeIds={Array.from(selected).filter((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))}
@@ -580,9 +590,8 @@ function EditEmployeeDrawer({
 type CityOpt = { id: string; name_en: string };
 type DistrictOpt = { id: string; city_id: string; name_en: string };
 
-function AddEmployeeModal({ departments, positions, cities, districts, onClose }: { departments: { id: string; name: string }[]; positions: { id: string; name: string }[]; cities: CityOpt[]; districts: DistrictOpt[]; onClose: () => void }) {
+function AddEmployeeModal({ departments, positions, cities, districts, managers, onClose }: { departments: { id: string; name: string }[]; positions: { id: string; name: string }[]; cities: CityOpt[]; districts: DistrictOpt[]; managers: { id: string; name: string }[]; onClose: () => void }) {
   const { t } = useI18n();
-  const allEmployees = useStore((s) => s.employees);
   const validateBatch = useServerFn(validateEmployeesBatch);
   const setupIncomplete = departments.length === 0 || positions.length === 0;
   const [form, setForm] = useState<Omit<Employee, "id"> & ExtraHr>({
@@ -640,7 +649,7 @@ function AddEmployeeModal({ departments, positions, cities, districts, onClose }
     if (!(VALID_SALARY_MODES as readonly string[]).includes(form.salaryMode)) return setErr("Invalid salary mode");
     if (!(VALID_CONTRACT_TYPES as readonly string[]).includes(form.contractType)) return setErr("Invalid contract type");
     if (!form.dept.trim()) return setErr("Department is required");
-    if (form.manager && !allEmployees.some((emp) => emp.id === form.manager)) return setErr("Invalid manager");
+    if (form.manager && !managers.some((emp) => emp.id === form.manager)) return setErr("Invalid manager");
     const expCheck = validateIdExpiry(form.nationalId, form.nationalIdExpiry);
     if (expCheck !== "ok") return setErr(t(expCheck as any));
     void (async () => {
@@ -653,7 +662,7 @@ function AddEmployeeModal({ departments, positions, cities, districts, onClose }
               targetDuration: form.targetDuration, manager: form.manager,
               nationalId: form.nationalId, nationalIdExpiry: form.nationalIdExpiry,
             }],
-            managerIds: allEmployees.map((emp) => emp.id),
+            managerIds: managers.map((emp) => emp.id),
           },
         });
         if (!res.ok) {
@@ -778,22 +787,24 @@ function AddEmployeeModal({ departments, positions, cities, districts, onClose }
                   <option value="Female">{t("female")}</option>
                 </select>
               </Field>
-              <Field label={t("nationalId")}>
-                <input value={form.nationalId} onChange={(e) => upd("nationalId", e.target.value)} maxLength={32} className={inputCls + " font-mono"} />
-              </Field>
-              <Field label="ID Issue Date">
-                <input type="date" value={form.idIssueDate} onChange={(e) => upd("idIssueDate", e.target.value)} className={inputCls + " font-mono"} />
-              </Field>
-              <Field label={`${t("idExpiry")} (Ending Date)`}>
-                <input type="date" value={form.nationalIdExpiry} onChange={(e) => upd("nationalIdExpiry", e.target.value)} className={inputCls + " font-mono"} />
-              </Field>
+              <div className="col-span-full grid gap-3 md:grid-cols-3">
+                <Field label={t("nationalId")}>
+                  <input value={form.nationalId} onChange={(e) => upd("nationalId", e.target.value)} maxLength={32} className={inputCls + " font-mono"} />
+                </Field>
+                <Field label="ID Issue Date">
+                  <input type="date" value={form.idIssueDate} onChange={(e) => upd("idIssueDate", e.target.value)} className={inputCls + " font-mono"} />
+                </Field>
+                <Field label={`${t("idExpiry")} (Ending Date)`}>
+                  <input type="date" value={form.nationalIdExpiry} onChange={(e) => upd("nationalIdExpiry", e.target.value)} className={inputCls + " font-mono"} />
+                </Field>
+              </div>
               <FieldFull label="Address in ID card">
                 <textarea value={form.idCardAddress} onChange={(e) => upd("idCardAddress", e.target.value)} rows={2} maxLength={250} className={inputCls + " resize-y"} />
               </FieldFull>
             </div>
           )}
           {tab === "personal" && (
-            <div className="grid gap-3 md:grid-cols-2 border-t border-border pt-3 mt-2">
+            <div className="grid gap-3 md:grid-cols-3 border-t border-border pt-3 mt-2">
               <Field label={t("country")}><input value={form.country} onChange={(e) => upd("country", e.target.value)} className={inputCls} /></Field>
               <Field label={t("city")}>
                 <select value={form.city} onChange={(e) => { upd("city", e.target.value); upd("district", ""); }} className={inputCls}>
@@ -819,41 +830,45 @@ function AddEmployeeModal({ departments, positions, cities, districts, onClose }
             </div>
           )}
           {tab === "employment" && (
-            <div className="grid gap-3 md:grid-cols-2">
-              <Field label={t("department")}>
-                <SearchableSelect
-                  value={form.dept}
-                  onChange={(v) => upd("dept", v)}
-                  options={departments.map((d) => d.name)}
-                  placeholder={departments.length ? "Search departments…" : "No departments available"}
-                  disabled={departments.length === 0}
-                />
-              </Field>
-              <Field label={t("position")}>
-                <SearchableSelect
-                  value={form.position}
-                  onChange={(v) => upd("position", v)}
-                  options={positions.map((p) => p.name)}
-                  placeholder={positions.length ? "Search positions…" : "No positions available"}
-                  disabled={positions.length === 0}
-                />
-              </Field>
-              <Field label={t("branch")}>
-                <select value={form.branch} onChange={(e) => upd("branch", e.target.value)} className={inputCls}>
-                  {locations.map((l) => <option key={l.id}>{l.name}</option>)}
-                </select>
-              </Field>
-              <Field label={t("manager")}>
-                <select value={form.manager} onChange={(e) => upd("manager", e.target.value)} className={inputCls}>
-                  <option value="">{t("noManager")}</option>
-                  {allEmployees.map((emp) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
-                </select>
-              </Field>
-              <Field label={t("status")}>
-                <select value={form.status} onChange={(e) => upd("status", e.target.value)} className={inputCls}>
-                  <option value="Active">{t("active")}</option><option value="Inactive">{t("inactive")}</option>
-                </select>
-              </Field>
+            <div className="space-y-3">
+              <div className="grid gap-3 md:grid-cols-2">
+                <Field label={t("department")}>
+                  <SearchableSelect
+                    value={form.dept}
+                    onChange={(v) => upd("dept", v)}
+                    options={departments.map((d) => d.name)}
+                    placeholder={departments.length ? "Search departments…" : "No departments available"}
+                    disabled={departments.length === 0}
+                  />
+                </Field>
+                <Field label={t("position")}>
+                  <SearchableSelect
+                    value={form.position}
+                    onChange={(v) => upd("position", v)}
+                    options={positions.map((p) => p.name)}
+                    placeholder={positions.length ? "Search positions…" : "No positions available"}
+                    disabled={positions.length === 0}
+                  />
+                </Field>
+              </div>
+              <div className="grid gap-3 md:grid-cols-3">
+                <Field label={t("branch")}>
+                  <select value={form.branch} onChange={(e) => upd("branch", e.target.value)} className={inputCls}>
+                    {locations.map((l) => <option key={l.id}>{l.name}</option>)}
+                  </select>
+                </Field>
+                <Field label={t("manager")}>
+                  <select value={form.manager} onChange={(e) => upd("manager", e.target.value)} className={inputCls}>
+                    <option value="">{t("noManager")}</option>
+                    {managers.map((emp) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
+                  </select>
+                </Field>
+                <Field label={t("status")}>
+                  <select value={form.status} onChange={(e) => upd("status", e.target.value)} className={inputCls}>
+                    <option value="Active">{t("active")}</option><option value="Inactive">{t("inactive")}</option>
+                  </select>
+                </Field>
+              </div>
               <FieldFull label={t("notes")}>
                 <textarea value={form.notes} onChange={(e) => upd("notes", e.target.value)}
                   rows={3} placeholder={t("notesPlaceholder")} className={inputCls + " min-h-[80px] resize-y"} />
@@ -861,52 +876,56 @@ function AddEmployeeModal({ departments, positions, cities, districts, onClose }
             </div>
           )}
           {tab === "employment" && (
-            <div className="grid gap-3 md:grid-cols-2 border-t border-border pt-3 mt-2">
-              <FieldFull label={t("salaryMode")}>
-                <div className="flex gap-4 text-sm">
-                  <label className="inline-flex items-center gap-1.5">
-                    <input type="radio" name="salaryMode" checked={form.salaryMode === "gross"} onChange={() => upd("salaryMode", "gross")} />
-                    {t("salaryGross")}
-                  </label>
-                  <label className="inline-flex items-center gap-1.5">
-                    <input type="radio" name="salaryMode" checked={form.salaryMode === "net"} onChange={() => upd("salaryMode", "net")} />
-                    {t("salaryNet")}
-                  </label>
-                </div>
-              </FieldFull>
-              <Field label={`${t("salary")} (EGP)`}>
-                <input type="number" min={0} value={form.salary || ""} onChange={(e) => upd("salary", Number(e.target.value))} className={inputCls + " font-mono"} />
-              </Field>
-              <FieldFull label="">
-                <SalaryPreview
-                  amount={Number(form.salary) || 0}
-                  mode={form.salaryMode === "net" ? "NET" : "GROSS"}
-                />
-              </FieldFull>
-              <Field label={`${t("allowance")} (EGP)`}>
-                <input type="number" min={0} value={form.allowance || ""} onChange={(e) => upd("allowance", Number(e.target.value))} className={inputCls + " font-mono"} />
-              </Field>
-              <Field label={t("targetValue")}>
-                <input type="number" min={1} value={form.target || ""} onChange={(e) => upd("target", Number(e.target.value))} placeholder="e.g. 20" className={inputCls + " font-mono"} />
-              </Field>
-              <Field label={t("targetDuration")}>
-                <select value={form.targetDuration} onChange={(e) => upd("targetDuration", e.target.value)} className={inputCls}>
-                  {["Daily", "Weekly", "Monthly", "Quarterly", "Yearly"].map((d) => <option key={d}>{d}</option>)}
-                </select>
-              </Field>
-              <Field label={t("contractType")}>
-                <select value={form.contractType} onChange={(e) => upd("contractType", e.target.value)} className={inputCls}>
-                  <option value="FullTime">{t("fullTime")}</option>
-                  <option value="PartTime">{t("partTime")}</option>
-                  <option value="Temporary">{t("contractTemp")}</option>
-                  <option value="Internship">{t("contractIntern")}</option>
-                  <option value="Probation3M">{t("contractProbation3M")}</option>
-                </select>
-              </Field>
-              <Field label={t("password")}>
-                <input type="text" value={form.password} onChange={(e) => upd("password", e.target.value)}
-                  maxLength={64} placeholder="min 6 chars" className={inputCls + " font-mono"} />
-              </Field>
+            <div className="space-y-3 border-t border-border pt-3 mt-2">
+              <div className="grid gap-3 md:grid-cols-2">
+                <FieldFull label={t("salaryMode")}>
+                  <div className="flex gap-4 text-sm">
+                    <label className="inline-flex items-center gap-1.5">
+                      <input type="radio" name="salaryMode" checked={form.salaryMode === "gross"} onChange={() => upd("salaryMode", "gross")} />
+                      {t("salaryGross")}
+                    </label>
+                    <label className="inline-flex items-center gap-1.5">
+                      <input type="radio" name="salaryMode" checked={form.salaryMode === "net"} onChange={() => upd("salaryMode", "net")} />
+                      {t("salaryNet")}
+                    </label>
+                  </div>
+                </FieldFull>
+                <Field label={`${t("salary")} (EGP)`}>
+                  <input type="number" min={0} value={form.salary || ""} onChange={(e) => upd("salary", Number(e.target.value))} className={inputCls + " font-mono"} />
+                </Field>
+                <FieldFull label="">
+                  <SalaryPreview
+                    amount={Number(form.salary) || 0}
+                    mode={form.salaryMode === "net" ? "NET" : "GROSS"}
+                  />
+                </FieldFull>
+                <Field label={`${t("allowance")} (EGP)`}>
+                  <input type="number" min={0} value={form.allowance || ""} onChange={(e) => upd("allowance", Number(e.target.value))} className={inputCls + " font-mono"} />
+                </Field>
+                <Field label={t("targetValue")}>
+                  <input type="number" min={1} value={form.target || ""} onChange={(e) => upd("target", Number(e.target.value))} placeholder="e.g. 20" className={inputCls + " font-mono"} />
+                </Field>
+              </div>
+              <div className="grid gap-3 md:grid-cols-3">
+                <Field label={t("targetDuration")}>
+                  <select value={form.targetDuration} onChange={(e) => upd("targetDuration", e.target.value)} className={inputCls}>
+                    {["Daily", "Weekly", "Monthly", "Quarterly", "Yearly"].map((d) => <option key={d}>{d}</option>)}
+                  </select>
+                </Field>
+                <Field label={t("contractType")}>
+                  <select value={form.contractType} onChange={(e) => upd("contractType", e.target.value)} className={inputCls}>
+                    <option value="FullTime">{t("fullTime")}</option>
+                    <option value="PartTime">{t("partTime")}</option>
+                    <option value="Temporary">{t("contractTemp")}</option>
+                    <option value="Internship">{t("contractIntern")}</option>
+                    <option value="Probation3M">{t("contractProbation3M")}</option>
+                  </select>
+                </Field>
+                <Field label={t("password")}>
+                  <input type="text" value={form.password} onChange={(e) => upd("password", e.target.value)}
+                    maxLength={64} placeholder="min 6 chars" className={inputCls + " font-mono"} />
+                </Field>
+              </div>
             </div>
           )}
           {tab === "employment" && (

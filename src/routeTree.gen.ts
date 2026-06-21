@@ -61,7 +61,6 @@ import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 import { Route as AdminAttendanceRouteImport } from './routes/admin.attendance'
 import { Route as AdminAllowancesRouteImport } from './routes/admin.allowances'
 import { Route as AdminEmployeesIndexRouteImport } from './routes/admin.employees.index'
-import { Route as ApiPublicHealthRouteImport } from './routes/api/public/health'
 import { Route as AdminEmployeesIdRouteImport } from './routes/admin.employees.$id'
 import { Route as ApiPublicCronRunSchedulesRouteImport } from './routes/api/public/cron/run-schedules'
 
@@ -326,11 +325,6 @@ const AdminEmployeesIndexRoute = AdminEmployeesIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AdminEmployeesRoute,
 } as any)
-const ApiPublicHealthRoute = ApiPublicHealthRouteImport.update({
-  id: '/api/public/health',
-  path: '/api/public/health',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AdminEmployeesIdRoute = AdminEmployeesIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -396,7 +390,6 @@ export interface FileRoutesByFullPath {
   '/manager/': typeof ManagerIndexRoute
   '/staff/': typeof StaffIndexRoute
   '/admin/employees/$id': typeof AdminEmployeesIdRoute
-  '/api/public/health': typeof ApiPublicHealthRoute
   '/admin/employees/': typeof AdminEmployeesIndexRoute
   '/api/public/cron/run-schedules': typeof ApiPublicCronRunSchedulesRoute
 }
@@ -448,7 +441,6 @@ export interface FileRoutesByTo {
   '/manager': typeof ManagerIndexRoute
   '/staff': typeof StaffIndexRoute
   '/admin/employees/$id': typeof AdminEmployeesIdRoute
-  '/api/public/health': typeof ApiPublicHealthRoute
   '/admin/employees': typeof AdminEmployeesIndexRoute
   '/api/public/cron/run-schedules': typeof ApiPublicCronRunSchedulesRoute
 }
@@ -506,7 +498,6 @@ export interface FileRoutesById {
   '/manager/': typeof ManagerIndexRoute
   '/staff/': typeof StaffIndexRoute
   '/admin/employees/$id': typeof AdminEmployeesIdRoute
-  '/api/public/health': typeof ApiPublicHealthRoute
   '/admin/employees/': typeof AdminEmployeesIndexRoute
   '/api/public/cron/run-schedules': typeof ApiPublicCronRunSchedulesRoute
 }
@@ -565,7 +556,6 @@ export interface FileRouteTypes {
     | '/manager/'
     | '/staff/'
     | '/admin/employees/$id'
-    | '/api/public/health'
     | '/admin/employees/'
     | '/api/public/cron/run-schedules'
   fileRoutesByTo: FileRoutesByTo
@@ -617,7 +607,6 @@ export interface FileRouteTypes {
     | '/manager'
     | '/staff'
     | '/admin/employees/$id'
-    | '/api/public/health'
     | '/admin/employees'
     | '/api/public/cron/run-schedules'
   id:
@@ -674,7 +663,6 @@ export interface FileRouteTypes {
     | '/manager/'
     | '/staff/'
     | '/admin/employees/$id'
-    | '/api/public/health'
     | '/admin/employees/'
     | '/api/public/cron/run-schedules'
   fileRoutesById: FileRoutesById
@@ -686,7 +674,6 @@ export interface RootRouteChildren {
   EmployeeRoute: typeof EmployeeRouteWithChildren
   ManagerRoute: typeof ManagerRouteWithChildren
   StaffRoute: typeof StaffRouteWithChildren
-  ApiPublicHealthRoute: typeof ApiPublicHealthRoute
   ApiPublicCronRunSchedulesRoute: typeof ApiPublicCronRunSchedulesRoute
 }
 
@@ -1056,13 +1043,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminEmployeesIndexRouteImport
       parentRoute: typeof AdminEmployeesRoute
     }
-    '/api/public/health': {
-      id: '/api/public/health'
-      path: '/api/public/health'
-      fullPath: '/api/public/health'
-      preLoaderRoute: typeof ApiPublicHealthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/admin/employees/$id': {
       id: '/admin/employees/$id'
       path: '/$id'
@@ -1226,7 +1206,6 @@ const rootRouteChildren: RootRouteChildren = {
   EmployeeRoute: EmployeeRouteWithChildren,
   ManagerRoute: ManagerRouteWithChildren,
   StaffRoute: StaffRouteWithChildren,
-  ApiPublicHealthRoute: ApiPublicHealthRoute,
   ApiPublicCronRunSchedulesRoute: ApiPublicCronRunSchedulesRoute,
 }
 export const routeTree = rootRouteImport

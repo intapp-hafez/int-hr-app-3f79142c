@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
 import {
-  Users, UserCheck, UserX, Clock, CalendarDays, TrendingUp, MapPin, Bell, CheckCheck, Activity,
+  Users, UserCheck, UserX, Clock, CalendarDays, TrendingUp, MapPin, Bell, CheckCheck,
   LogOut as LogOutIcon, ListChecks, CheckCircle2, FileText, Wallet, Shield, BarChart3, Settings,
   Building2, ArrowRight, Plus, Sparkles,
 } from "lucide-react";
@@ -278,83 +278,7 @@ function AdminDashboard() {
           </ul>
         )}
       </section>
-      <SystemHealthCard />
     </div>
-  );
-}
-
-type HealthRoute = { path: string; registered: boolean; status: number; ok: boolean };
-type HealthResponse = {
-  ok: boolean;
-  timestamp: string;
-  routeTree: { generated: boolean; totalRoutes: number };
-  routes: HealthRoute[];
-};
-
-export function SystemHealthCard() {
-  const { data, isLoading, isError, refetch, isFetching } = useQuery<HealthResponse>({
-    queryKey: ["system-health"],
-    queryFn: async () => {
-      const r = await fetch("/api/public/health", { cache: "no-store" });
-      return (await r.json()) as HealthResponse;
-    },
-    refetchInterval: 60_000,
-  });
-
-  const overall = isLoading
-    ? { label: "Checking…", tone: "bg-muted text-muted-foreground" }
-    : isError || !data
-      ? { label: "Unreachable", tone: "bg-destructive/10 text-destructive" }
-      : data.ok
-        ? { label: "Healthy", tone: "bg-success/10 text-success" }
-        : { label: "Degraded", tone: "bg-warning/20 text-warning-foreground" };
-
-  return (
-    <section className="rounded-3xl border border-border bg-card p-5">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="flex items-center gap-2 font-display text-base font-semibold">
-          <Activity className="h-4 w-4 text-brand" /> System Health
-        </h2>
-        <div className="flex items-center gap-2">
-          <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${overall.tone}`}>{overall.label}</span>
-          <button onClick={() => refetch()} className="text-xs text-brand disabled:opacity-50" disabled={isFetching}>
-            {isFetching ? "Refreshing…" : "Refresh"}
-          </button>
-        </div>
-      </div>
-      {data && (
-        <>
-          <div className="mb-3 grid grid-cols-2 gap-2 text-xs">
-            <div className="rounded-xl border border-border bg-muted/30 px-3 py-2">
-              <p className="text-muted-foreground">Route tree</p>
-              <p className="font-semibold">
-                {data.routeTree.generated ? `${data.routeTree.totalRoutes} routes` : "Not generated"}
-              </p>
-            </div>
-            <div className="rounded-xl border border-border bg-muted/30 px-3 py-2">
-              <p className="text-muted-foreground">Last check</p>
-              <p className="font-semibold">{new Date(data.timestamp).toLocaleTimeString()}</p>
-            </div>
-          </div>
-          <ul className="divide-y divide-border">
-            {data.routes.map((r) => (
-              <li key={r.path} className="flex items-center justify-between py-2 text-xs">
-                <span className="font-mono">{r.path}</span>
-                <span className="flex items-center gap-2">
-                  <span className="text-muted-foreground">{r.status || "—"}</span>
-                  <span
-                    className={`h-2 w-2 rounded-full ${
-                      r.ok ? "bg-success" : r.registered ? "bg-warning" : "bg-destructive"
-                    }`}
-                    title={r.ok ? "OK" : r.registered ? "Registered but failed probe" : "Not registered"}
-                  />
-                </span>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-    </section>
   );
 }
 

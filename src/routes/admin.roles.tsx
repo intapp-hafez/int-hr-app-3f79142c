@@ -24,12 +24,12 @@ const MANAGED_ROLES = ["hr", "manager", "user"] as const;
 type ManagedRole = (typeof MANAGED_ROLES)[number];
 
 const roleColor: Record<Role, string> = {
-  admin: "bg-destructive/15 text-destructive",
-  hr: "bg-brand/15 text-brand",
-  manager: "bg-info/15 text-info",
-  employee: "bg-success/15 text-success",
-  staff: "bg-warning/20 text-warning-foreground",
-  user: "bg-muted text-muted-foreground",
+  admin:    "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 ring-1 ring-red-300 dark:ring-red-700",
+  hr:       "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 ring-1 ring-purple-300 dark:ring-purple-700",
+  manager:  "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 ring-1 ring-blue-300 dark:ring-blue-700",
+  employee: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 ring-1 ring-emerald-300 dark:ring-emerald-700",
+  staff:    "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 ring-1 ring-amber-300 dark:ring-amber-700",
+  user:     "bg-slate-100 text-slate-600 dark:bg-slate-800/50 dark:text-slate-400 ring-1 ring-slate-300 dark:ring-slate-600",
 };
 
 function RolesPage() {
