@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { MapPin, Plus, Users, X, Trash2, Loader2, Layers } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
@@ -17,7 +17,8 @@ import {
   listAllAssignableEmployees,
   type GeofenceLocation,
 } from "@/backend/functions/geofencing.functions";
-import { EgyptMap } from "@/components/admin/EgyptMap";
+
+const EgyptMap = lazy(() => import("@/components/admin/EgyptMap").then((mod) => ({ default: mod.EgyptMap })));
 
 export const Route = createFileRoute("/admin/geofencing")({
   component: GeoPage,
@@ -58,7 +59,9 @@ function GeoPage() {
 
   return (
     <div className="space-y-5">
-      <EgyptMap />
+      <Suspense fallback={<div className="h-[420px] rounded-3xl border border-border bg-card" />}>
+        <EgyptMap />
+      </Suspense>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl font-semibold tracking-tight md:text-3xl">{t("geofencing")}</h1>

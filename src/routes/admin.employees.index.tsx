@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Plus, Search, Filter, X, ChevronRight, Upload, FileText, ArrowUp, ArrowDown, ArrowUpDown, Pencil, Trash2, Eye, AlertCircle, AlertTriangle, Ban, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
-import * as XLSX from "xlsx";
 import { Download } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { SalaryPreview } from "@/components/SalaryPreview";
@@ -143,7 +142,8 @@ function EmployeesPage() {
     onError: (e: any) => toast.error(e?.message ?? "Assign role failed"),
   });
 
-  function exportSelected() {
+  async function exportSelected() {
+    const XLSX = await import("xlsx");
     const sel = rows.filter((r) => selected.has(r.id));
     if (sel.length === 0) { toast.error("No rows selected"); return; }
     const data = sel.map((r) => ({
@@ -1201,7 +1201,8 @@ function ImportExcelBar() {
   const ref = useRef<HTMLInputElement>(null);
   const validateBatch = useServerFn(validateEmployeesBatch);
 
-  function downloadTemplate() {
+  async function downloadTemplate() {
+    const XLSX = await import("xlsx");
     const sample = [{
       empCode: "INT-042", name: "Jane Doe", email: "jane@int.app", phone: "+20 100 123 4567",
       dept: "Engineering", role: "employee", branch: locations[0]?.name ?? "Cairo HQ",
@@ -1225,6 +1226,7 @@ function ImportExcelBar() {
     if (!file) return;
     const existingIds = getState().employees.map((emp) => emp.id);
     try {
+      const XLSX = await import("xlsx");
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
       const ws = wb.Sheets[wb.SheetNames[0]];
@@ -1347,7 +1349,8 @@ function ImportExcelButtonsOnly() {
   const importEmployees = useServerFn(importEmployeesAdmin);
   const [errors, setErrors] = useState<ImportErrors | null>(null);
 
-  function downloadTemplate() {
+  async function downloadTemplate() {
+    const XLSX = await import("xlsx");
     const sample = [{
       empCode: "INT-042", name: "Jane Doe", email: "jane@int.app", phone: "+20 100 123 4567",
       dept: "Engineering", role: "employee", branch: locations[0]?.name ?? "Cairo HQ",
@@ -1371,6 +1374,7 @@ function ImportExcelButtonsOnly() {
     if (!file) return;
     setErrors(null);
     try {
+      const XLSX = await import("xlsx");
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
       const ws = wb.Sheets[wb.SheetNames[0]];
@@ -1500,7 +1504,8 @@ type ImportErrors = {
 
 function ImportErrorPanel({ errors, onClose }: { errors: ImportErrors; onClose: () => void }) {
   const { rowIssues, missing, unknown, mismatched, fatal, totalRows, importedCount } = errors;
-  function exportReport() {
+  async function exportReport() {
+    const XLSX = await import("xlsx");
     const data = rowIssues.map((r) => ({
       row: r.row, name: r.name ?? "", email: r.email ?? "",
       reasons: r.reasons.join("; "),

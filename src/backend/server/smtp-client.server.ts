@@ -12,8 +12,10 @@ type CfConnect = (
   options?: { secureTransport?: "on" | "off" | "starttls"; allowHalfOpen?: boolean },
 ) => any;
 async function loadConnect(): Promise<CfConnect> {
-  // @ts-expect-error - Workers runtime built-in
-  const mod = await import(/* @vite-ignore */ "cloudflare:sockets");
+  const dynamicImport = new Function("specifier", "return import(specifier)") as (
+    specifier: string,
+  ) => Promise<{ connect: CfConnect }>;
+  const mod = await dynamicImport("cloudflare:sockets");
   return mod.connect as CfConnect;
 }
 

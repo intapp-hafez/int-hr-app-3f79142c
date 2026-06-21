@@ -1,6 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import * as XLSX from "xlsx";
 import { EmployeeAvatar } from "@/components/EmployeeAvatar";
 import { AvatarUploader } from "@/components/AvatarUploader";
 import { useQuery } from "@tanstack/react-query";
@@ -1564,7 +1563,8 @@ function AttendanceTab({ employeeName }: { employeeName: string }) {
   const start = (safePage - 1) * pageSize;
   const slice = useMemo(() => rows.slice(start, start + pageSize), [rows, start, pageSize]);
 
-  function exportExcel() {
+  async function exportExcel() {
+    const XLSX = await import("xlsx");
     const data = rows.map((a) => ({
       [t("date")]: a.date,
       [t("in")]: a.in,
