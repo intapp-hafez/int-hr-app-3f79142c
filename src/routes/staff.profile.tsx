@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Smartphone, Share, MoreVertical, Plus, Download, CheckCircle2 } from "lucide-react";
 import { InstallButton } from "@/components/InstallButton";
-import { SettingsPage } from "./employee.settings";
+import { SettingsPage } from "@/components/employee/SettingsPage";
 
 export const Route = createFileRoute("/staff/profile")({
   component: StaffProfile,

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SettingsPage } from "./employee.settings";
+import { SettingsPage } from "@/components/employee/SettingsPage";
 
 export const Route = createFileRoute("/manager/profile")({
   component: ManagerProfile,

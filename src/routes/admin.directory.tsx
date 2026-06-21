@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -13,7 +13,8 @@ import {
 import { downloadTemplate, parseExcelFile } from "@/lib/excel";
 import { HolidaysManager } from "@/components/HolidaysManager";
 import { NetworksManager } from "./admin.networks";
-import { ContractTemplatesManager } from "@/components/ContractTemplatesManager";
+
+const ContractTemplatesManager = lazy(() => import("@/components/ContractTemplatesManager").then((mod) => ({ default: mod.ContractTemplatesManager })));
 
 type Tab = "departments" | "positions" | "cities" | "leaveTypes" | "holidays" | "networks" | "contractTemplates";
 const validTabs: Tab[] = ["departments", "positions", "cities", "leaveTypes", "holidays", "networks", "contractTemplates"];
@@ -98,7 +99,11 @@ function DirectoryPage() {
         {tab === "leaveTypes" && <LeaveTypesSection />}
         {tab === "holidays" && <HolidaysManager />}
         {tab === "networks" && <NetworksManager />}
-        {tab === "contractTemplates" && <ContractTemplatesManager />}
+        {tab === "contractTemplates" && (
+          <Suspense fallback={<div className="h-40 rounded-2xl bg-muted/30" />}>
+            <ContractTemplatesManager />
+          </Suspense>
+        )}
       </div>
     </div>
   );
