@@ -18,7 +18,7 @@ export const Route = createFileRoute("/employee/leaves")({
   component: LeavesPage,
 });
 
-function LeavesPage() {
+export function LeavesPage() {
   const { t } = useI18n();
   const { tLeaveType, tStatus } = useTranslators();
   const [open, setOpen] = useState(false);
