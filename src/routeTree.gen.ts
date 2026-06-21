@@ -28,7 +28,6 @@ import { Route as ManagerTasksRouteImport } from './routes/manager.tasks'
 import { Route as ManagerProfileRouteImport } from './routes/manager.profile'
 import { Route as ManagerCheckRouteImport } from './routes/manager.check'
 import { Route as EmployeeTasksRouteImport } from './routes/employee.tasks'
-import { Route as EmployeeSettingsRouteImport } from './routes/employee.settings'
 import { Route as EmployeeNotificationsRouteImport } from './routes/employee.notifications'
 import { Route as EmployeeMessagesRouteImport } from './routes/employee.messages'
 import { Route as EmployeeLeavesRouteImport } from './routes/employee.leaves'
@@ -157,11 +156,6 @@ const ManagerCheckRoute = ManagerCheckRouteImport.update({
 const EmployeeTasksRoute = EmployeeTasksRouteImport.update({
   id: '/tasks',
   path: '/tasks',
-  getParentRoute: () => EmployeeRoute,
-} as any)
-const EmployeeSettingsRoute = EmployeeSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
   getParentRoute: () => EmployeeRoute,
 } as any)
 const EmployeeNotificationsRoute = EmployeeNotificationsRouteImport.update({
@@ -375,7 +369,6 @@ export interface FileRoutesByFullPath {
   '/employee/leaves': typeof EmployeeLeavesRoute
   '/employee/messages': typeof EmployeeMessagesRoute
   '/employee/notifications': typeof EmployeeNotificationsRoute
-  '/employee/settings': typeof EmployeeSettingsRoute
   '/employee/tasks': typeof EmployeeTasksRoute
   '/manager/check': typeof ManagerCheckRoute
   '/manager/profile': typeof ManagerProfileRoute
@@ -426,7 +419,6 @@ export interface FileRoutesByTo {
   '/employee/leaves': typeof EmployeeLeavesRoute
   '/employee/messages': typeof EmployeeMessagesRoute
   '/employee/notifications': typeof EmployeeNotificationsRoute
-  '/employee/settings': typeof EmployeeSettingsRoute
   '/employee/tasks': typeof EmployeeTasksRoute
   '/manager/check': typeof ManagerCheckRoute
   '/manager/profile': typeof ManagerProfileRoute
@@ -483,7 +475,6 @@ export interface FileRoutesById {
   '/employee/leaves': typeof EmployeeLeavesRoute
   '/employee/messages': typeof EmployeeMessagesRoute
   '/employee/notifications': typeof EmployeeNotificationsRoute
-  '/employee/settings': typeof EmployeeSettingsRoute
   '/employee/tasks': typeof EmployeeTasksRoute
   '/manager/check': typeof ManagerCheckRoute
   '/manager/profile': typeof ManagerProfileRoute
@@ -541,7 +532,6 @@ export interface FileRouteTypes {
     | '/employee/leaves'
     | '/employee/messages'
     | '/employee/notifications'
-    | '/employee/settings'
     | '/employee/tasks'
     | '/manager/check'
     | '/manager/profile'
@@ -592,7 +582,6 @@ export interface FileRouteTypes {
     | '/employee/leaves'
     | '/employee/messages'
     | '/employee/notifications'
-    | '/employee/settings'
     | '/employee/tasks'
     | '/manager/check'
     | '/manager/profile'
@@ -648,7 +637,6 @@ export interface FileRouteTypes {
     | '/employee/leaves'
     | '/employee/messages'
     | '/employee/notifications'
-    | '/employee/settings'
     | '/employee/tasks'
     | '/manager/check'
     | '/manager/profile'
@@ -810,13 +798,6 @@ declare module '@tanstack/react-router' {
       path: '/tasks'
       fullPath: '/employee/tasks'
       preLoaderRoute: typeof EmployeeTasksRouteImport
-      parentRoute: typeof EmployeeRoute
-    }
-    '/employee/settings': {
-      id: '/employee/settings'
-      path: '/settings'
-      fullPath: '/employee/settings'
-      preLoaderRoute: typeof EmployeeSettingsRouteImport
       parentRoute: typeof EmployeeRoute
     }
     '/employee/notifications': {
@@ -1141,7 +1122,6 @@ interface EmployeeRouteChildren {
   EmployeeLeavesRoute: typeof EmployeeLeavesRoute
   EmployeeMessagesRoute: typeof EmployeeMessagesRoute
   EmployeeNotificationsRoute: typeof EmployeeNotificationsRoute
-  EmployeeSettingsRoute: typeof EmployeeSettingsRoute
   EmployeeTasksRoute: typeof EmployeeTasksRoute
   EmployeeIndexRoute: typeof EmployeeIndexRoute
 }
@@ -1153,7 +1133,6 @@ const EmployeeRouteChildren: EmployeeRouteChildren = {
   EmployeeLeavesRoute: EmployeeLeavesRoute,
   EmployeeMessagesRoute: EmployeeMessagesRoute,
   EmployeeNotificationsRoute: EmployeeNotificationsRoute,
-  EmployeeSettingsRoute: EmployeeSettingsRoute,
   EmployeeTasksRoute: EmployeeTasksRoute,
   EmployeeIndexRoute: EmployeeIndexRoute,
 }
