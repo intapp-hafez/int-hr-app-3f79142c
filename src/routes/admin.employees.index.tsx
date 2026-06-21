@@ -1349,7 +1349,8 @@ function ImportExcelButtonsOnly() {
   const importEmployees = useServerFn(importEmployeesAdmin);
   const [errors, setErrors] = useState<ImportErrors | null>(null);
 
-  function downloadTemplate() {
+  async function downloadTemplate() {
+    const XLSX = await import("xlsx");
     const sample = [{
       empCode: "INT-042", name: "Jane Doe", email: "jane@int.app", phone: "+20 100 123 4567",
       dept: "Engineering", role: "employee", branch: locations[0]?.name ?? "Cairo HQ",
@@ -1373,6 +1374,7 @@ function ImportExcelButtonsOnly() {
     if (!file) return;
     setErrors(null);
     try {
+      const XLSX = await import("xlsx");
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
       const ws = wb.Sheets[wb.SheetNames[0]];
@@ -1502,7 +1504,8 @@ type ImportErrors = {
 
 function ImportErrorPanel({ errors, onClose }: { errors: ImportErrors; onClose: () => void }) {
   const { rowIssues, missing, unknown, mismatched, fatal, totalRows, importedCount } = errors;
-  function exportReport() {
+  async function exportReport() {
+    const XLSX = await import("xlsx");
     const data = rowIssues.map((r) => ({
       row: r.row, name: r.name ?? "", email: r.email ?? "",
       reasons: r.reasons.join("; "),
