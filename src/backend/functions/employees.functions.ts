@@ -60,6 +60,47 @@ export type ImportEmployeeResult = {
   results: { index: number; ok: boolean; id?: string; email?: string; error?: string }[];
 };
 
+const CreateEmployeeSchema = z.object({
+  empCode: z.string().max(40).optional().default(""),
+  name: z.string().trim().min(2).max(120),
+  email: z.string().trim().email().max(160),
+  phone: z.string().max(40).optional().default(""),
+  dept: z.string().max(120).optional().default(""),
+  position: z.string().max(120).optional().default(""),
+  role: z.enum(IMPORT_ROLES).optional().default("employee"),
+  status: z.enum(["Active", "Inactive"]).optional().default("Active"),
+  password: z.string().min(6).max(128),
+  city: z.string().max(120).optional().default(""),
+  district: z.string().max(120).optional().default(""),
+  avatarUrl: z.string().max(800_000).optional().default(""),
+  nationalId: z.string().max(40).optional().default(""),
+  idIssueDate: z.string().max(20).optional().default(""),
+  nationalIdExpiry: z.string().max(20).optional().default(""),
+  managerId: z.string().uuid().optional().or(z.literal("")).default(""),
+  salaryMode: z.enum(["gross", "net"]).optional().default("gross"),
+  salaryGross: z.number().min(0).max(10_000_000).optional().default(0),
+  salaryNet: z.number().min(0).max(10_000_000).optional().default(0),
+  allowance: z.number().min(0).max(10_000_000).optional().default(0),
+  targetValue: z.number().min(0).max(10_000_000).optional().default(0),
+  targetDuration: z.enum(["Daily", "Weekly", "Monthly", "Quarterly", "Yearly"]).optional().default("Monthly"),
+  contractType: z.enum(["FullTime", "PartTime", "Temporary", "Internship", "Probation3M"]).optional().default("FullTime"),
+  contractStartDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal("")).default(""),
+  contractEndDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal("")).default(""),
+  contractCancelled: z.boolean().optional().default(false),
+  loginUrl: z.string().min(1).max(500),
+  appName: z.string().max(120).optional().default(""),
+});
+
+export type CreateEmployeeResult = {
+  ok: boolean;
+  id?: string;
+  email: string;
+  accountCreated: boolean;
+  profileCreated: boolean;
+  emailSent: boolean;
+  warning?: string;
+};
+
 export type ListEmployeesResult = {
   rows: AdminEmployeeRow[];
   total: number;
@@ -496,6 +537,122 @@ export const importEmployeesAdmin = createServerFn({ method: "POST" })
 
     const importedCount = results.filter((r) => r.ok).length;
     return { ok: importedCount === data.employees.length, importedCount, results };
+  });
+
+export const createEmployeeAdmin = createServerFn({ method: "POST" })
+  .middleware([requireAdminAccess])
+  .inputValidator((input) => CreateEmployeeSchema.parse(input))
+  .handler(async ({ context, data }): Promise<CreateEmployeeResult> => {
+    const { supabase } = context;
+    const { supabaseAdmin } = await import("@/backend/server/admin-client.server");
+    const { sendWelcomeEmail } = await import("@/backend/server/welcome-email.server");
+
+    const fullName = data.name.trim();
+    const email = data.email.trim().toLowerCase();
+    const empCode = data.empCode.trim();
+
+    const [{ data: existingProfile }, { data: departments }, { data: positions }] = await Promise.all([
+      supabaseAdmin.from("profiles").select("id").eq("email", email).maybeSingle(),
+      supabase.from("departments").select("id, name_en"),
+      supabase.from("positions").select("id, name_en"),
+    ]);
+    if (existingProfile) throw new Error(`Employee email already exists: ${email}`);
+
+    if (empCode) {
+      const { data: existingCode } = await supabaseAdmin
+        .from("profiles")
+        .select("id")
+        .eq("emp_code", empCode)
+        .maybeSingle();
+      if (existingCode) throw new Error(`Employee code already exists: ${empCode}`);
+    }
+
+    if (data.idIssueDate.trim() && !isStrictIsoDate(data.idIssueDate.trim())) {
+      throw new Error("ID issue date must be YYYY-MM-DD");
+    }
+    if (data.nationalIdExpiry.trim() && !isStrictIsoDate(data.nationalIdExpiry.trim())) {
+      throw new Error("ID expiry date must be YYYY-MM-DD");
+    }
+    if (data.idIssueDate.trim() && data.nationalIdExpiry.trim() && data.idIssueDate > data.nationalIdExpiry) {
+      throw new Error("ID issue date cannot be after the expiry date");
+    }
+
+    const departmentMap = new Map((departments ?? []).map((d: any) => [String(d.name_en).toLowerCase(), d.id]));
+    const positionMap = new Map((positions ?? []).map((p: any) => [String(p.name_en).toLowerCase(), p.id]));
+    const department_id = data.dept.trim() ? (departmentMap.get(data.dept.trim().toLowerCase()) ?? null) : null;
+    const position_id = data.position.trim() ? (positionMap.get(data.position.trim().toLowerCase()) ?? null) : null;
+    if (data.dept.trim() && !department_id) throw new Error(`Unknown department: ${data.dept}`);
+    if (data.position.trim() && !position_id) throw new Error(`Unknown position: ${data.position}`);
+
+    const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password: data.password,
+      email_confirm: true,
+      user_metadata: { full_name: fullName },
+    });
+    if (createError) throw new Error(createError.message);
+    const newId = created.user?.id;
+    if (!newId) throw new Error("Auth user was not created");
+
+    try {
+      const { error: profileError } = await supabaseAdmin.from("profiles").upsert({
+        id: newId,
+        emp_code: empCode || null,
+        full_name: fullName,
+        email,
+        phone: data.phone.trim() || null,
+        role: data.role as any,
+        city: data.city.trim() || null,
+        district: data.district.trim() || null,
+        department_id,
+        position_id,
+        status: data.status,
+        avatar_url: data.avatarUrl.trim() || null,
+        national_id: data.nationalId.trim() || null,
+        id_issue_date: data.idIssueDate.trim() || null,
+        id_expiry_date: data.nationalIdExpiry.trim() || null,
+        manager_id: data.managerId || null,
+        salary_mode: data.salaryMode,
+        salary_gross: data.salaryGross || null,
+        salary_net: data.salaryNet || null,
+        salary_amount: data.salaryMode === "net" ? data.salaryNet : data.salaryGross,
+        allowance: data.allowance || null,
+        target_value: data.targetValue || null,
+        target_duration: data.targetDuration,
+        contract_type: data.contractType,
+        contract_start_date: data.contractStartDate || null,
+        contract_end_date: data.contractEndDate || null,
+        contract_cancelled: data.contractCancelled,
+      } as any);
+      if (profileError) throw new Error(profileError.message);
+
+      const { error: roleError } = await supabaseAdmin
+        .from("user_roles")
+        .upsert({ user_id: newId, role: data.role as any } as any);
+      if (roleError) throw new Error(roleError.message);
+    } catch (e: any) {
+      await hardDeleteUser(supabaseAdmin, newId);
+      throw new Error(e?.message ?? "Employee profile was not created");
+    }
+
+    const mail = await sendWelcomeEmail({
+      to: email,
+      employeeName: fullName,
+      username: email,
+      password: data.password,
+      loginUrl: data.loginUrl,
+      appName: data.appName || undefined,
+    });
+
+    return {
+      ok: mail.ok,
+      id: String(newId),
+      email,
+      accountCreated: true,
+      profileCreated: true,
+      emailSent: mail.ok,
+      warning: mail.ok ? undefined : mail.error || "Welcome email failed",
+    };
   });
 
 export const deleteEmployeeAdmin = createServerFn({ method: "POST" })
