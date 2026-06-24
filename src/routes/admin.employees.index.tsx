@@ -803,10 +803,34 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
               </select>
             </Field>
             <Field label="Salary Gross (EGP)">
-              <input type="number" min={0} value={form.salaryGross || ""} onChange={(e) => { const n = Number(e.target.value); upd("salaryGross", n); if (form.salaryMode === "gross") upd("salary", n); }} className={inputCls + " font-mono"} />
+              <input
+                type="number"
+                min={0}
+                readOnly={form.salaryMode === "net"}
+                value={form.salaryGross || ""}
+                onChange={(e) => {
+                  const n = Number(e.target.value);
+                  upd("salaryGross", n);
+                  upd("salaryNet", n ? Math.round(n * 0.9) : 0);
+                  upd("salary", n);
+                }}
+                className={inputCls + " font-mono" + (form.salaryMode === "net" ? " bg-muted/40 text-muted-foreground" : "")}
+              />
             </Field>
             <Field label="Salary Net (EGP)">
-              <input type="number" min={0} value={form.salaryNet || ""} onChange={(e) => { const n = Number(e.target.value); upd("salaryNet", n); if (form.salaryMode === "net") upd("salary", n); }} className={inputCls + " font-mono"} />
+              <input
+                type="number"
+                min={0}
+                readOnly={form.salaryMode === "gross"}
+                value={form.salaryNet || ""}
+                onChange={(e) => {
+                  const n = Number(e.target.value);
+                  upd("salaryNet", n);
+                  upd("salaryGross", n ? Math.round(n / 0.9) : 0);
+                  upd("salary", n);
+                }}
+                className={inputCls + " font-mono" + (form.salaryMode === "gross" ? " bg-muted/40 text-muted-foreground" : "")}
+              />
             </Field>
             <Field label="Allowance (EGP)">
               <input type="number" min={0} value={form.allowance || ""} onChange={(e) => upd("allowance", Number(e.target.value))} className={inputCls + " font-mono"} />

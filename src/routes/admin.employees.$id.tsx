@@ -448,8 +448,34 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
               <option value="net">Net</option>
             </select>
           </EditField>
-          <EditField label="Salary Gross (EGP)"><input type="number" min={0} className={editInputCls + " font-mono"} value={form.salary_gross || ""} onChange={(e) => upd("salary_gross", Number(e.target.value))} /></EditField>
-          <EditField label="Salary Net (EGP)"><input type="number" min={0} className={editInputCls + " font-mono"} value={form.salary_net || ""} onChange={(e) => upd("salary_net", Number(e.target.value))} /></EditField>
+          <EditField label="Salary Gross (EGP)">
+            <input
+              type="number"
+              min={0}
+              readOnly={form.salary_mode === "net"}
+              className={editInputCls + " font-mono" + (form.salary_mode === "net" ? " bg-muted/40 text-muted-foreground" : "")}
+              value={form.salary_gross || ""}
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                upd("salary_gross", n);
+                upd("salary_net", n ? Math.round(n * 0.9) : 0);
+              }}
+            />
+          </EditField>
+          <EditField label="Salary Net (EGP)">
+            <input
+              type="number"
+              min={0}
+              readOnly={form.salary_mode === "gross"}
+              className={editInputCls + " font-mono" + (form.salary_mode === "gross" ? " bg-muted/40 text-muted-foreground" : "")}
+              value={form.salary_net || ""}
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                upd("salary_net", n);
+                upd("salary_gross", n ? Math.round(n / 0.9) : 0);
+              }}
+            />
+          </EditField>
           <EditField label="Allowance (EGP)"><input type="number" min={0} className={editInputCls + " font-mono"} value={form.allowance || ""} onChange={(e) => upd("allowance", Number(e.target.value))} /></EditField>
           <EditField label="Target Value"><input type="number" min={0} className={editInputCls + " font-mono"} value={form.target_value || ""} onChange={(e) => upd("target_value", Number(e.target.value))} /></EditField>
           <EditField label="Target Duration">
