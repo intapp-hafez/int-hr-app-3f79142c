@@ -796,12 +796,12 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
             </div>
           </div>
           <div className="grid gap-3 md:grid-cols-3">
-            <Field label="Email (login)"><input type="email" value={form.email} onChange={(e) => upd("email", e.target.value)} maxLength={120} className={inputCls} /></Field>
-            <Field label={t("password")}>
+            <Field label="Email (login)" error={fieldErrors.email}><input type="email" value={form.email} onChange={(e) => upd("email", e.target.value)} maxLength={120} className={inputCls} /></Field>
+            <Field label={t("password")} error={fieldErrors.password}>
               <input type="text" value={form.password} onChange={(e) => upd("password", e.target.value)} maxLength={64} placeholder="min 6 chars" className={inputCls + " font-mono"} />
             </Field>
-            <Field label="Full name"><input value={form.name} onChange={(e) => upd("name", e.target.value)} maxLength={80} className={inputCls} /></Field>
-            <Field label="Phone">
+            <Field label="Full name" error={fieldErrors.name}><input value={form.name} onChange={(e) => upd("name", e.target.value)} maxLength={80} className={inputCls} /></Field>
+            <Field label="Phone" error={fieldErrors.phone}>
               <input type="tel" dir="ltr" inputMode="tel" value={form.phone} onChange={(e) => upd("phone", formatEgPhone(e.target.value))} maxLength={20} placeholder="+20 100 123 4567" className={inputCls + " font-mono"} />
             </Field>
             <Field label="Employee Code">
@@ -831,7 +831,7 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
                 );
               })()}
             </Field>
-            <Field label="Department">
+            <Field label="Department" error={fieldErrors.dept}>
               <select value={form.dept} onChange={(e) => upd("dept", e.target.value)} disabled={departments.length === 0} className={inputCls + " disabled:opacity-60"}>
                 <option value="">—</option>
                 {departments.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
@@ -843,7 +843,7 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
                 {positions.map((p) => <option key={p.id} value={p.name}>{p.name}</option>)}
               </select>
             </Field>
-            <Field label="Manager">
+            <Field label="Manager" error={fieldErrors.manager}>
               <select value={form.manager} onChange={(e) => upd("manager", e.target.value)} className={inputCls}>
                 <option value="">—</option>
                 {managers.map((emp) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
@@ -855,13 +855,13 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
             <Field label="ID Issue Date">
               <input type="date" value={form.idIssueDate} onChange={(e) => upd("idIssueDate", e.target.value)} className={inputCls + " font-mono"} />
             </Field>
-            <Field label="ID Expiry Date">
+            <Field label="ID Expiry Date" error={fieldErrors.nationalIdExpiry}>
               <input type="date" value={form.nationalIdExpiry} onChange={(e) => upd("nationalIdExpiry", e.target.value)} className={inputCls + " font-mono"} />
             </Field>
             <Field label="Address on ID">
               <input value={form.idCardAddress} onChange={(e) => upd("idCardAddress", e.target.value)} maxLength={200} placeholder="As written on national ID" className={inputCls} />
             </Field>
-            <Field label="Contract Type">
+            <Field label="Contract Type" error={fieldErrors.contractType}>
               <select value={form.contractType} onChange={(e) => upd("contractType", e.target.value)} className={inputCls}>
                 <option value="FullTime">Full-time</option>
                 <option value="PartTime">Part-time</option>
@@ -880,13 +880,13 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
               <input type="checkbox" className="h-4 w-4 accent-brand" checked={contractCancelled} onChange={(e) => setContractCancelled(e.target.checked)} />
               Contract cancelled
             </label>
-            <Field label="Salary Basis">
+            <Field label="Salary Basis" error={fieldErrors.salaryMode}>
               <select value={form.salaryMode} onChange={(e) => upd("salaryMode", e.target.value as any)} className={inputCls}>
                 <option value="gross">Gross</option>
                 <option value="net">Net</option>
               </select>
             </Field>
-            <Field label="Salary Gross (EGP)">
+            <Field label="Salary Gross (EGP)" error={form.salaryMode === "gross" ? fieldErrors.salary : undefined}>
               <input
                 type="number"
                 min={0}
@@ -901,7 +901,7 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
                 className={inputCls + " font-mono" + (form.salaryMode === "net" ? " bg-muted/40 text-muted-foreground" : "")}
               />
             </Field>
-            <Field label="Salary Net (EGP)">
+            <Field label="Salary Net (EGP)" error={form.salaryMode === "net" ? fieldErrors.salary : undefined}>
               <input
                 type="number"
                 min={0}
@@ -919,7 +919,7 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
             <Field label="Allowance (EGP)">
               <input type="number" min={0} value={form.allowance || ""} onChange={(e) => upd("allowance", Number(e.target.value))} className={inputCls + " font-mono"} />
             </Field>
-            <Field label="Target Value">
+            <Field label="Target Value" error={fieldErrors.target}>
               <input type="number" min={0} value={form.target || ""} onChange={(e) => upd("target", Number(e.target.value))} className={inputCls + " font-mono"} />
             </Field>
             <Field label="Target Duration">
