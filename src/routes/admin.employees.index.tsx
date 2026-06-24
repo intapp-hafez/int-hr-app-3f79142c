@@ -736,6 +736,51 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
           </div>
         )}
         <form onSubmit={submit} className="space-y-3 max-h-[65vh] overflow-y-auto pr-1">
+          <div className="flex items-center gap-4 rounded-2xl border border-border bg-muted/30 p-3">
+            <EmployeeAvatar
+              id="new"
+              name={form.name || form.email || "?"}
+              url={form.avatarUrl || null}
+              className="h-16 w-16"
+            />
+            <div className="min-w-0 flex-1">
+              <p className="mb-1 text-xs font-medium text-muted-foreground">Avatar</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-1.5 text-xs font-semibold hover:bg-muted">
+                  <Upload className="h-3.5 w-3.5" /> Upload
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      e.currentTarget.value = "";
+                      if (!f) return;
+                      if (!["image/png","image/jpeg","image/jpg","image/webp"].includes(f.type)) {
+                        toast.error("Only PNG, JPEG or WEBP"); return;
+                      }
+                      if (f.size > 500 * 1024) { toast.error("Image must be 500 KB or less"); return; }
+                      const r = new FileReader();
+                      r.onload = () => upd("avatarUrl", String(r.result));
+                      r.onerror = () => toast.error("Could not read file");
+                      r.readAsDataURL(f);
+                    }}
+                  />
+                </label>
+                {form.avatarUrl && (
+                  <button type="button" onClick={() => upd("avatarUrl", "")} className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-1.5 text-xs">
+                    <X className="h-3.5 w-3.5" /> Remove
+                  </button>
+                )}
+                <input
+                  value={form.avatarUrl}
+                  onChange={(e) => upd("avatarUrl", e.target.value)}
+                  placeholder="or paste image URL…"
+                  className={inputCls + " flex-1 min-w-[180px]"}
+                />
+              </div>
+            </div>
+          </div>
           <div className="grid gap-3 md:grid-cols-3">
             <Field label="Email (login)"><input type="email" value={form.email} onChange={(e) => upd("email", e.target.value)} maxLength={120} className={inputCls} /></Field>
             <Field label={t("password")}>
@@ -798,6 +843,9 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
             </Field>
             <Field label="ID Expiry Date">
               <input type="date" value={form.nationalIdExpiry} onChange={(e) => upd("nationalIdExpiry", e.target.value)} className={inputCls + " font-mono"} />
+            </Field>
+            <Field label="Address on ID">
+              <input value={form.idCardAddress} onChange={(e) => upd("idCardAddress", e.target.value)} maxLength={200} placeholder="As written on national ID" className={inputCls} />
             </Field>
             <Field label="Contract Type">
               <select value={form.contractType} onChange={(e) => upd("contractType", e.target.value)} className={inputCls}>
