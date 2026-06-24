@@ -595,6 +595,7 @@ type DistrictOpt = { id: string; city_id: string; name_en: string };
 function AddEmployeeModal({ departments, positions, cities, districts, managers, onClose }: { departments: { id: string; name: string }[]; positions: { id: string; name: string }[]; cities: CityOpt[]; districts: DistrictOpt[]; managers: { id: string; name: string }[]; onClose: () => void }) {
   const { t } = useI18n();
   const validateBatch = useServerFn(validateEmployeesBatch);
+  const sendWelcome = useServerFn(sendEmployeeWelcomeEmail);
   const setupIncomplete = departments.length === 0 || positions.length === 0;
   const [form, setForm] = useState<Omit<Employee, "id"> & ExtraHr>({
     name: "",
