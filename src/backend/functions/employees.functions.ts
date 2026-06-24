@@ -510,6 +510,38 @@ export const deleteEmployeeAdmin = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/**
+ * Send the employee welcome email (username + password + login URL).
+ * Used by the single Add Employee form, which today persists locally but
+ * still needs to email the credentials to the new hire.
+ */
+export const sendEmployeeWelcomeEmail = createServerFn({ method: "POST" })
+  .middleware([requireAdminAccess])
+  .inputValidator((input) =>
+    z
+      .object({
+        to: z.string().email(),
+        employeeName: z.string().min(1).max(160),
+        username: z.string().min(1).max(160),
+        password: z.string().min(1).max(256),
+        loginUrl: z.string().min(1).max(500),
+        appName: z.string().max(120).optional().default(""),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { sendWelcomeEmail } = await import("@/backend/server/welcome-email.server");
+    const res = await sendWelcomeEmail({
+      to: data.to,
+      employeeName: data.employeeName,
+      username: data.username,
+      password: data.password,
+      loginUrl: data.loginUrl,
+      appName: data.appName || undefined,
+    });
+    return res;
+  });
+
 export const bulkDeleteEmployeesAdmin = createServerFn({ method: "POST" })
   .middleware([requireAdminAccess])
   .inputValidator((input) =>
