@@ -27,7 +27,6 @@ import {
   bulkDeleteEmployeesAdmin,
   bulkAssignEmployeeRole,
   listCitiesAndDistricts,
-  sendEmployeeWelcomeEmail,
   type AdminEmployeeRow,
   type ListEmployeesResult,
 } from "@/backend/functions/employees.functions";
@@ -595,6 +594,7 @@ type DistrictOpt = { id: string; city_id: string; name_en: string };
 
 function AddEmployeeModal({ departments, positions, cities, districts, managers, onClose }: { departments: { id: string; name: string }[]; positions: { id: string; name: string }[]; cities: CityOpt[]; districts: DistrictOpt[]; managers: { id: string; name: string }[]; onClose: () => void }) {
   const { t } = useI18n();
+  const qc = useQueryClient();
   const validateBatch = useServerFn(validateEmployeesBatch);
   const createEmployee = useServerFn(createEmployeeAdmin);
   const setupIncomplete = departments.length === 0 || positions.length === 0;
@@ -713,7 +713,7 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
     setErr(null);
     void (async () => {
       try {
-        const res = await validateBatch({
+        const validation = await validateBatch({
           data: {
             employees: [{
               name: form.name, email: form.email, dept: form.dept,
@@ -724,8 +724,8 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
             managerIds: managers.map((emp) => emp.id),
           },
         });
-        if (!res.ok) {
-          const r = res.results[0];
+        if (!validation.ok) {
+          const r = validation.results[0];
           const msg = r?.error ? (t(r.error as any) || r.error) : t("serverValidationFailed");
           setErr(msg);
           return;
@@ -733,7 +733,7 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
         const sal = Number(form.salary) || 0;
         const salaryGross = form.salaryMode === "gross" ? sal : Math.round(sal / 0.9);
         const salaryNet = form.salaryMode === "net" ? sal : Math.round(sal * 0.9);
-        const res = await createEmployee({
+        const created = await createEmployee({
           data: {
             empCode: form.empCode?.trim() || "",
             name: form.name.trim(),
@@ -765,11 +765,11 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
             appName: document.title || "HR Portal",
           },
         });
-        if (!res?.accountCreated || !res?.profileCreated) {
+        if (!created?.accountCreated || !created?.profileCreated) {
           throw new Error("Account was not created");
         }
-        if (!res.emailSent) {
-          const msg = res.warning || "Welcome email failed";
+        if (!created.emailSent) {
+          const msg = created.warning || "Welcome email failed";
           setErr(`Account created, but email was not sent: ${msg}`);
           toast.warning("Account created, but email was not sent", { description: msg });
           return;
