@@ -69,6 +69,7 @@ import {
 } from "@/lib/store";
 import { getContractInfo, fmtDate } from "@/lib/contracts";
 import { validateRehire } from "@/lib/employees.functions";
+import { computeSalaryPair } from "@/lib/salary-calc";
 import { FileSignature, RotateCcw, Ban, CheckCircle2, AlertTriangle } from "lucide-react";
 import { locations, myAttendance } from "@/lib/mock-data";
 import { formatEgPhone, isValidEgPhone } from "@/lib/phone";
