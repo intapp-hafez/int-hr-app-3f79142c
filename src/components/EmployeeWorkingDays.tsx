@@ -20,6 +20,8 @@ const WEEKDAYS = [
   { idx: 6, label: "Sat" },
 ];
 
+const WEEKDAY_SHORT = ["S", "M", "T", "W", "T", "F", "S"];
+
 function toggle(set: number[], n: number): number[] {
   return set.includes(n) ? set.filter((x) => x !== n) : [...set, n].sort();
 }
@@ -114,6 +116,29 @@ export function EmployeeWorkingDays({ employeeId }: { employeeId: string }) {
     return new Date(y, m - 1, 1).toLocaleString(undefined, { month: "long", year: "numeric" });
   }, [ym]);
 
+  const calendar = useMemo(() => {
+    const [y, m] = ym.split("-").map(Number);
+    const first = new Date(y, m - 1, 1);
+    const daysInMonth = new Date(y, m, 0).getDate();
+    const startWeekday = first.getDay();
+    const cells: Array<{ day: number | null; weekday: number; isToday: boolean }> = [];
+    for (let i = 0; i < startWeekday; i++) cells.push({ day: null, weekday: i, isToday: false });
+    const t = new Date();
+    for (let d = 1; d <= daysInMonth; d++) {
+      const wd = new Date(y, m - 1, d).getDay();
+      const isToday = t.getFullYear() === y && t.getMonth() + 1 === m && t.getDate() === d;
+      cells.push({ day: d, weekday: wd, isToday });
+    }
+    while (cells.length % 7 !== 0) cells.push({ day: null, weekday: cells.length % 7, isToday: false });
+    return cells;
+  }, [ym]);
+
+  const allowedCount = useMemo(
+    () => calendar.filter((c) => c.day !== null && monthDays.includes(c.weekday)).length,
+    [calendar, monthDays],
+  );
+  const totalDays = useMemo(() => calendar.filter((c) => c.day !== null).length, [calendar]);
+
   const monthOptions = useMemo(() => {
     const opts: { value: string; label: string }[] = [];
     const start = new Date(today.getFullYear(), today.getMonth() - 2, 1);
@@ -135,6 +160,26 @@ export function EmployeeWorkingDays({ employeeId }: { employeeId: string }) {
         <p className="text-[11px] text-muted-foreground">
           Default weekday pattern, plus optional month-specific overrides (e.g. allow Fridays in one month only).
         </p>
+        {data && (
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+            <span className="text-muted-foreground">Active weekdays:</span>
+            <span className="font-medium text-foreground">
+              {weekly.length === 0
+                ? "None"
+                : WEEKDAYS.filter((d) => weekly.includes(d.idx)).map((d) => d.label).join(", ")}
+            </span>
+            <span className="text-muted-foreground">·</span>
+            <span className="text-muted-foreground">
+              {data.months.length === 0
+                ? "No month overrides"
+                : `${data.months.length} month override${data.months.length === 1 ? "" : "s"}: ${data.months
+                    .map((o: { year: number; month: number }) =>
+                      new Date(o.year, o.month - 1, 1).toLocaleString(undefined, { month: "short", year: "2-digit" }),
+                    )
+                    .join(", ")}`}
+            </span>
+          </div>
+        )}
       </header>
 
       {/* Weekly pattern */}
@@ -240,6 +285,56 @@ export function EmployeeWorkingDays({ employeeId }: { employeeId: string }) {
         <p className="mt-2 text-[11px] text-muted-foreground">
           Tick a normally-off day (e.g. Fri) to let the employee work that day this month. Counts as a regular working day.
         </p>
+
+        <div className="mt-4 rounded-xl border border-border bg-background/50 p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-xs font-medium text-foreground">{monthLabel}</p>
+            <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+              <span className="inline-flex items-center gap-1">
+                <span className="h-2.5 w-2.5 rounded-sm bg-gradient-brand" /> Allowed
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="h-2.5 w-2.5 rounded-sm bg-muted" /> Off
+              </span>
+              <span className="font-medium text-foreground">
+                {allowedCount}/{totalDays}
+              </span>
+            </div>
+          </div>
+          <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-muted-foreground">
+            {WEEKDAY_SHORT.map((w, i) => (
+              <div key={i} className="py-1">{w}</div>
+            ))}
+          </div>
+          <div className="mt-1 grid grid-cols-7 gap-1">
+            {calendar.map((c, i) => {
+              if (c.day === null) return <div key={i} className="aspect-square" />;
+              const allowed = monthDays.includes(c.weekday);
+              const [yy, mm] = ym.split("-").map(Number);
+              const title =
+                new Date(yy, mm - 1, c.day).toLocaleDateString(undefined, {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                }) + (allowed ? " — allowed" : " — not allowed");
+              return (
+                <div
+                  key={i}
+                  title={title}
+                  className={
+                    "flex aspect-square items-center justify-center rounded-md border text-[11px] font-medium transition " +
+                    (allowed
+                      ? "border-transparent bg-gradient-brand text-brand-foreground shadow-brand"
+                      : "border-border bg-muted/40 text-muted-foreground line-through opacity-70") +
+                    (c.isToday ? " ring-2 ring-ring ring-offset-1 ring-offset-background" : "")
+                  }
+                >
+                  {c.day}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </section>
   );
