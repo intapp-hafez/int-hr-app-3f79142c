@@ -3,6 +3,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Save, RotateCcw, Plus, Trash2, Clock, Wallet, Target, AlertTriangle, Gauge, CalendarDays, Sparkles, Pencil, X, Check, Wifi, Building2, Briefcase, MapPin, Mail, Bell, BellRing, Send, CalendarClock, Play, Timer, Coins, Tag, ChevronRight, Shield, Eye, EyeOff, Copy, KeyRound } from "lucide-react";
 import { getVapidStatus } from "@/backend/functions/vapid-status.functions";
+import { getSmtpConfig, saveSmtpConfig, sendTestEmail } from "@/backend/functions/smtp.functions";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
 import {
@@ -85,6 +86,77 @@ function AdminSettings() {
   const [schDraft, setSchDraft] = useState<ExportSchedule>(() => emptySchedule());
   const [recipientsText, setRecipientsText] = useState("");
   const [showSmtpPassword, setShowSmtpPassword] = useState(false);
+  const [smtpSaving, setSmtpSaving] = useState(false);
+  const [smtpTesting, setSmtpTesting] = useState(false);
+  const loadSmtpFn = useServerFn(getSmtpConfig);
+  const saveSmtpFn = useServerFn(saveSmtpConfig);
+  const testSmtpFn = useServerFn(sendTestEmail);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const remote = await loadSmtpFn();
+        if (cancelled || !remote) return;
+        setSmtpDraft((d) => ({
+          ...d,
+          host: remote.host ?? d.host,
+          port: remote.port ?? d.port,
+          secure: remote.secure ?? d.secure,
+          username: remote.username ?? d.username,
+          fromEmail: remote.from_email ?? d.fromEmail,
+          fromName: remote.from_name ?? d.fromName,
+          password: "",
+        }));
+      } catch (e) {
+        // non-fatal: keep local draft
+        console.warn("Failed to load SMTP config", e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [loadSmtpFn]);
+
+  async function persistSmtp() {
+    setSmtpSaving(true);
+    try {
+      await saveSmtpFn({
+        data: {
+          host: smtpDraft.host.trim(),
+          port: Number(smtpDraft.port) || 0,
+          secure: !!smtpDraft.secure,
+          username: smtpDraft.username.trim(),
+          password: smtpDraft.password ? smtpDraft.password : undefined,
+          from_email: smtpDraft.fromEmail.trim(),
+          from_name: smtpDraft.fromName.trim(),
+        },
+      });
+      updateSmtp({ ...smtpDraft, password: "" });
+      setSmtpDraft((d) => ({ ...d, password: "" }));
+      toast.success(t("settingsSaved"));
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to save SMTP settings");
+    } finally {
+      setSmtpSaving(false);
+    }
+  }
+
+  async function testSmtp() {
+    const to = smtpDraft.fromEmail.trim();
+    if (!to) {
+      toast.error("Set a From Email first");
+      return;
+    }
+    setSmtpTesting(true);
+    try {
+      const res: any = await testSmtpFn({ data: { to } });
+      if (res?.ok) toast.success(t("smtpTestSent"));
+      else toast.error(res?.error ?? "Test failed");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Test failed");
+    } finally {
+      setSmtpTesting(false);
+    }
+  }
   const [prefsTarget, setPrefsTarget] = useState<string>("hr"); // "hr" | "manager:<id>"
   const currentPrefs = notifPrefsMap[prefsTarget] ?? getNotifPrefs(prefsTarget);
   const [prefsDraft, setPrefsDraft] = useState<NotifPrefs>(currentPrefs);
@@ -616,16 +688,18 @@ function AdminSettings() {
             </div>
             <div className="flex flex-wrap gap-2">
               <button
-                onClick={() => { updateSmtp(smtpDraft); toast.success(t("settingsSaved")); }}
-                className="inline-flex items-center gap-1.5 rounded-full bg-gradient-brand px-4 py-2 text-sm font-semibold text-brand-foreground shadow-brand"
+                onClick={persistSmtp}
+                disabled={smtpSaving}
+                className="inline-flex items-center gap-1.5 rounded-full bg-gradient-brand px-4 py-2 text-sm font-semibold text-brand-foreground shadow-brand disabled:opacity-60"
               >
-                <Save className="h-4 w-4" /> {t("save")}
+                <Save className="h-4 w-4" /> {smtpSaving ? "…" : t("save")}
               </button>
               <button
-                onClick={() => { updateSmtp(smtpDraft); toast.success(t("smtpTestSent")); }}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-4 py-2 text-sm font-semibold"
+                onClick={testSmtp}
+                disabled={smtpTesting}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-4 py-2 text-sm font-semibold disabled:opacity-60"
               >
-                <Mail className="h-4 w-4" /> {t("smtpTest")}
+                <Mail className="h-4 w-4" /> {smtpTesting ? "…" : t("smtpTest")}
               </button>
             </div>
             <div className="rounded-2xl border border-border bg-background/40 p-4">
