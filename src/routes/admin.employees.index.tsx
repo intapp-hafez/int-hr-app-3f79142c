@@ -643,27 +643,66 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
   const upd = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
 
-  function validate(): Record<string, string> {
+  function validateField(name: string, f: typeof form): string {
+    switch (name) {
+      case "name": return (!f.name.trim() || f.name.trim().length < 2) ? "Name is required (min 2 chars)" : "";
+      case "email": return !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email) ? "Valid email required" : "";
+      case "phone": return !isValidEgPhone(f.phone) ? t("phoneInvalid") : "";
+      case "password": return (!f.password || f.password.length < 6) ? "Password must be at least 6 characters" : "";
+      case "salary": return (!f.salary || f.salary <= 0) ? "Salary is required" : "";
+      case "target": return f.target <= 0 ? "Target value must be > 0" : "";
+      case "salaryMode": return !(VALID_SALARY_MODES as readonly string[]).includes(f.salaryMode) ? "Invalid salary mode" : "";
+      case "contractType": return !(VALID_CONTRACT_TYPES as readonly string[]).includes(f.contractType) ? "Invalid contract type" : "";
+      case "dept": return !f.dept.trim() ? "Department is required" : "";
+      case "manager": return (f.manager && !managers.some((emp) => emp.id === f.manager)) ? "Invalid manager" : "";
+      case "nationalIdExpiry": {
+        const c = validateIdExpiry(f.nationalId, f.nationalIdExpiry);
+        return c === "ok" ? "" : t(c as any);
+      }
+      default: return "";
+    }
+  }
+
+  const FIELD_NAMES = ["name","email","phone","password","salary","target","salaryMode","contractType","dept","manager","nationalIdExpiry"] as const;
+
+  function validate(f: typeof form = form): Record<string, string> {
     const errs: Record<string, string> = {};
-    if (!form.name.trim() || form.name.trim().length < 2) errs.name = "Name is required (min 2 chars)";
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = "Valid email required";
-    if (!isValidEgPhone(form.phone)) errs.phone = t("phoneInvalid");
-    if (!form.password || form.password.length < 6) errs.password = "Password must be at least 6 characters";
-    if (!form.salary || form.salary <= 0) errs.salary = "Salary is required";
-    if (form.target <= 0) errs.target = "Target value must be > 0";
-    if (!(VALID_SALARY_MODES as readonly string[]).includes(form.salaryMode)) errs.salaryMode = "Invalid salary mode";
-    if (!(VALID_CONTRACT_TYPES as readonly string[]).includes(form.contractType)) errs.contractType = "Invalid contract type";
-    if (!form.dept.trim()) errs.dept = "Department is required";
-    if (form.manager && !managers.some((emp) => emp.id === form.manager)) errs.manager = "Invalid manager";
-    const expCheck = validateIdExpiry(form.nationalId, form.nationalIdExpiry);
-    if (expCheck !== "ok") errs.nationalIdExpiry = t(expCheck as any);
+    for (const n of FIELD_NAMES) {
+      const m = validateField(n, f);
+      if (m) errs[n] = m;
+    }
     return errs;
+  }
+
+  // Live re-validation: only update messages for fields that already have an error,
+  // so users aren't yelled at before they've touched a field.
+  useEffect(() => {
+    setFieldErrors((prev) => {
+      const keys = Object.keys(prev);
+      if (keys.length === 0) return prev;
+      const next: Record<string, string> = {};
+      for (const k of keys) {
+        const m = validateField(k, form);
+        if (m) next[k] = m;
+      }
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form]);
+
+  function handleBlur(name: string) {
+    const m = validateField(name, form);
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      if (m) next[name] = m; else delete next[name];
+      return next;
+    });
   }
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (setupIncomplete) return setErr(t("employeeSetupIncomplete" as any) || "Add at least one Department and Position before creating employees.");
-    const errs = validate();
+    const errs = validate(form);
     setFieldErrors(errs);
     if (Object.keys(errs).length > 0) {
       setErr("Please fix the highlighted fields");
@@ -730,7 +769,7 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-foreground/40 p-4 md:items-center" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-foreground/40 p-4 md:items-center">
       <div onClick={(e) => e.stopPropagation()} className="my-auto w-full max-w-5xl rounded-3xl bg-background p-6 shadow-soft">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="font-display text-lg font-semibold">{t("addEmployee")}</h2>
@@ -796,13 +835,13 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
             </div>
           </div>
           <div className="grid gap-3 md:grid-cols-3">
-            <Field label="Email (login)" error={fieldErrors.email}><input type="email" value={form.email} onChange={(e) => upd("email", e.target.value)} maxLength={120} className={inputCls} /></Field>
+            <Field label="Email (login)" error={fieldErrors.email}><input type="email" value={form.email} onChange={(e) => upd("email", e.target.value)} onBlur={() => handleBlur("email")} maxLength={120} className={inputCls} /></Field>
             <Field label={t("password")} error={fieldErrors.password}>
-              <input type="text" value={form.password} onChange={(e) => upd("password", e.target.value)} maxLength={64} placeholder="min 6 chars" className={inputCls + " font-mono"} />
+              <input type="text" value={form.password} onChange={(e) => upd("password", e.target.value)} onBlur={() => handleBlur("password")} maxLength={64} placeholder="min 6 chars" className={inputCls + " font-mono"} />
             </Field>
-            <Field label="Full name" error={fieldErrors.name}><input value={form.name} onChange={(e) => upd("name", e.target.value)} maxLength={80} className={inputCls} /></Field>
+            <Field label="Full name" error={fieldErrors.name}><input value={form.name} onChange={(e) => upd("name", e.target.value)} onBlur={() => handleBlur("name")} maxLength={80} className={inputCls} /></Field>
             <Field label="Phone" error={fieldErrors.phone}>
-              <input type="tel" dir="ltr" inputMode="tel" value={form.phone} onChange={(e) => upd("phone", formatEgPhone(e.target.value))} maxLength={20} placeholder="+20 100 123 4567" className={inputCls + " font-mono"} />
+              <input type="tel" dir="ltr" inputMode="tel" value={form.phone} onChange={(e) => upd("phone", formatEgPhone(e.target.value))} onBlur={() => handleBlur("phone")} maxLength={20} placeholder="+20 100 123 4567" className={inputCls + " font-mono"} />
             </Field>
             <Field label="Employee Code">
               <input value={form.empCode} onChange={(e) => upd("empCode", e.target.value)} maxLength={20} placeholder="auto if blank" className={inputCls + " font-mono"} />
@@ -856,7 +895,7 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
               <input type="date" value={form.idIssueDate} onChange={(e) => upd("idIssueDate", e.target.value)} className={inputCls + " font-mono"} />
             </Field>
             <Field label="ID Expiry Date" error={fieldErrors.nationalIdExpiry}>
-              <input type="date" value={form.nationalIdExpiry} onChange={(e) => upd("nationalIdExpiry", e.target.value)} className={inputCls + " font-mono"} />
+              <input type="date" value={form.nationalIdExpiry} onChange={(e) => upd("nationalIdExpiry", e.target.value)} onBlur={() => handleBlur("nationalIdExpiry")} className={inputCls + " font-mono"} />
             </Field>
             <Field label="Address on ID">
               <input value={form.idCardAddress} onChange={(e) => upd("idCardAddress", e.target.value)} maxLength={200} placeholder="As written on national ID" className={inputCls} />
