@@ -25,14 +25,11 @@ const EmployeeSchema = z.object({
   contractType: z.enum(VALID_CONTRACT_TYPES),
   salaryMode: z.enum(VALID_SALARY_MODES),
   targetDuration: z.enum(VALID_TARGET_DURATIONS),
-  manager: z.string().trim().max(16).optional().default(""),
+  manager: z.string().trim().max(40).optional().default(""),
   managerIds: z.array(z.string()).optional().default([]),
   nationalId: z.string().trim().max(32).optional().default(""),
   nationalIdExpiry: z.string().trim().max(10).optional().default(""),
 }).superRefine((v, ctx) => {
-  if (v.manager && !ID_PATTERN.test(v.manager)) {
-    ctx.addIssue({ code: "custom", path: ["manager"], message: "managerInvalid" });
-  }
   if (v.manager && v.managerIds.length && !v.managerIds.includes(v.manager)) {
     ctx.addIssue({ code: "custom", path: ["manager"], message: "managerInvalid" });
   }
