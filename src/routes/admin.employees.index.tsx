@@ -6,6 +6,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Download } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { SalaryPreview } from "@/components/SalaryPreview";
+import { computeSalaryPair } from "@/lib/salary-calc";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useI18n } from "@/lib/i18n";
 import { useStore, getState, addEmployee, type Employee } from "@/lib/store";
