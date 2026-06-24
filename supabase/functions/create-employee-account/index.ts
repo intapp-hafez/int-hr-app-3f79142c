@@ -157,7 +157,9 @@ Deno.serve(async (req) => {
 
     const { error: profileError } = await admin.from("profiles").upsert(profile as any);
     if (profileError) throw new Error(profileError.message);
-    const { error: roleError } = await admin.from("user_roles").upsert({ user_id: newUserId, role } as any);
+    const { error: roleError } = await admin
+      .from("user_roles")
+      .upsert({ user_id: newUserId, role } as any, { onConflict: "user_id,role", ignoreDuplicates: true });
     if (roleError) throw new Error(roleError.message);
 
     const decryptKey = Deno.env.get("SMTP_ENCRYPTION_KEY") || "dev-fallback-key-change-me";
