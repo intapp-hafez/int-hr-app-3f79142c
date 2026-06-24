@@ -639,24 +639,38 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
   const [contractCancelled, setContractCancelled] = useState(false);
   const [allowPastExpiry, setAllowPastExpiry] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const upd = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
+
+  function validate(): Record<string, string> {
+    const errs: Record<string, string> = {};
+    if (!form.name.trim() || form.name.trim().length < 2) errs.name = "Name is required (min 2 chars)";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = "Valid email required";
+    if (!isValidEgPhone(form.phone)) errs.phone = t("phoneInvalid");
+    if (!form.password || form.password.length < 6) errs.password = "Password must be at least 6 characters";
+    if (!form.salary || form.salary <= 0) errs.salary = "Salary is required";
+    if (form.target <= 0) errs.target = "Target value must be > 0";
+    if (!(VALID_SALARY_MODES as readonly string[]).includes(form.salaryMode)) errs.salaryMode = "Invalid salary mode";
+    if (!(VALID_CONTRACT_TYPES as readonly string[]).includes(form.contractType)) errs.contractType = "Invalid contract type";
+    if (!form.dept.trim()) errs.dept = "Department is required";
+    if (form.manager && !managers.some((emp) => emp.id === form.manager)) errs.manager = "Invalid manager";
+    const expCheck = validateIdExpiry(form.nationalId, form.nationalIdExpiry);
+    if (expCheck !== "ok") errs.nationalIdExpiry = t(expCheck as any);
+    return errs;
+  }
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (setupIncomplete) return setErr(t("employeeSetupIncomplete" as any) || "Add at least one Department and Position before creating employees.");
-    if (!form.name.trim() || form.name.trim().length < 2) return setErr("Name is required (min 2 chars)");
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) return setErr("Valid email required");
-    if (!isValidEgPhone(form.phone)) return setErr(t("phoneInvalid"));
-    if (!form.password || form.password.length < 6) return setErr("Password must be at least 6 characters");
-    if (!form.salary || form.salary <= 0) return setErr("Salary is required");
-    if (form.target <= 0) return setErr("Target value must be > 0");
-    if (!(VALID_SALARY_MODES as readonly string[]).includes(form.salaryMode)) return setErr("Invalid salary mode");
-    if (!(VALID_CONTRACT_TYPES as readonly string[]).includes(form.contractType)) return setErr("Invalid contract type");
-    if (!form.dept.trim()) return setErr("Department is required");
-    if (form.manager && !managers.some((emp) => emp.id === form.manager)) return setErr("Invalid manager");
-    const expCheck = validateIdExpiry(form.nationalId, form.nationalIdExpiry);
-    if (expCheck !== "ok") return setErr(t(expCheck as any));
+    const errs = validate();
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) {
+      setErr("Please fix the highlighted fields");
+      toast.error("Please fix the highlighted fields");
+      return;
+    }
+    setErr(null);
     void (async () => {
       try {
         const res = await validateBatch({
