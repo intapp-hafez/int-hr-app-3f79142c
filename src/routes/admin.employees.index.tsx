@@ -730,7 +730,7 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-foreground/40 p-4 md:items-center" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-foreground/40 p-4 md:items-center">
       <div onClick={(e) => e.stopPropagation()} className="my-auto w-full max-w-5xl rounded-3xl bg-background p-6 shadow-soft">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="font-display text-lg font-semibold">{t("addEmployee")}</h2>
