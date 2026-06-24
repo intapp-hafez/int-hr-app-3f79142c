@@ -544,115 +544,13 @@ export const createEmployeeAdmin = createServerFn({ method: "POST" })
   .inputValidator((input) => CreateEmployeeSchema.parse(input))
   .handler(async ({ context, data }): Promise<CreateEmployeeResult> => {
     const { supabase } = context;
-    const { supabaseAdmin } = await import("@/backend/server/admin-client.server");
-    const { sendWelcomeEmail } = await import("@/backend/server/welcome-email.server");
-
-    const fullName = data.name.trim();
-    const email = data.email.trim().toLowerCase();
-    const empCode = data.empCode.trim();
-
-    const [{ data: existingProfile }, { data: departments }, { data: positions }] = await Promise.all([
-      supabaseAdmin.from("profiles").select("id").eq("email", email).maybeSingle(),
-      supabase.from("departments").select("id, name_en"),
-      supabase.from("positions").select("id, name_en"),
-    ]);
-    if (existingProfile) throw new Error(`Employee email already exists: ${email}`);
-
-    if (empCode) {
-      const { data: existingCode } = await supabaseAdmin
-        .from("profiles")
-        .select("id")
-        .eq("emp_code", empCode)
-        .maybeSingle();
-      if (existingCode) throw new Error(`Employee code already exists: ${empCode}`);
+    const { data: result, error } = await supabase.functions.invoke("create-employee-account", { body: data });
+    if (error) throw new Error(error.message ?? "Employee account creation failed");
+    const created = result as CreateEmployeeResult & { error?: string };
+    if (!created?.accountCreated || !created?.profileCreated) {
+      throw new Error(created?.error || created?.warning || "Employee account creation failed");
     }
-
-    if (data.idIssueDate.trim() && !isStrictIsoDate(data.idIssueDate.trim())) {
-      throw new Error("ID issue date must be YYYY-MM-DD");
-    }
-    if (data.nationalIdExpiry.trim() && !isStrictIsoDate(data.nationalIdExpiry.trim())) {
-      throw new Error("ID expiry date must be YYYY-MM-DD");
-    }
-    if (data.idIssueDate.trim() && data.nationalIdExpiry.trim() && data.idIssueDate > data.nationalIdExpiry) {
-      throw new Error("ID issue date cannot be after the expiry date");
-    }
-
-    const departmentMap = new Map((departments ?? []).map((d: any) => [String(d.name_en).toLowerCase(), d.id]));
-    const positionMap = new Map((positions ?? []).map((p: any) => [String(p.name_en).toLowerCase(), p.id]));
-    const department_id = data.dept.trim() ? (departmentMap.get(data.dept.trim().toLowerCase()) ?? null) : null;
-    const position_id = data.position.trim() ? (positionMap.get(data.position.trim().toLowerCase()) ?? null) : null;
-    if (data.dept.trim() && !department_id) throw new Error(`Unknown department: ${data.dept}`);
-    if (data.position.trim() && !position_id) throw new Error(`Unknown position: ${data.position}`);
-
-    const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password: data.password,
-      email_confirm: true,
-      user_metadata: { full_name: fullName },
-    });
-    if (createError) throw new Error(createError.message);
-    const newId = created.user?.id;
-    if (!newId) throw new Error("Auth user was not created");
-
-    try {
-      const { error: profileError } = await supabaseAdmin.from("profiles").upsert({
-        id: newId,
-        emp_code: empCode || null,
-        full_name: fullName,
-        email,
-        phone: data.phone.trim() || null,
-        role: data.role as any,
-        city: data.city.trim() || null,
-        district: data.district.trim() || null,
-        department_id,
-        position_id,
-        status: data.status,
-        avatar_url: data.avatarUrl.trim() || null,
-        national_id: data.nationalId.trim() || null,
-        id_issue_date: data.idIssueDate.trim() || null,
-        id_expiry_date: data.nationalIdExpiry.trim() || null,
-        manager_id: data.managerId || null,
-        salary_mode: data.salaryMode,
-        salary_gross: data.salaryGross || null,
-        salary_net: data.salaryNet || null,
-        salary_amount: data.salaryMode === "net" ? data.salaryNet : data.salaryGross,
-        allowance: data.allowance || null,
-        target_value: data.targetValue || null,
-        target_duration: data.targetDuration,
-        contract_type: data.contractType,
-        contract_start_date: data.contractStartDate || null,
-        contract_end_date: data.contractEndDate || null,
-        contract_cancelled: data.contractCancelled,
-      } as any);
-      if (profileError) throw new Error(profileError.message);
-
-      const { error: roleError } = await supabaseAdmin
-        .from("user_roles")
-        .upsert({ user_id: newId, role: data.role as any } as any);
-      if (roleError) throw new Error(roleError.message);
-    } catch (e: any) {
-      await hardDeleteUser(supabaseAdmin, newId);
-      throw new Error(e?.message ?? "Employee profile was not created");
-    }
-
-    const mail = await sendWelcomeEmail({
-      to: email,
-      employeeName: fullName,
-      username: email,
-      password: data.password,
-      loginUrl: data.loginUrl,
-      appName: data.appName || undefined,
-    });
-
-    return {
-      ok: mail.ok,
-      id: String(newId),
-      email,
-      accountCreated: true,
-      profileCreated: true,
-      emailSent: mail.ok,
-      warning: mail.ok ? undefined : mail.error || "Welcome email failed",
-    };
+    return created;
   });
 
 export const deleteEmployeeAdmin = createServerFn({ method: "POST" })
