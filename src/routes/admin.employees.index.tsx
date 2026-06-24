@@ -631,9 +631,11 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
     personalPhone: "",
   });
   const [docs, setDocs] = useState<Record<string, StoredDoc | undefined>>({});
-  const [tab, setTab] = useState<AddTab>("personal");
+  const [contractStartDate, setContractStartDate] = useState("");
+  const [contractEndDate, setContractEndDate] = useState("");
+  const [contractCancelled, setContractCancelled] = useState(false);
+  const [allowPastExpiry, setAllowPastExpiry] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [avatarBusy, setAvatarBusy] = useState(false);
   const upd = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
 
