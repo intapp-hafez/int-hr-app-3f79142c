@@ -22,11 +22,11 @@ import {
   updateEmployeeAdmin,
   bulkSetEmployeeStatus,
   importEmployeesAdmin,
+  createEmployeeAdmin,
   deleteEmployeeAdmin,
   bulkDeleteEmployeesAdmin,
   bulkAssignEmployeeRole,
   listCitiesAndDistricts,
-  sendEmployeeWelcomeEmail,
   type AdminEmployeeRow,
   type ListEmployeesResult,
 } from "@/backend/functions/employees.functions";
@@ -594,8 +594,9 @@ type DistrictOpt = { id: string; city_id: string; name_en: string };
 
 function AddEmployeeModal({ departments, positions, cities, districts, managers, onClose }: { departments: { id: string; name: string }[]; positions: { id: string; name: string }[]; cities: CityOpt[]; districts: DistrictOpt[]; managers: { id: string; name: string }[]; onClose: () => void }) {
   const { t } = useI18n();
+  const qc = useQueryClient();
   const validateBatch = useServerFn(validateEmployeesBatch);
-  const sendWelcome = useServerFn(sendEmployeeWelcomeEmail);
+  const createEmployee = useServerFn(createEmployeeAdmin);
   const setupIncomplete = departments.length === 0 || positions.length === 0;
   const [form, setForm] = useState<Omit<Employee, "id"> & ExtraHr>({
     name: "",
@@ -712,7 +713,7 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
     setErr(null);
     void (async () => {
       try {
-        const res = await validateBatch({
+        const validation = await validateBatch({
           data: {
             employees: [{
               name: form.name, email: form.email, dept: form.dept,
@@ -723,8 +724,8 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
             managerIds: managers.map((emp) => emp.id),
           },
         });
-        if (!res.ok) {
-          const r = res.results[0];
+        if (!validation.ok) {
+          const r = validation.results[0];
           const msg = r?.error ? (t(r.error as any) || r.error) : t("serverValidationFailed");
           setErr(msg);
           return;
@@ -732,38 +733,56 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
         const sal = Number(form.salary) || 0;
         const salaryGross = form.salaryMode === "gross" ? sal : Math.round(sal / 0.9);
         const salaryNet = form.salaryMode === "net" ? sal : Math.round(sal * 0.9);
-        const id = addEmployee({
-          ...form,
-          id: form.empCode?.trim() || undefined,
-          phone: formatEgPhone(form.phone),
-          salaryGross,
-          salaryNet,
-          documents: docs,
-        } as any);
-        toast.success(`Employee ${id} added`, { description: form.name });
-        // Fire-and-forget welcome email with credentials + login URL.
-        void (async () => {
-          try {
-            const loginUrl = `${window.location.origin}/auth`;
-            const res = await sendWelcome({
-              data: {
-                to: form.email.trim().toLowerCase(),
-                employeeName: form.name.trim(),
-                username: form.email.trim().toLowerCase(),
-                password: form.password,
-                loginUrl,
-                appName: document.title || "HR Portal",
-              },
-            });
-            if (res?.ok) toast.success("Welcome email sent", { description: form.email });
-            else toast.error("Welcome email failed", { description: res?.error || "SMTP not configured" });
-          } catch (err: any) {
-            toast.error("Welcome email failed", { description: err?.message || "send error" });
-          }
-        })();
+        const created = await createEmployee({
+          data: {
+            empCode: form.empCode?.trim() || "",
+            name: form.name.trim(),
+            email: form.email.trim().toLowerCase(),
+            phone: formatEgPhone(form.phone),
+            dept: form.dept,
+            position: form.position,
+            role: "employee",
+            status: form.status === "Inactive" ? "Inactive" : "Active",
+            password: form.password,
+            city: form.city,
+            district: form.district,
+            avatarUrl: form.avatarUrl,
+            nationalId: form.nationalId,
+            idIssueDate: form.idIssueDate,
+            nationalIdExpiry: form.nationalIdExpiry,
+            managerId: form.manager || "",
+            salaryMode: form.salaryMode,
+            salaryGross,
+            salaryNet,
+            allowance: Number(form.allowance) || 0,
+            targetValue: Number(form.target) || 0,
+            targetDuration: form.targetDuration as any,
+            contractType: form.contractType as any,
+            contractStartDate,
+            contractEndDate,
+            contractCancelled,
+            loginUrl: `${window.location.origin}/auth`,
+            appName: document.title || "HR Portal",
+          },
+        });
+        if (!created?.accountCreated || !created?.profileCreated) {
+          throw new Error("Account was not created");
+        }
+        if (!created.emailSent) {
+          const msg = created.warning || "Welcome email failed";
+          setErr(`Account created, but email was not sent: ${msg}`);
+          toast.warning("Account created, but email was not sent", { description: msg });
+          void qc.invalidateQueries({ queryKey: ["admin", "employees", "list"] });
+          onClose();
+          return;
+        }
+        toast.success("Employee account created and welcome email sent", { description: form.email });
+        void qc.invalidateQueries({ queryKey: ["admin", "employees", "list"] });
         onClose();
-      } catch {
-        setErr(t("serverValidationFailed"));
+      } catch (err: any) {
+        const msg = err?.message || t("serverValidationFailed");
+        setErr(msg);
+        toast.error("Employee was not created", { description: msg });
       }
     })();
   }

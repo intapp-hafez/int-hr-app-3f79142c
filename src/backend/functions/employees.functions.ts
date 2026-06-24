@@ -60,6 +60,47 @@ export type ImportEmployeeResult = {
   results: { index: number; ok: boolean; id?: string; email?: string; error?: string }[];
 };
 
+const CreateEmployeeSchema = z.object({
+  empCode: z.string().max(40).optional().default(""),
+  name: z.string().trim().min(2).max(120),
+  email: z.string().trim().email().max(160),
+  phone: z.string().max(40).optional().default(""),
+  dept: z.string().max(120).optional().default(""),
+  position: z.string().max(120).optional().default(""),
+  role: z.enum(IMPORT_ROLES).optional().default("employee"),
+  status: z.enum(["Active", "Inactive"]).optional().default("Active"),
+  password: z.string().min(6).max(128),
+  city: z.string().max(120).optional().default(""),
+  district: z.string().max(120).optional().default(""),
+  avatarUrl: z.string().max(800_000).optional().default(""),
+  nationalId: z.string().max(40).optional().default(""),
+  idIssueDate: z.string().max(20).optional().default(""),
+  nationalIdExpiry: z.string().max(20).optional().default(""),
+  managerId: z.string().uuid().optional().or(z.literal("")).default(""),
+  salaryMode: z.enum(["gross", "net"]).optional().default("gross"),
+  salaryGross: z.number().min(0).max(10_000_000).optional().default(0),
+  salaryNet: z.number().min(0).max(10_000_000).optional().default(0),
+  allowance: z.number().min(0).max(10_000_000).optional().default(0),
+  targetValue: z.number().min(0).max(10_000_000).optional().default(0),
+  targetDuration: z.enum(["Daily", "Weekly", "Monthly", "Quarterly", "Yearly"]).optional().default("Monthly"),
+  contractType: z.enum(["FullTime", "PartTime", "Temporary", "Internship", "Probation3M"]).optional().default("FullTime"),
+  contractStartDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal("")).default(""),
+  contractEndDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal("")).default(""),
+  contractCancelled: z.boolean().optional().default(false),
+  loginUrl: z.string().min(1).max(500),
+  appName: z.string().max(120).optional().default(""),
+});
+
+export type CreateEmployeeResult = {
+  ok: boolean;
+  id?: string;
+  email: string;
+  accountCreated: boolean;
+  profileCreated: boolean;
+  emailSent: boolean;
+  warning?: string;
+};
+
 export type ListEmployeesResult = {
   rows: AdminEmployeeRow[];
   total: number;
@@ -496,6 +537,20 @@ export const importEmployeesAdmin = createServerFn({ method: "POST" })
 
     const importedCount = results.filter((r) => r.ok).length;
     return { ok: importedCount === data.employees.length, importedCount, results };
+  });
+
+export const createEmployeeAdmin = createServerFn({ method: "POST" })
+  .middleware([requireAdminAccess])
+  .inputValidator((input) => CreateEmployeeSchema.parse(input))
+  .handler(async ({ context, data }): Promise<CreateEmployeeResult> => {
+    const { supabase } = context;
+    const { data: result, error } = await supabase.functions.invoke("create-employee-account", { body: data });
+    if (error) throw new Error(error.message ?? "Employee account creation failed");
+    const created = result as CreateEmployeeResult & { error?: string };
+    if (!created?.accountCreated || !created?.profileCreated) {
+      throw new Error(created?.error || created?.warning || "Employee account creation failed");
+    }
+    return created;
   });
 
 export const deleteEmployeeAdmin = createServerFn({ method: "POST" })
