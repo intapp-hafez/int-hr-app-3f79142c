@@ -1377,7 +1377,13 @@ function ImportExcelButtonsOnly() {
       }
       let added = 0;
       if (validRows.length > 0) {
-        const res = await importEmployees({ data: { employees: validRows } });
+        const res = await importEmployees({
+          data: {
+            employees: validRows,
+            loginUrl: `${window.location.origin}/auth`,
+            appName: document.title || "HR Portal",
+          },
+        });
         added = res.importedCount;
         res.results.forEach((r) => {
           if (!r.ok) {
