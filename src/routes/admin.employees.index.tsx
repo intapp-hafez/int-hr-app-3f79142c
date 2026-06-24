@@ -26,6 +26,7 @@ import {
   bulkDeleteEmployeesAdmin,
   bulkAssignEmployeeRole,
   listCitiesAndDistricts,
+  sendEmployeeWelcomeEmail,
   type AdminEmployeeRow,
   type ListEmployeesResult,
 } from "@/backend/functions/employees.functions";
@@ -594,6 +595,7 @@ type DistrictOpt = { id: string; city_id: string; name_en: string };
 function AddEmployeeModal({ departments, positions, cities, districts, managers, onClose }: { departments: { id: string; name: string }[]; positions: { id: string; name: string }[]; cities: CityOpt[]; districts: DistrictOpt[]; managers: { id: string; name: string }[]; onClose: () => void }) {
   const { t } = useI18n();
   const validateBatch = useServerFn(validateEmployeesBatch);
+  const sendWelcome = useServerFn(sendEmployeeWelcomeEmail);
   const setupIncomplete = departments.length === 0 || positions.length === 0;
   const [form, setForm] = useState<Omit<Employee, "id"> & ExtraHr>({
     name: "",
@@ -686,6 +688,26 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
           documents: docs,
         } as any);
         toast.success(`Employee ${id} added`, { description: form.name });
+        // Fire-and-forget welcome email with credentials + login URL.
+        void (async () => {
+          try {
+            const loginUrl = `${window.location.origin}/auth`;
+            const res = await sendWelcome({
+              data: {
+                to: form.email.trim().toLowerCase(),
+                employeeName: form.name.trim(),
+                username: form.email.trim().toLowerCase(),
+                password: form.password,
+                loginUrl,
+                appName: document.title || "HR Portal",
+              },
+            });
+            if (res?.ok) toast.success("Welcome email sent", { description: form.email });
+            else toast.error("Welcome email failed", { description: res?.error || "SMTP not configured" });
+          } catch (err: any) {
+            toast.error("Welcome email failed", { description: err?.message || "send error" });
+          }
+        })();
         onClose();
       } catch {
         setErr(t("serverValidationFailed"));
@@ -1355,7 +1377,13 @@ function ImportExcelButtonsOnly() {
       }
       let added = 0;
       if (validRows.length > 0) {
-        const res = await importEmployees({ data: { employees: validRows } });
+        const res = await importEmployees({
+          data: {
+            employees: validRows,
+            loginUrl: `${window.location.origin}/auth`,
+            appName: document.title || "HR Portal",
+          },
+        });
         added = res.importedCount;
         res.results.forEach((r) => {
           if (!r.ok) {
