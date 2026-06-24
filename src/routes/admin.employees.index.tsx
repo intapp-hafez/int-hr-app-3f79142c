@@ -1582,11 +1582,12 @@ function ImportErrorPanel({ errors, onClose }: { errors: ImportErrors; onClose: 
 
 const Th = ({ children }: { children: React.ReactNode }) => <th className="px-4 py-3 text-start font-medium">{children}</th>;
 const Td = ({ children, mono }: { children: React.ReactNode; mono?: boolean }) => <td className={`px-4 py-3 ${mono ? "font-mono text-xs tabular-nums" : ""}`}>{children}</td>;
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
     <label className="block">
       <span className="mb-1 block text-xs font-medium text-muted-foreground">{label}</span>
       {children}
+      {error && <p className="mt-1 text-[11px] text-destructive">{error}</p>}
     </label>
   );
 }
