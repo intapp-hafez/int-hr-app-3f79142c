@@ -688,6 +688,26 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
           documents: docs,
         } as any);
         toast.success(`Employee ${id} added`, { description: form.name });
+        // Fire-and-forget welcome email with credentials + login URL.
+        void (async () => {
+          try {
+            const loginUrl = `${window.location.origin}/auth`;
+            const res = await sendWelcome({
+              data: {
+                to: form.email.trim().toLowerCase(),
+                employeeName: form.name.trim(),
+                username: form.email.trim().toLowerCase(),
+                password: form.password,
+                loginUrl,
+                appName: document.title || "HR Portal",
+              },
+            });
+            if (res?.ok) toast.success("Welcome email sent", { description: form.email });
+            else toast.error("Welcome email failed", { description: res?.error || "SMTP not configured" });
+          } catch (err: any) {
+            toast.error("Welcome email failed", { description: err?.message || "send error" });
+          }
+        })();
         onClose();
       } catch {
         setErr(t("serverValidationFailed"));
