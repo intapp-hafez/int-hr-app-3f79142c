@@ -1,22 +1,43 @@
 /**
- * Minimal SMTP client built on Cloudflare Workers TCP sockets.
+ * Minimal SMTP client built on Node.js net/tls sockets.
  * Supports implicit TLS (port 465), STARTTLS (port 587/25), and AUTH LOGIN.
  * Returns a structured result so callers can persist deliveries.
  *
  * NOT a full-featured client; intentionally compact for transactional sends.
  */
-// cloudflare:sockets is a Workers runtime built-in without local types.
-// Imported dynamically so Vite's dep scanner doesn't try to resolve it in dev.
-type CfConnect = (
-  address: { hostname: string; port: number },
-  options?: { secureTransport?: "on" | "off" | "starttls"; allowHalfOpen?: boolean },
-) => any;
-async function loadConnect(): Promise<CfConnect> {
-  const dynamicImport = new Function("specifier", "return import(specifier)") as (
-    specifier: string,
-  ) => Promise<{ connect: CfConnect }>;
-  const mod = await dynamicImport("cloudflare:sockets");
-  return mod.connect as CfConnect;
+import net from "node:net";
+import tls from "node:tls";
+
+type AnySocket = net.Socket | tls.TLSSocket;
+
+function connectPlain(host: string, port: number): Promise<net.Socket> {
+  return new Promise((resolve, reject) => {
+    const s = net.createConnection({ host, port });
+    const onErr = (e: Error) => { s.removeListener("connect", onOk); reject(e); };
+    const onOk = () => { s.removeListener("error", onErr); resolve(s); };
+    s.once("error", onErr);
+    s.once("connect", onOk);
+  });
+}
+
+function connectTls(host: string, port: number): Promise<tls.TLSSocket> {
+  return new Promise((resolve, reject) => {
+    const s = tls.connect({ host, port, servername: host });
+    const onErr = (e: Error) => { s.removeListener("secureConnect", onOk); reject(e); };
+    const onOk = () => { s.removeListener("error", onErr); resolve(s); };
+    s.once("error", onErr);
+    s.once("secureConnect", onOk);
+  });
+}
+
+function upgradeToTls(sock: net.Socket, host: string): Promise<tls.TLSSocket> {
+  return new Promise((resolve, reject) => {
+    const t = tls.connect({ socket: sock, servername: host });
+    const onErr = (e: Error) => { t.removeListener("secureConnect", onOk); reject(e); };
+    const onOk = () => { t.removeListener("error", onErr); resolve(t); };
+    t.once("error", onErr);
+    t.once("secureConnect", onOk);
+  });
 }
 
 export type SmtpAuth = {
@@ -127,51 +148,64 @@ function buildMime(msg: SmtpMessage): string {
  */
 export async function sendEmail(auth: SmtpAuth, msg: SmtpMessage): Promise<SmtpResult> {
   const log: string[] = [];
-  let socket: any = null;
+  let socket: AnySocket | null = null;
   try {
-    const connect = await loadConnect();
-    socket = connect(
-      { hostname: auth.host, port: auth.port },
-      auth.secure ? { secureTransport: "on" } : { secureTransport: "starttls" },
-    );
-
-    const writer = socket.writable.getWriter();
-    const reader = socket.readable.getReader();
-    const dec = new TextDecoder();
-    const enc = new TextEncoder();
+    socket = auth.secure
+      ? await connectTls(auth.host, auth.port)
+      : await connectPlain(auth.host, auth.port);
 
     let buffer = "";
+    let pending: ((chunk: string) => void) | null = null;
+    let closed = false;
+    let errored: Error | null = null;
+
+    const attach = (s: AnySocket) => {
+      s.setEncoding("utf8");
+      s.on("data", (chunk: string) => {
+        buffer += chunk;
+        if (pending) { const fn = pending; pending = null; fn(""); }
+      });
+      s.on("error", (e: Error) => {
+        errored = e;
+        if (pending) { const fn = pending; pending = null; fn(""); }
+      });
+      s.on("close", () => {
+        closed = true;
+        if (pending) { const fn = pending; pending = null; fn(""); }
+      });
+    };
+    attach(socket);
+
+    function waitData(): Promise<void> {
+      return new Promise((resolve) => { pending = () => resolve(); });
+    }
+
     async function readReply(): Promise<{ code: number; lines: string[] }> {
-      // SMTP multi-line: lines look like "250-..." then final "250 ...".
-      // Read until we have a complete reply.
-      // Drain socket until terminator.
-      // Defensive cap.
-      for (let attempt = 0; attempt < 50; attempt++) {
-        // Check if buffer already contains complete reply
+      for (let attempt = 0; attempt < 200; attempt++) {
         const lines = buffer.split(CRLF);
-        // Find final line index (matches /^\d{3} /)
         let finalIdx = -1;
         for (let i = 0; i < lines.length; i++) {
           if (/^\d{3} /.test(lines[i])) { finalIdx = i; break; }
         }
         if (finalIdx >= 0) {
           const replyLines = lines.slice(0, finalIdx + 1);
-          const rest = lines.slice(finalIdx + 1).join(CRLF);
-          buffer = rest;
+          buffer = lines.slice(finalIdx + 1).join(CRLF);
           const code = parseInt(replyLines[finalIdx].slice(0, 3), 10);
           log.push(`S: ${replyLines.join(" / ")}`);
           return { code, lines: replyLines };
         }
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += dec.decode(value, { stream: true });
+        if (errored) throw errored;
+        if (closed) throw new Error("SMTP connection closed");
+        await waitData();
       }
       throw new Error("SMTP read timeout");
     }
 
-    async function write(cmd: string, redact = false) {
+    function write(cmd: string, redact = false): Promise<void> {
       log.push(`C: ${redact ? "<redacted>" : cmd.trim()}`);
-      await writer.write(enc.encode(cmd));
+      return new Promise((resolve, reject) => {
+        socket!.write(cmd, (err) => (err ? reject(err) : resolve()));
+      });
     }
 
     // Greeting
@@ -183,80 +217,30 @@ export async function sendEmail(auth: SmtpAuth, msg: SmtpMessage): Promise<SmtpR
     r = await readReply();
     if (r.code !== 250) throw new Error(`EHLO failed: ${r.code}`);
 
-    // STARTTLS branch — the cloudflare:sockets startTls() returns a new socket.
+    // STARTTLS branch
     if (!auth.secure && r.lines.some((l) => l.toUpperCase().includes("STARTTLS"))) {
       await write(`STARTTLS${CRLF}`);
       const tlsR = await readReply();
       if (tlsR.code !== 220) throw new Error(`STARTTLS failed: ${tlsR.code}`);
-      // Release current locks before upgrade.
-      writer.releaseLock();
-      reader.releaseLock();
-      const upgraded = socket.startTls();
-      // Replace socket reference for cleanup at end.
+      // Upgrade socket to TLS in place
+      const plain = socket as net.Socket;
+      plain.removeAllListeners("data");
+      plain.removeAllListeners("error");
+      plain.removeAllListeners("close");
+      const upgraded = await upgradeToTls(plain, auth.host);
       socket = upgraded;
-      const w2 = upgraded.writable.getWriter();
-      const r2 = upgraded.readable.getReader();
       buffer = "";
-      // re-EHLO over TLS
-      const enc2 = new TextEncoder();
-      const dec2 = new TextDecoder();
-      async function tlsRead(): Promise<{ code: number; lines: string[] }> {
-        for (let attempt = 0; attempt < 50; attempt++) {
-          const lines = buffer.split(CRLF);
-          let finalIdx = -1;
-          for (let i = 0; i < lines.length; i++) if (/^\d{3} /.test(lines[i])) { finalIdx = i; break; }
-          if (finalIdx >= 0) {
-            const replyLines = lines.slice(0, finalIdx + 1);
-            buffer = lines.slice(finalIdx + 1).join(CRLF);
-            log.push(`S: ${replyLines.join(" / ")}`);
-            return { code: parseInt(replyLines[finalIdx].slice(0, 3), 10), lines: replyLines };
-          }
-          const { value, done } = await r2.read();
-          if (done) break;
-          buffer += dec2.decode(value, { stream: true });
-        }
-        throw new Error("SMTP read timeout (tls)");
-      }
-      async function tlsWrite(cmd: string, redact = false) {
-        log.push(`C: ${redact ? "<redacted>" : cmd.trim()}`);
-        await w2.write(enc2.encode(cmd));
-      }
-      await tlsWrite(`EHLO hr-app.local${CRLF}`);
-      const ehlo2 = await tlsRead();
+      closed = false;
+      errored = null;
+      pending = null;
+      attach(upgraded);
+      // re-EHLO
+      await write(`EHLO hr-app.local${CRLF}`);
+      const ehlo2 = await readReply();
       if (ehlo2.code !== 250) throw new Error(`EHLO (tls) failed: ${ehlo2.code}`);
-      // AUTH LOGIN
-      await tlsWrite(`AUTH LOGIN${CRLF}`);
-      let a = await tlsRead();
-      if (a.code !== 334) throw new Error(`AUTH LOGIN start failed: ${a.code}`);
-      await tlsWrite(`${encodeBase64(auth.username)}${CRLF}`, true);
-      a = await tlsRead();
-      if (a.code !== 334) throw new Error(`AUTH username failed: ${a.code}`);
-      await tlsWrite(`${encodeBase64(auth.password)}${CRLF}`, true);
-      a = await tlsRead();
-      if (a.code !== 235) throw new Error(`AUTH password failed: ${a.code}`);
-      // MAIL FROM
-      await tlsWrite(`MAIL FROM:<${msg.fromEmail}>${CRLF}`);
-      let m = await tlsRead();
-      if (m.code !== 250) throw new Error(`MAIL FROM failed: ${m.code}`);
-      for (const rcpt of msg.to) {
-        await tlsWrite(`RCPT TO:<${rcpt}>${CRLF}`);
-        m = await tlsRead();
-        if (m.code !== 250 && m.code !== 251) throw new Error(`RCPT failed (${rcpt}): ${m.code}`);
-      }
-      await tlsWrite(`DATA${CRLF}`);
-      m = await tlsRead();
-      if (m.code !== 354) throw new Error(`DATA failed: ${m.code}`);
-      const body = buildMime(msg) + CRLF + "." + CRLF;
-      await tlsWrite(body);
-      m = await tlsRead();
-      if (m.code !== 250) throw new Error(`Message rejected: ${m.code}`);
-      await tlsWrite(`QUIT${CRLF}`);
-      try { await tlsRead(); } catch { /* ignore */ }
-      try { await upgraded.close(); } catch { /* ignore */ }
-      return { ok: true, code: 250, message: "OK", log };
     }
 
-    // Non-STARTTLS path (implicit TLS or plain) — reuse original socket
+    // AUTH + send (works for implicit TLS, plain, or upgraded STARTTLS)
     await write(`AUTH LOGIN${CRLF}`);
     let a = await readReply();
     if (a.code !== 334) throw new Error(`AUTH LOGIN start failed: ${a.code}`);
@@ -284,11 +268,11 @@ export async function sendEmail(auth: SmtpAuth, msg: SmtpMessage): Promise<SmtpR
     if (m.code !== 250) throw new Error(`Message rejected: ${m.code}`);
     await write(`QUIT${CRLF}`);
     try { await readReply(); } catch { /* ignore */ }
-    try { await socket.close(); } catch { /* ignore */ }
+    try { socket.end(); } catch { /* ignore */ }
     return { ok: true, code: 250, message: "OK", log };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    try { await socket?.close(); } catch { /* ignore */ }
+    try { socket?.destroy(); } catch { /* ignore */ }
     return { ok: false, message, log };
   }
 }
