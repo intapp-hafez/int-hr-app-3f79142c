@@ -8,7 +8,8 @@ export const getEmployeeWorkingDays = createServerFn({ method: "GET" })
   .middleware([requireAdminAccess])
   .inputValidator((i) => z.object({ employee_id: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
-    const { data: rows, error } = await context.supabase
+    const sb = context.supabase as any;
+    const { data: rows, error } = await sb
       .from("employee_working_days")
       .select("scope, year, month, days")
       .eq("employee_id", data.employee_id);
@@ -32,7 +33,8 @@ export const setEmployeeWorkingDaysWeekly = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const uniqueDays = Array.from(new Set(data.days)).sort();
-    const { error } = await context.supabase
+    const sb = context.supabase as any;
+    const { error } = await sb
       .from("employee_working_days")
       .upsert(
         { employee_id: data.employee_id, scope: "weekly", year: null, month: null, days: uniqueDays },
@@ -40,13 +42,13 @@ export const setEmployeeWorkingDaysWeekly = createServerFn({ method: "POST" })
       );
     if (error) {
       // Fallback: manual delete+insert if partial-index upsert isn't honored
-      const { error: delErr } = await context.supabase
+      const { error: delErr } = await sb
         .from("employee_working_days")
         .delete()
         .eq("employee_id", data.employee_id)
         .eq("scope", "weekly");
       if (delErr) throw new Error(delErr.message);
-      const { error: insErr } = await context.supabase
+      const { error: insErr } = await sb
         .from("employee_working_days")
         .insert({ employee_id: data.employee_id, scope: "weekly", days: uniqueDays });
       if (insErr) throw new Error(insErr.message);
@@ -68,7 +70,8 @@ export const setEmployeeWorkingDaysMonth = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const uniqueDays = Array.from(new Set(data.days)).sort();
-    const { error: delErr } = await context.supabase
+    const sb = context.supabase as any;
+    const { error: delErr } = await sb
       .from("employee_working_days")
       .delete()
       .eq("employee_id", data.employee_id)
@@ -76,7 +79,7 @@ export const setEmployeeWorkingDaysMonth = createServerFn({ method: "POST" })
       .eq("year", data.year)
       .eq("month", data.month);
     if (delErr) throw new Error(delErr.message);
-    const { error: insErr } = await context.supabase.from("employee_working_days").insert({
+    const { error: insErr } = await sb.from("employee_working_days").insert({
       employee_id: data.employee_id,
       scope: "month",
       year: data.year,
@@ -99,7 +102,8 @@ export const clearEmployeeWorkingDaysMonth = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
+    const sb = context.supabase as any;
+    const { error } = await sb
       .from("employee_working_days")
       .delete()
       .eq("employee_id", data.employee_id)
