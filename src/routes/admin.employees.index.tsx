@@ -835,13 +835,13 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
             </div>
           </div>
           <div className="grid gap-3 md:grid-cols-3">
-            <Field label="Email (login)" error={fieldErrors.email}><input type="email" value={form.email} onChange={(e) => upd("email", e.target.value)} maxLength={120} className={inputCls} /></Field>
+            <Field label="Email (login)" error={fieldErrors.email}><input type="email" value={form.email} onChange={(e) => upd("email", e.target.value)} onBlur={() => handleBlur("email")} maxLength={120} className={inputCls} /></Field>
             <Field label={t("password")} error={fieldErrors.password}>
-              <input type="text" value={form.password} onChange={(e) => upd("password", e.target.value)} maxLength={64} placeholder="min 6 chars" className={inputCls + " font-mono"} />
+              <input type="text" value={form.password} onChange={(e) => upd("password", e.target.value)} onBlur={() => handleBlur("password")} maxLength={64} placeholder="min 6 chars" className={inputCls + " font-mono"} />
             </Field>
-            <Field label="Full name" error={fieldErrors.name}><input value={form.name} onChange={(e) => upd("name", e.target.value)} maxLength={80} className={inputCls} /></Field>
+            <Field label="Full name" error={fieldErrors.name}><input value={form.name} onChange={(e) => upd("name", e.target.value)} onBlur={() => handleBlur("name")} maxLength={80} className={inputCls} /></Field>
             <Field label="Phone" error={fieldErrors.phone}>
-              <input type="tel" dir="ltr" inputMode="tel" value={form.phone} onChange={(e) => upd("phone", formatEgPhone(e.target.value))} maxLength={20} placeholder="+20 100 123 4567" className={inputCls + " font-mono"} />
+              <input type="tel" dir="ltr" inputMode="tel" value={form.phone} onChange={(e) => upd("phone", formatEgPhone(e.target.value))} onBlur={() => handleBlur("phone")} maxLength={20} placeholder="+20 100 123 4567" className={inputCls + " font-mono"} />
             </Field>
             <Field label="Employee Code">
               <input value={form.empCode} onChange={(e) => upd("empCode", e.target.value)} maxLength={20} placeholder="auto if blank" className={inputCls + " font-mono"} />
@@ -895,7 +895,7 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
               <input type="date" value={form.idIssueDate} onChange={(e) => upd("idIssueDate", e.target.value)} className={inputCls + " font-mono"} />
             </Field>
             <Field label="ID Expiry Date" error={fieldErrors.nationalIdExpiry}>
-              <input type="date" value={form.nationalIdExpiry} onChange={(e) => upd("nationalIdExpiry", e.target.value)} className={inputCls + " font-mono"} />
+              <input type="date" value={form.nationalIdExpiry} onChange={(e) => upd("nationalIdExpiry", e.target.value)} onBlur={() => handleBlur("nationalIdExpiry")} className={inputCls + " font-mono"} />
             </Field>
             <Field label="Address on ID">
               <input value={form.idCardAddress} onChange={(e) => upd("idCardAddress", e.target.value)} maxLength={200} placeholder="As written on national ID" className={inputCls} />
