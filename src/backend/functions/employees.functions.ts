@@ -598,19 +598,22 @@ export const listCitiesAndDistricts = createServerFn({ method: "GET" })
     managers: { id: string; name: string }[];
   }> => {
     const { supabase } = context;
-    const [{ data: cities }, { data: districts }, { data: depts }, { data: poss }, { data: mgrs }] = await Promise.all([
+    const [{ data: cities }, { data: districts }, { data: depts }, { data: poss }, { data: mgrs }, { data: mgrRoles }] = await Promise.all([
       supabase.from("cities").select("id, name_en").order("name_en"),
       supabase.from("districts").select("id, city_id, name_en").order("name_en"),
       supabase.from("departments").select("id, name_en").order("name_en"),
       supabase.from("positions").select("id, name_en").order("name_en"),
       supabase.from("profiles").select("id, full_name, email").eq("status", "Active").order("full_name"),
+      supabase.from("user_roles").select("user_id, role").in("role", ["admin", "manager"]),
     ]);
+    const allowedMgrIds = new Set((mgrRoles ?? []).map((r: any) => r.user_id));
+    const filteredMgrs = (mgrs ?? []).filter((m: any) => allowedMgrIds.has(m.id));
     return {
       cities: (cities ?? []).map((c: any) => ({ id: c.id, name_en: c.name_en })),
       districts: (districts ?? []).map((d: any) => ({ id: d.id, city_id: d.city_id, name_en: d.name_en })),
       departments: (depts ?? []).map((d: any) => ({ id: d.id, name_en: d.name_en })),
       positions: (poss ?? []).map((p: any) => ({ id: p.id, name_en: p.name_en })),
-      managers: (mgrs ?? []).map((m: any) => ({ id: m.id, name: m.full_name ?? m.email ?? "—" })),
+      managers: filteredMgrs.map((m: any) => ({ id: m.id, name: m.full_name ?? m.email ?? "—" })),
     };
   });
 
