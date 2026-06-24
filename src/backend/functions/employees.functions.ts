@@ -296,11 +296,18 @@ export const bulkSetEmployeeStatus = createServerFn({ method: "POST" })
 export const importEmployeesAdmin = createServerFn({ method: "POST" })
   .middleware([requireAdminAccess])
   .inputValidator((input) =>
-    z.object({ employees: z.array(ImportEmployeeRowSchema).min(1).max(500) }).parse(input),
+    z
+      .object({
+        employees: z.array(ImportEmployeeRowSchema).min(1).max(500),
+        loginUrl: z.string().max(500).optional().default(""),
+        appName: z.string().max(120).optional().default(""),
+      })
+      .parse(input),
   )
   .handler(async ({ context, data }): Promise<ImportEmployeeResult> => {
     const { supabase } = context;
     const { supabaseAdmin } = await import("@/backend/server/admin-client.server");
+    const { sendWelcomeEmail } = await import("@/backend/server/welcome-email.server");
 
     const [{ data: departments }, { data: positions }] = await Promise.all([
       supabase.from("departments").select("id, name_en"),
@@ -470,6 +477,18 @@ export const importEmployeesAdmin = createServerFn({ method: "POST" })
           avatar_url: row.avatarUrl.trim() || null,
         });
         results.push({ index, ok: true, id: String(newId), email });
+
+        // Best-effort welcome email; never blocks import.
+        if (data.loginUrl && row.password.trim()) {
+          void sendWelcomeEmail({
+            to: email,
+            employeeName: fullName,
+            username: email,
+            password: row.password.trim(),
+            loginUrl: data.loginUrl,
+            appName: data.appName || undefined,
+          });
+        }
       } catch (e: any) {
         results.push({ index, ok: false, email, error: e?.message ?? "Import failed" });
       }
