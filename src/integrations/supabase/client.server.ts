@@ -4,6 +4,15 @@
 // For user-authenticated queries (with RLS), use the auth middleware instead.
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
+import { supabase as browserSupabase } from './client';
+
+// Detect SPA/browser context (no Node process). In that case we cannot
+// safely use the service role key, so fall back to the authenticated
+// browser client — RLS + SECURITY DEFINER RPCs handle privileged ops.
+const isBrowser =
+  typeof window !== 'undefined' ||
+  typeof (globalThis as any).process === 'undefined' ||
+  !(globalThis as any).process?.env;
 
 function createSupabaseAdminClient() {
   const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
@@ -37,6 +46,9 @@ let _supabaseAdmin: ReturnType<typeof createSupabaseAdminClient> | undefined;
 // Import like: import { supabaseAdmin } from "@/integrations/supabase/client.server";
 export const supabaseAdmin = new Proxy({} as ReturnType<typeof createSupabaseAdminClient>, {
   get(_, prop, receiver) {
+    if (isBrowser) {
+      return Reflect.get(browserSupabase as any, prop, receiver);
+    }
     if (!_supabaseAdmin) _supabaseAdmin = createSupabaseAdminClient();
     return Reflect.get(_supabaseAdmin, prop, receiver);
   },
