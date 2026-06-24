@@ -74,6 +74,6 @@ export async function writeSmtpConfig(input: {
       _key: key(),
       _password: input.password,
     });
-    if (error) throw new Error(`Failed to encrypt SMTP password: ${error.message}`);
+    if (error) throw new Error(`Failed to store SMTP password: ${error.message}`);
   }
 }
