@@ -6,6 +6,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Download } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { SalaryPreview } from "@/components/SalaryPreview";
+import { computeSalaryPair } from "@/lib/salary-calc";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useI18n } from "@/lib/i18n";
 import { useStore, getState, addEmployee, type Employee } from "@/lib/store";
@@ -713,7 +714,7 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
           </div>
         )}
         <form onSubmit={submit} className="space-y-3 max-h-[65vh] overflow-y-auto pr-1">
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-3">
             <Field label="Email (login)"><input type="email" value={form.email} onChange={(e) => upd("email", e.target.value)} maxLength={120} className={inputCls} /></Field>
             <Field label={t("password")}>
               <input type="text" value={form.password} onChange={(e) => upd("password", e.target.value)} maxLength={64} placeholder="min 6 chars" className={inputCls + " font-mono"} />
@@ -791,8 +792,7 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
             <Field label="Contract End Date">
               <input type="date" value={contractEndDate} onChange={(e) => setContractEndDate(e.target.value)} className={inputCls + " font-mono"} />
             </Field>
-            <div className="hidden md:block" />
-            <label className="inline-flex items-center gap-2 text-xs text-muted-foreground md:col-span-2">
+            <label className="inline-flex items-center gap-2 text-xs text-muted-foreground md:col-span-3">
               <input type="checkbox" className="h-4 w-4 accent-brand" checked={contractCancelled} onChange={(e) => setContractCancelled(e.target.checked)} />
               Contract cancelled
             </label>
@@ -809,10 +809,10 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
                 readOnly={form.salaryMode === "net"}
                 value={form.salaryGross || ""}
                 onChange={(e) => {
-                  const n = Number(e.target.value);
-                  upd("salaryGross", n);
-                  upd("salaryNet", n ? Math.round(n * 0.9) : 0);
-                  upd("salary", n);
+                  const { gross, net } = computeSalaryPair(Number(e.target.value), "gross");
+                  upd("salaryGross", gross);
+                  upd("salaryNet", net);
+                  upd("salary", gross);
                 }}
                 className={inputCls + " font-mono" + (form.salaryMode === "net" ? " bg-muted/40 text-muted-foreground" : "")}
               />
@@ -824,10 +824,10 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
                 readOnly={form.salaryMode === "gross"}
                 value={form.salaryNet || ""}
                 onChange={(e) => {
-                  const n = Number(e.target.value);
-                  upd("salaryNet", n);
-                  upd("salaryGross", n ? Math.round(n / 0.9) : 0);
-                  upd("salary", n);
+                  const { gross, net } = computeSalaryPair(Number(e.target.value), "net");
+                  upd("salaryNet", net);
+                  upd("salaryGross", gross);
+                  upd("salary", net);
                 }}
                 className={inputCls + " font-mono" + (form.salaryMode === "gross" ? " bg-muted/40 text-muted-foreground" : "")}
               />
@@ -843,7 +843,7 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
                 {["Daily","Weekly","Monthly","Quarterly","Yearly"].map((d) => <option key={d} value={d}>{d}</option>)}
               </select>
             </Field>
-            <label className="inline-flex items-center gap-2 text-xs text-muted-foreground md:col-span-2">
+            <label className="inline-flex items-center gap-2 text-xs text-muted-foreground md:col-span-3">
               <input type="checkbox" className="h-4 w-4 accent-brand" checked={allowPastExpiry} onChange={(e) => setAllowPastExpiry(e.target.checked)} />
               Override: allow expiry date in the past (admin/HR only)
             </label>
