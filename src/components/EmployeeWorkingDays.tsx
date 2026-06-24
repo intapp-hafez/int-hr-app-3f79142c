@@ -58,7 +58,7 @@ export function EmployeeWorkingDays({ employeeId }: { employeeId: string }) {
   useEffect(() => {
     if (!data) return;
     const [y, m] = ym.split("-").map(Number);
-    const found = data.months.find((o) => o.year === y && o.month === m);
+    const found = data.months.find((o: { year: number; month: number; days: number[] }) => o.year === y && o.month === m);
     if (found) {
       setMonthDays(found.days);
       setMonthExists(true);
