@@ -772,6 +772,8 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
           const msg = created.warning || "Welcome email failed";
           setErr(`Account created, but email was not sent: ${msg}`);
           toast.warning("Account created, but email was not sent", { description: msg });
+          void qc.invalidateQueries({ queryKey: ["admin", "employees", "list"] });
+          onClose();
           return;
         }
         toast.success("Employee account created and welcome email sent", { description: form.email });

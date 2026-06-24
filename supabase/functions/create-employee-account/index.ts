@@ -178,15 +178,15 @@ Deno.serve(async (req) => {
     const appName = text(body.appName) || "HR Portal";
     const loginUrl = text(body.loginUrl);
     const rendered = welcomeEmail({ employeeName: fullName, username: email, password, loginUrl, appName });
-    const client = new SMTPClient({
-      connection: {
-        hostname: String(smtp.host),
-        port: Number(smtp.port),
-        tls: Boolean(smtp.secure),
-        auth: { username: String(smtp.username), password: String(smtp.password) },
-      },
-    });
     try {
+      const client = new SMTPClient({
+        connection: {
+          hostname: String(smtp.host),
+          port: Number(smtp.port),
+          tls: Boolean(smtp.secure),
+          auth: { username: String(smtp.username), password: String(smtp.password) },
+        },
+      });
       await client.send({
         from: smtp.from_name ? `${smtp.from_name} <${smtp.from_email}>` : smtp.from_email,
         to: email,
@@ -194,8 +194,20 @@ Deno.serve(async (req) => {
         content: rendered.text,
         html: rendered.html,
       });
-    } finally {
       try { await client.close(); } catch { /* ignore */ }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      return json(200, {
+        ok: false,
+        id: newUserId,
+        email,
+        accountCreated: true,
+        profileCreated: true,
+        emailSent: false,
+        warning: message || "Welcome email failed",
+      });
+    } finally {
+      // SMTP send errors are returned as warnings above; account creation remains committed.
     }
 
     return json(200, { ok: true, id: newUserId, email, accountCreated: true, profileCreated: true, emailSent: true });
