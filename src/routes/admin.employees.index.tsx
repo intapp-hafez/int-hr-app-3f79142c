@@ -639,24 +639,38 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
   const [contractCancelled, setContractCancelled] = useState(false);
   const [allowPastExpiry, setAllowPastExpiry] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const upd = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
+
+  function validate(): Record<string, string> {
+    const errs: Record<string, string> = {};
+    if (!form.name.trim() || form.name.trim().length < 2) errs.name = "Name is required (min 2 chars)";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = "Valid email required";
+    if (!isValidEgPhone(form.phone)) errs.phone = t("phoneInvalid");
+    if (!form.password || form.password.length < 6) errs.password = "Password must be at least 6 characters";
+    if (!form.salary || form.salary <= 0) errs.salary = "Salary is required";
+    if (form.target <= 0) errs.target = "Target value must be > 0";
+    if (!(VALID_SALARY_MODES as readonly string[]).includes(form.salaryMode)) errs.salaryMode = "Invalid salary mode";
+    if (!(VALID_CONTRACT_TYPES as readonly string[]).includes(form.contractType)) errs.contractType = "Invalid contract type";
+    if (!form.dept.trim()) errs.dept = "Department is required";
+    if (form.manager && !managers.some((emp) => emp.id === form.manager)) errs.manager = "Invalid manager";
+    const expCheck = validateIdExpiry(form.nationalId, form.nationalIdExpiry);
+    if (expCheck !== "ok") errs.nationalIdExpiry = t(expCheck as any);
+    return errs;
+  }
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (setupIncomplete) return setErr(t("employeeSetupIncomplete" as any) || "Add at least one Department and Position before creating employees.");
-    if (!form.name.trim() || form.name.trim().length < 2) return setErr("Name is required (min 2 chars)");
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) return setErr("Valid email required");
-    if (!isValidEgPhone(form.phone)) return setErr(t("phoneInvalid"));
-    if (!form.password || form.password.length < 6) return setErr("Password must be at least 6 characters");
-    if (!form.salary || form.salary <= 0) return setErr("Salary is required");
-    if (form.target <= 0) return setErr("Target value must be > 0");
-    if (!(VALID_SALARY_MODES as readonly string[]).includes(form.salaryMode)) return setErr("Invalid salary mode");
-    if (!(VALID_CONTRACT_TYPES as readonly string[]).includes(form.contractType)) return setErr("Invalid contract type");
-    if (!form.dept.trim()) return setErr("Department is required");
-    if (form.manager && !managers.some((emp) => emp.id === form.manager)) return setErr("Invalid manager");
-    const expCheck = validateIdExpiry(form.nationalId, form.nationalIdExpiry);
-    if (expCheck !== "ok") return setErr(t(expCheck as any));
+    const errs = validate();
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) {
+      setErr("Please fix the highlighted fields");
+      toast.error("Please fix the highlighted fields");
+      return;
+    }
+    setErr(null);
     void (async () => {
       try {
         const res = await validateBatch({
@@ -782,12 +796,12 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
             </div>
           </div>
           <div className="grid gap-3 md:grid-cols-3">
-            <Field label="Email (login)"><input type="email" value={form.email} onChange={(e) => upd("email", e.target.value)} maxLength={120} className={inputCls} /></Field>
-            <Field label={t("password")}>
+            <Field label="Email (login)" error={fieldErrors.email}><input type="email" value={form.email} onChange={(e) => upd("email", e.target.value)} maxLength={120} className={inputCls} /></Field>
+            <Field label={t("password")} error={fieldErrors.password}>
               <input type="text" value={form.password} onChange={(e) => upd("password", e.target.value)} maxLength={64} placeholder="min 6 chars" className={inputCls + " font-mono"} />
             </Field>
-            <Field label="Full name"><input value={form.name} onChange={(e) => upd("name", e.target.value)} maxLength={80} className={inputCls} /></Field>
-            <Field label="Phone">
+            <Field label="Full name" error={fieldErrors.name}><input value={form.name} onChange={(e) => upd("name", e.target.value)} maxLength={80} className={inputCls} /></Field>
+            <Field label="Phone" error={fieldErrors.phone}>
               <input type="tel" dir="ltr" inputMode="tel" value={form.phone} onChange={(e) => upd("phone", formatEgPhone(e.target.value))} maxLength={20} placeholder="+20 100 123 4567" className={inputCls + " font-mono"} />
             </Field>
             <Field label="Employee Code">
@@ -817,7 +831,7 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
                 );
               })()}
             </Field>
-            <Field label="Department">
+            <Field label="Department" error={fieldErrors.dept}>
               <select value={form.dept} onChange={(e) => upd("dept", e.target.value)} disabled={departments.length === 0} className={inputCls + " disabled:opacity-60"}>
                 <option value="">—</option>
                 {departments.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
@@ -829,7 +843,7 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
                 {positions.map((p) => <option key={p.id} value={p.name}>{p.name}</option>)}
               </select>
             </Field>
-            <Field label="Manager">
+            <Field label="Manager" error={fieldErrors.manager}>
               <select value={form.manager} onChange={(e) => upd("manager", e.target.value)} className={inputCls}>
                 <option value="">—</option>
                 {managers.map((emp) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
@@ -841,13 +855,13 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
             <Field label="ID Issue Date">
               <input type="date" value={form.idIssueDate} onChange={(e) => upd("idIssueDate", e.target.value)} className={inputCls + " font-mono"} />
             </Field>
-            <Field label="ID Expiry Date">
+            <Field label="ID Expiry Date" error={fieldErrors.nationalIdExpiry}>
               <input type="date" value={form.nationalIdExpiry} onChange={(e) => upd("nationalIdExpiry", e.target.value)} className={inputCls + " font-mono"} />
             </Field>
             <Field label="Address on ID">
               <input value={form.idCardAddress} onChange={(e) => upd("idCardAddress", e.target.value)} maxLength={200} placeholder="As written on national ID" className={inputCls} />
             </Field>
-            <Field label="Contract Type">
+            <Field label="Contract Type" error={fieldErrors.contractType}>
               <select value={form.contractType} onChange={(e) => upd("contractType", e.target.value)} className={inputCls}>
                 <option value="FullTime">Full-time</option>
                 <option value="PartTime">Part-time</option>
@@ -866,13 +880,13 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
               <input type="checkbox" className="h-4 w-4 accent-brand" checked={contractCancelled} onChange={(e) => setContractCancelled(e.target.checked)} />
               Contract cancelled
             </label>
-            <Field label="Salary Basis">
+            <Field label="Salary Basis" error={fieldErrors.salaryMode}>
               <select value={form.salaryMode} onChange={(e) => upd("salaryMode", e.target.value as any)} className={inputCls}>
                 <option value="gross">Gross</option>
                 <option value="net">Net</option>
               </select>
             </Field>
-            <Field label="Salary Gross (EGP)">
+            <Field label="Salary Gross (EGP)" error={form.salaryMode === "gross" ? fieldErrors.salary : undefined}>
               <input
                 type="number"
                 min={0}
@@ -887,7 +901,7 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
                 className={inputCls + " font-mono" + (form.salaryMode === "net" ? " bg-muted/40 text-muted-foreground" : "")}
               />
             </Field>
-            <Field label="Salary Net (EGP)">
+            <Field label="Salary Net (EGP)" error={form.salaryMode === "net" ? fieldErrors.salary : undefined}>
               <input
                 type="number"
                 min={0}
@@ -905,7 +919,7 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
             <Field label="Allowance (EGP)">
               <input type="number" min={0} value={form.allowance || ""} onChange={(e) => upd("allowance", Number(e.target.value))} className={inputCls + " font-mono"} />
             </Field>
-            <Field label="Target Value">
+            <Field label="Target Value" error={fieldErrors.target}>
               <input type="number" min={0} value={form.target || ""} onChange={(e) => upd("target", Number(e.target.value))} className={inputCls + " font-mono"} />
             </Field>
             <Field label="Target Duration">
@@ -1582,11 +1596,12 @@ function ImportErrorPanel({ errors, onClose }: { errors: ImportErrors; onClose: 
 
 const Th = ({ children }: { children: React.ReactNode }) => <th className="px-4 py-3 text-start font-medium">{children}</th>;
 const Td = ({ children, mono }: { children: React.ReactNode; mono?: boolean }) => <td className={`px-4 py-3 ${mono ? "font-mono text-xs tabular-nums" : ""}`}>{children}</td>;
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
     <label className="block">
       <span className="mb-1 block text-xs font-medium text-muted-foreground">{label}</span>
       {children}
+      {error && <p className="mt-1 text-[11px] text-destructive">{error}</p>}
     </label>
   );
 }
