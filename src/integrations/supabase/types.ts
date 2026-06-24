@@ -502,6 +502,47 @@ export type Database = {
           },
         ]
       }
+      employee_working_days: {
+        Row: {
+          created_at: string
+          days: number[]
+          employee_id: string
+          id: string
+          month: number | null
+          scope: string
+          updated_at: string
+          year: number | null
+        }
+        Insert: {
+          created_at?: string
+          days?: number[]
+          employee_id: string
+          id?: string
+          month?: number | null
+          scope: string
+          updated_at?: string
+          year?: number | null
+        }
+        Update: {
+          created_at?: string
+          days?: number[]
+          employee_id?: string
+          id?: string
+          month?: number | null
+          scope?: string
+          updated_at?: string
+          year?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_working_days_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       export_runs: {
         Row: {
           error: string | null
