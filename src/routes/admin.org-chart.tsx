@@ -65,13 +65,6 @@ function PersonCard({
     ? "bg-gradient-to-r from-brand/60 via-brand/30 to-transparent"
     : "bg-gradient-to-r from-border via-border/60 to-transparent";
   const displayTitle = title ?? person.positionName ?? "Team Member";
-  const initials = person.name
-    .split(" ")
-    .map((s) => s[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
   return (
     <div
       ref={editing ? sortable.setNodeRef : undefined}
