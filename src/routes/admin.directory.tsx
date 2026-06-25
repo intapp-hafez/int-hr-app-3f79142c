@@ -126,7 +126,6 @@ function NamedSection({ kind }: { kind: "departments" | "positions" }) {
     staleTime: 5 * 60_000,
   });
   const managers: Array<{ id: string; name: string }> = (mgrQ.data as any)?.managers ?? [];
-  const nameFor = (id?: string | null) => managers.find((m) => m.id === id)?.name ?? "";
   const mUpsert = useMutation({
     mutationFn: (row: { id?: string; name_en: string; name_ar: string; active?: boolean; responsible_person_id?: string | null }) => upsert({ data: row }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: key }); toast.success("Saved"); },
