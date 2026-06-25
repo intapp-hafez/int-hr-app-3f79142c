@@ -25,7 +25,7 @@ export const upsertDepartment = createServerFn({ method: "POST" })
     const { error } = await context.supabase.from("departments").upsert({
       id: data.id, name_en: data.name_en, name_ar: data.name_ar, active: data.active ?? true,
       responsible_person_id: data.responsible_person_id ?? null,
-    });
+    } as any);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
