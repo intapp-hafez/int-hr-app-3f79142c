@@ -3,6 +3,14 @@ import { z } from "zod";
 import { requireAdminAccess } from "@/integrations/supabase/admin-auth-middleware";
 import { NamedRowSchema, DistrictRowSchema, LeaveTypeRowSchema } from "../schemas";
 
+type DepartmentUpsert = {
+  id?: string;
+  name_en: string;
+  name_ar: string;
+  active: boolean;
+  responsible_person_id: string | null;
+};
+
 // ── Departments ────────────────────────────────────
 export const listDepartments = createServerFn({ method: "GET" })
   .middleware([requireAdminAccess])
@@ -22,10 +30,19 @@ export const upsertDepartment = createServerFn({ method: "POST" })
   .middleware([requireAdminAccess])
   .inputValidator((i) => NamedRowSchema.parse(i))
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.from("departments").upsert({
-      id: data.id, name_en: data.name_en, name_ar: data.name_ar, active: data.active ?? true,
+    const row: DepartmentUpsert = {
+      id: data.id,
+      name_en: data.name_en,
+      name_ar: data.name_ar,
+      active: data.active ?? true,
       responsible_person_id: data.responsible_person_id ?? null,
-    } as any);
+    };
+    // Cast: supabase generated types haven't been regenerated to include
+    // the new `responsible_person_id` column yet. RLS still enforces
+    // admin/HR-only writes server-side.
+    const { error } = await context.supabase
+      .from("departments")
+      .upsert(row as unknown as Parameters<typeof context.supabase.from<"departments">>[0] extends never ? never : any);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
