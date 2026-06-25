@@ -52,64 +52,109 @@ function PersonCard({
     transition: sortable.transition,
     opacity: sortable.isDragging ? 0.4 : 1,
   } : undefined;
-  const ring =
-    accent === "primary"
-      ? "ring-2 ring-brand/60 bg-gradient-to-b from-brand/10 to-card"
-      : accent === "head"
-      ? "ring-1 ring-brand/30 bg-gradient-to-b from-brand/5 to-card"
-      : "bg-card";
+  const isPrimary = accent === "primary";
+  const isHead = accent === "head";
+  const tone = isPrimary
+    ? "border-brand/40 bg-gradient-to-br from-brand/10 via-card to-card shadow-[0_8px_24px_-12px_hsl(var(--brand)/0.45)]"
+    : isHead
+    ? "border-brand/20 bg-gradient-to-br from-brand/[0.04] via-card to-card"
+    : "border-border/70 bg-card";
+  const stripe = isPrimary
+    ? "bg-gradient-to-r from-brand via-brand/70 to-brand/30"
+    : isHead
+    ? "bg-gradient-to-r from-brand/60 via-brand/30 to-transparent"
+    : "bg-gradient-to-r from-border via-border/60 to-transparent";
+  const displayTitle = title ?? person.positionName ?? "Team Member";
+  const initials = person.name
+    .split(" ")
+    .map((s) => s[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
   return (
     <div
       ref={editing ? sortable.setNodeRef : undefined}
       style={style}
-      className={`group relative flex w-60 flex-col items-stretch gap-3 overflow-hidden rounded-2xl border border-border ${ring} p-4 shadow-sm transition ${editing ? "cursor-grab active:cursor-grabbing" : "hover:-translate-y-0.5 hover:shadow-md"}`}
+      className={`group relative flex w-64 flex-col overflow-hidden rounded-2xl border ${tone} backdrop-blur-sm transition-all duration-300 ${editing ? "cursor-grab active:cursor-grabbing" : "hover:-translate-y-1 hover:border-brand/50 hover:shadow-[0_16px_40px_-16px_hsl(var(--brand)/0.4)]"}`}
       onClick={() => !editing && onOpen(person, { title, deptName })}
       role={editing ? undefined : "button"}
       {...(editing ? sortable.attributes : {})}
       {...(editing ? sortable.listeners : {})}
     >
-      {accent === "primary" && (
-        <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-brand px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-foreground shadow">
-          <Crown className="h-3 w-3" /> Lead
+      {/* Accent stripe */}
+      <div className={`h-1 w-full ${stripe}`} />
+
+      {/* Lead badge */}
+      {isPrimary && (
+        <span className="absolute right-3 top-3 z-10 inline-flex items-center gap-1 rounded-full bg-brand px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-brand-foreground shadow-md">
+          <Crown className="h-2.5 w-2.5" /> Lead
         </span>
       )}
-      <div className="flex items-center gap-3">
-        {editing && <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" />}
-        <EmployeeAvatar
-          id={person.id}
-          name={person.name}
-          url={person.avatarUrl}
-          className="h-12 w-12 shrink-0 ring-2 ring-background shadow-md"
-        />
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-left text-sm font-bold text-foreground" title={person.name}>
+      {editing && (
+        <span className="absolute left-2 top-2 z-10 rounded-md bg-background/80 p-1 text-muted-foreground shadow-sm">
+          <GripVertical className="h-3.5 w-3.5" />
+        </span>
+      )}
+
+      <div className="flex flex-col items-center gap-3 px-4 pb-3 pt-5">
+        {/* Avatar with status dot */}
+        <div className="relative">
+          <div className={`absolute -inset-1 rounded-full ${isPrimary ? "bg-gradient-to-tr from-brand/40 to-brand/10" : isHead ? "bg-gradient-to-tr from-brand/20 to-transparent" : ""}`} />
+          <EmployeeAvatar
+            id={person.id}
+            name={person.name}
+            url={person.avatarUrl}
+            fallback={initials}
+            className="relative h-16 w-16 ring-2 ring-background shadow-lg"
+          />
+          <span className="absolute bottom-0.5 right-0.5 block h-3 w-3 rounded-full border-2 border-card bg-emerald-500 shadow-sm" />
+        </div>
+
+        {/* Name + title */}
+        <div className="min-w-0 w-full text-center">
+          <div className="truncate text-sm font-semibold tracking-tight text-foreground" title={person.name}>
             {person.name}
           </div>
           <div
-            className="truncate text-left text-[11px] font-medium text-muted-foreground"
-            title={title ?? person.positionName ?? "—"}
+            className="mt-0.5 truncate text-[11px] font-medium text-muted-foreground"
+            title={displayTitle}
           >
-            {title ?? person.positionName ?? "—"}
+            {displayTitle}
           </div>
+          {deptName && (
+            <div className="mt-2 inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/40 px-2 py-0.5 text-[9.5px] font-medium uppercase tracking-wide text-muted-foreground">
+              <Building2 className="h-2.5 w-2.5" />
+              <span className="truncate max-w-[140px]">{deptName}</span>
+            </div>
+          )}
         </div>
-        {!editing && <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition group-hover:opacity-100" />}
       </div>
-      <div className="flex w-full flex-col gap-1.5 border-t border-border/60 pt-2.5 text-[11px] text-muted-foreground">
-        {person.email ? (
-          <span className="flex min-w-0 items-center gap-1.5">
-            <Mail className="h-3 w-3 shrink-0" />
-            <span className="truncate" title={person.email}>{person.email}</span>
-          </span>
-        ) : null}
-        {person.phone ? (
-          <span className="flex min-w-0 items-center gap-1.5">
-            <Phone className="h-3 w-3 shrink-0" />
-            <span className="truncate" title={person.phone}>{person.phone}</span>
-          </span>
-        ) : null}
-        {!person.email && !person.phone && (
-          <span className="text-muted-foreground/70">No contact info</span>
-        )}
+
+      {/* Contact footer */}
+      <div className="mt-auto border-t border-border/60 bg-muted/20 px-4 py-2.5">
+        <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+          <div className="flex min-w-0 flex-col gap-0.5">
+            {person.email && (
+              <span className="flex min-w-0 items-center gap-1.5" title={person.email}>
+                <Mail className="h-3 w-3 shrink-0 text-brand/70" />
+                <span className="truncate">{person.email}</span>
+              </span>
+            )}
+            {person.phone && (
+              <span className="flex min-w-0 items-center gap-1.5" title={person.phone}>
+                <Phone className="h-3 w-3 shrink-0 text-brand/70" />
+                <span className="truncate">{person.phone}</span>
+              </span>
+            )}
+            {!person.email && !person.phone && (
+              <span className="text-muted-foreground/60 italic">No contact info</span>
+            )}
+          </div>
+          {!editing && (
+            <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-all group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:opacity-100 group-hover:text-brand" />
+          )}
+        </div>
       </div>
     </div>
   );
