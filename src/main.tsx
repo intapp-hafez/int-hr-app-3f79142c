@@ -5,13 +5,15 @@ import "./styles.css";
 // rather than silently killing the page.
 async function boot() {
   try {
-    const [{ RouterProvider }, { getRouter }, { StrictMode, createElement }] = await Promise.all([
+    const [{ RouterProvider }, { getRouter }, { StrictMode, createElement }, { installPerfProfiler }] = await Promise.all([
       import("@tanstack/react-router"),
       import("./router"),
       import("react"),
+      import("./lib/perf-profiler"),
     ]);
 
     const router = getRouter();
+    installPerfProfiler(router as any);
     const rootEl = document.getElementById("root")!;
 
     createRoot(rootEl).render(

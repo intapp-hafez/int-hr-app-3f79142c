@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Mail, Phone, Search, X, ChevronLeft, ChevronRight, ShieldCheck, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Mail, Phone, Search, X, ChevronLeft, ChevronRight, ShieldCheck, AlertTriangle, CheckCircle2, CalendarDays } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -10,6 +10,7 @@ import { getMyTeam, checkEmployeeAssignment, getTeamPresence, type TeamMember, t
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { EmployeeWorkingDays } from "@/components/EmployeeWorkingDays";
 
 export const Route = createFileRoute("/manager/team")({
   component: TeamPage,
@@ -97,6 +98,7 @@ function TeamPage() {
   const [checkResult, setCheckResult] = useState<AssignmentCheck | null>(null);
   const [checkError, setCheckError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
+  const [openDaysFor, setOpenDaysFor] = useState<string | null>(null);
   const runCheck = async () => {
     setChecking(true); setCheckError(null); setCheckResult(null);
     try {
@@ -225,6 +227,22 @@ function TeamPage() {
                 <div className="mt-3 flex items-center justify-between border-t border-border pt-2 text-xs">
                   <span className="text-muted-foreground">{t("tasks")}</span>
                   <span className="font-semibold">{open}</span>
+                </div>
+                <div className="mt-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => setOpenDaysFor((cur) => (cur === e.id ? null : e.id))}
+                  >
+                    <CalendarDays className="mr-1 h-4 w-4" />
+                    {openDaysFor === e.id ? "Hide working days" : "Working days"}
+                  </Button>
+                  {openDaysFor === e.id && (
+                    <div className="mt-3">
+                      <EmployeeWorkingDays employeeId={e.id} />
+                    </div>
+                  )}
                 </div>
               </li>
             );

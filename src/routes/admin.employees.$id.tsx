@@ -69,6 +69,7 @@ import {
 } from "@/lib/store";
 import { getContractInfo, fmtDate } from "@/lib/contracts";
 import { validateRehire } from "@/lib/employees.functions";
+import { computeSalaryPair } from "@/lib/salary-calc";
 import { FileSignature, RotateCcw, Ban, CheckCircle2, AlertTriangle } from "lucide-react";
 import { locations, myAttendance } from "@/lib/mock-data";
 import { formatEgPhone, isValidEgPhone } from "@/lib/phone";
@@ -375,7 +376,7 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
             <AlertCircle className="h-3.5 w-3.5" /> You have unsaved changes.
           </div>
         )}
-        <div className="grid grid-cols-1 gap-3 p-5 text-sm md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 p-5 text-sm md:grid-cols-3">
           <EditField label="Full name"><input className={editInputCls} value={form.full_name} onChange={(e) => upd("full_name", e.target.value)} /></EditField>
           <EditField label="Phone"><input className={editInputCls + " font-mono"} value={form.phone} onChange={(e) => upd("phone", e.target.value)} /></EditField>
           <EditField label="Employee Code"><input className={editInputCls + " font-mono"} value={form.emp_code} onChange={(e) => upd("emp_code", e.target.value)} /></EditField>
@@ -438,7 +439,7 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
               )}
             </div>
           </EditField>
-          <label className="inline-flex items-center gap-2 text-xs text-muted-foreground md:col-span-2">
+          <label className="inline-flex items-center gap-2 text-xs text-muted-foreground md:col-span-3">
             <input type="checkbox" className="h-4 w-4 accent-brand" checked={form.contract_cancelled} onChange={(e) => upd("contract_cancelled", e.target.checked)} />
             Contract cancelled
           </label>
@@ -448,8 +449,34 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
               <option value="net">Net</option>
             </select>
           </EditField>
-          <EditField label="Salary Gross (EGP)"><input type="number" min={0} className={editInputCls + " font-mono"} value={form.salary_gross || ""} onChange={(e) => upd("salary_gross", Number(e.target.value))} /></EditField>
-          <EditField label="Salary Net (EGP)"><input type="number" min={0} className={editInputCls + " font-mono"} value={form.salary_net || ""} onChange={(e) => upd("salary_net", Number(e.target.value))} /></EditField>
+          <EditField label="Salary Gross (EGP)">
+            <input
+              type="number"
+              min={0}
+              readOnly={form.salary_mode === "net"}
+              className={editInputCls + " font-mono" + (form.salary_mode === "net" ? " bg-muted/40 text-muted-foreground" : "")}
+              value={form.salary_gross || ""}
+              onChange={(e) => {
+                const { gross, net } = computeSalaryPair(Number(e.target.value), "gross");
+                upd("salary_gross", gross);
+                upd("salary_net", net);
+              }}
+            />
+          </EditField>
+          <EditField label="Salary Net (EGP)">
+            <input
+              type="number"
+              min={0}
+              readOnly={form.salary_mode === "gross"}
+              className={editInputCls + " font-mono" + (form.salary_mode === "gross" ? " bg-muted/40 text-muted-foreground" : "")}
+              value={form.salary_net || ""}
+              onChange={(e) => {
+                const { gross, net } = computeSalaryPair(Number(e.target.value), "net");
+                upd("salary_net", net);
+                upd("salary_gross", gross);
+              }}
+            />
+          </EditField>
           <EditField label="Allowance (EGP)"><input type="number" min={0} className={editInputCls + " font-mono"} value={form.allowance || ""} onChange={(e) => upd("allowance", Number(e.target.value))} /></EditField>
           <EditField label="Target Value"><input type="number" min={0} className={editInputCls + " font-mono"} value={form.target_value || ""} onChange={(e) => upd("target_value", Number(e.target.value))} /></EditField>
           <EditField label="Target Duration">
@@ -457,12 +484,12 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
               {["Daily","Weekly","Monthly","Quarterly","Yearly"].map((d) => <option key={d} value={d}>{d}</option>)}
             </select>
           </EditField>
-          <label className="inline-flex items-center gap-2 text-xs text-muted-foreground md:col-span-2">
+          <label className="inline-flex items-center gap-2 text-xs text-muted-foreground md:col-span-3">
             <input type="checkbox" className="h-4 w-4 accent-brand" checked={form.allow_past_expiry} onChange={(e) => upd("allow_past_expiry", e.target.checked)} />
             Override: allow expiry date in the past (admin/HR only)
           </label>
-          {err && <p className="md:col-span-2 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{err}</p>}
-          <div className="md:col-span-2 flex justify-end gap-2">
+          {err && <p className="md:col-span-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{err}</p>}
+          <div className="md:col-span-3 flex justify-end gap-2">
             <button onClick={tryCancel} className="rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold">Cancel</button>
             <button disabled={saving || !isDirty} onClick={save} className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-brand px-4 py-2 text-sm font-semibold text-brand-foreground shadow-brand disabled:opacity-60">
               <Save className="h-3.5 w-3.5" /> {saving ? "Saving…" : "Save"}

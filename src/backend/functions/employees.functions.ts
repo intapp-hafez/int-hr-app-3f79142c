@@ -60,6 +60,47 @@ export type ImportEmployeeResult = {
   results: { index: number; ok: boolean; id?: string; email?: string; error?: string }[];
 };
 
+const CreateEmployeeSchema = z.object({
+  empCode: z.string().max(40).optional().default(""),
+  name: z.string().trim().min(2).max(120),
+  email: z.string().trim().email().max(160),
+  phone: z.string().max(40).optional().default(""),
+  dept: z.string().max(120).optional().default(""),
+  position: z.string().max(120).optional().default(""),
+  role: z.enum(IMPORT_ROLES).optional().default("employee"),
+  status: z.enum(["Active", "Inactive"]).optional().default("Active"),
+  password: z.string().min(6).max(128),
+  city: z.string().max(120).optional().default(""),
+  district: z.string().max(120).optional().default(""),
+  avatarUrl: z.string().max(800_000).optional().default(""),
+  nationalId: z.string().max(40).optional().default(""),
+  idIssueDate: z.string().max(20).optional().default(""),
+  nationalIdExpiry: z.string().max(20).optional().default(""),
+  managerId: z.string().uuid().optional().or(z.literal("")).default(""),
+  salaryMode: z.enum(["gross", "net"]).optional().default("gross"),
+  salaryGross: z.number().min(0).max(10_000_000).optional().default(0),
+  salaryNet: z.number().min(0).max(10_000_000).optional().default(0),
+  allowance: z.number().min(0).max(10_000_000).optional().default(0),
+  targetValue: z.number().min(0).max(10_000_000).optional().default(0),
+  targetDuration: z.enum(["Daily", "Weekly", "Monthly", "Quarterly", "Yearly"]).optional().default("Monthly"),
+  contractType: z.enum(["FullTime", "PartTime", "Temporary", "Internship", "Probation3M"]).optional().default("FullTime"),
+  contractStartDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal("")).default(""),
+  contractEndDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal("")).default(""),
+  contractCancelled: z.boolean().optional().default(false),
+  loginUrl: z.string().min(1).max(500),
+  appName: z.string().max(120).optional().default(""),
+});
+
+export type CreateEmployeeResult = {
+  ok: boolean;
+  id?: string;
+  email: string;
+  accountCreated: boolean;
+  profileCreated: boolean;
+  emailSent: boolean;
+  warning?: string;
+};
+
 export type ListEmployeesResult = {
   rows: AdminEmployeeRow[];
   total: number;
@@ -296,11 +337,18 @@ export const bulkSetEmployeeStatus = createServerFn({ method: "POST" })
 export const importEmployeesAdmin = createServerFn({ method: "POST" })
   .middleware([requireAdminAccess])
   .inputValidator((input) =>
-    z.object({ employees: z.array(ImportEmployeeRowSchema).min(1).max(500) }).parse(input),
+    z
+      .object({
+        employees: z.array(ImportEmployeeRowSchema).min(1).max(500),
+        loginUrl: z.string().max(500).optional().default(""),
+        appName: z.string().max(120).optional().default(""),
+      })
+      .parse(input),
   )
   .handler(async ({ context, data }): Promise<ImportEmployeeResult> => {
     const { supabase } = context;
     const { supabaseAdmin } = await import("@/backend/server/admin-client.server");
+    const { sendWelcomeEmail } = await import("@/backend/server/welcome-email.server");
 
     const [{ data: departments }, { data: positions }] = await Promise.all([
       supabase.from("departments").select("id, name_en"),
@@ -470,6 +518,18 @@ export const importEmployeesAdmin = createServerFn({ method: "POST" })
           avatar_url: row.avatarUrl.trim() || null,
         });
         results.push({ index, ok: true, id: String(newId), email });
+
+        // Best-effort welcome email; never blocks import.
+        if (data.loginUrl && row.password.trim()) {
+          void sendWelcomeEmail({
+            to: email,
+            employeeName: fullName,
+            username: email,
+            password: row.password.trim(),
+            loginUrl: data.loginUrl,
+            appName: data.appName || undefined,
+          });
+        }
       } catch (e: any) {
         results.push({ index, ok: false, email, error: e?.message ?? "Import failed" });
       }
@@ -477,6 +537,20 @@ export const importEmployeesAdmin = createServerFn({ method: "POST" })
 
     const importedCount = results.filter((r) => r.ok).length;
     return { ok: importedCount === data.employees.length, importedCount, results };
+  });
+
+export const createEmployeeAdmin = createServerFn({ method: "POST" })
+  .middleware([requireAdminAccess])
+  .inputValidator((input) => CreateEmployeeSchema.parse(input))
+  .handler(async ({ context, data }): Promise<CreateEmployeeResult> => {
+    const { supabase } = context;
+    const { data: result, error } = await supabase.functions.invoke("create-employee-account", { body: data });
+    if (error) throw new Error(error.message ?? "Employee account creation failed");
+    const created = result as CreateEmployeeResult & { error?: string };
+    if (!created?.accountCreated || !created?.profileCreated) {
+      throw new Error(created?.error || created?.warning || "Employee account creation failed");
+    }
+    return created;
   });
 
 export const deleteEmployeeAdmin = createServerFn({ method: "POST" })
@@ -489,6 +563,38 @@ export const deleteEmployeeAdmin = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/backend/server/admin-client.server");
     await hardDeleteUser(supabaseAdmin, data.id);
     return { ok: true };
+  });
+
+/**
+ * Send the employee welcome email (username + password + login URL).
+ * Used by the single Add Employee form, which today persists locally but
+ * still needs to email the credentials to the new hire.
+ */
+export const sendEmployeeWelcomeEmail = createServerFn({ method: "POST" })
+  .middleware([requireAdminAccess])
+  .inputValidator((input) =>
+    z
+      .object({
+        to: z.string().email(),
+        employeeName: z.string().min(1).max(160),
+        username: z.string().min(1).max(160),
+        password: z.string().min(1).max(256),
+        loginUrl: z.string().min(1).max(500),
+        appName: z.string().max(120).optional().default(""),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { sendWelcomeEmail } = await import("@/backend/server/welcome-email.server");
+    const res = await sendWelcomeEmail({
+      to: data.to,
+      employeeName: data.employeeName,
+      username: data.username,
+      password: data.password,
+      loginUrl: data.loginUrl,
+      appName: data.appName || undefined,
+    });
+    return res;
   });
 
 export const bulkDeleteEmployeesAdmin = createServerFn({ method: "POST" })
@@ -547,19 +653,22 @@ export const listCitiesAndDistricts = createServerFn({ method: "GET" })
     managers: { id: string; name: string }[];
   }> => {
     const { supabase } = context;
-    const [{ data: cities }, { data: districts }, { data: depts }, { data: poss }, { data: mgrs }] = await Promise.all([
+    const [{ data: cities }, { data: districts }, { data: depts }, { data: poss }, { data: mgrs }, { data: mgrRoles }] = await Promise.all([
       supabase.from("cities").select("id, name_en").order("name_en"),
       supabase.from("districts").select("id, city_id, name_en").order("name_en"),
       supabase.from("departments").select("id, name_en").order("name_en"),
       supabase.from("positions").select("id, name_en").order("name_en"),
       supabase.from("profiles").select("id, full_name, email").eq("status", "Active").order("full_name"),
+      supabase.from("user_roles").select("user_id, role").in("role", ["admin", "manager"]),
     ]);
+    const allowedMgrIds = new Set((mgrRoles ?? []).map((r: any) => r.user_id));
+    const filteredMgrs = (mgrs ?? []).filter((m: any) => allowedMgrIds.has(m.id));
     return {
       cities: (cities ?? []).map((c: any) => ({ id: c.id, name_en: c.name_en })),
       districts: (districts ?? []).map((d: any) => ({ id: d.id, city_id: d.city_id, name_en: d.name_en })),
       departments: (depts ?? []).map((d: any) => ({ id: d.id, name_en: d.name_en })),
       positions: (poss ?? []).map((p: any) => ({ id: p.id, name_en: p.name_en })),
-      managers: (mgrs ?? []).map((m: any) => ({ id: m.id, name: m.full_name ?? m.email ?? "—" })),
+      managers: filteredMgrs.map((m: any) => ({ id: m.id, name: m.full_name ?? m.email ?? "—" })),
     };
   });
 

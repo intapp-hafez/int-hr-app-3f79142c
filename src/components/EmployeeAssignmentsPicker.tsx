@@ -11,6 +11,7 @@ import {
   listEmployeeAssignments,
   setEmployeeAssignments,
 } from "@/backend/functions/employee-assignments.functions";
+import { EmployeeWorkingDays } from "@/components/EmployeeWorkingDays";
 
 type Kind = "kpi" | "allowance" | "targets_overtime" | "shift";
 
@@ -81,6 +82,7 @@ export function EmployeeAssignmentsPicker({ employeeId }: { employeeId: string }
 
   return (
     <div className="space-y-5">
+      <EmployeeWorkingDays employeeId={employeeId} />
       {KIND_META.map((meta) => {
         const rows = sources[meta.id].filter((r: any) => r.is_active !== false);
         return (

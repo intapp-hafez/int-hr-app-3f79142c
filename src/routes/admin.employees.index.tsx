@@ -6,6 +6,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Download } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { SalaryPreview } from "@/components/SalaryPreview";
+import { computeSalaryPair } from "@/lib/salary-calc";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useI18n } from "@/lib/i18n";
 import { useStore, getState, addEmployee, type Employee } from "@/lib/store";
@@ -21,6 +22,7 @@ import {
   updateEmployeeAdmin,
   bulkSetEmployeeStatus,
   importEmployeesAdmin,
+  createEmployeeAdmin,
   deleteEmployeeAdmin,
   bulkDeleteEmployeesAdmin,
   bulkAssignEmployeeRole,
@@ -592,7 +594,9 @@ type DistrictOpt = { id: string; city_id: string; name_en: string };
 
 function AddEmployeeModal({ departments, positions, cities, districts, managers, onClose }: { departments: { id: string; name: string }[]; positions: { id: string; name: string }[]; cities: CityOpt[]; districts: DistrictOpt[]; managers: { id: string; name: string }[]; onClose: () => void }) {
   const { t } = useI18n();
+  const qc = useQueryClient();
   const validateBatch = useServerFn(validateEmployeesBatch);
+  const createEmployee = useServerFn(createEmployeeAdmin);
   const setupIncomplete = departments.length === 0 || positions.length === 0;
   const [form, setForm] = useState<Omit<Employee, "id"> & ExtraHr>({
     name: "",
@@ -631,30 +635,85 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
     personalPhone: "",
   });
   const [docs, setDocs] = useState<Record<string, StoredDoc | undefined>>({});
-  const [tab, setTab] = useState<AddTab>("personal");
+  const [contractStartDate, setContractStartDate] = useState("");
+  const [contractEndDate, setContractEndDate] = useState("");
+  const [contractCancelled, setContractCancelled] = useState(false);
+  const [allowPastExpiry, setAllowPastExpiry] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const upd = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
+
+  function validateField(name: string, f: typeof form): string {
+    switch (name) {
+      case "name": return (!f.name.trim() || f.name.trim().length < 2) ? "Name is required (min 2 chars)" : "";
+      case "email": return !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email) ? "Valid email required" : "";
+      case "phone": return !isValidEgPhone(f.phone) ? t("phoneInvalid") : "";
+      case "password": return (!f.password || f.password.length < 6) ? "Password must be at least 6 characters" : "";
+      case "salary": return (!f.salary || f.salary <= 0) ? "Salary is required" : "";
+      case "target": return f.target <= 0 ? "Target value must be > 0" : "";
+      case "salaryMode": return !(VALID_SALARY_MODES as readonly string[]).includes(f.salaryMode) ? "Invalid salary mode" : "";
+      case "contractType": return !(VALID_CONTRACT_TYPES as readonly string[]).includes(f.contractType) ? "Invalid contract type" : "";
+      case "dept": return !f.dept.trim() ? "Department is required" : "";
+      case "manager": return (f.manager && !managers.some((emp) => emp.id === f.manager)) ? "Invalid manager" : "";
+      case "nationalIdExpiry": {
+        const c = validateIdExpiry(f.nationalId, f.nationalIdExpiry);
+        return c === "ok" ? "" : t(c as any);
+      }
+      default: return "";
+    }
+  }
+
+  const FIELD_NAMES = ["name","email","phone","password","salary","target","salaryMode","contractType","dept","manager","nationalIdExpiry"] as const;
+
+  function validate(f: typeof form = form): Record<string, string> {
+    const errs: Record<string, string> = {};
+    for (const n of FIELD_NAMES) {
+      const m = validateField(n, f);
+      if (m) errs[n] = m;
+    }
+    return errs;
+  }
+
+  // Live re-validation: only update messages for fields that already have an error,
+  // so users aren't yelled at before they've touched a field.
+  useEffect(() => {
+    setFieldErrors((prev) => {
+      const keys = Object.keys(prev);
+      if (keys.length === 0) return prev;
+      const next: Record<string, string> = {};
+      for (const k of keys) {
+        const m = validateField(k, form);
+        if (m) next[k] = m;
+      }
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form]);
+
+  function handleBlur(name: string) {
+    const m = validateField(name, form);
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      if (m) next[name] = m; else delete next[name];
+      return next;
+    });
+  }
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (setupIncomplete) return setErr(t("employeeSetupIncomplete" as any) || "Add at least one Department and Position before creating employees.");
-    if (!form.name.trim() || form.name.trim().length < 2) return setErr("Name is required (min 2 chars)");
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) return setErr("Valid email required");
-    if (!isValidEgPhone(form.phone)) return setErr(t("phoneInvalid"));
-    if (!form.password || form.password.length < 6) return setErr("Password must be at least 6 characters");
-    if (!form.salary || form.salary <= 0) return setErr("Salary is required");
-    if (form.target <= 0) return setErr("Target value must be > 0");
-    if (!(VALID_SALARY_MODES as readonly string[]).includes(form.salaryMode)) return setErr("Invalid salary mode");
-    if (!(VALID_CONTRACT_TYPES as readonly string[]).includes(form.contractType)) return setErr("Invalid contract type");
-    if (!form.dept.trim()) return setErr("Department is required");
-    if (form.manager && !managers.some((emp) => emp.id === form.manager)) return setErr("Invalid manager");
-    const expCheck = validateIdExpiry(form.nationalId, form.nationalIdExpiry);
-    if (expCheck !== "ok") return setErr(t(expCheck as any));
+    const errs = validate(form);
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) {
+      setErr("Please fix the highlighted fields");
+      toast.error("Please fix the highlighted fields");
+      return;
+    }
+    setErr(null);
     void (async () => {
       try {
-        const res = await validateBatch({
+        const validation = await validateBatch({
           data: {
             employees: [{
               name: form.name, email: form.email, dept: form.dept,
@@ -665,8 +724,8 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
             managerIds: managers.map((emp) => emp.id),
           },
         });
-        if (!res.ok) {
-          const r = res.results[0];
+        if (!validation.ok) {
+          const r = validation.results[0];
           const msg = r?.error ? (t(r.error as any) || r.error) : t("serverValidationFailed");
           setErr(msg);
           return;
@@ -674,24 +733,62 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
         const sal = Number(form.salary) || 0;
         const salaryGross = form.salaryMode === "gross" ? sal : Math.round(sal / 0.9);
         const salaryNet = form.salaryMode === "net" ? sal : Math.round(sal * 0.9);
-        const id = addEmployee({
-          ...form,
-          id: form.empCode?.trim() || undefined,
-          phone: formatEgPhone(form.phone),
-          salaryGross,
-          salaryNet,
-          documents: docs,
-        } as any);
-        toast.success(`Employee ${id} added`, { description: form.name });
+        const created = await createEmployee({
+          data: {
+            empCode: form.empCode?.trim() || "",
+            name: form.name.trim(),
+            email: form.email.trim().toLowerCase(),
+            phone: formatEgPhone(form.phone),
+            dept: form.dept,
+            position: form.position,
+            role: "employee",
+            status: form.status === "Inactive" ? "Inactive" : "Active",
+            password: form.password,
+            city: form.city,
+            district: form.district,
+            avatarUrl: form.avatarUrl,
+            nationalId: form.nationalId,
+            idIssueDate: form.idIssueDate,
+            nationalIdExpiry: form.nationalIdExpiry,
+            managerId: form.manager || "",
+            salaryMode: form.salaryMode,
+            salaryGross,
+            salaryNet,
+            allowance: Number(form.allowance) || 0,
+            targetValue: Number(form.target) || 0,
+            targetDuration: form.targetDuration as any,
+            contractType: form.contractType as any,
+            contractStartDate,
+            contractEndDate,
+            contractCancelled,
+            loginUrl: `${window.location.origin}/auth`,
+            appName: document.title || "HR Portal",
+          },
+        });
+        if (!created?.accountCreated || !created?.profileCreated) {
+          throw new Error("Account was not created");
+        }
+        if (!created.emailSent) {
+          const msg = created.warning || "Welcome email failed";
+          setErr(`Account created, but email was not sent: ${msg}`);
+          toast.warning("Account created, but email was not sent", { description: msg });
+          void qc.invalidateQueries({ queryKey: ["admin", "employees", "list"] });
+          onClose();
+          return;
+        }
+        toast.success("Employee account created and welcome email sent", { description: form.email });
+        void qc.invalidateQueries({ queryKey: ["admin", "employees", "list"] });
         onClose();
-      } catch {
-        setErr(t("serverValidationFailed"));
+      } catch (err: any) {
+        const msg = err?.message || t("serverValidationFailed");
+        setErr(msg);
+        toast.error("Employee was not created", { description: msg });
       }
     })();
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-foreground/40 p-4 md:items-center" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-foreground/40 p-4 md:items-center">
       <div onClick={(e) => e.stopPropagation()} className="my-auto w-full max-w-5xl rounded-3xl bg-background p-6 shadow-soft">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="font-display text-lg font-semibold">{t("addEmployee")}</h2>
@@ -710,236 +807,189 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
             </div>
           </div>
         )}
-        <div className="mb-3 flex flex-wrap gap-1 rounded-2xl border border-border bg-card p-1 text-xs">
-          {ADD_TABS.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => setTab(s.id)}
-              className={`flex-1 min-w-[110px] rounded-xl px-3 py-2 font-semibold transition-colors ${
-                tab === s.id ? "bg-gradient-brand text-brand-foreground shadow-brand" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {t(s.labelKey as any)}
-            </button>
-          ))}
-        </div>
         <form onSubmit={submit} className="space-y-3 max-h-[65vh] overflow-y-auto pr-1">
-          {tab === "personal" && (
-            <div className="grid gap-3 md:grid-cols-2">
-              <FieldFull label="Avatar (WEBP / PNG / JPEG · ≤500KB or URL)">
-                <div className="flex items-center gap-3">
-                  {form.avatarUrl ? (
-                    <img src={form.avatarUrl} alt="avatar" className="h-14 w-14 rounded-full object-cover border border-border" />
-                  ) : (
-                    <div className="h-14 w-14 rounded-full bg-muted grid place-items-center text-xs text-muted-foreground">—</div>
-                  )}
+          <div className="flex items-center gap-4 rounded-2xl border border-border bg-muted/30 p-3">
+            <EmployeeAvatar
+              id="new"
+              name={form.name || form.email || "?"}
+              url={form.avatarUrl || null}
+              className="h-16 w-16"
+            />
+            <div className="min-w-0 flex-1">
+              <p className="mb-1 text-xs font-medium text-muted-foreground">Avatar</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-1.5 text-xs font-semibold hover:bg-muted">
+                  <Upload className="h-3.5 w-3.5" /> Upload
                   <input
-                    type="url" placeholder="https://… (optional)"
-                    value={form.avatarUrl}
-                    onChange={(e) => upd("avatarUrl", e.target.value)}
-                    className={inputCls + " flex-1"}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      e.currentTarget.value = "";
+                      if (!f) return;
+                      if (!["image/png","image/jpeg","image/jpg","image/webp"].includes(f.type)) {
+                        toast.error("Only PNG, JPEG or WEBP"); return;
+                      }
+                      if (f.size > 500 * 1024) { toast.error("Image must be 500 KB or less"); return; }
+                      const r = new FileReader();
+                      r.onload = () => upd("avatarUrl", String(r.result));
+                      r.onerror = () => toast.error("Could not read file");
+                      r.readAsDataURL(f);
+                    }}
                   />
-                  <label className="rounded-xl border border-border bg-card px-3 py-2 text-xs font-semibold cursor-pointer hover:bg-muted">
-                    {avatarBusy ? t("validating") : t("upload")}
-                    <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
-                      onChange={async (e) => {
-                        const f = e.target.files?.[0]; e.currentTarget.value = "";
-                        if (!f) return;
-                        const okType = ["image/png","image/jpeg","image/jpg","image/webp"].includes(f.type);
-                        if (!okType) { toast.error("Only WEBP, PNG or JPEG allowed"); return; }
-                        if (f.size > 500 * 1024) { toast.error("Avatar must be 500 KB or less"); return; }
-                        setAvatarBusy(true);
-                        try {
-                          const dataUrl: string = await new Promise((resolve, reject) => {
-                            const r = new FileReader();
-                            r.onload = () => resolve(String(r.result));
-                            r.onerror = () => reject(r.error);
-                            r.readAsDataURL(f);
-                          });
-                          upd("avatarUrl", dataUrl);
-                        } finally { setAvatarBusy(false); }
-                      }} />
-                  </label>
-                  {form.avatarUrl && (
-                    <button type="button" onClick={() => upd("avatarUrl", "")} className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted"><X className="h-4 w-4" /></button>
-                  )}
-                </div>
-              </FieldFull>
-              <Field label="Employee Code">
-                <input value={form.empCode} onChange={(e) => upd("empCode", e.target.value)} maxLength={20} placeholder="e.g. INT-042 (auto if blank)" className={inputCls + " font-mono"} />
-              </Field>
-              <Field label={t("name")}><input value={form.name} onChange={(e) => upd("name", e.target.value)} maxLength={80} className={inputCls} /></Field>
-              <Field label={t("email")}><input type="email" value={form.email} onChange={(e) => upd("email", e.target.value)} maxLength={120} className={inputCls} /></Field>
-              <Field label={t("phone")}>
-                <input type="tel" dir="ltr" inputMode="tel" value={form.phone}
-                  onChange={(e) => upd("phone", formatEgPhone(e.target.value))}
-                  maxLength={20} placeholder="+20 100 123 4567" className={inputCls + " font-mono"} />
-              </Field>
-              <Field label={t("personalPhone")}>
-                <input type="tel" dir="ltr" inputMode="tel" value={form.personalPhone}
-                  onChange={(e) => upd("personalPhone", e.target.value)} maxLength={20} className={inputCls + " font-mono"} />
-              </Field>
-              <Field label={t("gender")}>
-                <select value={form.gender} onChange={(e) => upd("gender", e.target.value)} className={inputCls}>
-                  <option value="">—</option>
-                  <option value="Male">{t("male")}</option>
-                  <option value="Female">{t("female")}</option>
-                </select>
-              </Field>
-              <div className="col-span-full grid gap-3 md:grid-cols-3">
-                <Field label={t("nationalId")}>
-                  <input value={form.nationalId} onChange={(e) => upd("nationalId", e.target.value)} maxLength={32} className={inputCls + " font-mono"} />
-                </Field>
-                <Field label="ID Issue Date">
-                  <input type="date" value={form.idIssueDate} onChange={(e) => upd("idIssueDate", e.target.value)} className={inputCls + " font-mono"} />
-                </Field>
-                <Field label={`${t("idExpiry")} (Ending Date)`}>
-                  <input type="date" value={form.nationalIdExpiry} onChange={(e) => upd("nationalIdExpiry", e.target.value)} className={inputCls + " font-mono"} />
-                </Field>
-              </div>
-              <FieldFull label="Address in ID card">
-                <textarea value={form.idCardAddress} onChange={(e) => upd("idCardAddress", e.target.value)} rows={2} maxLength={250} className={inputCls + " resize-y"} />
-              </FieldFull>
-            </div>
-          )}
-          {tab === "personal" && (
-            <div className="grid gap-3 md:grid-cols-3 border-t border-border pt-3 mt-2">
-              <Field label={t("country")}><input value={form.country} onChange={(e) => upd("country", e.target.value)} className={inputCls} /></Field>
-              <Field label={t("city")}>
-                <select value={form.city} onChange={(e) => { upd("city", e.target.value); upd("district", ""); }} className={inputCls}>
-                  <option value="">—</option>
-                  {cities.map((c) => <option key={c.id} value={c.name_en}>{c.name_en}</option>)}
-                </select>
-              </Field>
-              <Field label={t("district")}>
-                {(() => {
-                  const cityId = cities.find((c) => c.name_en === form.city)?.id;
-                  const filtered = cityId ? districts.filter((d) => d.city_id === cityId) : [];
-                  return (
-                    <select value={form.district} onChange={(e) => upd("district", e.target.value)} disabled={!cityId} className={inputCls + " disabled:opacity-60"}>
-                      <option value="">{cityId ? "—" : "Select a city first"}</option>
-                      {filtered.map((d) => <option key={d.id} value={d.name_en}>{d.name_en}</option>)}
-                    </select>
-                  );
-                })()}
-              </Field>
-              <Field label={t("street")}><input value={form.street} onChange={(e) => upd("street", e.target.value)} className={inputCls} /></Field>
-              <Field label={t("building")}><input value={form.building} onChange={(e) => upd("building", e.target.value)} className={inputCls} /></Field>
-              <Field label={t("flat")}><input value={form.flat} onChange={(e) => upd("flat", e.target.value)} className={inputCls} /></Field>
-            </div>
-          )}
-          {tab === "employment" && (
-            <div className="space-y-3">
-              <div className="grid gap-3 md:grid-cols-2">
-                <Field label={t("department")}>
-                  <SearchableSelect
-                    value={form.dept}
-                    onChange={(v) => upd("dept", v)}
-                    options={departments.map((d) => d.name)}
-                    placeholder={departments.length ? "Search departments…" : "No departments available"}
-                    disabled={departments.length === 0}
-                  />
-                </Field>
-                <Field label={t("position")}>
-                  <SearchableSelect
-                    value={form.position}
-                    onChange={(v) => upd("position", v)}
-                    options={positions.map((p) => p.name)}
-                    placeholder={positions.length ? "Search positions…" : "No positions available"}
-                    disabled={positions.length === 0}
-                  />
-                </Field>
-              </div>
-              <div className="grid gap-3 md:grid-cols-3">
-                <Field label={t("branch")}>
-                  <select value={form.branch} onChange={(e) => upd("branch", e.target.value)} className={inputCls}>
-                    {locations.map((l) => <option key={l.id}>{l.name}</option>)}
-                  </select>
-                </Field>
-                <Field label={t("manager")}>
-                  <select value={form.manager} onChange={(e) => upd("manager", e.target.value)} className={inputCls}>
-                    <option value="">{t("noManager")}</option>
-                    {managers.map((emp) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
-                  </select>
-                </Field>
-                <Field label={t("status")}>
-                  <select value={form.status} onChange={(e) => upd("status", e.target.value)} className={inputCls}>
-                    <option value="Active">{t("active")}</option><option value="Inactive">{t("inactive")}</option>
-                  </select>
-                </Field>
-              </div>
-              <FieldFull label={t("notes")}>
-                <textarea value={form.notes} onChange={(e) => upd("notes", e.target.value)}
-                  rows={3} placeholder={t("notesPlaceholder")} className={inputCls + " min-h-[80px] resize-y"} />
-              </FieldFull>
-            </div>
-          )}
-          {tab === "employment" && (
-            <div className="space-y-3 border-t border-border pt-3 mt-2">
-              <div className="grid gap-3 md:grid-cols-2">
-                <FieldFull label={t("salaryMode")}>
-                  <div className="flex gap-4 text-sm">
-                    <label className="inline-flex items-center gap-1.5">
-                      <input type="radio" name="salaryMode" checked={form.salaryMode === "gross"} onChange={() => upd("salaryMode", "gross")} />
-                      {t("salaryGross")}
-                    </label>
-                    <label className="inline-flex items-center gap-1.5">
-                      <input type="radio" name="salaryMode" checked={form.salaryMode === "net"} onChange={() => upd("salaryMode", "net")} />
-                      {t("salaryNet")}
-                    </label>
-                  </div>
-                </FieldFull>
-                <Field label={`${t("salary")} (EGP)`}>
-                  <input type="number" min={0} value={form.salary || ""} onChange={(e) => upd("salary", Number(e.target.value))} className={inputCls + " font-mono"} />
-                </Field>
-                <FieldFull label="">
-                  <SalaryPreview
-                    amount={Number(form.salary) || 0}
-                    mode={form.salaryMode === "net" ? "NET" : "GROSS"}
-                  />
-                </FieldFull>
-                <Field label={`${t("allowance")} (EGP)`}>
-                  <input type="number" min={0} value={form.allowance || ""} onChange={(e) => upd("allowance", Number(e.target.value))} className={inputCls + " font-mono"} />
-                </Field>
-                <Field label={t("targetValue")}>
-                  <input type="number" min={1} value={form.target || ""} onChange={(e) => upd("target", Number(e.target.value))} placeholder="e.g. 20" className={inputCls + " font-mono"} />
-                </Field>
-              </div>
-              <div className="grid gap-3 md:grid-cols-3">
-                <Field label={t("targetDuration")}>
-                  <select value={form.targetDuration} onChange={(e) => upd("targetDuration", e.target.value)} className={inputCls}>
-                    {["Daily", "Weekly", "Monthly", "Quarterly", "Yearly"].map((d) => <option key={d}>{d}</option>)}
-                  </select>
-                </Field>
-                <Field label={t("contractType")}>
-                  <select value={form.contractType} onChange={(e) => upd("contractType", e.target.value)} className={inputCls}>
-                    <option value="FullTime">{t("fullTime")}</option>
-                    <option value="PartTime">{t("partTime")}</option>
-                    <option value="Temporary">{t("contractTemp")}</option>
-                    <option value="Internship">{t("contractIntern")}</option>
-                    <option value="Probation3M">{t("contractProbation3M")}</option>
-                  </select>
-                </Field>
-                <Field label={t("password")}>
-                  <input type="text" value={form.password} onChange={(e) => upd("password", e.target.value)}
-                    maxLength={64} placeholder="min 6 chars" className={inputCls + " font-mono"} />
-                </Field>
-              </div>
-            </div>
-          )}
-          {tab === "employment" && (
-            <div className="grid gap-3 sm:grid-cols-2 border-t border-border pt-3 mt-2">
-              {ADD_DOC_KEYS.map((k) => (
-                <ModalDocUpload
-                  key={k}
-                  label={t(k as any)}
-                  doc={docs[k]}
-                  onChange={(d) => setDocs((p) => ({ ...p, [k]: d }))}
+                </label>
+                {form.avatarUrl && (
+                  <button type="button" onClick={() => upd("avatarUrl", "")} className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-1.5 text-xs">
+                    <X className="h-3.5 w-3.5" /> Remove
+                  </button>
+                )}
+                <input
+                  value={form.avatarUrl}
+                  onChange={(e) => upd("avatarUrl", e.target.value)}
+                  placeholder="or paste image URL…"
+                  className={inputCls + " flex-1 min-w-[180px]"}
                 />
-              ))}
+              </div>
             </div>
-          )}
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            <Field label="Email (login)" error={fieldErrors.email}><input type="email" value={form.email} onChange={(e) => upd("email", e.target.value)} onBlur={() => handleBlur("email")} maxLength={120} className={inputCls} /></Field>
+            <Field label={t("password")} error={fieldErrors.password}>
+              <input type="text" value={form.password} onChange={(e) => upd("password", e.target.value)} onBlur={() => handleBlur("password")} maxLength={64} placeholder="min 6 chars" className={inputCls + " font-mono"} />
+            </Field>
+            <Field label="Full name" error={fieldErrors.name}><input value={form.name} onChange={(e) => upd("name", e.target.value)} onBlur={() => handleBlur("name")} maxLength={80} className={inputCls} /></Field>
+            <Field label="Phone" error={fieldErrors.phone}>
+              <input type="tel" dir="ltr" inputMode="tel" value={form.phone} onChange={(e) => upd("phone", formatEgPhone(e.target.value))} onBlur={() => handleBlur("phone")} maxLength={20} placeholder="+20 100 123 4567" className={inputCls + " font-mono"} />
+            </Field>
+            <Field label="Employee Code">
+              <input value={form.empCode} onChange={(e) => upd("empCode", e.target.value)} maxLength={20} placeholder="auto if blank" className={inputCls + " font-mono"} />
+            </Field>
+            <Field label="Status">
+              <select value={form.status} onChange={(e) => upd("status", e.target.value)} className={inputCls}>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+            </Field>
+            <Field label="City">
+              <select value={form.city} onChange={(e) => { upd("city", e.target.value); upd("district", ""); }} className={inputCls}>
+                <option value="">—</option>
+                {cities.map((c) => <option key={c.id} value={c.name_en}>{c.name_en}</option>)}
+              </select>
+            </Field>
+            <Field label="District">
+              {(() => {
+                const cityId = cities.find((c) => c.name_en === form.city)?.id;
+                const filtered = cityId ? districts.filter((d) => d.city_id === cityId) : [];
+                return (
+                  <select value={form.district} onChange={(e) => upd("district", e.target.value)} disabled={!cityId} className={inputCls + " disabled:opacity-60"}>
+                    <option value="">{cityId ? "—" : "Select a city first"}</option>
+                    {filtered.map((d) => <option key={d.id} value={d.name_en}>{d.name_en}</option>)}
+                  </select>
+                );
+              })()}
+            </Field>
+            <Field label="Department" error={fieldErrors.dept}>
+              <select value={form.dept} onChange={(e) => upd("dept", e.target.value)} disabled={departments.length === 0} className={inputCls + " disabled:opacity-60"}>
+                <option value="">—</option>
+                {departments.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Position">
+              <select value={form.position} onChange={(e) => upd("position", e.target.value)} disabled={positions.length === 0} className={inputCls + " disabled:opacity-60"}>
+                <option value="">—</option>
+                {positions.map((p) => <option key={p.id} value={p.name}>{p.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Manager" error={fieldErrors.manager}>
+              <select value={form.manager} onChange={(e) => upd("manager", e.target.value)} className={inputCls}>
+                <option value="">—</option>
+                {managers.map((emp) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
+              </select>
+            </Field>
+            <Field label="National ID">
+              <input value={form.nationalId} onChange={(e) => upd("nationalId", e.target.value)} maxLength={32} className={inputCls + " font-mono"} />
+            </Field>
+            <Field label="ID Issue Date">
+              <input type="date" value={form.idIssueDate} onChange={(e) => upd("idIssueDate", e.target.value)} className={inputCls + " font-mono"} />
+            </Field>
+            <Field label="ID Expiry Date" error={fieldErrors.nationalIdExpiry}>
+              <input type="date" value={form.nationalIdExpiry} onChange={(e) => upd("nationalIdExpiry", e.target.value)} onBlur={() => handleBlur("nationalIdExpiry")} className={inputCls + " font-mono"} />
+            </Field>
+            <Field label="Address on ID">
+              <input value={form.idCardAddress} onChange={(e) => upd("idCardAddress", e.target.value)} maxLength={200} placeholder="As written on national ID" className={inputCls} />
+            </Field>
+            <Field label="Contract Type" error={fieldErrors.contractType}>
+              <select value={form.contractType} onChange={(e) => upd("contractType", e.target.value)} className={inputCls}>
+                <option value="FullTime">Full-time</option>
+                <option value="PartTime">Part-time</option>
+                <option value="Temporary">Temporary</option>
+                <option value="Internship">Internship</option>
+                <option value="Probation3M">Probation (3 months)</option>
+              </select>
+            </Field>
+            <Field label="Contract Start Date">
+              <input type="date" value={contractStartDate} onChange={(e) => setContractStartDate(e.target.value)} className={inputCls + " font-mono"} />
+            </Field>
+            <Field label="Contract End Date">
+              <input type="date" value={contractEndDate} onChange={(e) => setContractEndDate(e.target.value)} className={inputCls + " font-mono"} />
+            </Field>
+            <label className="inline-flex items-center gap-2 text-xs text-muted-foreground md:col-span-3">
+              <input type="checkbox" className="h-4 w-4 accent-brand" checked={contractCancelled} onChange={(e) => setContractCancelled(e.target.checked)} />
+              Contract cancelled
+            </label>
+            <Field label="Salary Basis" error={fieldErrors.salaryMode}>
+              <select value={form.salaryMode} onChange={(e) => upd("salaryMode", e.target.value as any)} className={inputCls}>
+                <option value="gross">Gross</option>
+                <option value="net">Net</option>
+              </select>
+            </Field>
+            <Field label="Salary Gross (EGP)" error={form.salaryMode === "gross" ? fieldErrors.salary : undefined}>
+              <input
+                type="number"
+                min={0}
+                readOnly={form.salaryMode === "net"}
+                value={form.salaryGross || ""}
+                onChange={(e) => {
+                  const { gross, net } = computeSalaryPair(Number(e.target.value), "gross");
+                  upd("salaryGross", gross);
+                  upd("salaryNet", net);
+                  upd("salary", gross);
+                }}
+                className={inputCls + " font-mono" + (form.salaryMode === "net" ? " bg-muted/40 text-muted-foreground" : "")}
+              />
+            </Field>
+            <Field label="Salary Net (EGP)" error={form.salaryMode === "net" ? fieldErrors.salary : undefined}>
+              <input
+                type="number"
+                min={0}
+                readOnly={form.salaryMode === "gross"}
+                value={form.salaryNet || ""}
+                onChange={(e) => {
+                  const { gross, net } = computeSalaryPair(Number(e.target.value), "net");
+                  upd("salaryNet", net);
+                  upd("salaryGross", gross);
+                  upd("salary", net);
+                }}
+                className={inputCls + " font-mono" + (form.salaryMode === "gross" ? " bg-muted/40 text-muted-foreground" : "")}
+              />
+            </Field>
+            <Field label="Allowance (EGP)">
+              <input type="number" min={0} value={form.allowance || ""} onChange={(e) => upd("allowance", Number(e.target.value))} className={inputCls + " font-mono"} />
+            </Field>
+            <Field label="Target Value" error={fieldErrors.target}>
+              <input type="number" min={0} value={form.target || ""} onChange={(e) => upd("target", Number(e.target.value))} className={inputCls + " font-mono"} />
+            </Field>
+            <Field label="Target Duration">
+              <select value={form.targetDuration} onChange={(e) => upd("targetDuration", e.target.value)} className={inputCls}>
+                {["Daily","Weekly","Monthly","Quarterly","Yearly"].map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </Field>
+            <label className="inline-flex items-center gap-2 text-xs text-muted-foreground md:col-span-3">
+              <input type="checkbox" className="h-4 w-4 accent-brand" checked={allowPastExpiry} onChange={(e) => setAllowPastExpiry(e.target.checked)} />
+              Override: allow expiry date in the past (admin/HR only)
+            </label>
+          </div>
           {err && <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{err}</p>}
         </form>
         <div className="mt-4 flex gap-2 border-t border-border pt-3">
@@ -1447,7 +1497,13 @@ function ImportExcelButtonsOnly() {
       }
       let added = 0;
       if (validRows.length > 0) {
-        const res = await importEmployees({ data: { employees: validRows } });
+        const res = await importEmployees({
+          data: {
+            employees: validRows,
+            loginUrl: `${window.location.origin}/auth`,
+            appName: document.title || "HR Portal",
+          },
+        });
         added = res.importedCount;
         res.results.forEach((r) => {
           if (!r.ok) {
@@ -1598,11 +1654,12 @@ function ImportErrorPanel({ errors, onClose }: { errors: ImportErrors; onClose: 
 
 const Th = ({ children }: { children: React.ReactNode }) => <th className="px-4 py-3 text-start font-medium">{children}</th>;
 const Td = ({ children, mono }: { children: React.ReactNode; mono?: boolean }) => <td className={`px-4 py-3 ${mono ? "font-mono text-xs tabular-nums" : ""}`}>{children}</td>;
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
     <label className="block">
       <span className="mb-1 block text-xs font-medium text-muted-foreground">{label}</span>
       {children}
+      {error && <p className="mt-1 text-[11px] text-destructive">{error}</p>}
     </label>
   );
 }
