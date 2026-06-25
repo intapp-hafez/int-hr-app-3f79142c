@@ -105,7 +105,6 @@ function PersonCard({
             id={person.id}
             name={person.name}
             url={person.avatarUrl}
-            fallback={initials}
             className="relative h-16 w-16 ring-2 ring-background shadow-lg"
           />
           <span className="absolute bottom-0.5 right-0.5 block h-3 w-3 rounded-full border-2 border-card bg-emerald-500 shadow-sm" />
