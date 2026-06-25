@@ -10,6 +10,7 @@ import {
   listCitiesWithDistricts, upsertCity, deleteCity, upsertDistrict, deleteDistrict,
   listLeaveTypes, upsertLeaveType, deleteLeaveType,
 } from "@/backend/functions/directory.functions";
+import { listCitiesAndDistricts } from "@/backend/functions/employees.functions";
 import { downloadTemplate, parseExcelFile } from "@/lib/excel";
 import { HolidaysManager } from "@/components/HolidaysManager";
 import { NetworksManager } from "./admin.networks";
@@ -116,8 +117,17 @@ function NamedSection({ kind }: { kind: "departments" | "positions" }) {
   const del = useServerFn(kind === "departments" ? deleteDepartment : deletePosition);
   const key = [kind];
   const q = useQuery({ queryKey: key, queryFn: () => list() });
+  const isDept = kind === "departments";
+  const listMgrs = useServerFn(listCitiesAndDistricts);
+  const mgrQ = useQuery({
+    queryKey: ["dept-responsibles"],
+    queryFn: () => listMgrs(),
+    enabled: isDept,
+    staleTime: 5 * 60_000,
+  });
+  const managers: Array<{ id: string; name: string }> = (mgrQ.data as any)?.managers ?? [];
   const mUpsert = useMutation({
-    mutationFn: (row: { id?: string; name_en: string; name_ar: string; active?: boolean }) => upsert({ data: row }),
+    mutationFn: (row: { id?: string; name_en: string; name_ar: string; active?: boolean; responsible_person_id?: string | null }) => upsert({ data: row }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: key }); toast.success("Saved"); },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -126,7 +136,7 @@ function NamedSection({ kind }: { kind: "departments" | "positions" }) {
     onSuccess: () => { qc.invalidateQueries({ queryKey: key }); toast.success("Deleted"); },
     onError: (e: Error) => toast.error(e.message),
   });
-  const [draft, setDraft] = useState({ name_en: "", name_ar: "" });
+  const [draft, setDraft] = useState<{ name_en: string; name_ar: string; responsible_person_id: string }>({ name_en: "", name_ar: "", responsible_person_id: "" });
 
   const headers = ["name_en", "name_ar", "active"];
   const paged = usePaged<any>(q.data ?? []);
@@ -156,20 +166,63 @@ function NamedSection({ kind }: { kind: "departments" | "positions" }) {
         onTemplate={() => downloadTemplate(`${kind}_template.xlsx`, headers, [{ name_en: "Sales", name_ar: "المبيعات", active: true }])}
         onImport={handleImport}
       />
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className={`grid gap-3 ${isDept ? "md:grid-cols-4" : "md:grid-cols-3"}`}>
         <input className={inputCls} placeholder="Name (EN)" value={draft.name_en} onChange={(e) => setDraft({ ...draft, name_en: e.target.value })} />
         <input className={inputCls} placeholder="Name (AR)" value={draft.name_ar} onChange={(e) => setDraft({ ...draft, name_ar: e.target.value })} />
+        {isDept && (
+          <select
+            className={inputCls}
+            value={draft.responsible_person_id}
+            onChange={(e) => setDraft({ ...draft, responsible_person_id: e.target.value })}
+          >
+            <option value="">Responsible person…</option>
+            {managers.map((m) => (
+              <option key={m.id} value={m.id}>{m.name}</option>
+            ))}
+          </select>
+        )}
         <button
-          onClick={() => { if (!draft.name_en) return toast.error("Name required"); mUpsert.mutate({ ...draft, active: true }); setDraft({ name_en: "", name_ar: "" }); }}
+          onClick={() => {
+            if (!draft.name_en) return toast.error("Name required");
+            mUpsert.mutate({
+              name_en: draft.name_en,
+              name_ar: draft.name_ar,
+              active: true,
+              ...(isDept ? { responsible_person_id: draft.responsible_person_id || null } : {}),
+            });
+            setDraft({ name_en: "", name_ar: "", responsible_person_id: "" });
+          }}
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-brand px-4 py-2 text-sm font-semibold text-brand-foreground shadow-brand">
           <Plus className="h-4 w-4" /> Add
         </button>
       </div>
-      <Table cols={["Name (EN)", "Name (AR)", "Active", ""]}>
+      <Table cols={isDept ? ["Name (EN)", "Name (AR)", "Responsible", "Active", ""] : ["Name (EN)", "Name (AR)", "Active", ""]}>
         {paged.slice.map((r: any) => (
           <tr key={r.id} className="hover:bg-muted/30">
             <td className="px-3 py-2 font-medium">{r.name_en}</td>
             <td className="px-3 py-2">{r.name_ar}</td>
+            {isDept && (
+              <td className="px-3 py-2">
+                <select
+                  className={inputCls}
+                  value={r.responsible_person_id ?? ""}
+                  onChange={(e) =>
+                    mUpsert.mutate({
+                      id: r.id, name_en: r.name_en, name_ar: r.name_ar, active: r.active,
+                      responsible_person_id: e.target.value || null,
+                    })
+                  }
+                >
+                  <option value="">—</option>
+                  {managers.map((m) => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                  {r.responsible_person_id && !managers.find((m) => m.id === r.responsible_person_id) && (
+                    <option value={r.responsible_person_id}>{r.responsible_person_name ?? "(unknown)"}</option>
+                  )}
+                </select>
+              </td>
+            )}
             <td className="px-3 py-2">
               <button onClick={() => mUpsert.mutate({ id: r.id, name_en: r.name_en, name_ar: r.name_ar, active: !r.active })}
                 className={`rounded-full px-2 py-1 text-xs ${r.active ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}>

@@ -7,9 +7,15 @@ import { NamedRowSchema, DistrictRowSchema, LeaveTypeRowSchema } from "../schema
 export const listDepartments = createServerFn({ method: "GET" })
   .middleware([requireAdminAccess])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase.from("departments").select("*").order("name_en");
+    const { data, error } = await context.supabase
+      .from("departments")
+      .select("*, responsible:profiles!departments_responsible_person_id_fkey(id, full_name, email)")
+      .order("name_en");
     if (error) throw new Error(error.message);
-    return data ?? [];
+    return (data ?? []).map((d: any) => ({
+      ...d,
+      responsible_person_name: d.responsible?.full_name ?? d.responsible?.email ?? null,
+    }));
   });
 
 export const upsertDepartment = createServerFn({ method: "POST" })
@@ -18,7 +24,8 @@ export const upsertDepartment = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.from("departments").upsert({
       id: data.id, name_en: data.name_en, name_ar: data.name_ar, active: data.active ?? true,
-    });
+      responsible_person_id: data.responsible_person_id ?? null,
+    } as any);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
