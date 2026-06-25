@@ -10,6 +10,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { getMyTeam } from "@/lib/team.functions";
 import { createTask, listTasks, transitionTask as transitionTaskFn, deleteTask as deleteTaskFn, getProfileNames } from "@/backend/functions/tasks.functions";
 import { mapTaskRow, type TaskRow } from "@/lib/task-mapping";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/manager/tasks")({
   component: ManagerTasksPage,
@@ -249,13 +250,24 @@ function HistoryList({ history, nameOf }: { history?: ManagerTask["history"]; na
   );
 }
 
-type Row = { title: string; description: string; district: string; address: string; hours: string };
-const emptyRow = (): Row => ({ title: "", description: "", district: "", address: "", hours: "" });
+type Row = { title: string; description: string; cityId: string; district: string; address: string; hours: string };
+const emptyRow = (): Row => ({ title: "", description: "", cityId: "", district: "", address: "", hours: "" });
 
 function AddTaskModal({ me, team, onClose, onCreated }: { me: string; team: Array<{ id: string; name: string }>; onClose: () => void; onCreated?: () => void }) {
   const { t } = useI18n();
-  const cities = getState().policy.cities;
-  const allDistricts = cities.flatMap((c) => c.districts.map((d) => d.nameEn));
+  const { data: cityData } = useQuery({
+    queryKey: ["geo", "cities-districts"],
+    queryFn: async () => {
+      const [{ data: cities }, { data: districts }] = await Promise.all([
+        supabase.from("cities").select("id, name_en").order("name_en"),
+        supabase.from("districts").select("id, city_id, name_en").order("name_en"),
+      ]);
+      return { cities: cities ?? [], districts: districts ?? [] };
+    },
+    staleTime: 5 * 60_000,
+  });
+  const cities = cityData?.cities ?? [];
+  const districts = cityData?.districts ?? [];
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [dueTime, setDueTime] = useState("");
   const [priority, setPriority] = useState<TaskPriority>("medium");
@@ -358,14 +370,23 @@ function AddTaskModal({ me, team, onClose, onCreated }: { me: string; team: Arra
                     <label className="text-[11px] font-medium">{t("rowTitle")}</label>
                     <input value={r.title} onChange={(e) => updateRow(i, { title: e.target.value })} className="input" />
                   </div>
-                  <div className="col-span-6 md:col-span-3">
-                    <label className="text-[11px] font-medium">{t("rowSiteDistrict")}</label>
-                    <select value={r.district} onChange={(e) => updateRow(i, { district: e.target.value })} className="input">
+                  <div className="col-span-6 md:col-span-2">
+                    <label className="text-[11px] font-medium">{t("taskCity") ?? "City"}</label>
+                    <select value={r.cityId} onChange={(e) => updateRow(i, { cityId: e.target.value, district: "" })} className="input">
                       <option value="">—</option>
-                      {allDistricts.map((d) => <option key={d} value={d}>{d}</option>)}
+                      {cities.map((c: any) => <option key={c.id} value={c.id}>{c.name_en}</option>)}
                     </select>
                   </div>
-                  <div className="col-span-6 md:col-span-3">
+                  <div className="col-span-6 md:col-span-2">
+                    <label className="text-[11px] font-medium">{t("rowSiteDistrict")}</label>
+                    <select value={r.district} onChange={(e) => updateRow(i, { district: e.target.value })} className="input" disabled={!r.cityId}>
+                      <option value="">—</option>
+                      {districts.filter((d: any) => d.city_id === r.cityId).map((d: any) => (
+                        <option key={d.id} value={d.name_en}>{d.name_en}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-span-6 md:col-span-2">
                     <label className="text-[11px] font-medium">{t("rowAddress")}</label>
                     <input value={r.address} onChange={(e) => updateRow(i, { address: e.target.value })} className="input" />
                   </div>
