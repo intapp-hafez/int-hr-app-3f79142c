@@ -51,6 +51,7 @@ export const NamedRowSchema = z.object({
   name_en: z.string().min(1).max(120),
   name_ar: z.string().max(120).default(""),
   active: z.boolean().optional(),
+  responsible_person_id: z.string().uuid().nullable().optional(),
 });
 export const DistrictRowSchema = z.object({
   id: z.string().uuid().optional(),
