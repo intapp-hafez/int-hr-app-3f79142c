@@ -40,9 +40,7 @@ export const upsertDepartment = createServerFn({ method: "POST" })
     // Cast: supabase generated types haven't been regenerated to include
     // the new `responsible_person_id` column yet. RLS still enforces
     // admin/HR-only writes server-side.
-    const { error } = await context.supabase
-      .from("departments")
-      .upsert(row as unknown as Parameters<typeof context.supabase.from<"departments">>[0] extends never ? never : any);
+    const { error } = await (context.supabase.from("departments") as any).upsert(row);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
