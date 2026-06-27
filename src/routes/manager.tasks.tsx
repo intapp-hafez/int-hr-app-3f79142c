@@ -50,6 +50,8 @@ function ManagerTasksPage() {
   const listTasksFn = useServerFn(listTasks);
   const transitionFn = useServerFn(transitionTaskFn);
   const deleteFn = useServerFn(deleteTaskFn);
+  const reassignFn = useServerFn(updateTaskAssignees);
+  const importCreateFn = useServerFn(createTask);
   const { data: taskRows = [] } = useQuery({
     queryKey: ["tasks-db"],
     queryFn: () => listTasksFn(),
@@ -84,6 +86,10 @@ function ManagerTasksPage() {
     try { await deleteFn({ data: { id } }); toast.success("Removed"); invalidate(); }
     catch (e: any) { toast.error(e?.message ?? "Failed"); }
   };
+  const doReassign = async (id: string, assignees: string[]) => {
+    try { await reassignFn({ data: { id, assignees } }); toast.success("Reassigned"); invalidate(); setReassignFor(null); }
+    catch (e: any) { toast.error(e?.message ?? "Failed"); }
+  };
 
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -92,7 +98,11 @@ function ManagerTasksPage() {
   const [fEmployee, setFEmployee] = useState<string>("all");
   const [fDate, setFDate] = useState<string>("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [view, setView] = useState<"cards" | "table">("cards");
+  const [view, setView] = useState<"cards" | "table">("table");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [reassignFor, setReassignFor] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
 
   const visible = useMemo(() => {
     const ql = q.trim().toLowerCase();
