@@ -129,6 +129,72 @@ function ManagerTasksPage() {
   const clearAll = () => { setQ(""); setFStatus("all"); setFPriority("all"); setFEmployee("all"); setFDate(""); };
   const hasFilters = q || fStatus !== "all" || fPriority !== "all" || fEmployee !== "all" || fDate;
 
+  const totalPages = Math.max(1, Math.ceil(visible.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const paged = useMemo(() => visible.slice((safePage - 1) * pageSize, safePage * pageSize), [visible, safePage, pageSize]);
+  useMemo(() => { setPage(1); /* reset */ }, [q, fStatus, fPriority, fEmployee, fDate, pageSize]);
+
+  const teamWithEmail = team as Array<{ id: string; name: string; email?: string | null }>;
+
+  const downloadTemplate = async () => {
+    const XLSX = await import("xlsx");
+    const ws = XLSX.utils.aoa_to_sheet([
+      ["title", "description", "priority", "due_date", "due_time", "city", "district", "address", "estimated_hours", "assignee_emails"],
+      ["Sample task", "Optional description", "medium", new Date().toISOString().slice(0, 10), "09:00", "", "", "", "2", teamWithEmail[0]?.email ?? "employee@example.com"],
+    ]);
+    ws["!cols"] = [{ wch: 24 }, { wch: 32 }, { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 14 }, { wch: 18 }, { wch: 28 }, { wch: 10 }, { wch: 32 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Tasks");
+    XLSX.writeFile(wb, "tasks-template.xlsx");
+  };
+
+  const handleImportFile = async (file: File) => {
+    if (!me) return;
+    setImporting(true);
+    try {
+      const XLSX = await import("xlsx");
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: "" });
+      const byEmail = new Map(teamWithEmail.map((m) => [String(m.email ?? "").toLowerCase(), m.id]));
+      let ok = 0, failed = 0;
+      for (const r of rows) {
+        const title = String(r.title ?? r.Title ?? "").trim();
+        if (!title) { failed++; continue; }
+        const emails = String(r.assignee_emails ?? r.assignees ?? "")
+          .split(/[,;\s]+/).map((s) => s.trim().toLowerCase()).filter(Boolean);
+        const assignees = emails.map((e) => byEmail.get(e)).filter((x): x is string => !!x);
+        if (assignees.length === 0) { failed++; continue; }
+        const priorityRaw = String(r.priority ?? "medium").toLowerCase();
+        const priority = (["low", "medium", "high"].includes(priorityRaw) ? priorityRaw : "medium") as TaskPriority;
+        try {
+          await importCreateFn({
+            data: {
+              title,
+              description: String(r.description ?? "").trim() || undefined,
+              priority,
+              due_date: String(r.due_date ?? "").trim() || null,
+              due_time: String(r.due_time ?? "").trim() || null,
+              city: String(r.city ?? "").trim() || null,
+              district: String(r.district ?? "").trim() || null,
+              address: String(r.address ?? "").trim() || null,
+              estimated_hours: r.estimated_hours !== "" && r.estimated_hours != null ? Number(r.estimated_hours) : null,
+              assignees,
+            },
+          });
+          ok++;
+        } catch { failed++; }
+      }
+      toast.success(`Imported ${ok}${failed ? ` • ${failed} failed` : ""}`);
+      invalidate();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Import failed");
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
