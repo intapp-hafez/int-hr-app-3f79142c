@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { Plus, Trash2, Play, Check, X, Search, MapPin, History, ChevronDown, ChevronUp } from "lucide-react";
-import { LayoutGrid, Table as TableIcon } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Plus, Trash2, Play, Pause, Check, X, Search, MapPin, History, ChevronDown, ChevronUp, Users, Upload, Download, ChevronLeft, ChevronRight, LayoutGrid, Table as TableIcon } from "lucide-react";
 import { toast } from "sonner";
 import { getState, type TaskPriority, type TaskStatus, type ManagerTask } from "@/lib/store";
 import { useSession } from "@/lib/auth";
@@ -9,7 +8,7 @@ import { useI18n } from "@/lib/i18n";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getMyTeam } from "@/lib/team.functions";
-import { createTask, listTasks, transitionTask as transitionTaskFn, deleteTask as deleteTaskFn, getProfileNames } from "@/backend/functions/tasks.functions";
+import { createTask, listTasks, transitionTask as transitionTaskFn, deleteTask as deleteTaskFn, getProfileNames, updateTaskAssignees } from "@/backend/functions/tasks.functions";
 import { mapTaskRow, type TaskRow } from "@/lib/task-mapping";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -51,6 +50,8 @@ function ManagerTasksPage() {
   const listTasksFn = useServerFn(listTasks);
   const transitionFn = useServerFn(transitionTaskFn);
   const deleteFn = useServerFn(deleteTaskFn);
+  const reassignFn = useServerFn(updateTaskAssignees);
+  const importCreateFn = useServerFn(createTask);
   const { data: taskRows = [] } = useQuery({
     queryKey: ["tasks-db"],
     queryFn: () => listTasksFn(),
@@ -85,6 +86,10 @@ function ManagerTasksPage() {
     try { await deleteFn({ data: { id } }); toast.success("Removed"); invalidate(); }
     catch (e: any) { toast.error(e?.message ?? "Failed"); }
   };
+  const doReassign = async (id: string, assignees: string[]) => {
+    try { await reassignFn({ data: { id, assignees } }); toast.success("Reassigned"); invalidate(); setReassignFor(null); }
+    catch (e: any) { toast.error(e?.message ?? "Failed"); }
+  };
 
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -93,7 +98,11 @@ function ManagerTasksPage() {
   const [fEmployee, setFEmployee] = useState<string>("all");
   const [fDate, setFDate] = useState<string>("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [view, setView] = useState<"cards" | "table">("cards");
+  const [view, setView] = useState<"cards" | "table">("table");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [reassignFor, setReassignFor] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
 
   const visible = useMemo(() => {
     const ql = q.trim().toLowerCase();
@@ -120,6 +129,72 @@ function ManagerTasksPage() {
   const clearAll = () => { setQ(""); setFStatus("all"); setFPriority("all"); setFEmployee("all"); setFDate(""); };
   const hasFilters = q || fStatus !== "all" || fPriority !== "all" || fEmployee !== "all" || fDate;
 
+  const totalPages = Math.max(1, Math.ceil(visible.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const paged = useMemo(() => visible.slice((safePage - 1) * pageSize, safePage * pageSize), [visible, safePage, pageSize]);
+  useEffect(() => { setPage(1); }, [q, fStatus, fPriority, fEmployee, fDate, pageSize]);
+
+  const teamWithEmail = team as Array<{ id: string; name: string; email?: string | null }>;
+
+  const downloadTemplate = async () => {
+    const XLSX = await import("xlsx");
+    const ws = XLSX.utils.aoa_to_sheet([
+      ["title", "description", "priority", "due_date", "due_time", "city", "district", "address", "estimated_hours", "assignee_emails"],
+      ["Sample task", "Optional description", "medium", new Date().toISOString().slice(0, 10), "09:00", "", "", "", "2", teamWithEmail[0]?.email ?? "employee@example.com"],
+    ]);
+    ws["!cols"] = [{ wch: 24 }, { wch: 32 }, { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 14 }, { wch: 18 }, { wch: 28 }, { wch: 10 }, { wch: 32 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Tasks");
+    XLSX.writeFile(wb, "tasks-template.xlsx");
+  };
+
+  const handleImportFile = async (file: File) => {
+    if (!me) return;
+    setImporting(true);
+    try {
+      const XLSX = await import("xlsx");
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: "" });
+      const byEmail = new Map(teamWithEmail.map((m) => [String(m.email ?? "").toLowerCase(), m.id]));
+      let ok = 0, failed = 0;
+      for (const r of rows) {
+        const title = String(r.title ?? r.Title ?? "").trim();
+        if (!title) { failed++; continue; }
+        const emails = String(r.assignee_emails ?? r.assignees ?? "")
+          .split(/[,;\s]+/).map((s) => s.trim().toLowerCase()).filter(Boolean);
+        const assignees = emails.map((e) => byEmail.get(e)).filter((x): x is string => !!x);
+        if (assignees.length === 0) { failed++; continue; }
+        const priorityRaw = String(r.priority ?? "medium").toLowerCase();
+        const priority = (["low", "medium", "high"].includes(priorityRaw) ? priorityRaw : "medium") as TaskPriority;
+        try {
+          await importCreateFn({
+            data: {
+              title,
+              description: String(r.description ?? "").trim() || undefined,
+              priority,
+              due_date: String(r.due_date ?? "").trim() || null,
+              due_time: String(r.due_time ?? "").trim() || null,
+              city: String(r.city ?? "").trim() || null,
+              district: String(r.district ?? "").trim() || null,
+              address: String(r.address ?? "").trim() || null,
+              estimated_hours: r.estimated_hours !== "" && r.estimated_hours != null ? Number(r.estimated_hours) : null,
+              assignees,
+            },
+          });
+          ok++;
+        } catch { failed++; }
+      }
+      toast.success(`Imported ${ok}${failed ? ` • ${failed} failed` : ""}`);
+      invalidate();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Import failed");
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -127,13 +202,31 @@ function ManagerTasksPage() {
           <h1 className="font-display text-xl font-semibold">{t("tasks")}</h1>
           <p className="text-sm text-muted-foreground">{visible.length}</p>
         </div>
-        <button
-          onClick={() => setOpen(true)}
-          disabled={team.length === 0}
-          className="inline-flex items-center gap-1.5 rounded-full bg-gradient-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground shadow-brand disabled:opacity-50"
-        >
-          <Plus className="h-3.5 w-3.5" /> {t("addTask")}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={downloadTemplate}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold"
+          >
+            <Download className="h-3.5 w-3.5" /> Template
+          </button>
+          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold">
+            <Upload className="h-3.5 w-3.5" /> {importing ? "Importing…" : "Import Excel"}
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              disabled={importing || team.length === 0}
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) { handleImportFile(f); e.target.value = ""; } }}
+            />
+          </label>
+          <button
+            onClick={() => setOpen(true)}
+            disabled={team.length === 0}
+            className="inline-flex items-center gap-1.5 rounded-full bg-gradient-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground shadow-brand disabled:opacity-50"
+          >
+            <Plus className="h-3.5 w-3.5" /> {t("addTask")}
+          </button>
+        </div>
       </div>
 
       <div className="flex justify-end">
@@ -179,6 +272,7 @@ function ManagerTasksPage() {
       {visible.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-muted/30 p-8 text-center text-sm text-muted-foreground">{t("noTasks")}</div>
       ) : view === "table" ? (
+        <>
         <div className="overflow-x-auto rounded-2xl border border-border bg-card shadow-soft">
           <table className="w-full text-sm">
             <thead className="bg-muted/40 text-xs text-muted-foreground">
@@ -193,7 +287,7 @@ function ManagerTasksPage() {
               </tr>
             </thead>
             <tbody>
-              {visible.map((tk) => (
+              {paged.map((tk) => (
                 <tr key={tk.id} className="border-t border-border align-top hover:bg-muted/30">
                   <td className="px-3 py-2">
                     <div className="font-medium">{tk.title}</div>
@@ -215,9 +309,14 @@ function ManagerTasksPage() {
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex flex-wrap items-center justify-end gap-1">
-                      {tk.status === "pending" && (
+                      {(tk.status === "pending" || tk.status === "cancelled") && (
                         <button onClick={() => doTransition(tk.id, "in_progress")} title={t("markInProgress")} className="rounded-full border border-border bg-card p-1.5">
                           <Play className="h-3 w-3" />
+                        </button>
+                      )}
+                      {tk.status === "in_progress" && (
+                        <button onClick={() => doTransition(tk.id, "pending")} title="Pause" className="rounded-full border border-border bg-card p-1.5 text-warning">
+                          <Pause className="h-3 w-3" />
                         </button>
                       )}
                       {tk.status !== "done" && tk.status !== "cancelled" && (
@@ -225,11 +324,9 @@ function ManagerTasksPage() {
                           <Check className="h-3 w-3" />
                         </button>
                       )}
-                      {tk.status !== "cancelled" && tk.status !== "done" && (
-                        <button onClick={() => doTransition(tk.id, "cancelled")} title={t("statusCancelled")} className="rounded-full border border-border bg-card p-1.5 text-muted-foreground">
-                          <X className="h-3 w-3" />
-                        </button>
-                      )}
+                      <button onClick={() => setReassignFor(tk.id)} title="Reassign" className="rounded-full border border-border bg-card p-1.5">
+                        <Users className="h-3 w-3" />
+                      </button>
                       <button onClick={() => doDelete(tk.id)} title={t("delete")} className="rounded-full border border-border bg-card p-1.5 text-danger">
                         <Trash2 className="h-3 w-3" />
                       </button>
@@ -240,6 +337,25 @@ function ManagerTasksPage() {
             </tbody>
           </table>
         </div>
+        <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <span>Rows per page</span>
+            <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} className="input h-8 w-auto py-0 text-xs">
+              {[10, 25, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <span>{visible.length === 0 ? 0 : (safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, visible.length)} of {visible.length}</span>
+            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage <= 1} className="rounded-full border border-border bg-card p-1 disabled:opacity-40">
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </button>
+            <span>Page {safePage} / {totalPages}</span>
+            <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={safePage >= totalPages} className="rounded-full border border-border bg-card p-1 disabled:opacity-40">
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+        </>
       ) : (
         <ul className="space-y-3">
           {visible.map((tk) => (
@@ -306,6 +422,42 @@ function ManagerTasksPage() {
       )}
 
       {open && me && <AddTaskModal me={me.id} team={team} onClose={() => setOpen(false)} onCreated={invalidate} />}
+      {reassignFor && (
+        <ReassignModal
+          team={team}
+          current={tasks.find((tk) => tk.id === reassignFor)?.assignees ?? []}
+          onClose={() => setReassignFor(null)}
+          onSave={(ids) => doReassign(reassignFor, ids)}
+        />
+      )}
+    </div>
+  );
+}
+
+function ReassignModal({ team, current, onClose, onSave }: { team: Array<{ id: string; name: string }>; current: string[]; onClose: () => void; onSave: (ids: string[]) => void }) {
+  const [sel, setSel] = useState<string[]>(current);
+  const toggle = (id: string) => setSel((a) => (a.includes(id) ? a.filter((x) => x !== id) : [...a, id]));
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-2xl bg-background p-5 shadow-soft">
+        <h3 className="mb-3 font-display text-base font-semibold">Reassign task</h3>
+        <div className="flex flex-wrap gap-1.5">
+          {team.map((e) => (
+            <button
+              key={e.id}
+              type="button"
+              onClick={() => toggle(e.id)}
+              className={`rounded-full border px-2.5 py-1 text-xs font-medium ${sel.includes(e.id) ? "border-brand bg-brand text-brand-foreground" : "border-border bg-card"}`}
+            >
+              {e.name}
+            </button>
+          ))}
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <button onClick={onClose} className="rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold">Cancel</button>
+          <button onClick={() => sel.length && onSave(sel)} disabled={sel.length === 0} className="rounded-full bg-gradient-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground shadow-brand disabled:opacity-50">Save</button>
+        </div>
+      </div>
     </div>
   );
 }
