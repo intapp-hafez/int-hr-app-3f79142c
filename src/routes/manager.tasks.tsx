@@ -202,29 +202,31 @@ function ManagerTasksPage() {
           <h1 className="font-display text-xl font-semibold">{t("tasks")}</h1>
           <p className="text-sm text-muted-foreground">{visible.length}</p>
         </div>
-        <button
-          onClick={() => setOpen(true)}
-          disabled={team.length === 0}
-          className="inline-flex items-center gap-1.5 rounded-full bg-gradient-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground shadow-brand disabled:opacity-50"
-        >
-          <Plus className="h-3.5 w-3.5" /> {t("addTask")}
-        </button>
-        <button
-          onClick={downloadTemplate}
-          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold"
-        >
-          <Download className="h-3.5 w-3.5" /> Template
-        </button>
-        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold">
-          <Upload className="h-3.5 w-3.5" /> {importing ? "Importing…" : "Import Excel"}
-          <input
-            type="file"
-            accept=".xlsx,.xls"
-            className="hidden"
-            disabled={importing || team.length === 0}
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) { handleImportFile(f); e.target.value = ""; } }}
-          />
-        </label>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={downloadTemplate}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold"
+          >
+            <Download className="h-3.5 w-3.5" /> Template
+          </button>
+          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold">
+            <Upload className="h-3.5 w-3.5" /> {importing ? "Importing…" : "Import Excel"}
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              disabled={importing || team.length === 0}
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) { handleImportFile(f); e.target.value = ""; } }}
+            />
+          </label>
+          <button
+            onClick={() => setOpen(true)}
+            disabled={team.length === 0}
+            className="inline-flex items-center gap-1.5 rounded-full bg-gradient-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground shadow-brand disabled:opacity-50"
+          >
+            <Plus className="h-3.5 w-3.5" /> {t("addTask")}
+          </button>
+        </div>
       </div>
 
       <div className="flex justify-end">
