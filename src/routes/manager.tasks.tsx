@@ -422,6 +422,42 @@ function ManagerTasksPage() {
       )}
 
       {open && me && <AddTaskModal me={me.id} team={team} onClose={() => setOpen(false)} onCreated={invalidate} />}
+      {reassignFor && (
+        <ReassignModal
+          team={team}
+          current={tasks.find((tk) => tk.id === reassignFor)?.assignees ?? []}
+          onClose={() => setReassignFor(null)}
+          onSave={(ids) => doReassign(reassignFor, ids)}
+        />
+      )}
+    </div>
+  );
+}
+
+function ReassignModal({ team, current, onClose, onSave }: { team: Array<{ id: string; name: string }>; current: string[]; onClose: () => void; onSave: (ids: string[]) => void }) {
+  const [sel, setSel] = useState<string[]>(current);
+  const toggle = (id: string) => setSel((a) => (a.includes(id) ? a.filter((x) => x !== id) : [...a, id]));
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-2xl bg-background p-5 shadow-soft">
+        <h3 className="mb-3 font-display text-base font-semibold">Reassign task</h3>
+        <div className="flex flex-wrap gap-1.5">
+          {team.map((e) => (
+            <button
+              key={e.id}
+              type="button"
+              onClick={() => toggle(e.id)}
+              className={`rounded-full border px-2.5 py-1 text-xs font-medium ${sel.includes(e.id) ? "border-brand bg-brand text-brand-foreground" : "border-border bg-card"}`}
+            >
+              {e.name}
+            </button>
+          ))}
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <button onClick={onClose} className="rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold">Cancel</button>
+          <button onClick={() => sel.length && onSave(sel)} disabled={sel.length === 0} className="rounded-full bg-gradient-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground shadow-brand disabled:opacity-50">Save</button>
+        </div>
+      </div>
     </div>
   );
 }
