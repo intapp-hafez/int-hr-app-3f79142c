@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, Play, Pause, Check, X, Search, MapPin, History, ChevronDown, ChevronUp, Users, Upload, Download, ChevronLeft, ChevronRight, LayoutGrid, Table as TableIcon } from "lucide-react";
 import { toast } from "sonner";
 import { getState, type TaskPriority, type TaskStatus, type ManagerTask } from "@/lib/store";
@@ -132,7 +132,7 @@ function ManagerTasksPage() {
   const totalPages = Math.max(1, Math.ceil(visible.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const paged = useMemo(() => visible.slice((safePage - 1) * pageSize, safePage * pageSize), [visible, safePage, pageSize]);
-  useMemo(() => { setPage(1); /* reset */ }, [q, fStatus, fPriority, fEmployee, fDate, pageSize]);
+  useEffect(() => { setPage(1); }, [q, fStatus, fPriority, fEmployee, fDate, pageSize]);
 
   const teamWithEmail = team as Array<{ id: string; name: string; email?: string | null }>;
 
