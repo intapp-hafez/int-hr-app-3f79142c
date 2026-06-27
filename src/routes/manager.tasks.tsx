@@ -272,6 +272,7 @@ function ManagerTasksPage() {
       {visible.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-muted/30 p-8 text-center text-sm text-muted-foreground">{t("noTasks")}</div>
       ) : view === "table" ? (
+        <>
         <div className="overflow-x-auto rounded-2xl border border-border bg-card shadow-soft">
           <table className="w-full text-sm">
             <thead className="bg-muted/40 text-xs text-muted-foreground">
@@ -286,7 +287,7 @@ function ManagerTasksPage() {
               </tr>
             </thead>
             <tbody>
-              {visible.map((tk) => (
+              {paged.map((tk) => (
                 <tr key={tk.id} className="border-t border-border align-top hover:bg-muted/30">
                   <td className="px-3 py-2">
                     <div className="font-medium">{tk.title}</div>
@@ -308,9 +309,14 @@ function ManagerTasksPage() {
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex flex-wrap items-center justify-end gap-1">
-                      {tk.status === "pending" && (
+                      {(tk.status === "pending" || tk.status === "cancelled") && (
                         <button onClick={() => doTransition(tk.id, "in_progress")} title={t("markInProgress")} className="rounded-full border border-border bg-card p-1.5">
                           <Play className="h-3 w-3" />
+                        </button>
+                      )}
+                      {tk.status === "in_progress" && (
+                        <button onClick={() => doTransition(tk.id, "pending")} title="Pause" className="rounded-full border border-border bg-card p-1.5 text-warning">
+                          <Pause className="h-3 w-3" />
                         </button>
                       )}
                       {tk.status !== "done" && tk.status !== "cancelled" && (
@@ -318,11 +324,9 @@ function ManagerTasksPage() {
                           <Check className="h-3 w-3" />
                         </button>
                       )}
-                      {tk.status !== "cancelled" && tk.status !== "done" && (
-                        <button onClick={() => doTransition(tk.id, "cancelled")} title={t("statusCancelled")} className="rounded-full border border-border bg-card p-1.5 text-muted-foreground">
-                          <X className="h-3 w-3" />
-                        </button>
-                      )}
+                      <button onClick={() => setReassignFor(tk.id)} title="Reassign" className="rounded-full border border-border bg-card p-1.5">
+                        <Users className="h-3 w-3" />
+                      </button>
                       <button onClick={() => doDelete(tk.id)} title={t("delete")} className="rounded-full border border-border bg-card p-1.5 text-danger">
                         <Trash2 className="h-3 w-3" />
                       </button>
@@ -333,6 +337,25 @@ function ManagerTasksPage() {
             </tbody>
           </table>
         </div>
+        <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <span>Rows per page</span>
+            <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} className="input h-8 w-auto py-0 text-xs">
+              {[10, 25, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <span>{visible.length === 0 ? 0 : (safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, visible.length)} of {visible.length}</span>
+            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage <= 1} className="rounded-full border border-border bg-card p-1 disabled:opacity-40">
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </button>
+            <span>Page {safePage} / {totalPages}</span>
+            <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={safePage >= totalPages} className="rounded-full border border-border bg-card p-1 disabled:opacity-40">
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+        </>
       ) : (
         <ul className="space-y-3">
           {visible.map((tk) => (
