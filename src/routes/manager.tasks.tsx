@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Plus, Trash2, Play, Check, X, Search, MapPin, History, ChevronDown, ChevronUp } from "lucide-react";
-import { LayoutGrid, Table as TableIcon } from "lucide-react";
+import { Plus, Trash2, Play, Pause, Check, X, Search, MapPin, History, ChevronDown, ChevronUp, Users, Upload, Download, ChevronLeft, ChevronRight, LayoutGrid, Table as TableIcon } from "lucide-react";
 import { toast } from "sonner";
 import { getState, type TaskPriority, type TaskStatus, type ManagerTask } from "@/lib/store";
 import { useSession } from "@/lib/auth";
@@ -9,7 +8,7 @@ import { useI18n } from "@/lib/i18n";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getMyTeam } from "@/lib/team.functions";
-import { createTask, listTasks, transitionTask as transitionTaskFn, deleteTask as deleteTaskFn, getProfileNames } from "@/backend/functions/tasks.functions";
+import { createTask, listTasks, transitionTask as transitionTaskFn, deleteTask as deleteTaskFn, getProfileNames, updateTaskAssignees } from "@/backend/functions/tasks.functions";
 import { mapTaskRow, type TaskRow } from "@/lib/task-mapping";
 import { supabase } from "@/integrations/supabase/client";
 
