@@ -259,6 +259,7 @@ export type Database = {
           id: string
           name_ar: string
           name_en: string
+          responsible_person_id: string | null
           sort_order: number
           updated_at: string
         }
@@ -268,6 +269,7 @@ export type Database = {
           id?: string
           name_ar?: string
           name_en: string
+          responsible_person_id?: string | null
           sort_order?: number
           updated_at?: string
         }
@@ -277,10 +279,19 @@ export type Database = {
           id?: string
           name_ar?: string
           name_en?: string
+          responsible_person_id?: string | null
           sort_order?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "departments_responsible_person_id_fkey"
+            columns: ["responsible_person_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       districts: {
         Row: {

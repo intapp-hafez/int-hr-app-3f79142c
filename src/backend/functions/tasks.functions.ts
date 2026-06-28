@@ -86,3 +86,18 @@ export const deleteTask = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+export const updateTaskAssignees = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => z.object({
+    id: z.string().uuid(),
+    assignees: z.array(z.string().uuid()).min(1).max(50),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase
+      .from("tasks")
+      .update({ assignees: data.assignees })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });

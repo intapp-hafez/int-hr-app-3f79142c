@@ -34,7 +34,7 @@ export const getOrgChart = createServerFn({ method: "GET" })
   .handler(async ({ context }): Promise<OrgChart> => {
     const sb = context.supabase;
     const [{ data: depts }, { data: positions }, { data: profiles }] = await Promise.all([
-      sb.from("departments").select("id, name_en, name_ar, sort_order").order("sort_order").order("name_en"),
+      sb.from("departments").select("id, name_en, name_ar, sort_order, responsible_person_id").order("sort_order").order("name_en"),
       sb.from("positions").select("id, name_en, name_ar, sort_order").order("sort_order").order("name_en"),
       sb
         .from("profiles")
@@ -49,6 +49,7 @@ export const getOrgChart = createServerFn({ method: "GET" })
     const deptList = (depts ?? []).map((d: any) => ({
       id: d.id as string,
       name: (d.name_en ?? d.name_ar ?? "Department") as string,
+      responsibleId: (d.responsible_person_id ?? null) as string | null,
     }));
 
     const allPeople: OrgPerson[] = (profiles ?? [])
@@ -91,12 +92,17 @@ export const getOrgChart = createServerFn({ method: "GET" })
 
     const departments: OrgDept[] = deptList.map((d) => {
       const people = byDept.get(d.id) ?? [];
-      // Department head: person in dept with most direct reports within dept (or none)
+      // Department head: explicit responsible_person_id wins, otherwise heuristic
       let head: OrgPerson | null = null;
-      let bestScore = -1;
-      for (const p of people) {
-        const score = people.filter((x) => x.managerId === p.id).length;
-        if (score > bestScore) { bestScore = score; head = p; }
+      if (d.responsibleId) {
+        head = allPeople.find((p) => p.id === d.responsibleId) ?? null;
+      }
+      if (!head) {
+        let bestScore = -1;
+        for (const p of people) {
+          const score = people.filter((x) => x.managerId === p.id).length;
+          if (score > bestScore) { bestScore = score; head = p; }
+        }
       }
       // Group remaining by position
       const rest = people.filter((p) => p.id !== head?.id);
