@@ -160,7 +160,7 @@ export const exportLeaveBalancesAdmin = createServerFn({ method: "GET" })
       const { data: matches, error: pErr } = await context.supabase
         .from("profiles")
         .select("id")
-        .or(`full_name.ilike.%${term}%,id.ilike.${term}%`)
+        .or(`full_name.ilike.%${term}%,email.ilike.%${term}%`)
         .limit(5000);
       if (pErr) throw new Error(pErr.message);
       employeeIdFilter = (matches ?? []).map((m: any) => m.id);
