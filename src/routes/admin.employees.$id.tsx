@@ -955,7 +955,6 @@ function AttendanceHistoryPanel({ employeeId }: { employeeId: string }) {
   const wdFn = useServerFn(getEmployeeWorkingDays);
   const today = new Date();
   const [cursor, setCursor] = useState({ year: today.getFullYear(), month: today.getMonth() + 1 });
-  const monthStart = `${cursor.year}-${String(cursor.month).padStart(2, "0")}-01`;
   const daysInMonth = new Date(cursor.year, cursor.month, 0).getDate();
   const monthLabel = new Date(cursor.year, cursor.month - 1, 1).toLocaleString(undefined, { month: "long", year: "numeric" });
 
