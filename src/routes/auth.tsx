@@ -25,6 +25,8 @@ function AuthPage() {
     if (!raw) return null;
     // Only allow same-origin, non-auth paths
     if (!raw.startsWith("/") || raw.startsWith("//") || raw.startsWith("/auth")) return null;
+    // Ignore the public landing page so role-based home takes over after sign-in
+    if (raw === "/" || raw === "") return null;
     return raw;
   })();
   const [email, setEmail] = useState("");
