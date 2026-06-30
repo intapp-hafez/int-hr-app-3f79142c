@@ -13,6 +13,7 @@ import {
   getEmployeeAttendanceHistory,
   getEmployeeLeavesHistory,
 } from "@/backend/functions/employees.functions";
+import { getEmployeeWorkingDays } from "@/backend/functions/employee-working-days.functions";
 import { getMe } from "@/backend/functions/auth.functions";
 import {
   listEmployeeDevices,
@@ -951,38 +952,152 @@ type LeaveStatus = "All" | "Pending" | "Approved" | "Rejected";
 
 function AttendanceHistoryPanel({ employeeId }: { employeeId: string }) {
   const fn = useServerFn(getEmployeeAttendanceHistory);
-  const { data, isLoading } = useQuery({
-    queryKey: ["employee", "attendance", employeeId],
-    queryFn: () => fn({ data: { employee_id: employeeId, limit: 180 } }),
+  const wdFn = useServerFn(getEmployeeWorkingDays);
+  const today = new Date();
+  const [cursor, setCursor] = useState({ year: today.getFullYear(), month: today.getMonth() + 1 });
+  const daysInMonth = new Date(cursor.year, cursor.month, 0).getDate();
+  const monthLabel = new Date(cursor.year, cursor.month - 1, 1).toLocaleString(undefined, { month: "long", year: "numeric" });
+
+  const { data: attData, isLoading } = useQuery({
+    queryKey: ["employee", "attendance", employeeId, cursor.year, cursor.month],
+    queryFn: () => fn({ data: { employee_id: employeeId, limit: 500 } }),
   });
-  const rows = (data ?? []) as any[];
+  const { data: wdData } = useQuery({
+    queryKey: ["employee", "working-days", employeeId],
+    queryFn: () => wdFn({ data: { employee_id: employeeId } }),
+  });
+
+  const weeklyDays: number[] = wdData?.weekly ?? [0, 1, 2, 3, 4];
+  const monthOverride = wdData?.months.find((m: any) => m.year === cursor.year && m.month === cursor.month);
+  const workingDayIdx: number[] = monthOverride?.days ?? weeklyDays;
+
+  const attByDate = useMemo(() => {
+    const m = new Map<string, any>();
+    (attData ?? []).forEach((r: any) => { if (r.date) m.set(r.date, r); });
+    return m;
+  }, [attData]);
+
+  const isFuture = (d: Date) => d.getTime() > new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+
+  const rows = useMemo(() => {
+    const list: Array<{ date: string; dayLabel: string; dow: number; rec: any; isWorking: boolean; future: boolean }> = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dt = new Date(cursor.year, cursor.month - 1, d);
+      const iso = `${cursor.year}-${String(cursor.month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      list.push({
+        date: iso,
+        dayLabel: dt.toLocaleDateString(undefined, { weekday: "short" }),
+        dow: dt.getDay(),
+        rec: attByDate.get(iso),
+        isWorking: workingDayIdx.includes(dt.getDay()),
+        future: isFuture(dt),
+      });
+    }
+    return list;
+  }, [daysInMonth, cursor.year, cursor.month, attByDate, workingDayIdx]);
+
+  const stats = useMemo(() => {
+    let present = 0, late = 0, absent = 0, working = 0;
+    rows.forEach((r) => {
+      if (!r.isWorking) return;
+      working++;
+      if (r.future) return;
+      const s = String(r.rec?.status ?? "").toLowerCase();
+      if (r.rec && (s === "late" || (r.rec.in_time && s.includes("late")))) late++;
+      else if (r.rec && r.rec.in_time) present++;
+      else absent++;
+    });
+    return { present, late, absent, working };
+  }, [rows]);
+
+  function hours(rec: any): string {
+    if (!rec?.in_time || !rec?.out_time) return "—";
+    const ms = new Date(rec.out_time).getTime() - new Date(rec.in_time).getTime();
+    if (!isFinite(ms) || ms <= 0) return "—";
+    const h = Math.floor(ms / 3_600_000);
+    const m = Math.round((ms % 3_600_000) / 60_000);
+    return `${h}h ${String(m).padStart(2, "0")}m`;
+  }
+
+  function shiftMonth(delta: number) {
+    setCursor((c) => {
+      const m = c.month + delta;
+      if (m < 1) return { year: c.year - 1, month: 12 };
+      if (m > 12) return { year: c.year + 1, month: 1 };
+      return { year: c.year, month: m };
+    });
+  }
+
+  function statusFor(r: typeof rows[number]): { label: string; cls: string } {
+    if (!r.isWorking) return { label: "OFF", cls: "bg-muted text-muted-foreground" };
+    if (r.future) return { label: "—", cls: "bg-transparent text-muted-foreground" };
+    const rec = r.rec;
+    const s = String(rec?.status ?? "").toLowerCase();
+    if (s === "late" || (rec && s.includes("late"))) return { label: "LATE", cls: "bg-amber-500/15 text-amber-600" };
+    if (rec?.in_time) return { label: "PRESENT", cls: "bg-emerald-500/15 text-emerald-600" };
+    return { label: "ABSENT", cls: "bg-destructive/10 text-destructive" };
+  }
+
   return (
-    <div className="rounded-3xl border border-border bg-card p-5">
-      <h2 className="mb-4 font-display text-base font-semibold">Attendance · last 180 days</h2>
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No attendance records.</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-              <tr><th className="px-2 py-2 text-start">Date</th><th className="px-2 py-2 text-start">In</th><th className="px-2 py-2 text-start">Out</th><th className="px-2 py-2 text-start">Branch</th><th className="px-2 py-2 text-start">Status</th></tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.id} className="border-b border-border last:border-b-0">
-                  <td className="px-2 py-2 font-mono">{r.date}</td>
-                  <td className="px-2 py-2 font-mono">{r.in_time ? new Date(r.in_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</td>
-                  <td className="px-2 py-2 font-mono">{r.out_time ? new Date(r.out_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</td>
-                  <td className="px-2 py-2">{r.branch ?? "—"}</td>
-                  <td className="px-2 py-2"><span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase">{r.status ?? "—"}</span></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+    <div className="rounded-3xl border border-border bg-card">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => shiftMonth(-1)}
+            className="grid h-8 w-8 place-items-center rounded-full border border-border bg-background hover:bg-muted"
+            aria-label="Previous month"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <h2 className="font-display text-base font-semibold tracking-tight">{monthLabel}</h2>
+          <button
+            onClick={() => shiftMonth(1)}
+            className="grid h-8 w-8 place-items-center rounded-full border border-border bg-background hover:bg-muted"
+            aria-label="Next month"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
         </div>
-      )}
+        <div className="flex flex-wrap items-center gap-3 text-xs">
+          <span><span className="font-semibold text-emerald-600 tabular-nums">{stats.present}</span> <span className="text-muted-foreground">present</span></span>
+          <span><span className="font-semibold text-amber-600 tabular-nums">{stats.late}</span> <span className="text-muted-foreground">late</span></span>
+          <span><span className="font-semibold text-destructive tabular-nums">{stats.absent}</span> <span className="text-muted-foreground">absent</span></span>
+          <span className="text-muted-foreground">/ <span className="font-semibold text-foreground tabular-nums">{stats.working}</span> working days</span>
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="border-b border-border bg-muted/40 text-[11px] uppercase tracking-wider text-muted-foreground">
+            <tr>
+              <th className="px-5 py-3 text-start font-semibold">Date</th>
+              <th className="px-3 py-3 text-start font-semibold">Day</th>
+              <th className="px-3 py-3 text-start font-semibold">Check In</th>
+              <th className="px-3 py-3 text-start font-semibold">Check Out</th>
+              <th className="px-3 py-3 text-start font-semibold">Hours</th>
+              <th className="px-5 py-3 text-end font-semibold">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading ? (
+              <tr><td colSpan={6} className="px-5 py-8 text-center text-sm text-muted-foreground">Loading…</td></tr>
+            ) : rows.map((r) => {
+              const st = statusFor(r);
+              return (
+                <tr key={r.date} className="border-b border-border last:border-b-0 hover:bg-muted/30">
+                  <td className="px-5 py-3 font-mono text-[13px] tabular-nums">{r.date}</td>
+                  <td className="px-3 py-3 text-muted-foreground">{r.dayLabel}</td>
+                  <td className="px-3 py-3 font-mono tabular-nums">{r.rec?.in_time ? new Date(r.rec.in_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</td>
+                  <td className="px-3 py-3 font-mono tabular-nums">{r.rec?.out_time ? new Date(r.rec.out_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</td>
+                  <td className="px-3 py-3 font-mono tabular-nums">{hours(r.rec)}</td>
+                  <td className="px-5 py-3 text-end">
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${st.cls}`}>{st.label}</span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
