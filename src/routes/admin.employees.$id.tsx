@@ -1109,7 +1109,10 @@ function AttendanceHistoryPanel({ employeeId }: { employeeId: string }) {
               return (
                 <tr key={r.date} className="border-b border-border last:border-b-0 hover:bg-muted/30">
                   <td className="px-5 py-3 font-mono text-[13px] tabular-nums">{r.date}</td>
-                  <td className="px-3 py-3 text-muted-foreground">{r.dayLabel}</td>
+                  <td className="px-3 py-3 text-muted-foreground">
+                    {r.dayLabel}
+                    {r.holiday && <span className="ms-2 text-[11px] font-medium text-violet-600">· {r.holiday.name}</span>}
+                  </td>
                   <td className="px-3 py-3 font-mono tabular-nums">{r.rec?.in_time ? new Date(r.rec.in_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</td>
                   <td className="px-3 py-3 font-mono tabular-nums">{r.rec?.out_time ? new Date(r.rec.out_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</td>
                   <td className="px-3 py-3 font-mono tabular-nums">{hours(r.rec)}</td>
