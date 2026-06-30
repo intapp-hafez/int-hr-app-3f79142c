@@ -505,6 +505,14 @@ function ManagerTasksPage() {
           onSave={(ids) => doReassign(reassignFor, ids)}
         />
       )}
+      {bulkReassign && (
+        <ReassignModal
+          team={team}
+          current={[]}
+          onClose={() => setBulkReassign(false)}
+          onSave={(ids) => bulkDoReassign(ids)}
+        />
+      )}
     </div>
   );
 }
