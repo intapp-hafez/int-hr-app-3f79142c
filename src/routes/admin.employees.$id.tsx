@@ -951,7 +951,6 @@ function DevicesTab({ devices }: { devices: Device[] }) {
 type LeaveStatus = "All" | "Pending" | "Approved" | "Rejected";
 
 function AttendanceHistoryPanel({ employeeId }: { employeeId: string }) {
-function AttendanceHistoryPanel({ employeeId }: { employeeId: string }) {
   const fn = useServerFn(getEmployeeAttendanceHistory);
   const wdFn = useServerFn(getEmployeeWorkingDays);
   const today = new Date();
