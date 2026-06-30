@@ -955,6 +955,7 @@ function AttendanceHistoryPanel({ employeeId }: { employeeId: string }) {
   const fn = useServerFn(getEmployeeAttendanceHistory);
   const wdFn = useServerFn(getEmployeeWorkingDays);
   const holFn = useServerFn(listHolidays);
+  const leavesFn = useServerFn(getEmployeeLeavesHistory);
   const today = new Date();
   const [cursor, setCursor] = useState({ year: today.getFullYear(), month: today.getMonth() + 1 });
   const daysInMonth = new Date(cursor.year, cursor.month, 0).getDate();
@@ -971,6 +972,10 @@ function AttendanceHistoryPanel({ employeeId }: { employeeId: string }) {
   const { data: holidaysData } = useQuery({
     queryKey: ["holidays", "all"],
     queryFn: () => holFn(),
+  });
+  const { data: leavesData } = useQuery({
+    queryKey: ["employee", "leaves", employeeId],
+    queryFn: () => leavesFn({ data: { employee_id: employeeId } }),
   });
 
   const weeklyDays: number[] = wdData?.weekly ?? [0, 1, 2, 3, 4];
@@ -992,6 +997,23 @@ function AttendanceHistoryPanel({ employeeId }: { employeeId: string }) {
     return m;
   }, [holidaysData, cursor.year]);
 
+  // Approved leave days → date -> { type, paid }
+  const leaveByDate = useMemo(() => {
+    const m = new Map<string, { type: string; paid: boolean | null }>();
+    (leavesData ?? []).forEach((l: any) => {
+      if (!l?.start_date || !l?.end_date) return;
+      const status = String(l.status ?? "").toLowerCase();
+      if (status !== "approved") return;
+      const start = new Date(l.start_date + "T00:00:00");
+      const end = new Date(l.end_date + "T00:00:00");
+      for (let d = new Date(start); d.getTime() <= end.getTime(); d.setDate(d.getDate() + 1)) {
+        const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        m.set(iso, { type: l.leave_type_name ?? "Leave", paid: l.paid });
+      }
+    });
+    return m;
+  }, [leavesData]);
+
   const attByDate = useMemo(() => {
     const m = new Map<string, any>();
     (attData ?? []).forEach((r: any) => { if (r.date) m.set(r.date, r); });
@@ -1001,11 +1023,12 @@ function AttendanceHistoryPanel({ employeeId }: { employeeId: string }) {
   const isFuture = (d: Date) => d.getTime() > new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
 
   const rows = useMemo(() => {
-    const list: Array<{ date: string; dayLabel: string; dow: number; rec: any; isWorking: boolean; future: boolean; holiday: { name: string; type: string } | null }> = [];
+    const list: Array<{ date: string; dayLabel: string; dow: number; rec: any; isWorking: boolean; future: boolean; holiday: { name: string; type: string } | null; leave: { type: string; paid: boolean | null } | null }> = [];
     for (let d = 1; d <= daysInMonth; d++) {
       const dt = new Date(cursor.year, cursor.month - 1, d);
       const iso = `${cursor.year}-${String(cursor.month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
       const holiday = holidayByDate.get(iso) ?? null;
+      const leave = leaveByDate.get(iso) ?? null;
       list.push({
         date: iso,
         dayLabel: dt.toLocaleDateString(undefined, { weekday: "short" }),
@@ -1014,23 +1037,25 @@ function AttendanceHistoryPanel({ employeeId }: { employeeId: string }) {
         isWorking: workingDayIdx.includes(dt.getDay()) && !holiday,
         future: isFuture(dt),
         holiday,
+        leave,
       });
     }
     return list;
-  }, [daysInMonth, cursor.year, cursor.month, attByDate, workingDayIdx, holidayByDate]);
+  }, [daysInMonth, cursor.year, cursor.month, attByDate, workingDayIdx, holidayByDate, leaveByDate]);
 
   const stats = useMemo(() => {
-    let present = 0, late = 0, absent = 0, working = 0;
+    let present = 0, late = 0, absent = 0, leave = 0, working = 0;
     rows.forEach((r) => {
       if (!r.isWorking) return;
       working++;
       if (r.future) return;
+      if (r.leave) { leave++; return; }
       const s = String(r.rec?.status ?? "").toLowerCase();
       if (r.rec && (s === "late" || (r.rec.in_time && s.includes("late")))) late++;
       else if (r.rec && r.rec.in_time) present++;
       else absent++;
     });
-    return { present, late, absent, working };
+    return { present, late, absent, leave, working };
   }, [rows]);
 
   function hours(rec: any): string {
@@ -1052,7 +1077,10 @@ function AttendanceHistoryPanel({ employeeId }: { employeeId: string }) {
   }
 
   function statusFor(r: typeof rows[number]): { label: string; cls: string } {
+    // Precedence: HOLIDAY > LEAVE > OFF > attendance status. Both labels are
+    // also rendered alongside when the day is simultaneously a holiday and leave.
     if (r.holiday) return { label: "HOLIDAY", cls: "bg-violet-500/15 text-violet-600" };
+    if (r.leave) return { label: "LEAVE", cls: "bg-sky-500/15 text-sky-600" };
     if (!r.isWorking) return { label: "OFF", cls: "bg-muted text-muted-foreground" };
     if (r.future) return { label: "—", cls: "bg-transparent text-muted-foreground" };
     const rec = r.rec;
@@ -1086,6 +1114,7 @@ function AttendanceHistoryPanel({ employeeId }: { employeeId: string }) {
           <span><span className="font-semibold text-emerald-600 tabular-nums">{stats.present}</span> <span className="text-muted-foreground">present</span></span>
           <span><span className="font-semibold text-amber-600 tabular-nums">{stats.late}</span> <span className="text-muted-foreground">late</span></span>
           <span><span className="font-semibold text-destructive tabular-nums">{stats.absent}</span> <span className="text-muted-foreground">absent</span></span>
+          <span><span className="font-semibold text-sky-600 tabular-nums">{stats.leave}</span> <span className="text-muted-foreground">leave</span></span>
           <span className="text-muted-foreground">/ <span className="font-semibold text-foreground tabular-nums">{stats.working}</span> working days</span>
         </div>
       </div>
@@ -1112,6 +1141,7 @@ function AttendanceHistoryPanel({ employeeId }: { employeeId: string }) {
                   <td className="px-3 py-3 text-muted-foreground">
                     {r.dayLabel}
                     {r.holiday && <span className="ms-2 text-[11px] font-medium text-violet-600">· {r.holiday.name}</span>}
+                    {r.leave && <span className="ms-2 inline-flex items-center rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-sky-600">Leave{r.leave.paid === false ? " (unpaid)" : ""}</span>}
                   </td>
                   <td className="px-3 py-3 font-mono tabular-nums">{r.rec?.in_time ? new Date(r.rec.in_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</td>
                   <td className="px-3 py-3 font-mono tabular-nums">{r.rec?.out_time ? new Date(r.rec.out_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</td>
