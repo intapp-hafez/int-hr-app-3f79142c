@@ -103,6 +103,9 @@ function ManagerTasksPage() {
   const [pageSize, setPageSize] = useState(25);
   const [reassignFor, setReassignFor] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkReassign, setBulkReassign] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const visible = useMemo(() => {
     const ql = q.trim().toLowerCase();
@@ -133,6 +136,52 @@ function ManagerTasksPage() {
   const safePage = Math.min(page, totalPages);
   const paged = useMemo(() => visible.slice((safePage - 1) * pageSize, safePage * pageSize), [visible, safePage, pageSize]);
   useEffect(() => { setPage(1); }, [q, fStatus, fPriority, fEmployee, fDate, pageSize]);
+  useEffect(() => { setSelected(new Set()); }, [q, fStatus, fPriority, fEmployee, fDate, view]);
+
+  const toggleSel = (id: string) =>
+    setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const pageIds = paged.map((tk) => tk.id);
+  const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selected.has(id));
+  const togglePageAll = () =>
+    setSelected((s) => {
+      const n = new Set(s);
+      if (allPageSelected) pageIds.forEach((id) => n.delete(id));
+      else pageIds.forEach((id) => n.add(id));
+      return n;
+    });
+  const selectedTasks = useMemo(() => tasks.filter((tk) => selected.has(tk.id)), [tasks, selected]);
+
+  const bulkTransition = async (status: TaskStatus) => {
+    const targets = selectedTasks.filter((tk) => {
+      if (status === "in_progress") return tk.status === "pending" || tk.status === "cancelled";
+      if (status === "pending") return tk.status === "in_progress";
+      if (status === "done") return tk.status !== "done" && tk.status !== "cancelled";
+      return true;
+    });
+    if (targets.length === 0) { toast.error("No eligible tasks selected"); return; }
+    setBulkBusy(true);
+    let ok = 0, failed = 0;
+    await Promise.all(targets.map(async (tk) => {
+      try { await transitionFn({ data: { id: tk.id, status } }); ok++; } catch { failed++; }
+    }));
+    toast.success(`Updated ${ok}${failed ? ` • ${failed} failed` : ""}`);
+    setSelected(new Set());
+    setBulkBusy(false);
+    invalidate();
+  };
+  const bulkDoReassign = async (assignees: string[]) => {
+    if (selectedTasks.length === 0) return;
+    setBulkBusy(true);
+    let ok = 0, failed = 0;
+    await Promise.all(selectedTasks.map(async (tk) => {
+      try { await reassignFn({ data: { id: tk.id, assignees } }); ok++; } catch { failed++; }
+    }));
+    toast.success(`Reassigned ${ok}${failed ? ` • ${failed} failed` : ""}`);
+    setBulkReassign(false);
+    setSelected(new Set());
+    setBulkBusy(false);
+    invalidate();
+  };
 
   const teamWithEmail = team as Array<{ id: string; name: string; email?: string | null }>;
 
@@ -273,10 +322,33 @@ function ManagerTasksPage() {
         <div className="rounded-2xl border border-dashed border-border bg-muted/30 p-8 text-center text-sm text-muted-foreground">{t("noTasks")}</div>
       ) : view === "table" ? (
         <>
+        {selected.size > 0 && (
+          <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-brand/30 bg-brand/5 px-3 py-2 text-xs">
+            <span className="font-semibold">{selected.size} selected</span>
+            <button disabled={bulkBusy} onClick={() => bulkTransition("in_progress")} className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 font-semibold disabled:opacity-50">
+              <Play className="h-3 w-3" /> Start
+            </button>
+            <button disabled={bulkBusy} onClick={() => bulkTransition("pending")} className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 font-semibold text-warning disabled:opacity-50">
+              <Pause className="h-3 w-3" /> Pause
+            </button>
+            <button disabled={bulkBusy} onClick={() => bulkTransition("done")} className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2.5 py-1 font-semibold text-success disabled:opacity-50">
+              <Check className="h-3 w-3" /> Complete
+            </button>
+            <button disabled={bulkBusy} onClick={() => setBulkReassign(true)} className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 font-semibold disabled:opacity-50">
+              <Users className="h-3 w-3" /> Reassign
+            </button>
+            <button onClick={() => setSelected(new Set())} className="ms-auto inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 font-semibold">
+              <X className="h-3 w-3" /> Clear
+            </button>
+          </div>
+        )}
         <div className="overflow-x-auto rounded-2xl border border-border bg-card shadow-soft">
           <table className="w-full text-sm">
             <thead className="bg-muted/40 text-xs text-muted-foreground">
               <tr>
+                <th className="w-8 px-3 py-2">
+                  <input type="checkbox" checked={allPageSelected} onChange={togglePageAll} aria-label="Select all" />
+                </th>
                 <th className="px-3 py-2 text-start font-semibold">{t("rowTitle") ?? "Title"}</th>
                 <th className="px-3 py-2 text-start font-semibold">{t("assignedTo")}</th>
                 <th className="px-3 py-2 text-start font-semibold">{t("taskDate")}</th>
@@ -289,6 +361,9 @@ function ManagerTasksPage() {
             <tbody>
               {paged.map((tk) => (
                 <tr key={tk.id} className="border-t border-border align-top hover:bg-muted/30">
+                  <td className="px-3 py-2">
+                    <input type="checkbox" checked={selected.has(tk.id)} onChange={() => toggleSel(tk.id)} aria-label={`Select ${tk.title}`} />
+                  </td>
                   <td className="px-3 py-2">
                     <div className="font-medium">{tk.title}</div>
                     {tk.description && <div className="text-xs text-muted-foreground">{tk.description}</div>}
@@ -428,6 +503,14 @@ function ManagerTasksPage() {
           current={tasks.find((tk) => tk.id === reassignFor)?.assignees ?? []}
           onClose={() => setReassignFor(null)}
           onSave={(ids) => doReassign(reassignFor, ids)}
+        />
+      )}
+      {bulkReassign && (
+        <ReassignModal
+          team={team}
+          current={[]}
+          onClose={() => setBulkReassign(false)}
+          onSave={(ids) => bulkDoReassign(ids)}
         />
       )}
     </div>
