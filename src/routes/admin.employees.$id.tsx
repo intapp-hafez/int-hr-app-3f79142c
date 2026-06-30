@@ -13,6 +13,7 @@ import {
   getEmployeeAttendanceHistory,
   getEmployeeLeavesHistory,
 } from "@/backend/functions/employees.functions";
+import { getEmployeeWorkingDays } from "@/backend/functions/employee-working-days.functions";
 import { getMe } from "@/backend/functions/auth.functions";
 import {
   listEmployeeDevices,
