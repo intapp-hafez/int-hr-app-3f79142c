@@ -14,6 +14,7 @@ import {
   getEmployeeLeavesHistory,
 } from "@/backend/functions/employees.functions";
 import { getEmployeeWorkingDays } from "@/backend/functions/employee-working-days.functions";
+import { listHolidays } from "@/backend/functions/holidays.functions";
 import { getMe } from "@/backend/functions/auth.functions";
 import {
   listEmployeeDevices,
@@ -953,6 +954,7 @@ type LeaveStatus = "All" | "Pending" | "Approved" | "Rejected";
 function AttendanceHistoryPanel({ employeeId }: { employeeId: string }) {
   const fn = useServerFn(getEmployeeAttendanceHistory);
   const wdFn = useServerFn(getEmployeeWorkingDays);
+  const holFn = useServerFn(listHolidays);
   const today = new Date();
   const [cursor, setCursor] = useState({ year: today.getFullYear(), month: today.getMonth() + 1 });
   const daysInMonth = new Date(cursor.year, cursor.month, 0).getDate();
@@ -966,10 +968,29 @@ function AttendanceHistoryPanel({ employeeId }: { employeeId: string }) {
     queryKey: ["employee", "working-days", employeeId],
     queryFn: () => wdFn({ data: { employee_id: employeeId } }),
   });
+  const { data: holidaysData } = useQuery({
+    queryKey: ["holidays", "all"],
+    queryFn: () => holFn(),
+  });
 
   const weeklyDays: number[] = wdData?.weekly ?? [0, 1, 2, 3, 4];
   const monthOverride = wdData?.months.find((m: any) => m.year === cursor.year && m.month === cursor.month);
   const workingDayIdx: number[] = monthOverride?.days ?? weeklyDays;
+
+  const holidayByDate = useMemo(() => {
+    const m = new Map<string, { name: string; type: string }>();
+    (holidaysData ?? []).forEach((h: any) => {
+      if (!h?.date) return;
+      m.set(h.date, { name: h.name, type: h.type });
+      if (h.recurring) {
+        // Apply recurring holiday to the currently viewed year
+        const mmdd = String(h.date).slice(5);
+        const iso = `${cursor.year}-${mmdd}`;
+        if (!m.has(iso)) m.set(iso, { name: h.name, type: h.type });
+      }
+    });
+    return m;
+  }, [holidaysData, cursor.year]);
 
   const attByDate = useMemo(() => {
     const m = new Map<string, any>();
@@ -980,21 +1001,23 @@ function AttendanceHistoryPanel({ employeeId }: { employeeId: string }) {
   const isFuture = (d: Date) => d.getTime() > new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
 
   const rows = useMemo(() => {
-    const list: Array<{ date: string; dayLabel: string; dow: number; rec: any; isWorking: boolean; future: boolean }> = [];
+    const list: Array<{ date: string; dayLabel: string; dow: number; rec: any; isWorking: boolean; future: boolean; holiday: { name: string; type: string } | null }> = [];
     for (let d = 1; d <= daysInMonth; d++) {
       const dt = new Date(cursor.year, cursor.month - 1, d);
       const iso = `${cursor.year}-${String(cursor.month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      const holiday = holidayByDate.get(iso) ?? null;
       list.push({
         date: iso,
         dayLabel: dt.toLocaleDateString(undefined, { weekday: "short" }),
         dow: dt.getDay(),
         rec: attByDate.get(iso),
-        isWorking: workingDayIdx.includes(dt.getDay()),
+        isWorking: workingDayIdx.includes(dt.getDay()) && !holiday,
         future: isFuture(dt),
+        holiday,
       });
     }
     return list;
-  }, [daysInMonth, cursor.year, cursor.month, attByDate, workingDayIdx]);
+  }, [daysInMonth, cursor.year, cursor.month, attByDate, workingDayIdx, holidayByDate]);
 
   const stats = useMemo(() => {
     let present = 0, late = 0, absent = 0, working = 0;
@@ -1029,6 +1052,7 @@ function AttendanceHistoryPanel({ employeeId }: { employeeId: string }) {
   }
 
   function statusFor(r: typeof rows[number]): { label: string; cls: string } {
+    if (r.holiday) return { label: "HOLIDAY", cls: "bg-violet-500/15 text-violet-600" };
     if (!r.isWorking) return { label: "OFF", cls: "bg-muted text-muted-foreground" };
     if (r.future) return { label: "—", cls: "bg-transparent text-muted-foreground" };
     const rec = r.rec;
