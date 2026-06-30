@@ -51,7 +51,6 @@ import { Route as AdminLeavesRouteImport } from './routes/admin.leaves'
 import { Route as AdminLatePenaltiesRouteImport } from './routes/admin.late-penalties'
 import { Route as AdminKpisRouteImport } from './routes/admin.kpis'
 import { Route as AdminHolidaysRouteImport } from './routes/admin.holidays'
-import { Route as AdminHolidayTypesRouteImport } from './routes/admin.holiday-types'
 import { Route as AdminGeofencingRouteImport } from './routes/admin.geofencing'
 import { Route as AdminEmployeesRouteImport } from './routes/admin.employees'
 import { Route as AdminEmployeeAccessRouteImport } from './routes/admin.employee-access'
@@ -275,11 +274,6 @@ const AdminHolidaysRoute = AdminHolidaysRouteImport.update({
   path: '/holidays',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminHolidayTypesRoute = AdminHolidayTypesRouteImport.update({
-  id: '/holiday-types',
-  path: '/holiday-types',
-  getParentRoute: () => AdminRoute,
-} as any)
 const AdminGeofencingRoute = AdminGeofencingRouteImport.update({
   id: '/geofencing',
   path: '/geofencing',
@@ -352,7 +346,6 @@ export interface FileRoutesByFullPath {
   '/admin/employee-access': typeof AdminEmployeeAccessRoute
   '/admin/employees': typeof AdminEmployeesRouteWithChildren
   '/admin/geofencing': typeof AdminGeofencingRoute
-  '/admin/holiday-types': typeof AdminHolidayTypesRoute
   '/admin/holidays': typeof AdminHolidaysRoute
   '/admin/kpis': typeof AdminKpisRoute
   '/admin/late-penalties': typeof AdminLatePenaltiesRoute
@@ -403,7 +396,6 @@ export interface FileRoutesByTo {
   '/admin/directory': typeof AdminDirectoryRoute
   '/admin/employee-access': typeof AdminEmployeeAccessRoute
   '/admin/geofencing': typeof AdminGeofencingRoute
-  '/admin/holiday-types': typeof AdminHolidayTypesRoute
   '/admin/holidays': typeof AdminHolidaysRoute
   '/admin/kpis': typeof AdminKpisRoute
   '/admin/late-penalties': typeof AdminLatePenaltiesRoute
@@ -460,7 +452,6 @@ export interface FileRoutesById {
   '/admin/employee-access': typeof AdminEmployeeAccessRoute
   '/admin/employees': typeof AdminEmployeesRouteWithChildren
   '/admin/geofencing': typeof AdminGeofencingRoute
-  '/admin/holiday-types': typeof AdminHolidayTypesRoute
   '/admin/holidays': typeof AdminHolidaysRoute
   '/admin/kpis': typeof AdminKpisRoute
   '/admin/late-penalties': typeof AdminLatePenaltiesRoute
@@ -518,7 +509,6 @@ export interface FileRouteTypes {
     | '/admin/employee-access'
     | '/admin/employees'
     | '/admin/geofencing'
-    | '/admin/holiday-types'
     | '/admin/holidays'
     | '/admin/kpis'
     | '/admin/late-penalties'
@@ -569,7 +559,6 @@ export interface FileRouteTypes {
     | '/admin/directory'
     | '/admin/employee-access'
     | '/admin/geofencing'
-    | '/admin/holiday-types'
     | '/admin/holidays'
     | '/admin/kpis'
     | '/admin/late-penalties'
@@ -625,7 +614,6 @@ export interface FileRouteTypes {
     | '/admin/employee-access'
     | '/admin/employees'
     | '/admin/geofencing'
-    | '/admin/holiday-types'
     | '/admin/holidays'
     | '/admin/kpis'
     | '/admin/late-penalties'
@@ -973,13 +961,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminHolidaysRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/holiday-types': {
-      id: '/admin/holiday-types'
-      path: '/holiday-types'
-      fullPath: '/admin/holiday-types'
-      preLoaderRoute: typeof AdminHolidayTypesRouteImport
-      parentRoute: typeof AdminRoute
-    }
     '/admin/geofencing': {
       id: '/admin/geofencing'
       path: '/geofencing'
@@ -1083,7 +1064,6 @@ interface AdminRouteChildren {
   AdminEmployeeAccessRoute: typeof AdminEmployeeAccessRoute
   AdminEmployeesRoute: typeof AdminEmployeesRouteWithChildren
   AdminGeofencingRoute: typeof AdminGeofencingRoute
-  AdminHolidayTypesRoute: typeof AdminHolidayTypesRoute
   AdminHolidaysRoute: typeof AdminHolidaysRoute
   AdminKpisRoute: typeof AdminKpisRoute
   AdminLatePenaltiesRoute: typeof AdminLatePenaltiesRoute
@@ -1112,7 +1092,6 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminEmployeeAccessRoute: AdminEmployeeAccessRoute,
   AdminEmployeesRoute: AdminEmployeesRouteWithChildren,
   AdminGeofencingRoute: AdminGeofencingRoute,
-  AdminHolidayTypesRoute: AdminHolidayTypesRoute,
   AdminHolidaysRoute: AdminHolidaysRoute,
   AdminKpisRoute: AdminKpisRoute,
   AdminLatePenaltiesRoute: AdminLatePenaltiesRoute,
