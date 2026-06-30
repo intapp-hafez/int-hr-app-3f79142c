@@ -8,17 +8,15 @@ import {
   listDepartments, upsertDepartment, deleteDepartment,
   listPositions, upsertPosition, deletePosition,
   listCitiesWithDistricts, upsertCity, deleteCity, upsertDistrict, deleteDistrict,
-  listLeaveTypes, upsertLeaveType, deleteLeaveType,
 } from "@/backend/functions/directory.functions";
 import { listCitiesAndDistricts } from "@/backend/functions/employees.functions";
 import { downloadTemplate, parseExcelFile } from "@/lib/excel";
-import { HolidaysManager } from "@/components/HolidaysManager";
 import { NetworksManager } from "./admin.networks";
 
 const ContractTemplatesManager = lazy(() => import("@/components/ContractTemplatesManager").then((mod) => ({ default: mod.ContractTemplatesManager })));
 
-type Tab = "departments" | "positions" | "cities" | "leaveTypes" | "holidays" | "networks" | "contractTemplates";
-const validTabs: Tab[] = ["departments", "positions", "cities", "leaveTypes", "holidays", "networks", "contractTemplates"];
+type Tab = "departments" | "positions" | "cities" | "networks" | "contractTemplates";
+const validTabs: Tab[] = ["departments", "positions", "cities", "networks", "contractTemplates"];
 
 export const Route = createFileRoute("/admin/directory")({
   component: DirectoryPage,
@@ -32,8 +30,6 @@ const tabs: { id: Tab; label: string }[] = [
   { id: "departments", label: "Departments" },
   { id: "positions", label: "Positions" },
   { id: "cities", label: "Cities & Districts" },
-  { id: "leaveTypes", label: "Leave Types" },
-  { id: "holidays", label: "Holidays" },
   { id: "networks", label: "Networks" },
   { id: "contractTemplates", label: "Contract Templates" },
 ];
@@ -97,8 +93,6 @@ function DirectoryPage() {
         {tab === "departments" && <NamedSection kind="departments" />}
         {tab === "positions" && <NamedSection kind="positions" />}
         {tab === "cities" && <CitiesSection />}
-        {tab === "leaveTypes" && <LeaveTypesSection />}
-        {tab === "holidays" && <HolidaysManager />}
         {tab === "networks" && <NetworksManager />}
         {tab === "contractTemplates" && (
           <Suspense fallback={<div className="h-40 rounded-2xl bg-muted/30" />}>
@@ -349,52 +343,7 @@ function CitiesSection() {
   );
 }
 
-function LeaveTypesSection() {
-  const qc = useQueryClient();
-  const list = useServerFn(listLeaveTypes);
-  const upsert = useServerFn(upsertLeaveType);
-  const del = useServerFn(deleteLeaveType);
-  const q = useQuery({ queryKey: ["leave_types"], queryFn: () => list() });
-  const m = useMutation({ mutationFn: (r: any) => upsert({ data: r }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["leave_types"] }); toast.success("Saved"); }, onError: (e: Error) => toast.error(e.message) });
-  const mD = useMutation({ mutationFn: (id: string) => del({ data: { id } }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["leave_types"] }); toast.success("Deleted"); }, onError: (e: Error) => toast.error(e.message) });
-  const [draft, setDraft] = useState({ name: "", annual_days: 0, paid: true, active: true, requires_proof: false });
-  const paged = usePaged<any>(q.data ?? []);
-  return (
-    <div className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-6">
-        <input className={`${inputCls} md:col-span-2`} placeholder="Name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
-        <input className={inputCls} type="number" placeholder="Annual days" value={draft.annual_days} onChange={(e) => setDraft({ ...draft, annual_days: Number(e.target.value) })} />
-        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={draft.paid} onChange={(e) => setDraft({ ...draft, paid: e.target.checked })} /> Paid</label>
-        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={draft.requires_proof} onChange={(e) => setDraft({ ...draft, requires_proof: e.target.checked })} /> Requires proof</label>
-        <button onClick={() => { if (!draft.name) return toast.error("Name required"); m.mutate(draft); setDraft({ name: "", annual_days: 0, paid: true, active: true, requires_proof: false }); }}
-          className="rounded-xl bg-gradient-brand px-4 py-2 text-sm font-semibold text-brand-foreground shadow-brand">Add</button>
-      </div>
-      <Table cols={["Name", "Annual days", "Paid", "Requires proof", "Active", ""]}>
-        {paged.slice.map((r: any) => (
-          <tr key={r.id}>
-            <td className="px-3 py-2 font-medium">{r.name}</td>
-            <td className="px-3 py-2">{r.annual_days}</td>
-            <td className="px-3 py-2">{r.paid ? "Yes" : "No"}</td>
-            <td className="px-3 py-2">
-              <button onClick={() => m.mutate({ ...r, requires_proof: !r.requires_proof })} className={`rounded-full px-2 py-1 text-xs ${r.requires_proof ? "bg-warning/20 text-warning-foreground" : "bg-muted text-muted-foreground"}`}>
-                {r.requires_proof ? "Yes" : "No"}
-              </button>
-            </td>
-            <td className="px-3 py-2">
-              <button onClick={() => m.mutate({ ...r, active: !r.active })} className={`rounded-full px-2 py-1 text-xs ${r.active ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}>
-                {r.active ? "Yes" : "No"}
-              </button>
-            </td>
-            <td className="px-3 py-2 text-end">
-              <button onClick={() => mD.mutate(r.id)} className="rounded-lg p-1.5 text-destructive hover:bg-destructive/10"><Trash2 className="h-4 w-4" /></button>
-            </td>
-          </tr>
-        ))}
-      </Table>
-      <Pagination page={paged.page} pageCount={paged.pageCount} onChange={paged.setPage} />
-    </div>
-  );
-}
+
 
 const inputCls = "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring";
 

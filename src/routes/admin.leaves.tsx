@@ -8,6 +8,9 @@ import { useI18n } from "@/lib/i18n";
 import { listAllLeavesAdmin, decideLeave } from "@/backend/functions/leaves.functions";
 import { listLeaveBalancesAdmin, updateLeaveBalance, bulkUpdateLeaveBalances, exportLeaveBalancesAdmin } from "@/backend/functions/leave-balances.functions";
 import { listLeaveTypes } from "@/backend/functions/directory.functions";
+import { LeaveTypesManager } from "@/components/admin/LeaveTypesManager";
+import { HolidayTypesManager } from "@/components/admin/HolidayTypesManager";
+import { HolidaysManager } from "@/components/HolidaysManager";
 
 const tone: Record<string, string> = {
   approved: "bg-success/15 text-success",
@@ -18,14 +21,30 @@ const tone: Record<string, string> = {
 
 export const Route = createFileRoute("/admin/leaves")({
   component: AdminLeaves,
+  validateSearch: (s: Record<string, unknown>): { tab?: LeavesTab } => {
+    const t = s.tab as string | undefined;
+    return { tab: t && LEAVES_TABS.includes(t as LeavesTab) ? (t as LeavesTab) : undefined };
+  },
 });
 
 type Status = "all" | "pending" | "approved" | "rejected" | "cancelled";
 const STATUSES: Status[] = ["all", "pending", "approved", "rejected", "cancelled"];
 
+type LeavesTab = "requests" | "balances" | "leaveTypes" | "holidays" | "holidayTypes";
+const LEAVES_TABS: LeavesTab[] = ["requests", "balances", "leaveTypes", "holidays", "holidayTypes"];
+const TAB_LABELS: Record<LeavesTab, string> = {
+  requests: "Requests",
+  balances: "Balances",
+  leaveTypes: "Leave Types",
+  holidays: "Holidays",
+  holidayTypes: "Holiday Types",
+};
+
 function AdminLeaves() {
   const { t } = useI18n();
   const qc = useQueryClient();
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
   const listFn = useServerFn(listAllLeavesAdmin);
   const decideFn = useServerFn(decideLeave);
   const balancesFn = useServerFn(listLeaveBalancesAdmin);
@@ -33,7 +52,8 @@ function AdminLeaves() {
   const bulkUpdateBalFn = useServerFn(bulkUpdateLeaveBalances);
   const exportBalFn = useServerFn(exportLeaveBalancesAdmin);
   const [filter, setFilter] = useState<Status>("all");
-  const [tab, setTab] = useState<"requests" | "balances">("requests");
+  const tab: LeavesTab = search.tab ?? "requests";
+  const setTab = (t: LeavesTab) => navigate({ search: { tab: t }, replace: true });
   const [balPage, setBalPage] = useState(1);
   const [balPageSize, setBalPageSize] = useState(50);
   const [balTypeFilter, setBalTypeFilter] = useState<string>("all");
@@ -163,15 +183,25 @@ function AdminLeaves() {
         </span>
       </div>
 
-      <div className="flex items-center gap-2 border-b border-border">
-        {(["requests", "balances"] as const).map((k) => (
+      <div className="flex flex-wrap items-center gap-2 border-b border-border">
+        {LEAVES_TABS.map((k) => (
           <button key={k} onClick={() => setTab(k)}
             className={`relative px-4 py-2 text-sm font-medium capitalize transition ${tab === k ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
-            {k === "requests" ? "Requests" : "Balances"}
+            {TAB_LABELS[k]}
             {tab === k && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary" />}
           </button>
         ))}
       </div>
+
+      {tab === "leaveTypes" && (
+        <div className="rounded-3xl border border-border bg-card p-5"><LeaveTypesManager /></div>
+      )}
+      {tab === "holidays" && (
+        <div className="rounded-3xl border border-border bg-card p-5"><HolidaysManager /></div>
+      )}
+      {tab === "holidayTypes" && (
+        <div className="rounded-3xl border border-border bg-card p-5"><HolidayTypesManager /></div>
+      )}
 
       {tab === "requests" && (
         <>
