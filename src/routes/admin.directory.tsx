@@ -8,17 +8,15 @@ import {
   listDepartments, upsertDepartment, deleteDepartment,
   listPositions, upsertPosition, deletePosition,
   listCitiesWithDistricts, upsertCity, deleteCity, upsertDistrict, deleteDistrict,
-  listLeaveTypes, upsertLeaveType, deleteLeaveType,
 } from "@/backend/functions/directory.functions";
 import { listCitiesAndDistricts } from "@/backend/functions/employees.functions";
 import { downloadTemplate, parseExcelFile } from "@/lib/excel";
-import { HolidaysManager } from "@/components/HolidaysManager";
 import { NetworksManager } from "./admin.networks";
 
 const ContractTemplatesManager = lazy(() => import("@/components/ContractTemplatesManager").then((mod) => ({ default: mod.ContractTemplatesManager })));
 
-type Tab = "departments" | "positions" | "cities" | "leaveTypes" | "holidays" | "networks" | "contractTemplates";
-const validTabs: Tab[] = ["departments", "positions", "cities", "leaveTypes", "holidays", "networks", "contractTemplates"];
+type Tab = "departments" | "positions" | "cities" | "networks" | "contractTemplates";
+const validTabs: Tab[] = ["departments", "positions", "cities", "networks", "contractTemplates"];
 
 export const Route = createFileRoute("/admin/directory")({
   component: DirectoryPage,
@@ -32,8 +30,6 @@ const tabs: { id: Tab; label: string }[] = [
   { id: "departments", label: "Departments" },
   { id: "positions", label: "Positions" },
   { id: "cities", label: "Cities & Districts" },
-  { id: "leaveTypes", label: "Leave Types" },
-  { id: "holidays", label: "Holidays" },
   { id: "networks", label: "Networks" },
   { id: "contractTemplates", label: "Contract Templates" },
 ];
@@ -97,8 +93,6 @@ function DirectoryPage() {
         {tab === "departments" && <NamedSection kind="departments" />}
         {tab === "positions" && <NamedSection kind="positions" />}
         {tab === "cities" && <CitiesSection />}
-        {tab === "leaveTypes" && <LeaveTypesSection />}
-        {tab === "holidays" && <HolidaysManager />}
         {tab === "networks" && <NetworksManager />}
         {tab === "contractTemplates" && (
           <Suspense fallback={<div className="h-40 rounded-2xl bg-muted/30" />}>
