@@ -146,7 +146,7 @@ function exportAttendanceCsv(rows: AttendanceRow[]) {
   const header = ["Employee", "Date", "Check In", "Check Out", "Total", "Branch", "Location", "Status", "Note"];
   const esc = (v: string) => `"${String(v ?? "").replace(/"/g, '""')}"`;
   const lines = [header.join(",")].concat(rows.map((r) => [
-    r.employee_name, r.date, toHM(r.in_time), toHM(r.out_time), calcHours(r.in_time, r.out_time),
+    r.employee_name, formatDate(r.date), toHM(r.in_time), toHM(r.out_time), calcHours(r.in_time, r.out_time),
     r.branch ?? "", [r.street, r.district, r.city].filter(Boolean).join(", "), r.status, r.note ?? "",
   ].map(esc).join(",")));
   const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
