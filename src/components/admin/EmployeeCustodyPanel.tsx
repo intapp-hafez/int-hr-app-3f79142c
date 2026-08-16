@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Plus, Package, Trash2, Loader2, X, CornerDownLeft, Pencil, Filter } from "lucide-react";
+import { Plus, Package, Trash2, Loader2, X, CornerDownLeft, Pencil, Filter, History } from "lucide-react";
+import { getMe } from "@/backend/functions/auth.functions";
 import {
   listEmployeeCustody,
   addEmployeeCustody,
@@ -43,6 +44,12 @@ export function EmployeeCustodyPanel({ employeeId }: { employeeId: string }) {
   const delFn = useServerFn(deleteEmployeeCustody);
   const updFn = useServerFn(updateEmployeeCustody);
   const retFn = useServerFn(returnEmployeeCustody);
+  const meFn = useServerFn(getMe);
+  const { data: me } = useQuery({ queryKey: ["me", "roles"], queryFn: () => meFn(), staleTime: 60_000 });
+  const currentUserName =
+    ((me?.profile as any)?.full_name as string | undefined)?.trim() ||
+    ((me?.profile as any)?.email as string | undefined)?.trim() ||
+    "";
 
   const [openAdd, setOpenAdd] = useState(false);
   const [editItem, setEditItem] = useState<CustodyItem | null>(null);
@@ -108,6 +115,13 @@ export function EmployeeCustodyPanel({ employeeId }: { employeeId: string }) {
     [allItems, filters],
   );
   const activeFilters = Object.values(filters).filter(Boolean).length;
+  const returnedItems = useMemo(
+    () =>
+      items
+        .filter((it) => !!it.return_date)
+        .sort((a, b) => String(b.return_date).localeCompare(String(a.return_date))),
+    [items],
+  );
 
   return (
     <div className="space-y-4">
@@ -268,6 +282,31 @@ export function EmployeeCustodyPanel({ employeeId }: { employeeId: string }) {
         )}
       </div>
 
+      <div className="rounded-3xl border border-border bg-card p-4">
+        <div className="mb-3 flex items-center gap-2">
+          <History className="h-4 w-4 text-muted-foreground" />
+          <h3 className="text-sm font-semibold">{t("custodyReturnHistory" as any) ?? "Return history"}</h3>
+        </div>
+        {returnedItems.length === 0 ? (
+          <p className="py-4 text-center text-sm text-muted-foreground">
+            {t("noReturnedCustody" as any) ?? "No returned items yet"}
+          </p>
+        ) : (
+          <ul className="divide-y divide-border text-sm">
+            {returnedItems.map((it) => (
+              <li key={it.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                <span className="font-medium">{it.name}</span>
+                <span className="text-xs text-muted-foreground">
+                  {t("returnedBy" as any) ?? "Returned by"}: <span className="font-semibold text-foreground">{it.returned_by ?? "—"}</span>
+                  {" • "}
+                  {t("returnDate" as any) ?? "Return date"}: <span className="font-semibold text-foreground">{formatDate(it.return_date)}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       {openAdd && <CustodyFormModal onClose={() => setOpenAdd(false)} onSubmit={(v) => addMut.mutate(v)} pending={addMut.isPending} />}
       {editItem && (
         <CustodyFormModal
@@ -299,7 +338,15 @@ export function EmployeeCustodyPanel({ employeeId }: { employeeId: string }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      {returnItem && <ReturnCustodyModal item={returnItem} onClose={() => setReturnItem(null)} onSubmit={(v) => retMut.mutate(v)} pending={retMut.isPending} />}
+      {returnItem && (
+        <ReturnCustodyModal
+          item={returnItem}
+          defaultReturnedBy={currentUserName}
+          onClose={() => setReturnItem(null)}
+          onSubmit={(v) => retMut.mutate(v)}
+          pending={retMut.isPending}
+        />
+      )}
     </div>
   );
 }
@@ -415,11 +462,13 @@ function CustodyFormModal({
 
 function ReturnCustodyModal({
   item,
+  defaultReturnedBy,
   onClose,
   onSubmit,
   pending,
 }: {
   item: CustodyItem;
+  defaultReturnedBy?: string;
   onClose: () => void;
   onSubmit: (v: any) => void;
   pending: boolean;
@@ -427,8 +476,12 @@ function ReturnCustodyModal({
   const { t } = useI18n();
   const [date, setDate] = useState(today());
   const [notes, setNotes] = useState("");
-  const [returnedBy, setReturnedBy] = useState("");
+  const [returnedBy, setReturnedBy] = useState(defaultReturnedBy ?? "");
   const [err, setErr] = useState<string | null>(null);
+  const touched = useRef(false);
+  useEffect(() => {
+    if (!touched.current && defaultReturnedBy) setReturnedBy(defaultReturnedBy);
+  }, [defaultReturnedBy]);
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4">
@@ -461,6 +514,7 @@ function ReturnCustodyModal({
             <input
               value={returnedBy}
               onChange={(e) => {
+                touched.current = true;
                 setReturnedBy(e.target.value);
                 if (err) setErr(null);
               }}
