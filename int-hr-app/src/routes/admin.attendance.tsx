@@ -430,7 +430,7 @@ function AdminAttendance() {
                 ) : rows.map((row) => (
                   <tr key={row.id} className="border-b border-border last:border-b-0 hover:bg-muted/40">
                     <td className="px-4 py-3 font-medium">{row.employee_name}</td>
-                    <td className="px-4 py-3 font-mono tabular-nums">{row.date}</td>
+                    <td className="px-4 py-3 font-mono tabular-nums">{formatDate(row.date)}</td>
                     <td className="px-4 py-3 font-mono tabular-nums">{toHM(row.in_time)}</td>
                     <td className="px-4 py-3 font-mono tabular-nums">{toHM(row.out_time)}</td>
                     <td className="px-4 py-3 font-mono tabular-nums">{calcHours(row.in_time, row.out_time)}</td>
