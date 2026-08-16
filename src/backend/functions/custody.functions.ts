@@ -162,7 +162,7 @@ export const returnEmployeeCustody = createServerFn({ method: "POST" })
       .object({
         id: z.string().uuid(),
         return_date: z.string().min(1),
-        returned_by: z.string().trim().min(1, "Returned by is required").max(200),
+        returned_by: z.string().trim().max(200).optional().nullable(),
         return_notes: z.string().max(2000).optional().nullable(),
       })
       .parse(i),
@@ -172,7 +172,7 @@ export const returnEmployeeCustody = createServerFn({ method: "POST" })
       .from("employee_custody")
       .update({
         return_date: data.return_date,
-        returned_by: data.returned_by,
+        returned_by: data.returned_by?.trim() || null,
         return_notes: data.return_notes || null,
       })
       .eq("id", data.id)
