@@ -53,6 +53,14 @@ function calcHours(inIso?: string | null, outIso?: string | null): string {
   if (mins < 0) return "—";
   return `${Math.floor(mins / 60)}h ${(mins % 60).toString().padStart(2, "0")}m`;
 }
+function formatDate(dateString?: string | null): string {
+  if (!dateString) return "—";
+  const parts = dateString.split("-");
+  if (parts.length === 3) {
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+  return dateString;
+}
 
 type AttendanceRow = {
   id: string;
@@ -138,7 +146,7 @@ function exportAttendanceCsv(rows: AttendanceRow[]) {
   const header = ["Employee", "Date", "Check In", "Check Out", "Total", "Branch", "Location", "Status", "Note"];
   const esc = (v: string) => `"${String(v ?? "").replace(/"/g, '""')}"`;
   const lines = [header.join(",")].concat(rows.map((r) => [
-    r.employee_name, r.date, toHM(r.in_time), toHM(r.out_time), calcHours(r.in_time, r.out_time),
+    r.employee_name, formatDate(r.date), toHM(r.in_time), toHM(r.out_time), calcHours(r.in_time, r.out_time),
     r.branch ?? "", [r.street, r.district, r.city].filter(Boolean).join(", "), r.status, r.note ?? "",
   ].map(esc).join(",")));
   const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
@@ -422,7 +430,7 @@ function AdminAttendance() {
                 ) : rows.map((row) => (
                   <tr key={row.id} className="border-b border-border last:border-b-0 hover:bg-muted/40">
                     <td className="px-4 py-3 font-medium">{row.employee_name}</td>
-                    <td className="px-4 py-3 font-mono tabular-nums">{row.date}</td>
+                    <td className="px-4 py-3 font-mono tabular-nums">{formatDate(row.date)}</td>
                     <td className="px-4 py-3 font-mono tabular-nums">{toHM(row.in_time)}</td>
                     <td className="px-4 py-3 font-mono tabular-nums">{toHM(row.out_time)}</td>
                     <td className="px-4 py-3 font-mono tabular-nums">{calcHours(row.in_time, row.out_time)}</td>
