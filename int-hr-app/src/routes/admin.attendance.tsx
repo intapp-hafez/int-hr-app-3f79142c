@@ -53,6 +53,14 @@ function calcHours(inIso?: string | null, outIso?: string | null): string {
   if (mins < 0) return "—";
   return `${Math.floor(mins / 60)}h ${(mins % 60).toString().padStart(2, "0")}m`;
 }
+function formatDate(dateString?: string | null): string {
+  if (!dateString) return "—";
+  const parts = dateString.split("-");
+  if (parts.length === 3) {
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+  return dateString;
+}
 
 type AttendanceRow = {
   id: string;
