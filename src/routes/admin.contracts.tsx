@@ -16,6 +16,7 @@ import {
   type ContractRow as ApiContractRow,
 } from "@/backend/functions/contracts.functions";
 import { EmployeeAvatar } from "@/components/EmployeeAvatar";
+import { formatDate } from "@/lib/date-format";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -49,7 +50,7 @@ function daysUntil(end: Date) {
   return Math.round((b.getTime() - a.getTime()) / DAY);
 }
 function fmtDate(d: Date | null) {
-  return d ? d.toISOString().slice(0, 10) : "—";
+  return d ? formatDate(d.toISOString().slice(0, 10)) : "—";
 }
 function rowsFromApi(api: ApiContractRow[]): Row[] {
   return api.map((r) => {
@@ -102,7 +103,7 @@ function ContractsPage() {
   const renewMut = useMutation({
     mutationFn: (vars: { id: string; months: number }) => renewFn({ data: vars }),
     onSuccess: (res) => {
-      toast.success(t("contractRenewed"), { description: res?.contract_end_date ? `${t("contractEnd")}: ${res.contract_end_date}` : undefined });
+      toast.success(t("contractRenewed"), { description: res?.contract_end_date ? `${t("contractEnd")}: ${formatDate(res.contract_end_date)}` : undefined });
       invalidate();
     },
     onError: (e: any) => toast.error(t("contractRenewed"), { description: e?.message ?? "Failed" }),
