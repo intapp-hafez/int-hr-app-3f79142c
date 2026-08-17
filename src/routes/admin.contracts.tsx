@@ -103,7 +103,7 @@ function ContractsPage() {
   const renewMut = useMutation({
     mutationFn: (vars: { id: string; months: number }) => renewFn({ data: vars }),
     onSuccess: (res) => {
-      toast.success(t("contractRenewed"), { description: res?.contract_end_date ? `${t("contractEnd")}: ${res.contract_end_date}` : undefined });
+      toast.success(t("contractRenewed"), { description: res?.contract_end_date ? `${t("contractEnd")}: ${formatDate(res.contract_end_date)}` : undefined });
       invalidate();
     },
     onError: (e: any) => toast.error(t("contractRenewed"), { description: e?.message ?? "Failed" }),
