@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMemo } from "react";
 import { MapPin, Wifi, WifiOff, CalendarDays, Clock } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { formatDate } from "@/lib/date-format";
 import { listMyAttendance } from "@/backend/functions/attendance.functions";
 import { listMyLeaves } from "@/backend/functions/leaves.functions";
 
@@ -86,7 +87,7 @@ export function AttendancePage() {
             <article key={a.id} className="rounded-2xl border border-border bg-card p-4 space-y-2">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <p className="text-sm font-semibold">{a.date}</p>
+                  <p className="text-sm font-semibold">{formatDate(a.date)}</p>
                   <p className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
                     <Clock className="h-3 w-3" /> {fmtTime(a.in_time)} → {fmtTime(a.out_time)}
                     {hours && <span className="ml-1 font-mono tabular-nums">· {hours}</span>}
@@ -129,7 +130,7 @@ export function AttendancePage() {
                   <ul className="mt-0.5 space-y-0.5">
                     {overlapping.map((l: any) => (
                       <li key={l.id}>
-                        {l.leave_type_name ?? "Leave"} · {l.start_date} → {l.end_date} ({l.status})
+                        {l.leave_type_name ?? "Leave"} · {formatDate(l.start_date)} → {formatDate(l.end_date)} ({l.status})
                       </li>
                     ))}
                   </ul>

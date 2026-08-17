@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { EmployeeAvatar } from "@/components/EmployeeAvatar";
+import { formatDate } from "@/lib/date-format";
 import { EmployeeTripsPanel } from "@/components/employee/EmployeeTripsPanel";
 import { EmployeeCustodyPanel } from "@/components/admin/EmployeeCustodyPanel";
 import { AvatarUploader } from "@/components/AvatarUploader";
@@ -1917,7 +1918,7 @@ function AttendanceHistoryPanel({ employeeId }: { employeeId: string }) {
                       />
                     ) : null}
                   </td>
-                  <td className="px-3 py-3 font-mono text-[13px] tabular-nums">{r.date}</td>
+                  <td className="px-3 py-3 font-mono text-[13px] tabular-nums">{formatDate(r.date)}</td>
                   <td className="px-3 py-3 text-muted-foreground">
                     {r.dayLabel}
                     {r.holiday && <span className="ms-2 text-[11px] font-medium text-violet-600">· {r.holiday.name}</span>}
@@ -2655,7 +2656,7 @@ function AttendanceTab({ employeeName }: { employeeName: string }) {
   async function exportExcel() {
     const XLSX = await import("xlsx");
     const data = rows.map((a) => ({
-      [t("date")]: a.date,
+      [t("date")]: formatDate(a.date),
       [t("in")]: a.in,
       [t("out")]: a.out,
       [t("workingHours")]: a.hours,
@@ -2729,7 +2730,7 @@ function AttendanceTab({ employeeName }: { employeeName: string }) {
                 const em = earlyMin(a.out);
                 return (
                   <tr key={a.date} className="hover:bg-muted/30">
-                    <td className="px-4 py-3 font-medium">{a.date}</td>
+                    <td className="px-4 py-3 font-medium">{formatDate(a.date)}</td>
                     <td className="px-4 py-3 font-mono tabular-nums text-muted-foreground">
                       <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" />{a.in}</span>
                     </td>

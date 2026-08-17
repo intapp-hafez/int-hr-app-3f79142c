@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
+import { formatDate } from "@/lib/date-format";
 import { useStore } from "@/lib/store";
 import {
   adminListAttendance,
@@ -274,7 +275,7 @@ function exportAttendanceCsv(rows: AttendanceRow[]) {
   const header = ["Employee", "Date", "Check In", "Check Out", "Total", "Branch", "Location", "Status", "Note"];
   const esc = (v: string) => `"${String(v ?? "").replace(/"/g, '""')}"`;
   const lines = [header.join(",")].concat(rows.map((r) => [
-    r.employee_name, r.date, format12H(r.in_time), format12H(r.out_time), calcHours(r.in_time, r.out_time),
+    r.employee_name, formatDate(r.date), format12H(r.in_time), format12H(r.out_time), calcHours(r.in_time, r.out_time),
     r.branch ?? "", [r.street, r.district, r.city].filter(Boolean).join(", "), r.status, r.note ?? "",
   ].map(esc).join(",")));
   const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
@@ -286,7 +287,7 @@ function exportAttendanceCsv(rows: AttendanceRow[]) {
 function printAttendancePdf(rows: AttendanceRow[], title: string) {
   const w = window.open("", "_blank", "width=900,height=700");
   if (!w) return;
-  const body = rows.map((r) => `<tr><td>${escapeHtml(r.employee_name)}</td><td>${r.date}</td><td>${format12H(r.in_time)}</td><td>${format12H(r.out_time)}</td><td>${calcHours(r.in_time, r.out_time)}</td><td>${escapeHtml(r.branch ?? "")}</td><td>${escapeHtml([r.street, r.district, r.city].filter(Boolean).join(", "))}</td><td>${escapeHtml(r.status)}</td><td>${escapeHtml(r.note ?? "")}</td></tr>`).join("");
+  const body = rows.map((r) => `<tr><td>${escapeHtml(r.employee_name)}</td><td>${formatDate(r.date)}</td><td>${format12H(r.in_time)}</td><td>${format12H(r.out_time)}</td><td>${calcHours(r.in_time, r.out_time)}</td><td>${escapeHtml(r.branch ?? "")}</td><td>${escapeHtml([r.street, r.district, r.city].filter(Boolean).join(", "))}</td><td>${escapeHtml(r.status)}</td><td>${escapeHtml(r.note ?? "")}</td></tr>`).join("");
   w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;padding:24px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #ddd;padding:6px;text-align:left}th{background:#f5f5f5}@media print{button{display:none}}</style></head><body><h1>${escapeHtml(title)}</h1><table><thead><tr><th>Employee</th><th>Date</th><th>In</th><th>Out</th><th>Total</th><th>Branch</th><th>Location</th><th>Status</th><th>Note</th></tr></thead><tbody>${body || `<tr><td colspan="9" style="text-align:center">No records</td></tr>`}</tbody></table><script>window.onload=()=>window.print()</script></body></html>`);
   w.document.close();
 }
@@ -341,7 +342,7 @@ function AdminAttendance() {
           id: r.id,
           lat: r.lat as number,
           lng: r.lng as number,
-          label: `${r.employee_name} · ${r.date} ${format12H(r.in_time)}`,
+          label: `${r.employee_name} · ${formatDate(r.date)} ${format12H(r.in_time)}`,
           color: r.free_check ? "#f59e0b" : "#2563eb",
         })),
     [rows],
@@ -603,7 +604,7 @@ function AdminAttendance() {
                         {row.employee_name}
                       </div>
                     </td>
-                    <td className="px-4 py-3 font-mono tabular-nums">{row.date}</td>
+                    <td className="px-4 py-3 font-mono tabular-nums">{formatDate(row.date)}</td>
                     <td className="px-4 py-3 font-mono tabular-nums align-top">
                       <div className="flex flex-col">
                         <span>{format12H(row.in_time)}</span>

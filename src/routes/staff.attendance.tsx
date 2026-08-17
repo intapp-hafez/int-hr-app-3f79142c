@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Check, Loader2 } from "lucide-react";
+import { formatDate } from "@/lib/date-format";
 import {
   staffListAttendance,
   staffUpsertAttendance,
@@ -131,7 +132,7 @@ function StaffAttendance() {
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold">{r.employee_name}</p>
                 <p className="text-[11px] text-muted-foreground">
-                  {r.date} · in {format12H(r.in_time)} · out {format12H(r.out_time)}
+                  {formatDate(r.date)} · in {format12H(r.in_time)} · out {format12H(r.out_time)}
                 </p>
               </div>
               <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${tone[r.status] ?? "bg-muted"}`}>
