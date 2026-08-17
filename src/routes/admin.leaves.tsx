@@ -11,6 +11,7 @@ import { listLeaveTypes } from "@/backend/functions/directory.functions";
 import { LeaveTypesManager } from "@/components/admin/LeaveTypesManager";
 import { HolidayTypesManager } from "@/components/admin/HolidayTypesManager";
 import { HolidaysManager } from "@/components/HolidaysManager";
+import { LEAVES_TABS, TAB_LABELS, type LeavesTab } from "@/lib/leaves-tabs";
 
 const tone: Record<string, string> = {
   approved: "bg-success/15 text-success",
@@ -29,16 +30,6 @@ export const Route = createFileRoute("/admin/leaves")({
 
 type Status = "all" | "pending" | "approved" | "rejected" | "cancelled";
 const STATUSES: Status[] = ["all", "pending", "approved", "rejected", "cancelled"];
-
-type LeavesTab = "requests" | "balances" | "leaveTypes" | "holidays" | "holidayTypes";
-const LEAVES_TABS: LeavesTab[] = ["requests", "balances", "leaveTypes", "holidays", "holidayTypes"];
-const TAB_LABELS: Record<LeavesTab, string> = {
-  requests: "leaveRequests",
-  balances: "leaveBalances",
-  leaveTypes: "leaveTypesAdmin",
-  holidays: "holidaysAdmin",
-  holidayTypes: "holidayTypes",
-};
 
 function AdminLeaves() {
   const { t } = useI18n();
