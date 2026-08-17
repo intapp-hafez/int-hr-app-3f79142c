@@ -49,7 +49,7 @@ function daysUntil(end: Date) {
   return Math.round((b.getTime() - a.getTime()) / DAY);
 }
 function fmtDate(d: Date | null) {
-  return d ? d.toISOString().slice(0, 10) : "—";
+  return d ? formatDate(d.toISOString().slice(0, 10)) : "—";
 }
 function rowsFromApi(api: ApiContractRow[]): Row[] {
   return api.map((r) => {
