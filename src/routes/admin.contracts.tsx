@@ -16,6 +16,7 @@ import {
   type ContractRow as ApiContractRow,
 } from "@/backend/functions/contracts.functions";
 import { EmployeeAvatar } from "@/components/EmployeeAvatar";
+import { formatDate } from "@/lib/date-format";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
