@@ -76,43 +76,17 @@ function Index() {
             </ul>
           </div>
 
-          {/* Phone mock */}
-          <div className="relative mx-auto w-full max-w-sm">
-            <div className="absolute -inset-8 -z-10 rounded-[3rem] bg-gradient-brand opacity-20 blur-3xl" />
-            <div className="rounded-[2.25rem] border border-border bg-gradient-dark p-3 shadow-brand">
-              <div className="rounded-[1.75rem] bg-background p-5" dir={dir}>
-                <div className="flex items-center justify-between text-[10px] font-medium text-muted-foreground">
-                  <span>09:41</span>
-                  <span>•••</span>
-                </div>
-                <div className="mt-4">
-                  <p className="text-xs text-muted-foreground">Welcome back</p>
-                  <p className="font-display text-lg font-semibold">Integrated Technics</p>
-                </div>
-                <div className="mt-4 rounded-2xl bg-gradient-brand p-5 text-brand-foreground shadow-brand">
-                  <p className="text-xs opacity-90">{t("workingHours")}</p>
-                  <p className="font-display text-3xl font-semibold tabular-nums">08:32 — 17:18</p>
-                  <p className="mt-1 text-xs opacity-90">Cairo HQ • INT-Cairo-Secure</p>
-                </div>
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <div className="rounded-xl border border-border p-3">
-                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                      <MapPin className="h-3 w-3 text-success" /> {t("gpsStatus")}
-                    </div>
-                    <p className="mt-0.5 text-xs font-semibold text-success">{t("insideZone")}</p>
-                  </div>
-                  <div className="rounded-xl border border-border p-3">
-                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                      <Wifi className="h-3 w-3 text-success" /> {t("networkStatus")}
-                    </div>
-                    <p className="mt-0.5 text-xs font-semibold text-success">{t("connected")}</p>
-                  </div>
-                </div>
-                <button className="mt-4 w-full rounded-xl bg-foreground py-3 text-sm font-semibold text-background">
-                  {t("checkOut")}
-                </button>
-              </div>
-            </div>
+          {/* Hero dashboard image */}
+          <div className="relative mx-auto w-full">
+            <div className="absolute -inset-6 -z-10 rounded-[2rem] bg-gradient-brand opacity-20 blur-3xl" />
+            <img
+              src={heroDashboardAsset.url}
+              alt="INT-HR mobile attendance dashboard showing working hours, GPS status, network status, and check-out"
+              className="w-full rounded-2xl border border-border bg-card shadow-brand"
+              loading="eager"
+              width={1920}
+              height={1072}
+            />
           </div>
         </section>
       </main>
