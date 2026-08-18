@@ -190,6 +190,57 @@ export const getAdminReportsData = createServerFn({ method: "POST" })
         reason: a.note || "No reason provided"
       }));
 
+    // Expiry reports (next 30 days) — independent of the selected range
+    const todayD = new Date();
+    const todayIso = todayD.toISOString().split("T")[0];
+    const in30Iso = new Date(todayD.getTime() + 30 * 86400000).toISOString().split("T")[0];
+    const daysLeft = (iso: string) =>
+      Math.ceil((new Date(iso + "T00:00:00Z").getTime() - new Date(todayIso + "T00:00:00Z").getTime()) / 86400000);
+
+    let idExpQ = supabase
+      .from("profiles")
+      .select("id, full_name, emp_code, city, department_id, national_id, id_expiry_date, status")
+      .eq("status", "Active")
+      .not("id_expiry_date", "is", null)
+      .gte("id_expiry_date", todayIso)
+      .lte("id_expiry_date", in30Iso)
+      .order("id_expiry_date", { ascending: true });
+    if (data.branch !== "all") idExpQ = idExpQ.eq("city", data.branch);
+    const { data: idExpRaw } = await idExpQ;
+
+    const idExpiry = (idExpRaw || []).map((p: any) => ({
+      employee: p.full_name || p.emp_code || p.id,
+      empCode: p.emp_code || "-",
+      branch: p.city || "-",
+      department: deptMap.get(p.department_id) || "-",
+      nationalId: p.national_id || "-",
+      expiryDate: p.id_expiry_date,
+      daysLeft: daysLeft(p.id_expiry_date),
+    }));
+
+    let ctrExpQ = supabase
+      .from("profiles")
+      .select("id, full_name, emp_code, city, department_id, contract_type, contract_end_date, contract_cancelled, status")
+      .eq("status", "Active")
+      .not("contract_end_date", "is", null)
+      .gte("contract_end_date", todayIso)
+      .lte("contract_end_date", in30Iso)
+      .order("contract_end_date", { ascending: true });
+    if (data.branch !== "all") ctrExpQ = ctrExpQ.eq("city", data.branch);
+    const { data: ctrExpRaw } = await ctrExpQ;
+
+    const contractExpiry = (ctrExpRaw || [])
+      .filter((p: any) => !p.contract_cancelled)
+      .map((p: any) => ({
+        employee: p.full_name || p.emp_code || p.id,
+        empCode: p.emp_code || "-",
+        branch: p.city || "-",
+        department: deptMap.get(p.department_id) || "-",
+        contractType: p.contract_type || "-",
+        endDate: p.contract_end_date,
+        daysLeft: daysLeft(p.contract_end_date),
+      }));
+
     return {
       employees: (profiles || []).map((p: any) => ({ ...p, dept: deptMap.get(p.department_id) || "Unknown" })),
       locations: cities?.map((c: any) => ({ id: c.id, name: c.name_en })) || [],
@@ -207,7 +258,9 @@ export const getAdminReportsData = createServerFn({ method: "POST" })
         late: lateList,
         overtime: overtimeList,
         leaves: leaveSummary,
-        absence: absenceReport
+        absence: absenceReport,
+        idExpiry,
+        contractExpiry
       }
     };
   });
