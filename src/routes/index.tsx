@@ -30,13 +30,13 @@ function Index() {
 
       {/* Hero */}
       <main className="mx-auto max-w-6xl px-6 pb-20 pt-8">
-        <section className="grid items-center gap-10 lg:grid-cols-2">
+        <section aria-labelledby="hero-heading" className="grid items-center gap-10 lg:grid-cols-2">
           <div>
             <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground">
               <span className="h-1.5 w-1.5 rounded-full bg-success" />
               Geo-fenced • Network-verified
             </span>
-            <h1 className="mt-5 font-display text-4xl font-semibold leading-tight tracking-tight text-foreground sm:text-5xl">
+            <h1 id="hero-heading" className="mt-5 font-display text-4xl font-semibold leading-tight tracking-tight text-foreground sm:text-5xl">
               {t("appName")}.<br />
               <span className="text-brand">Attendance that can't be faked.</span>
             </h1>
@@ -78,12 +78,14 @@ function Index() {
 
           {/* Hero dashboard image */}
           <div className="relative mx-auto w-full">
-            <div className="absolute -inset-6 -z-10 rounded-[2rem] bg-gradient-brand opacity-20 blur-3xl" />
+            <div aria-hidden="true" className="absolute -inset-6 -z-10 rounded-[2rem] bg-gradient-brand opacity-20 blur-3xl" />
             <img
               src={heroDashboardAsset.url}
-              alt="INT-HR mobile attendance dashboard showing working hours, GPS status, network status, and check-out"
+              alt="INT-HR employee app on a phone: a Welcome back screen with an orange Working Hours card showing 08:32 to 17:18, green GPS location verified and Wi-Fi network verified badges, and a large Check Out button."
               className="w-full rounded-2xl border border-border bg-card shadow-brand"
               loading="eager"
+              decoding="async"
+              fetchPriority="high"
               width={1920}
               height={1072}
             />
