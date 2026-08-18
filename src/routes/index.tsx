@@ -3,6 +3,7 @@ import { ArrowRight, MapPin, Wifi, ShieldCheck, Smartphone } from "lucide-react"
 import { AppLogo } from "@/components/AppLogo";
 import { InstallButton } from "@/components/InstallButton";
 import { LanguageToggle, useI18n } from "@/lib/i18n";
+import heroDashboardAsset from "@/assets/hero-dashboard.jpg.asset.json";
 
 export const Route = createFileRoute("/")({
   head: () => ({
