@@ -16,7 +16,7 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const { t, dir } = useI18n();
+  const { t } = useI18n();
   return (
     <div className="min-h-screen bg-background">
       {/* Top bar */}
