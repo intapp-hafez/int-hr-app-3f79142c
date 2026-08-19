@@ -93,16 +93,16 @@ function ReportsPage() {
     
     if (name === "Daily Attendance") {
       headers = ["Employee", "Branch", "Date", "Status"];
-      rows = (tables.daily || []).map((r: any) => [r.employee, r.branch, r.date, r.status]);
+      rows = (tables.daily || []).map((r: any) => [r.employee, r.branch, formatDate(r.date), r.status]);
     } else if (name === "Monthly Attendance") {
       headers = ["Employee", "Branch", "Days Present", "Days Absent", "Late Count"];
       rows = (tables.monthly || []).map((r: any) => [r.employee, r.branch, r.daysPresent, r.daysAbsent, r.lateCount]);
     } else if (name === "Late Arrivals") {
       headers = ["Employee", "Date", "Check-In Time", "Minutes Late"];
-      rows = (tables.late || []).map((r: any) => [r.employee, r.date, r.checkInTime, r.minutesLate]);
+      rows = (tables.late || []).map((r: any) => [r.employee, formatDate(r.date), r.checkInTime, r.minutesLate]);
     } else if (name === "Overtime") {
       headers = ["Employee", "Date", "Overtime Hours"];
-      rows = (tables.overtime || []).map((r: any) => [r.employee, r.date, r.hours]);
+      rows = (tables.overtime || []).map((r: any) => [r.employee, formatDate(r.date), r.hours]);
     } else if (name === "Leave Summary") {
       headers = ["Employee", "Leave Type", "Start Date", "End Date", "Status"];
       rows = (tables.leaves || []).map((r: any) => [r.employee, r.type, r.start, r.end, r.status]);
