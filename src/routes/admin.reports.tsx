@@ -3,9 +3,11 @@ import { useMemo, useState } from "react";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import {
   Download, FileText, FileSpreadsheet, FileBarChart2,
-  TrendingUp, TrendingDown, Clock, UserX, Users, Timer, CheckCircle2, Calendar, ChevronLeft, ChevronRight
+  TrendingUp, TrendingDown, Clock, UserX, Users, Timer, CheckCircle2, Calendar, ChevronLeft, ChevronRight,
+  CreditCard, FileClock
 } from "lucide-react";
 import { format, subMonths, addMonths } from "date-fns";
+import { formatDate } from "@/lib/date-format";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
 import { useQuery } from "@tanstack/react-query";
@@ -25,6 +27,8 @@ const reportTemplates = [
   { name: "Overtime", desc: "Hours worked beyond shift schedule", icon: Timer },
   { name: "Leave Summary", desc: "Leave usage by type and department", icon: FileSpreadsheet },
   { name: "Absence Report", desc: "Unexplained absences and patterns", icon: UserX },
+  { name: "National ID Expiry", desc: "IDs expiring within the next 30 days", icon: CreditCard },
+  { name: "Contract Expiry", desc: "Contracts ending within the next 30 days", icon: FileClock },
 ];
 
 const ranges = ["today", "yesterday", "thisMonth"] as const;
@@ -58,7 +62,7 @@ function ReportsPage() {
   const locations = data?.locations || [];
   const leaves = data?.leaves || [];
   const kpis = data?.kpis || { attendanceRate: 0, avgLate: "0.0", totalOvertimeHrs: 0, headcount: 0 };
-  const tables = data?.tables || { daily: [], monthly: [], late: [], overtime: [], leaves: [], absence: [] };
+  const tables = data?.tables || { daily: [], monthly: [], late: [], overtime: [], leaves: [], absence: [], idExpiry: [], contractExpiry: [] };
 
   const filteredEmployees = employees; // Already filtered by backend
 
@@ -89,22 +93,28 @@ function ReportsPage() {
     
     if (name === "Daily Attendance") {
       headers = ["Employee", "Branch", "Date", "Status"];
-      rows = (tables.daily || []).map((r: any) => [r.employee, r.branch, r.date, r.status]);
+      rows = (tables.daily || []).map((r: any) => [r.employee, r.branch, formatDate(r.date), r.status]);
     } else if (name === "Monthly Attendance") {
       headers = ["Employee", "Branch", "Days Present", "Days Absent", "Late Count"];
       rows = (tables.monthly || []).map((r: any) => [r.employee, r.branch, r.daysPresent, r.daysAbsent, r.lateCount]);
     } else if (name === "Late Arrivals") {
       headers = ["Employee", "Date", "Check-In Time", "Minutes Late"];
-      rows = (tables.late || []).map((r: any) => [r.employee, r.date, r.checkInTime, r.minutesLate]);
+      rows = (tables.late || []).map((r: any) => [r.employee, formatDate(r.date), r.checkInTime, r.minutesLate]);
     } else if (name === "Overtime") {
       headers = ["Employee", "Date", "Overtime Hours"];
-      rows = (tables.overtime || []).map((r: any) => [r.employee, r.date, r.hours]);
+      rows = (tables.overtime || []).map((r: any) => [r.employee, formatDate(r.date), r.hours]);
     } else if (name === "Leave Summary") {
       headers = ["Employee", "Leave Type", "Start Date", "End Date", "Status"];
       rows = (tables.leaves || []).map((r: any) => [r.employee, r.type, r.start, r.end, r.status]);
     } else if (name === "Absence Report") {
       headers = ["Employee", "Date", "Note / Reason"];
-      rows = (tables.absence || []).map((r: any) => [r.employee, r.date, r.reason]);
+      rows = (tables.absence || []).map((r: any) => [r.employee, formatDate(r.date), r.reason]);
+    } else if (name === "National ID Expiry") {
+      headers = ["Employee", "Emp Code", "Branch", "Department", "National ID", "Expiry Date", "Days Left"];
+      rows = (tables.idExpiry || []).map((r: any) => [r.employee, r.empCode, r.branch, r.department, r.nationalId, formatDate(r.expiryDate), r.daysLeft]);
+    } else if (name === "Contract Expiry") {
+      headers = ["Employee", "Emp Code", "Branch", "Department", "Contract Type", "End Date", "Days Left"];
+      rows = (tables.contractExpiry || []).map((r: any) => [r.employee, r.empCode, r.branch, r.department, r.contractType, formatDate(r.endDate), r.daysLeft]);
     }
 
     if (fmt === "Excel" || fmt === "CSV") {
@@ -526,22 +536,28 @@ function ReportTableViewer({
 
   if (reportName === "Daily Attendance") {
     headers = ["Employee", "Branch", "Date", "Status"];
-    rows = (tables.daily || []).map((r: any) => [r.employee, r.branch, r.date, r.status]);
+    rows = (tables.daily || []).map((r: any) => [r.employee, r.branch, formatDate(r.date), r.status]);
   } else if (reportName === "Monthly Attendance") {
     headers = ["Employee", "Branch", "Days Present", "Days Absent", "Late Count"];
     rows = (tables.monthly || []).map((r: any) => [r.employee, r.branch, r.daysPresent, r.daysAbsent, r.lateCount]);
   } else if (reportName === "Late Arrivals") {
     headers = ["Employee", "Date", "Check-In Time", "Minutes Late"];
-    rows = (tables.late || []).map((r: any) => [r.employee, r.date, r.checkInTime, r.minutesLate]);
+    rows = (tables.late || []).map((r: any) => [r.employee, formatDate(r.date), r.checkInTime, r.minutesLate]);
   } else if (reportName === "Overtime") {
     headers = ["Employee", "Date", "Overtime Hours"];
-    rows = (tables.overtime || []).map((r: any) => [r.employee, r.date, r.hours]);
+    rows = (tables.overtime || []).map((r: any) => [r.employee, formatDate(r.date), r.hours]);
   } else if (reportName === "Leave Summary") {
     headers = ["Employee", "Leave Type", "Start Date", "End Date", "Status"];
-    rows = (tables.leaves || []).map((r: any) => [r.employee, r.type, r.start, r.end, r.status === "Approved" || r.status === "approved" ? "Approved" : r.status === "Rejected" || r.status === "rejected" ? "Rejected" : "Pending"]);
+    rows = (tables.leaves || []).map((r: any) => [r.employee, r.type, formatDate(r.start), formatDate(r.end), r.status === "Approved" || r.status === "approved" ? "Approved" : r.status === "Rejected" || r.status === "rejected" ? "Rejected" : "Pending"]);
   } else if (reportName === "Absence Report") {
     headers = ["Employee", "Date", "Note / Reason"];
-    rows = (tables.absence || []).map((r: any) => [r.employee, r.date, r.reason]);
+    rows = (tables.absence || []).map((r: any) => [r.employee, formatDate(r.date), r.reason]);
+  } else if (reportName === "National ID Expiry") {
+    headers = ["Employee", "Emp Code", "Branch", "Department", "National ID", "Expiry Date", "Days Left"];
+    rows = (tables.idExpiry || []).map((r: any) => [r.employee, r.empCode, r.branch, r.department, r.nationalId, formatDate(r.expiryDate), r.daysLeft]);
+  } else if (reportName === "Contract Expiry") {
+    headers = ["Employee", "Emp Code", "Branch", "Department", "Contract Type", "End Date", "Days Left"];
+    rows = (tables.contractExpiry || []).map((r: any) => [r.employee, r.empCode, r.branch, r.department, r.contractType, formatDate(r.endDate), r.daysLeft]);
   }
 
   return (
