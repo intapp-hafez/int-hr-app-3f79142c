@@ -108,7 +108,13 @@ function ReportsPage() {
       rows = (tables.leaves || []).map((r: any) => [r.employee, r.type, r.start, r.end, r.status]);
     } else if (name === "Absence Report") {
       headers = ["Employee", "Date", "Note / Reason"];
-      rows = (tables.absence || []).map((r: any) => [r.employee, r.date, r.reason]);
+      rows = (tables.absence || []).map((r: any) => [r.employee, formatDate(r.date), r.reason]);
+    } else if (name === "National ID Expiry") {
+      headers = ["Employee", "Emp Code", "Branch", "Department", "National ID", "Expiry Date", "Days Left"];
+      rows = (tables.idExpiry || []).map((r: any) => [r.employee, r.empCode, r.branch, r.department, r.nationalId, formatDate(r.expiryDate), r.daysLeft]);
+    } else if (name === "Contract Expiry") {
+      headers = ["Employee", "Emp Code", "Branch", "Department", "Contract Type", "End Date", "Days Left"];
+      rows = (tables.contractExpiry || []).map((r: any) => [r.employee, r.empCode, r.branch, r.department, r.contractType, formatDate(r.endDate), r.daysLeft]);
     }
 
     if (fmt === "Excel" || fmt === "CSV") {
