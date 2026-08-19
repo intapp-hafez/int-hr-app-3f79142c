@@ -3,9 +3,11 @@ import { useMemo, useState } from "react";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import {
   Download, FileText, FileSpreadsheet, FileBarChart2,
-  TrendingUp, TrendingDown, Clock, UserX, Users, Timer, CheckCircle2, Calendar, ChevronLeft, ChevronRight
+  TrendingUp, TrendingDown, Clock, UserX, Users, Timer, CheckCircle2, Calendar, ChevronLeft, ChevronRight,
+  CreditCard, FileClock
 } from "lucide-react";
 import { format, subMonths, addMonths } from "date-fns";
+import { formatDate } from "@/lib/date-format";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
 import { useQuery } from "@tanstack/react-query";
