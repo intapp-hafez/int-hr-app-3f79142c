@@ -1,7 +1,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { loadSmtpConfig } from "./smtp-config.server";
 import { sendEmail } from "./smtp-client.server";
-import { rowsToCsv, rowsToXlsx, type ActivityRow } from "./csv-xlsx.server";
+import { rowsToCsv, rowsToXlsx, tableToCsv, tableToXlsx, type ActivityRow } from "./csv-xlsx.server";
 import { renderExportEmail } from "./email-render.server";
 
 export type RunSummary = {
@@ -31,6 +31,60 @@ function todayInTz(tz: string, now: Date): string {
   } catch {
     return now.toISOString().slice(0, 10);
   }
+}
+
+function weekdayInTz(tz: string, now: Date): number {
+  const iso = todayInTz(tz, now);
+  return new Date(iso + "T00:00:00Z").getUTCDay(); // 0 = Sunday
+}
+
+const EXPIRY_HEADERS: Record<string, string[]> = {
+  id_expiry: ["Employee", "Emp Code", "Branch", "Department", "National ID", "Expiry Date", "Days Left"],
+  contract_expiry: ["Employee", "Emp Code", "Branch", "Department", "Contract Type", "End Date", "Days Left"],
+};
+
+async function fetchExpiryRows(
+  kind: "id_expiry" | "contract_expiry",
+  todayLocal: string,
+  days: number,
+): Promise<(string | number)[][]> {
+  const untilIso = new Date(new Date(todayLocal + "T00:00:00Z").getTime() + days * 86400000)
+    .toISOString()
+    .slice(0, 10);
+  const dateCol = kind === "id_expiry" ? "id_expiry_date" : "contract_end_date";
+
+  const { data: depts } = await supabaseAdmin.from("departments").select("id, name_en");
+  const deptMap = new Map((depts ?? []).map((d: any) => [d.id, d.name_en]));
+
+  const { data: rows, error } = await supabaseAdmin
+    .from("profiles")
+    .select(
+      "id, full_name, emp_code, city, department_id, national_id, id_expiry_date, contract_type, contract_end_date, contract_cancelled, status",
+    )
+    .eq("status", "Active")
+    .not(dateCol, "is", null)
+    .gte(dateCol, todayLocal)
+    .lte(dateCol, untilIso)
+    .order(dateCol, { ascending: true })
+    .limit(5000);
+  if (error) throw new Error(`expiry fetch: ${error.message}`);
+
+  const daysLeft = (iso: string) =>
+    Math.ceil(
+      (new Date(iso + "T00:00:00Z").getTime() - new Date(todayLocal + "T00:00:00Z").getTime()) / 86400000,
+    );
+
+  return (rows ?? [])
+    .filter((p: any) => (kind === "contract_expiry" ? !p.contract_cancelled : true))
+    .map((p: any) => [
+      p.full_name || p.emp_code || p.id,
+      p.emp_code || "-",
+      p.city || "-",
+      deptMap.get(p.department_id) || "-",
+      kind === "id_expiry" ? p.national_id || "-" : p.contract_type || "-",
+      (kind === "id_expiry" ? p.id_expiry_date : p.contract_end_date) ?? "",
+      daysLeft((kind === "id_expiry" ? p.id_expiry_date : p.contract_end_date) as string),
+    ]);
 }
 
 function computeRange(kind: string, todayLocal: string): { from: string; to: string; label: string } {
@@ -131,6 +185,15 @@ export async function runDueSchedules(now: Date = new Date()): Promise<RunSummar
       continue;
     }
 
+    if ((sch as any).frequency === "weekly") {
+      const wanted = (sch as any).weekday;
+      if (wanted != null && weekdayInTz(tz, now) !== Number(wanted)) {
+        summaries.push({ schedule_id: sch.id, status: "skipped", reason: "not_scheduled_weekday",
+          recipients_sent: [], recipients_failed: [], row_count: 0 });
+        continue;
+      }
+    }
+
     const { data: lockRow, error: lockErr } = await supabaseAdmin
       .from("export_runs")
       .insert({ schedule_id: sch.id, run_date: todayLocal, status: "running" })
@@ -144,16 +207,32 @@ export async function runDueSchedules(now: Date = new Date()): Promise<RunSummar
     const runId = lockRow.id;
 
     try {
-      const { from, to, label } = computeRange(sch.date_range_kind, todayLocal);
-      const rows = await fetchActivityRows(sch.employee_ids ?? [], from, to);
-      const file = sch.format === "xlsx" ? rowsToXlsx(rows) : rowsToCsv(rows);
+      const reportKind = ((sch as any).report_kind as string) || "activity";
+      let file: Uint8Array;
+      let rowCount = 0;
+      let label: string;
+
+      if (reportKind === "id_expiry" || reportKind === "contract_expiry") {
+        const windowDays = Number((sch as any).expiry_days ?? 30);
+        const table = await fetchExpiryRows(reportKind as "id_expiry" | "contract_expiry", todayLocal, windowDays);
+        const headers = EXPIRY_HEADERS[reportKind];
+        file = sch.format === "xlsx" ? tableToXlsx(headers, table, sch.name) : tableToCsv(headers, table);
+        rowCount = table.length;
+        label = `${reportKind === "id_expiry" ? "National ID" : "Contract"} expiring within ${windowDays} days`;
+      } else {
+        const { from, to, label: rangeLabel } = computeRange(sch.date_range_kind, todayLocal);
+        const rows = await fetchActivityRows(sch.employee_ids ?? [], from, to);
+        file = sch.format === "xlsx" ? rowsToXlsx(rows) : rowsToCsv(rows);
+        rowCount = rows.length;
+        label = rangeLabel;
+      }
       const filename = `${sch.name.replace(/[^a-z0-9_-]+/gi, "_")}_${todayLocal}.${sch.format}`;
       const contentType = sch.format === "xlsx"
         ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         : "text/csv";
 
       const { subject, html, text } = renderExportEmail({
-        scheduleName: sch.name, runDate: todayLocal, rangeLabel: label, rowCount: rows.length,
+        scheduleName: sch.name, runDate: todayLocal, rangeLabel: label, rowCount,
       });
 
       const sent: string[] = [];
@@ -196,12 +275,12 @@ export async function runDueSchedules(now: Date = new Date()): Promise<RunSummar
       await supabaseAdmin.from("export_runs").update({
         status, finished_at: new Date().toISOString(),
         recipients_sent: sent, recipients_failed: failed,
-        file_size_bytes: file.length, row_count: rows.length,
+        file_size_bytes: file.length, row_count: rowCount,
         error: lastError ?? null,
       }).eq("id", runId);
       await supabaseAdmin.from("export_schedules").update({ last_run_date: todayLocal }).eq("id", sch.id);
 
-      summaries.push({ schedule_id: sch.id, status, recipients_sent: sent, recipients_failed: failed, row_count: rows.length });
+      summaries.push({ schedule_id: sch.id, status, recipients_sent: sent, recipients_failed: failed, row_count: rowCount });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       await supabaseAdmin.from("export_runs").update({
