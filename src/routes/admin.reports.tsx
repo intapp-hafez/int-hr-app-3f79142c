@@ -62,7 +62,7 @@ function ReportsPage() {
   const locations = data?.locations || [];
   const leaves = data?.leaves || [];
   const kpis = data?.kpis || { attendanceRate: 0, avgLate: "0.0", totalOvertimeHrs: 0, headcount: 0 };
-  const tables = data?.tables || { daily: [], monthly: [], late: [], overtime: [], leaves: [], absence: [] };
+  const tables = data?.tables || { daily: [], monthly: [], late: [], overtime: [], leaves: [], absence: [], idExpiry: [], contractExpiry: [] };
 
   const filteredEmployees = employees; // Already filtered by backend
 
