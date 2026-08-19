@@ -548,10 +548,16 @@ function ReportTableViewer({
     rows = (tables.overtime || []).map((r: any) => [r.employee, r.date, r.hours]);
   } else if (reportName === "Leave Summary") {
     headers = ["Employee", "Leave Type", "Start Date", "End Date", "Status"];
-    rows = (tables.leaves || []).map((r: any) => [r.employee, r.type, r.start, r.end, r.status === "Approved" || r.status === "approved" ? "Approved" : r.status === "Rejected" || r.status === "rejected" ? "Rejected" : "Pending"]);
+    rows = (tables.leaves || []).map((r: any) => [r.employee, r.type, formatDate(r.start), formatDate(r.end), r.status === "Approved" || r.status === "approved" ? "Approved" : r.status === "Rejected" || r.status === "rejected" ? "Rejected" : "Pending"]);
   } else if (reportName === "Absence Report") {
     headers = ["Employee", "Date", "Note / Reason"];
-    rows = (tables.absence || []).map((r: any) => [r.employee, r.date, r.reason]);
+    rows = (tables.absence || []).map((r: any) => [r.employee, formatDate(r.date), r.reason]);
+  } else if (reportName === "National ID Expiry") {
+    headers = ["Employee", "Emp Code", "Branch", "Department", "National ID", "Expiry Date", "Days Left"];
+    rows = (tables.idExpiry || []).map((r: any) => [r.employee, r.empCode, r.branch, r.department, r.nationalId, formatDate(r.expiryDate), r.daysLeft]);
+  } else if (reportName === "Contract Expiry") {
+    headers = ["Employee", "Emp Code", "Branch", "Department", "Contract Type", "End Date", "Days Left"];
+    rows = (tables.contractExpiry || []).map((r: any) => [r.employee, r.empCode, r.branch, r.department, r.contractType, formatDate(r.endDate), r.daysLeft]);
   }
 
   return (
