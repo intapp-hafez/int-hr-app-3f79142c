@@ -27,6 +27,8 @@ const reportTemplates = [
   { name: "Overtime", desc: "Hours worked beyond shift schedule", icon: Timer },
   { name: "Leave Summary", desc: "Leave usage by type and department", icon: FileSpreadsheet },
   { name: "Absence Report", desc: "Unexplained absences and patterns", icon: UserX },
+  { name: "National ID Expiry", desc: "IDs expiring within the next 30 days", icon: CreditCard },
+  { name: "Contract Expiry", desc: "Contracts ending within the next 30 days", icon: FileClock },
 ];
 
 const ranges = ["today", "yesterday", "thisMonth"] as const;
