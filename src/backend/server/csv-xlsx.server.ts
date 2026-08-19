@@ -52,3 +52,26 @@ export function rowsToXlsx(rows: ActivityRow[]): Uint8Array {
   const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
   return new Uint8Array(buf);
 }
+
+/** Generic table export (headers + string rows) used by expiry reports. */
+export function tableToCsv(headers: string[], rows: (string | number)[][]): Uint8Array {
+  const esc = (v: string | number) => {
+    const s = v == null ? "" : String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const lines = [headers.map(esc).join(",")];
+  for (const r of rows) lines.push(r.map(esc).join(","));
+  return new TextEncoder().encode("\uFEFF" + lines.join("\n"));
+}
+
+export function tableToXlsx(
+  headers: string[],
+  rows: (string | number)[][],
+  sheetName = "Report",
+): Uint8Array {
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName.slice(0, 30));
+  const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+  return new Uint8Array(buf);
+}
