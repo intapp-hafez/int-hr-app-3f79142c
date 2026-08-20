@@ -20,7 +20,7 @@ export const upsertSchedule = createServerFn({ method: "POST" })
   .inputValidator((input) => ExportScheduleSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const payload = { ...data, owner_id: userId };
+    const payload = { ...data, owner_id: userId } as any;
     if (data.id) {
       const { error } = await supabase.from("export_schedules").update(payload).eq("id", data.id);
       if (error) throw new Error(error.message);
@@ -60,4 +60,12 @@ export const triggerScheduleNow = createServerFn({ method: "POST" })
     const { runDueSchedules } = await import("../server/scheduler.server");
     const summaries = await runDueSchedules(new Date());
     return { summaries };
+  });
+
+export const sendScheduleTestEmail = createServerFn({ method: "POST" })
+  .middleware([requireAdminAccess])
+  .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data }) => {
+    const { sendScheduleTest } = await import("../server/scheduler.server");
+    return await sendScheduleTest(data.id, new Date());
   });
