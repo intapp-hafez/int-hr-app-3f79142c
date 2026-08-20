@@ -42,13 +42,17 @@ export const NotificationPrefsSchema = z.object({
 export const ExportScheduleSchema = z.object({
   id: z.string().uuid().optional(),
   name: z.string().min(1).max(255),
-  employee_ids: z.array(z.string().uuid()).max(500),
-  date_range_kind: z.enum(["today", "yesterday", "last_7_days", "last_30_days"]),
+  employee_ids: z.array(z.string().uuid()).max(500).default([]),
+  date_range_kind: z.enum(["today", "yesterday", "last_7_days", "last_30_days"]).default("today"),
   format: z.enum(["csv", "xlsx"]),
   recipients: z.array(z.string().email()).min(1).max(50),
   send_time: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
   timezone: z.string().min(1).max(64),
   enabled: z.boolean(),
+  report_kind: z.enum(["activity", "id_expiry", "contract_expiry"]).default("activity"),
+  frequency: z.enum(["daily", "weekly"]).default("daily"),
+  weekday: z.number().int().min(0).max(6).nullable().default(null),
+  expiry_days: z.number().int().min(1).max(365).default(30),
 });
 export type ExportScheduleInput = z.infer<typeof ExportScheduleSchema>;
 
