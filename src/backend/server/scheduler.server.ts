@@ -293,3 +293,74 @@ export async function runDueSchedules(now: Date = new Date()): Promise<RunSummar
 
   return summaries;
 }
+
+/**
+ * Send one schedule immediately (test send). Does not lock, does not update
+ * last_run_date, and ignores send_time / weekday / frequency.
+ */
+export async function sendScheduleTest(scheduleId: string, now: Date = new Date()): Promise<RunSummary> {
+  const { data: sch, error } = await supabaseAdmin
+    .from("export_schedules")
+    .select("*")
+    .eq("id", scheduleId)
+    .single();
+  if (error || !sch) throw new Error(error?.message || "Schedule not found");
+
+  const tz = sch.timezone || "UTC";
+  const todayLocal = todayInTz(tz, now);
+  const reportKind = ((sch as any).report_kind as string) || "activity";
+
+  let file: Uint8Array;
+  let rowCount = 0;
+  let label: string;
+
+  if (reportKind === "id_expiry" || reportKind === "contract_expiry") {
+    const windowDays = Number((sch as any).expiry_days ?? 30);
+    const table = await fetchExpiryRows(reportKind as "id_expiry" | "contract_expiry", todayLocal, windowDays);
+    const headers = EXPIRY_HEADERS[reportKind];
+    file = sch.format === "xlsx" ? tableToXlsx(headers, table, sch.name) : tableToCsv(headers, table);
+    rowCount = table.length;
+    label = `${reportKind === "id_expiry" ? "National ID" : "Contract"} expiring within ${windowDays} days`;
+  } else {
+    const { from, to, label: rangeLabel } = computeRange(sch.date_range_kind, todayLocal);
+    const rows = await fetchActivityRows(sch.employee_ids ?? [], from, to);
+    file = sch.format === "xlsx" ? rowsToXlsx(rows) : rowsToCsv(rows);
+    rowCount = rows.length;
+    label = rangeLabel;
+  }
+
+  const filename = `${sch.name.replace(/[^a-z0-9_-]+/gi, "_")}_${todayLocal}.${sch.format}`;
+  const contentType = sch.format === "xlsx"
+    ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    : "text/csv";
+  const { subject, html, text } = renderExportEmail({
+    scheduleName: `${sch.name} (test)`, runDate: todayLocal, rangeLabel: label, rowCount,
+  });
+
+  const smtp = await loadSmtpConfig();
+  if (!smtp || !smtp.host || !smtp.password) {
+    return { schedule_id: sch.id, status: "failed", reason: "SMTP not configured",
+      recipients_sent: [], recipients_failed: sch.recipients ?? [], row_count: rowCount };
+  }
+
+  const sent: string[] = [];
+  const failed: string[] = [];
+  let lastError: string | undefined;
+  for (const rcpt of sch.recipients ?? []) {
+    const res = await sendEmail(
+      { host: smtp.host, port: smtp.port, secure: smtp.secure, username: smtp.username, password: smtp.password },
+      {
+        from: smtp.from_name ? `${smtp.from_name} <${smtp.from_email}>` : smtp.from_email,
+        fromEmail: smtp.from_email,
+        to: [rcpt], subject, html, text,
+        attachments: [{ filename, content: file, contentType }],
+      },
+    );
+    if (res.ok) sent.push(rcpt);
+    else { failed.push(rcpt); lastError = res.message; }
+  }
+
+  const status: "sent" | "failed" | "partial" =
+    failed.length === 0 ? "sent" : sent.length === 0 ? "failed" : "partial";
+  return { schedule_id: sch.id, status, reason: lastError, recipients_sent: sent, recipients_failed: failed, row_count: rowCount };
+}
