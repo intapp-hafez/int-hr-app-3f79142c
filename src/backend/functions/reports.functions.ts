@@ -9,6 +9,7 @@ export const getAdminReportsData = createServerFn({ method: "POST" })
       .object({
         range: z.string(),
         branch: z.string(),
+        expiryDays: z.number().int().min(1).max(365).optional(),
       })
       .parse(input)
   )
@@ -190,10 +191,11 @@ export const getAdminReportsData = createServerFn({ method: "POST" })
         reason: a.note || "No reason provided"
       }));
 
-    // Expiry reports (next 30 days) — independent of the selected range
+    // Expiry reports — window configurable, independent of the selected range
     const todayD = new Date();
     const todayIso = todayD.toISOString().split("T")[0];
-    const in30Iso = new Date(todayD.getTime() + 30 * 86400000).toISOString().split("T")[0];
+    const expiryWindowDays = data.expiryDays ?? 30;
+    const in30Iso = new Date(todayD.getTime() + expiryWindowDays * 86400000).toISOString().split("T")[0];
     const daysLeft = (iso: string) =>
       Math.ceil((new Date(iso + "T00:00:00Z").getTime() - new Date(todayIso + "T00:00:00Z").getTime()) / 86400000);
 
@@ -209,6 +211,7 @@ export const getAdminReportsData = createServerFn({ method: "POST" })
     const { data: idExpRaw } = await idExpQ;
 
     const idExpiry = (idExpRaw || []).map((p: any) => ({
+      id: p.id,
       employee: p.full_name || p.emp_code || p.id,
       empCode: p.emp_code || "-",
       branch: p.city || "-",
@@ -232,6 +235,7 @@ export const getAdminReportsData = createServerFn({ method: "POST" })
     const contractExpiry = (ctrExpRaw || [])
       .filter((p: any) => !p.contract_cancelled)
       .map((p: any) => ({
+        id: p.id,
         employee: p.full_name || p.emp_code || p.id,
         empCode: p.emp_code || "-",
         branch: p.city || "-",
