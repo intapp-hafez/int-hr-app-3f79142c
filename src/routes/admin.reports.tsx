@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import {
@@ -19,6 +19,9 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Banknote } from "lucide-react";
+import { ExpiryScheduleManager } from "@/components/admin/ExpiryScheduleManager";
+
+const EXPIRY_REPORTS = ["National ID Expiry", "Contract Expiry"];
 
 const reportTemplates = [
   { name: "Daily Attendance", desc: "Per-day breakdown by employee and branch", icon: FileBarChart2 },
@@ -27,8 +30,8 @@ const reportTemplates = [
   { name: "Overtime", desc: "Hours worked beyond shift schedule", icon: Timer },
   { name: "Leave Summary", desc: "Leave usage by type and department", icon: FileSpreadsheet },
   { name: "Absence Report", desc: "Unexplained absences and patterns", icon: UserX },
-  { name: "National ID Expiry", desc: "IDs expiring within the next 30 days", icon: CreditCard },
-  { name: "Contract Expiry", desc: "Contracts ending within the next 30 days", icon: FileClock },
+  { name: "National ID Expiry", desc: "IDs expiring within the selected window", icon: CreditCard },
+  { name: "Contract Expiry", desc: "Contracts ending within the selected window", icon: FileClock },
 ];
 
 const ranges = ["today", "yesterday", "thisMonth"] as const;
@@ -40,8 +43,10 @@ export const Route = createFileRoute("/admin/reports")({
 
 function ReportsPage() {
   const { t } = useI18n();
+  const navigate = useNavigate();
   const [range, setRange] = useState<Range>("thisMonth");
   const [branch, setBranch] = useState<string>("all");
+  const [expiryDays, setExpiryDays] = useState<number>(30);
   const [viewingReport, setViewingReport] = useState<string | null>(null);
   const [branchPage, setBranchPage] = useState(0);
 
@@ -54,8 +59,8 @@ function ReportsPage() {
 
   const fetchReports = useServerFn(getAdminReportsData);
   const { data, isLoading } = useQuery({
-    queryKey: ["admin-reports", range, branch],
-    queryFn: () => fetchReports({ data: { range, branch } })
+    queryKey: ["admin-reports", range, branch, expiryDays],
+    queryFn: () => fetchReports({ data: { range, branch, expiryDays } })
   });
 
   const employees = data?.employees || [];
