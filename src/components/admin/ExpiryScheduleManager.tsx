@@ -273,6 +273,10 @@ export function ExpiryScheduleManager() {
 const inputCls =
   "w-full rounded-xl border border-border bg-background px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring";
 
+function inputClass(error?: string) {
+  return error ? `${inputCls} border-destructive focus:ring-destructive` : inputCls;
+}
+
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
     <label className="block">
