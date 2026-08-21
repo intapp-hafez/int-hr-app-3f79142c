@@ -534,35 +534,47 @@ function ReportTableViewer({
   tables: any;
   onExport: (fmt: "PDF" | "Excel" | "CSV", name: string) => void;
 }) {
+  const navigate = useNavigate();
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+
   if (!reportName) return null;
 
+  const isExpiryReport = EXPIRY_REPORTS.includes(reportName);
+
   let headers: string[] = [];
-  let rows: React.ReactNode[][] = [];
+  let rows: { id?: string; cells: React.ReactNode[] }[] = [];
 
   if (reportName === "Daily Attendance") {
     headers = ["Employee", "Branch", "Date", "Status"];
-    rows = (tables.daily || []).map((r: any) => [r.employee, r.branch, formatDate(r.date), r.status]);
+    rows = (tables.daily || []).map((r: any) => ({ cells: [r.employee, r.branch, formatDate(r.date), r.status] }));
   } else if (reportName === "Monthly Attendance") {
     headers = ["Employee", "Branch", "Days Present", "Days Absent", "Late Count"];
-    rows = (tables.monthly || []).map((r: any) => [r.employee, r.branch, r.daysPresent, r.daysAbsent, r.lateCount]);
+    rows = (tables.monthly || []).map((r: any) => ({ cells: [r.employee, r.branch, r.daysPresent, r.daysAbsent, r.lateCount] }));
   } else if (reportName === "Late Arrivals") {
     headers = ["Employee", "Date", "Check-In Time", "Minutes Late"];
-    rows = (tables.late || []).map((r: any) => [r.employee, formatDate(r.date), r.checkInTime, r.minutesLate]);
+    rows = (tables.late || []).map((r: any) => ({ cells: [r.employee, formatDate(r.date), r.checkInTime, r.minutesLate] }));
   } else if (reportName === "Overtime") {
     headers = ["Employee", "Date", "Overtime Hours"];
-    rows = (tables.overtime || []).map((r: any) => [r.employee, formatDate(r.date), r.hours]);
+    rows = (tables.overtime || []).map((r: any) => ({ cells: [r.employee, formatDate(r.date), r.hours] }));
   } else if (reportName === "Leave Summary") {
     headers = ["Employee", "Leave Type", "Start Date", "End Date", "Status"];
-    rows = (tables.leaves || []).map((r: any) => [r.employee, r.type, formatDate(r.start), formatDate(r.end), r.status === "Approved" || r.status === "approved" ? "Approved" : r.status === "Rejected" || r.status === "rejected" ? "Rejected" : "Pending"]);
+    rows = (tables.leaves || []).map((r: any) => ({ cells: [r.employee, r.type, formatDate(r.start), formatDate(r.end), r.status === "Approved" || r.status === "approved" ? "Approved" : r.status === "Rejected" || r.status === "rejected" ? "Rejected" : "Pending"] }));
   } else if (reportName === "Absence Report") {
     headers = ["Employee", "Date", "Note / Reason"];
-    rows = (tables.absence || []).map((r: any) => [r.employee, formatDate(r.date), r.reason]);
+    rows = (tables.absence || []).map((r: any) => ({ cells: [r.employee, formatDate(r.date), r.reason] }));
   } else if (reportName === "National ID Expiry") {
     headers = ["Employee", "Emp Code", "Branch", "Department", "National ID", "Expiry Date", "Days Left"];
-    rows = (tables.idExpiry || []).map((r: any) => [r.employee, r.empCode, r.branch, r.department, r.nationalId, formatDate(r.expiryDate), r.daysLeft]);
+    rows = (tables.idExpiry || []).map((r: any) => ({ id: r.id, cells: [r.employee, r.empCode, r.branch, r.department, r.nationalId, formatDate(r.expiryDate), r.daysLeft] }));
   } else if (reportName === "Contract Expiry") {
     headers = ["Employee", "Emp Code", "Branch", "Department", "Contract Type", "End Date", "Days Left"];
-    rows = (tables.contractExpiry || []).map((r: any) => [r.employee, r.empCode, r.branch, r.department, r.contractType, formatDate(r.endDate), r.daysLeft]);
+    rows = (tables.contractExpiry || []).map((r: any) => ({ id: r.id, cells: [r.employee, r.empCode, r.branch, r.department, r.contractType, formatDate(r.endDate), r.daysLeft] }));
+  }
+
+  function openEmployee(id: string) {
+    if (!id || loadingId) return;
+    setLoadingId(id);
+    navigate({ to: "/admin/employees/$id", params: { id } })
+      .catch(() => setLoadingId(null));
   }
 
   return (
@@ -574,6 +586,11 @@ function ReportTableViewer({
               <DialogTitle className="text-xl font-display">{reportName}</DialogTitle>
               <DialogDescription className="text-xs mt-1">
                 Showing data for {branch === "all" ? "all branches" : branch}
+                {isExpiryReport && (
+                  <span className="ms-2 inline-flex items-center gap-1 rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-medium text-brand">
+                    <ExternalLink className="h-3 w-3" /> Click a row to open employee
+                  </span>
+                )}
               </DialogDescription>
             </div>
             <div className="flex gap-4 items-center">
@@ -630,23 +647,37 @@ function ReportTableViewer({
                   </TableCell>
                 </TableRow>
               ) : (
-                rows.map((row, i) => (
-                  <TableRow key={i}>
-                    {row.map((cell, j) => (
-                      <TableCell key={j} className="whitespace-nowrap px-4 py-2.5">
-                        {j === headers.length - 1 && typeof cell === "string" && (cell === "Present" || cell === "Approved") ? (
-                          <span className="text-success bg-success/10 px-2 py-0.5 rounded text-[11px] font-semibold">{cell}</span>
-                        ) : j === headers.length - 1 && typeof cell === "string" && (cell === "Absent" || cell === "Rejected") ? (
-                          <span className="text-destructive bg-destructive/10 px-2 py-0.5 rounded text-[11px] font-semibold">{cell}</span>
-                        ) : j === headers.length - 1 && typeof cell === "string" && (cell === "Late" || cell === "Pending") ? (
-                          <span className="text-warning bg-warning/10 px-2 py-0.5 rounded text-[11px] font-semibold">{cell}</span>
-                        ) : (
-                          cell
-                        )}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
+                rows.map((row, i) => {
+                  const clickable = isExpiryReport && !!row.id;
+                  const isLoading = loadingId === row.id;
+                  return (
+                    <TableRow
+                      key={i}
+                      onClick={() => clickable && openEmployee(row.id!)}
+                      className={clickable ? "cursor-pointer hover:bg-muted/60 transition-colors group" : ""}
+                      data-clickable={clickable}
+                    >
+                      {row.cells.map((cell, j) => (
+                        <TableCell key={j} className="whitespace-nowrap px-4 py-2.5">
+                          {j === 0 && clickable ? (
+                            <span className="inline-flex items-center gap-2">
+                              {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-brand" /> : <ExternalLink className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />}
+                              <span className={isLoading ? "text-muted-foreground" : ""}>{cell}</span>
+                            </span>
+                          ) : j === headers.length - 1 && typeof cell === "string" && (cell === "Present" || cell === "Approved") ? (
+                            <span className="text-success bg-success/10 px-2 py-0.5 rounded text-[11px] font-semibold">{cell}</span>
+                          ) : j === headers.length - 1 && typeof cell === "string" && (cell === "Absent" || cell === "Rejected") ? (
+                            <span className="text-destructive bg-destructive/10 px-2 py-0.5 rounded text-[11px] font-semibold">{cell}</span>
+                          ) : j === headers.length - 1 && typeof cell === "string" && (cell === "Late" || cell === "Pending") ? (
+                            <span className="text-warning bg-warning/10 px-2 py-0.5 rounded text-[11px] font-semibold">{cell}</span>
+                          ) : (
+                            cell
+                          )}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>
