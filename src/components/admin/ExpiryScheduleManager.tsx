@@ -47,15 +47,24 @@ export function ExpiryScheduleManager() {
   const [draft, setDraft] = useState<Draft>(emptyDraft);
 
   const validation = useMemo(() => {
-    const errors: string[] = [];
-    if (!draft.name.trim()) errors.push("Name is required");
-    const recipients = draft.recipients.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean);
-    if (recipients.length === 0) errors.push("At least one recipient is required");
-    if (recipients.some((r) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r))) errors.push("One or more emails are invalid");
-    if (!Number.isFinite(draft.expiry_days) || draft.expiry_days < 1 || draft.expiry_days > 365) {
-      errors.push("Expiry window must be between 1 and 365 days");
+    const nameError = !draft.name.trim() ? "Name is required" : undefined;
+    const recipientsList = draft.recipients.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean);
+    let recipientsError: string | undefined;
+    if (recipientsList.length === 0) {
+      recipientsError = "At least one recipient is required";
+    } else if (recipientsList.some((r) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r))) {
+      recipientsError = "One or more email addresses are invalid";
     }
-    return { ok: errors.length === 0, errors };
+    const expiryDaysError =
+      !Number.isFinite(draft.expiry_days) || draft.expiry_days < 1 || draft.expiry_days > 365
+        ? "Expiry window must be between 1 and 365 days"
+        : undefined;
+    return {
+      ok: !nameError && !recipientsError && !expiryDaysError,
+      nameError,
+      recipientsError,
+      expiryDaysError,
+    };
   }, [draft]);
 
   const { data: schedules = [], isLoading } = useQuery({
@@ -154,10 +163,11 @@ export function ExpiryScheduleManager() {
               <option value="contract_expiry">Contract Expiry</option>
             </select>
           </Field>
-          <Field label="Expiry window (days)" error={validation.errors.find((e) => e.includes("Expiry window"))}>
+          <Field label="Expiry window (days)" error={validation.expiryDaysError}>
             <select
-              className={inputCls}
+              className={inputClass(validation.expiryDaysError)}
               value={draft.expiry_days}
+              aria-invalid={!!validation.expiryDaysError}
               onChange={(e) => setDraft({ ...draft, expiry_days: Number(e.target.value) })}
             >
               {[7, 30, 60, 90].map((d) => <option key={d} value={d}>{d} days</option>)}
@@ -189,11 +199,12 @@ export function ExpiryScheduleManager() {
               <option value="csv">CSV</option>
             </select>
           </Field>
-          <Field label="Recipients (comma separated)">
+          <Field label="Recipients (comma separated)" error={validation.recipientsError}>
             <input
-              className={inputCls}
+              className={inputClass(validation.recipientsError)}
               placeholder="hr@company.com, admin@company.com"
               value={draft.recipients}
+              aria-invalid={!!validation.recipientsError}
               onChange={(e) => setDraft({ ...draft, recipients: e.target.value })}
             />
           </Field>
@@ -261,6 +272,10 @@ export function ExpiryScheduleManager() {
 
 const inputCls =
   "w-full rounded-xl border border-border bg-background px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring";
+
+function inputClass(error?: string) {
+  return error ? `${inputCls} border-destructive focus:ring-destructive` : inputCls;
+}
 
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
