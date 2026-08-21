@@ -199,11 +199,12 @@ export function ExpiryScheduleManager() {
               <option value="csv">CSV</option>
             </select>
           </Field>
-          <Field label="Recipients (comma separated)">
+          <Field label="Recipients (comma separated)" error={validation.recipientsError}>
             <input
-              className={inputCls}
+              className={inputClass(validation.recipientsError)}
               placeholder="hr@company.com, admin@company.com"
               value={draft.recipients}
+              aria-invalid={!!validation.recipientsError}
               onChange={(e) => setDraft({ ...draft, recipients: e.target.value })}
             />
           </Field>
