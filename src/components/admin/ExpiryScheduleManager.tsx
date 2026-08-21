@@ -46,6 +46,18 @@ export function ExpiryScheduleManager() {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
 
+  const validation = useMemo(() => {
+    const errors: string[] = [];
+    if (!draft.name.trim()) errors.push("Name is required");
+    const recipients = draft.recipients.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean);
+    if (recipients.length === 0) errors.push("At least one recipient is required");
+    if (recipients.some((r) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r))) errors.push("One or more emails are invalid");
+    if (!Number.isFinite(draft.expiry_days) || draft.expiry_days < 1 || draft.expiry_days > 365) {
+      errors.push("Expiry window must be between 1 and 365 days");
+    }
+    return { ok: errors.length === 0, errors };
+  }, [draft]);
+
   const { data: schedules = [], isLoading } = useQuery({
     queryKey: ["export-schedules"],
     queryFn: () => fetchList({}),
