@@ -204,7 +204,7 @@ export function ExpiryScheduleManager() {
             </label>
             <div className="flex-1" />
             <button
-              disabled={saveMut.isPending || !draft.recipients.trim()}
+              disabled={saveMut.isPending || !validation.ok}
               onClick={() => saveMut.mutate(draft)}
               className="rounded-full bg-foreground px-4 py-1.5 text-[11px] font-semibold text-background disabled:opacity-50"
             >
