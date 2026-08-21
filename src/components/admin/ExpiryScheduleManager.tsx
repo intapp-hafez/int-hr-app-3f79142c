@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -45,6 +45,18 @@ export function ExpiryScheduleManager() {
 
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
+
+  const validation = useMemo(() => {
+    const errors: string[] = [];
+    if (!draft.name.trim()) errors.push("Name is required");
+    const recipients = draft.recipients.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean);
+    if (recipients.length === 0) errors.push("At least one recipient is required");
+    if (recipients.some((r) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r))) errors.push("One or more emails are invalid");
+    if (!Number.isFinite(draft.expiry_days) || draft.expiry_days < 1 || draft.expiry_days > 365) {
+      errors.push("Expiry window must be between 1 and 365 days");
+    }
+    return { ok: errors.length === 0, errors };
+  }, [draft]);
 
   const { data: schedules = [], isLoading } = useQuery({
     queryKey: ["export-schedules"],
@@ -142,7 +154,7 @@ export function ExpiryScheduleManager() {
               <option value="contract_expiry">Contract Expiry</option>
             </select>
           </Field>
-          <Field label="Expiry window (days)">
+          <Field label="Expiry window (days)" error={validation.errors.find((e) => e.includes("Expiry window"))}>
             <select
               className={inputCls}
               value={draft.expiry_days}
@@ -192,7 +204,7 @@ export function ExpiryScheduleManager() {
             </label>
             <div className="flex-1" />
             <button
-              disabled={saveMut.isPending || !draft.recipients.trim()}
+              disabled={saveMut.isPending || !validation.ok}
               onClick={() => saveMut.mutate(draft)}
               className="rounded-full bg-foreground px-4 py-1.5 text-[11px] font-semibold text-background disabled:opacity-50"
             >
@@ -250,11 +262,12 @@ export function ExpiryScheduleManager() {
 const inputCls =
   "w-full rounded-xl border border-border bg-background px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring";
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
     <label className="block">
       <span className="mb-1 block text-[11px] font-semibold text-muted-foreground">{label}</span>
       {children}
+      {error && <span className="mt-1 block text-[11px] text-destructive">{error}</span>}
     </label>
   );
 }

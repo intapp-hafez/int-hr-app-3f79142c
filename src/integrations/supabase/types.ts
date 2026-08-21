@@ -1092,45 +1092,57 @@ export type Database = {
           date_range_kind: string
           employee_ids: string[]
           enabled: boolean
+          expiry_days: number
           format: string
+          frequency: string
           id: string
           last_run_date: string | null
           name: string
           owner_id: string
           recipients: string[]
+          report_kind: string
           send_time: string
           timezone: string
           updated_at: string
+          weekday: number | null
         }
         Insert: {
           created_at?: string
           date_range_kind?: string
           employee_ids?: string[]
           enabled?: boolean
+          expiry_days?: number
           format?: string
+          frequency?: string
           id?: string
           last_run_date?: string | null
           name: string
           owner_id: string
           recipients?: string[]
+          report_kind?: string
           send_time?: string
           timezone?: string
           updated_at?: string
+          weekday?: number | null
         }
         Update: {
           created_at?: string
           date_range_kind?: string
           employee_ids?: string[]
           enabled?: boolean
+          expiry_days?: number
           format?: string
+          frequency?: string
           id?: string
           last_run_date?: string | null
           name?: string
           owner_id?: string
           recipients?: string[]
+          report_kind?: string
           send_time?: string
           timezone?: string
           updated_at?: string
+          weekday?: number | null
         }
         Relationships: []
       }
