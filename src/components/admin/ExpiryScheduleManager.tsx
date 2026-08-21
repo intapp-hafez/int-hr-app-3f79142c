@@ -163,10 +163,11 @@ export function ExpiryScheduleManager() {
               <option value="contract_expiry">Contract Expiry</option>
             </select>
           </Field>
-          <Field label="Expiry window (days)" error={validation.errors.find((e) => e.includes("Expiry window"))}>
+          <Field label="Expiry window (days)" error={validation.expiryDaysError}>
             <select
-              className={inputCls}
+              className={inputClass(validation.expiryDaysError)}
               value={draft.expiry_days}
+              aria-invalid={!!validation.expiryDaysError}
               onChange={(e) => setDraft({ ...draft, expiry_days: Number(e.target.value) })}
             >
               {[7, 30, 60, 90].map((d) => <option key={d} value={d}>{d} days</option>)}
