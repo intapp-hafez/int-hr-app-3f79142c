@@ -154,7 +154,7 @@ export function ExpiryScheduleManager() {
               <option value="contract_expiry">Contract Expiry</option>
             </select>
           </Field>
-          <Field label="Expiry window (days)">
+          <Field label="Expiry window (days)" error={validation.errors.find((e) => e.includes("Expiry window"))}>
             <select
               className={inputCls}
               value={draft.expiry_days}
