@@ -4,7 +4,7 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianG
 import {
   Download, FileText, FileSpreadsheet, FileBarChart2,
   TrendingUp, TrendingDown, Clock, UserX, Users, Timer, CheckCircle2, Calendar, ChevronLeft, ChevronRight,
-  CreditCard, FileClock
+  CreditCard, FileClock, Loader2, ExternalLink
 } from "lucide-react";
 import { format, subMonths, addMonths } from "date-fns";
 import { formatDate } from "@/lib/date-format";
