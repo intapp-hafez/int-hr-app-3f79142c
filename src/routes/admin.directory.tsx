@@ -15,11 +15,12 @@ import { downloadTemplate, parseExcelFile } from "@/lib/excel";
 import { NetworksManager } from "./admin.networks";
 import { DepartmentStructureModal } from "@/components/admin/DepartmentStructureModal";
 import { SectionsManager } from "@/components/admin/SectionsManager";
+import { SmsBroadcastTab } from "@/components/admin/SmsBroadcastTab";
 
 const ContractTemplatesManager = lazy(() => import("@/components/ContractTemplatesManager").then((mod) => ({ default: mod.ContractTemplatesManager })));
 
-type Tab = "departments" | "sections" | "positions" | "job_grades" | "cities" | "networks" | "contractTemplates";
-const validTabs: Tab[] = ["departments", "sections", "positions", "job_grades", "cities", "networks", "contractTemplates"];
+type Tab = "departments" | "sections" | "positions" | "job_grades" | "cities" | "networks" | "contractTemplates" | "sms";
+const validTabs: Tab[] = ["departments", "sections", "positions", "job_grades", "cities", "networks", "contractTemplates", "sms"];
 
 export const Route = createFileRoute("/admin/directory")({
   component: DirectoryPage,
@@ -37,6 +38,7 @@ const tabs: { id: Tab; label: string }[] = [
   { id: "cities", label: "Cities & Districts" },
   { id: "networks", label: "Networks" },
   { id: "contractTemplates", label: "Contract Templates" },
+  { id: "sms", label: "SMS Broadcast" },
 ];
 
 const PAGE_SIZE = 10;
@@ -106,6 +108,7 @@ function DirectoryPage() {
             <ContractTemplatesManager />
           </Suspense>
         )}
+        {tab === "sms" && <SmsBroadcastTab />}
       </div>
     </div>
   );

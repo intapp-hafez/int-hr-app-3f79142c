@@ -43,7 +43,6 @@ function AdminLayout() {
     { to: "/admin/leaves", icon: CalendarDays, label: t("leaves"), page: "leaves" },
     { to: "/admin/payroll", icon: Wallet, label: t("payroll"), page: "payroll" },
     { to: "/admin/advances", icon: Banknote, label: t("advancesTitle"), page: "advances" },
-    { to: "/admin/sms", icon: MessageSquare, label: "SMS", page: "employees" },
     { to: "/admin/reports", icon: FileBarChart2, label: t("reports"), page: "reports" },
     { to: "/admin/audit", icon: ScrollText, label: t("audit"), page: "audit" },
     { to: "/admin/directory", icon: Building2, label: t("directory"), page: "directory" },
