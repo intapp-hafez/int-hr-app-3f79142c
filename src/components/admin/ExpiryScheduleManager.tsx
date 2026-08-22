@@ -58,7 +58,15 @@ export function ExpiryScheduleManager() {
       recipientsError = "At least one recipient is required";
     } else {
       const bad = draft.recipients.filter((r) => !EMAIL_RE.test(r));
+      const seen = new Set<string>();
+      const dupes = new Set<string>();
+      for (const r of draft.recipients) {
+        const k = r.toLowerCase();
+        if (seen.has(k)) dupes.add(k);
+        seen.add(k);
+      }
       if (bad.length) recipientsError = `Invalid email${bad.length > 1 ? "s" : ""}: ${bad.join(", ")}`;
+      else if (dupes.size) recipientsError = `Duplicate email${dupes.size > 1 ? "s" : ""}: ${[...dupes].join(", ")}`;
     }
     const expiryDaysError =
       !Number.isFinite(draft.expiry_days) || draft.expiry_days < 1 || draft.expiry_days > 365
@@ -71,6 +79,7 @@ export function ExpiryScheduleManager() {
       expiryDaysError,
     };
   }, [draft]);
+
 
   function focusFirstInvalid() {
     const target = validation.nameError
