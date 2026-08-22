@@ -6,8 +6,8 @@ These are TanStack Start server functions, not REST endpoints, so they are invok
 through the framework's RPC layer rather than by a fixed external URL.
 
 - **Development:** `http://localhost:8080`
-- **Production / Preview:** `https://id-preview--c13f87af-b8cc-4f37-8f17-4bed3b54a010.lovable.app`
-- **Published app:** configured project domain (not published yet)
+- **Production / Preview:** `https://hr.company.com`
+- **Published app:** configured project domain
 
 Client calls go through `useServerFn(fn)`; the framework routes them to the correct
 server function internally.

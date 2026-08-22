@@ -9,8 +9,7 @@ Read-only API for pulling employee master data into an external system.
 
 | Environment | Base URL |
 |---|---|
-| Preview (stable) | `https://project--c13f87af-b8cc-4f37-8f17-4bed3b54a010-dev.lovable.app` |
-| Production (stable) | `https://project--c13f87af-b8cc-4f37-8f17-4bed3b54a010.lovable.app` |
+| Production / Staging | `https://hr.company.com` |
 | Local dev | `http://localhost:8080` |
 | Self-hosted / IIS | your own domain or IP (e.g. `https://hr.company.com`) |
 
@@ -62,7 +61,7 @@ Returns a paginated employee list. Use the same endpoint with `id=` or
 ```bash
 # All active employees, first page
 curl -H "x-api-key: $EMPLOYEE_API_KEY" \
-  "https://project--c13f87af-b8cc-4f37-8f17-4bed3b54a010.lovable.app/api/public/employees?status=Active&page_size=200"
+  "https://hr.company.com/api/public/employees?status=Active&page_size=200"
 
 # Single employee by code
 curl -H "x-api-key: $EMPLOYEE_API_KEY" \
