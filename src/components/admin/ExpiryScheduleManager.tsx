@@ -58,7 +58,15 @@ export function ExpiryScheduleManager() {
       recipientsError = "At least one recipient is required";
     } else {
       const bad = draft.recipients.filter((r) => !EMAIL_RE.test(r));
+      const seen = new Set<string>();
+      const dupes = new Set<string>();
+      for (const r of draft.recipients) {
+        const k = r.toLowerCase();
+        if (seen.has(k)) dupes.add(k);
+        seen.add(k);
+      }
       if (bad.length) recipientsError = `Invalid email${bad.length > 1 ? "s" : ""}: ${bad.join(", ")}`;
+      else if (dupes.size) recipientsError = `Duplicate email${dupes.size > 1 ? "s" : ""}: ${[...dupes].join(", ")}`;
     }
     const expiryDaysError =
       !Number.isFinite(draft.expiry_days) || draft.expiry_days < 1 || draft.expiry_days > 365
@@ -71,6 +79,7 @@ export function ExpiryScheduleManager() {
       expiryDaysError,
     };
   }, [draft]);
+
 
   function focusFirstInvalid() {
     const target = validation.nameError
@@ -317,14 +326,62 @@ function EmailChipsInput({
 }) {
   const [text, setText] = useState("");
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [focusIndex, setFocusIndex] = useState<number | null>(null);
+  const [rejected, setRejected] = useState<string[]>([]);
+  const [lastAdded, setLastAdded] = useState(0);
+  const chipRefs = useRef<(HTMLSpanElement | null)[]>([]);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  function focusChip(i: number | null) {
+    setFocusIndex(i);
+    if (i === null) inputRef?.current?.focus();
+    else requestAnimationFrame(() => chipRefs.current[i]?.focus());
+  }
 
   function commit(raw: string) {
-    const parts = raw.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean);
-    if (!parts.length) return;
+    const parts = raw
+      .split(/[,;\s\n\r\t]+/)
+      .map((s) => s.trim().replace(/^[<"']+|[>"',.;]+$/g, ""))
+      .filter(Boolean);
+    if (!parts.length) return { added: 0, bad: [] as string[], dupes: [] as string[] };
     const next = [...value];
-    for (const p of parts) if (!next.includes(p)) next.push(p);
+    const lower = new Set(next.map((v) => v.toLowerCase()));
+    const bad: string[] = [];
+    const dupes: string[] = [];
+    let added = 0;
+    for (const p of parts) {
+      if (!EMAIL_RE.test(p)) {
+        bad.push(p);
+        continue;
+      }
+      if (lower.has(p.toLowerCase())) {
+        dupes.push(p);
+        continue;
+      }
+      lower.add(p.toLowerCase());
+      next.push(p);
+      added++;
+    }
     onChange(next);
     setText("");
+    setRejected(bad);
+    setLastAdded(added);
+    if (bad.length || dupes.length) {
+      toast.warning(
+        `Skipped ${bad.length + dupes.length} entr${bad.length + dupes.length > 1 ? "ies" : "y"}`,
+        {
+          description: [
+            bad.length ? `Invalid: ${bad.slice(0, 5).join(", ")}${bad.length > 5 ? "…" : ""}` : null,
+            dupes.length ? `Duplicates: ${dupes.slice(0, 5).join(", ")}${dupes.length > 5 ? "…" : ""}` : null,
+          ]
+            .filter(Boolean)
+            .join(" · "),
+        },
+      );
+    } else if (added > 1) {
+      toast.success(`Added ${added} recipients`);
+    }
+    return { added, bad, dupes };
   }
 
   function move(from: number, to: number) {
@@ -333,81 +390,191 @@ function EmailChipsInput({
     const [item] = next.splice(from, 1);
     next.splice(to, 0, item);
     onChange(next);
+    focusChip(to);
   }
 
+  function removeAt(i: number) {
+    onChange(value.filter((_, idx) => idx !== i));
+    const nextLen = value.length - 1;
+    if (nextLen === 0) focusChip(null);
+    else focusChip(Math.min(i, nextLen - 1));
+  }
+
+  async function importFile(file: File) {
+    const content = await file.text();
+    commit(content);
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  function onChipKeyDown(e: React.KeyboardEvent, i: number) {
+    if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      if (e.ctrlKey || e.metaKey || e.altKey) move(i, i - 1);
+      else focusChip(Math.max(0, i - 1));
+    } else if (e.key === "ArrowRight") {
+      e.preventDefault();
+      if (e.ctrlKey || e.metaKey || e.altKey) move(i, i + 1);
+      else if (i === value.length - 1) focusChip(null);
+      else focusChip(i + 1);
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      focusChip(0);
+    } else if (e.key === "End") {
+      e.preventDefault();
+      focusChip(null);
+    } else if (e.key === "Backspace" || e.key === "Delete") {
+      e.preventDefault();
+      removeAt(i);
+    } else if (e.key === "Escape") {
+      focusChip(null);
+    }
+  }
+
+  const invalidCount = value.filter((v) => !EMAIL_RE.test(v)).length;
+  const dupeCount = value.length - new Set(value.map((v) => v.toLowerCase())).size;
+
   return (
-    <div
-      onClick={() => inputRef?.current?.focus()}
-      className={`flex min-h-[42px] flex-wrap items-center gap-1.5 rounded-xl border bg-background px-2 py-1.5 focus-within:ring-1 ${
-        invalid ? "border-destructive focus-within:ring-destructive" : "border-border focus-within:ring-ring"
-      }`}
-    >
-      {value.map((email, i) => {
-        const bad = !EMAIL_RE.test(email);
-        return (
-          <span
-            key={`${email}-${i}`}
-            draggable
-            onDragStart={() => setDragIndex(i)}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => {
-              e.preventDefault();
-              if (dragIndex !== null) move(dragIndex, i);
-              setDragIndex(null);
-            }}
-            onDragEnd={() => setDragIndex(null)}
-            className={`inline-flex cursor-grab items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium active:cursor-grabbing ${
-              bad ? "bg-destructive/10 text-destructive" : "bg-muted text-foreground"
-            } ${dragIndex === i ? "opacity-50" : ""}`}
-          >
-            <GripVertical className="h-3 w-3 opacity-50" />
-            {email}
-            <button
-              type="button"
-              aria-label={`Remove ${email}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                onChange(value.filter((_, idx) => idx !== i));
+    <div>
+      <div
+        onClick={() => inputRef?.current?.focus()}
+        className={`flex min-h-[42px] flex-wrap items-center gap-1.5 rounded-xl border bg-background px-2 py-1.5 focus-within:ring-1 ${
+          invalid ? "border-destructive focus-within:ring-destructive" : "border-border focus-within:ring-ring"
+        }`}
+      >
+        {value.map((email, i) => {
+          const bad = !EMAIL_RE.test(email);
+          return (
+            <span
+              key={`${email}-${i}`}
+              ref={(el) => {
+                chipRefs.current[i] = el;
               }}
-              className="rounded-full p-0.5 hover:bg-foreground/10"
+              tabIndex={-1}
+              role="listitem"
+              aria-label={`${email}. Press Delete to remove, Ctrl plus arrow keys to reorder`}
+              onKeyDown={(e) => onChipKeyDown(e, i)}
+              draggable
+              onDragStart={() => setDragIndex(i)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (dragIndex !== null) move(dragIndex, i);
+                setDragIndex(null);
+              }}
+              onDragEnd={() => setDragIndex(null)}
+              className={`inline-flex cursor-grab items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium outline-none active:cursor-grabbing ${
+                bad ? "bg-destructive/10 text-destructive" : "bg-muted text-foreground"
+              } ${dragIndex === i ? "opacity-50" : ""} ${focusIndex === i ? "ring-1 ring-ring" : ""}`}
             >
-              <X className="h-3 w-3" />
-            </button>
-          </span>
-        );
-      })}
-      <input
-        ref={inputRef}
-        className="min-w-[160px] flex-1 bg-transparent px-1 py-0.5 text-xs outline-none"
-        placeholder={value.length ? "Add another…" : "hr@company.com, admin@company.com"}
-        value={text}
-        onChange={(e) => {
-          const v = e.target.value;
-          if (/[,;]/.test(v)) commit(v);
-          else setText(v);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === "Tab" || e.key === " ") {
-            if (text.trim()) {
+              <GripVertical className="h-3 w-3 opacity-50" />
+              {email}
+              <button
+                type="button"
+                tabIndex={-1}
+                aria-label={`Remove ${email}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeAt(i);
+                }}
+                className="rounded-full p-0.5 hover:bg-foreground/10"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          );
+        })}
+        <input
+          ref={inputRef}
+          className="min-w-[160px] flex-1 bg-transparent px-1 py-0.5 text-xs outline-none"
+          placeholder={value.length ? "Add another…" : "hr@company.com, admin@company.com"}
+          value={text}
+          onFocus={() => setFocusIndex(null)}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (/[,;]/.test(v)) commit(v);
+            else setText(v);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === "Tab" || e.key === " ") {
+              if (text.trim()) {
+                e.preventDefault();
+                commit(text);
+              }
+            } else if (e.key === "Backspace" && !text && value.length) {
               e.preventDefault();
-              commit(text);
+              focusChip(value.length - 1);
+            } else if (e.key === "ArrowLeft" && !text && value.length) {
+              e.preventDefault();
+              focusChip(value.length - 1);
             }
-          } else if (e.key === "Backspace" && !text && value.length) {
-            onChange(value.slice(0, -1));
-          }
-        }}
-        onPaste={(e) => {
-          const pasted = e.clipboardData.getData("text");
-          if (/[,;\s]/.test(pasted)) {
-            e.preventDefault();
-            commit(`${text} ${pasted}`);
-          }
-        }}
-        onBlur={() => text.trim() && commit(text)}
-      />
+          }}
+          onPaste={(e) => {
+            const pasted = e.clipboardData.getData("text");
+            if (/[,;\s]/.test(pasted)) {
+              e.preventDefault();
+              commit(`${text} ${pasted}`);
+            }
+          }}
+          onBlur={() => text.trim() && commit(text)}
+        />
+      </div>
+
+      <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+        <span>
+          <strong className="text-foreground">{value.length}</strong> recipient{value.length === 1 ? "" : "s"}
+          {invalidCount > 0 && <span className="text-destructive"> · {invalidCount} invalid</span>}
+          {dupeCount > 0 && <span className="text-destructive"> · {dupeCount} duplicate</span>}
+          {lastAdded > 0 && <span> · {lastAdded} added</span>}
+        </span>
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 font-semibold text-foreground hover:bg-muted/70"
+        >
+          <Upload className="h-3 w-3" /> Import CSV / text
+        </button>
+        {value.length > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              onChange([]);
+              setRejected([]);
+              setLastAdded(0);
+            }}
+            className="rounded-full px-2 py-1 font-semibold hover:text-destructive"
+          >
+            Clear all
+          </button>
+        )}
+        <span className="ms-auto hidden md:inline">
+          ← → move · Ctrl+← → reorder · Del removes
+        </span>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".csv,.txt,text/csv,text/plain"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void importFile(f);
+          }}
+        />
+      </div>
+
+      {value.length > 0 && (
+        <p className="mt-1 truncate text-[11px] text-muted-foreground" title={value.join(", ")}>
+          Sending to: {value.join(", ")}
+        </p>
+      )}
+      {rejected.length > 0 && (
+        <p className="mt-1 text-[11px] text-destructive">
+          Rejected: {rejected.join(", ")}
+        </p>
+      )}
     </div>
   );
 }
+
 
 const inputCls =
   "w-full rounded-xl border border-border bg-background px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring";
