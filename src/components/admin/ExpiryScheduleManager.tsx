@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { CalendarClock, Mail, Plus, Send, Trash2 } from "lucide-react";
+import { CalendarClock, GripVertical, Mail, Plus, Send, Trash2, X } from "lucide-react";
 import {
   listSchedules,
   upsertSchedule,
@@ -11,6 +11,7 @@ import {
 } from "@/backend/functions/schedules.functions";
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type Draft = {
   name: string;
@@ -19,7 +20,7 @@ type Draft = {
   weekday: number;
   expiry_days: number;
   send_time: string;
-  recipients: string;
+  recipients: string[];
   format: "csv" | "xlsx";
   enabled: boolean;
 };
@@ -31,7 +32,7 @@ const emptyDraft: Draft = {
   weekday: 0,
   expiry_days: 30,
   send_time: "08:00",
-  recipients: "",
+  recipients: [],
   format: "xlsx",
   enabled: true,
 };
@@ -46,14 +47,18 @@ export function ExpiryScheduleManager() {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
 
+  const nameRef = useRef<HTMLInputElement>(null);
+  const expiryRef = useRef<HTMLSelectElement>(null);
+  const recipientsRef = useRef<HTMLInputElement>(null);
+
   const validation = useMemo(() => {
     const nameError = !draft.name.trim() ? "Name is required" : undefined;
-    const recipientsList = draft.recipients.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean);
     let recipientsError: string | undefined;
-    if (recipientsList.length === 0) {
+    if (draft.recipients.length === 0) {
       recipientsError = "At least one recipient is required";
-    } else if (recipientsList.some((r) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r))) {
-      recipientsError = "One or more email addresses are invalid";
+    } else {
+      const bad = draft.recipients.filter((r) => !EMAIL_RE.test(r));
+      if (bad.length) recipientsError = `Invalid email${bad.length > 1 ? "s" : ""}: ${bad.join(", ")}`;
     }
     const expiryDaysError =
       !Number.isFinite(draft.expiry_days) || draft.expiry_days < 1 || draft.expiry_days > 365
@@ -66,6 +71,20 @@ export function ExpiryScheduleManager() {
       expiryDaysError,
     };
   }, [draft]);
+
+  function focusFirstInvalid() {
+    const target = validation.nameError
+      ? nameRef.current
+      : validation.expiryDaysError
+        ? expiryRef.current
+        : validation.recipientsError
+          ? recipientsRef.current
+          : null;
+    if (target) {
+      target.focus();
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }
 
   const { data: schedules = [], isLoading } = useQuery({
     queryKey: ["export-schedules"],
@@ -80,7 +99,7 @@ export function ExpiryScheduleManager() {
           employee_ids: [],
           date_range_kind: "today" as const,
           format: d.format,
-          recipients: d.recipients.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean),
+          recipients: d.recipients,
           send_time: d.send_time.length === 5 ? `${d.send_time}:00` : d.send_time,
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
           enabled: d.enabled,
@@ -150,8 +169,14 @@ export function ExpiryScheduleManager() {
 
       {open && (
         <div className="mb-5 grid gap-3 rounded-2xl border border-border bg-muted/30 p-4 md:grid-cols-3">
-          <Field label="Name">
-            <input className={inputCls} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+          <Field label="Name" error={validation.nameError}>
+            <input
+              ref={nameRef}
+              className={inputClass(validation.nameError)}
+              aria-invalid={!!validation.nameError}
+              value={draft.name}
+              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+            />
           </Field>
           <Field label="Report">
             <select
@@ -165,6 +190,7 @@ export function ExpiryScheduleManager() {
           </Field>
           <Field label="Expiry window (days)" error={validation.expiryDaysError}>
             <select
+              ref={expiryRef}
               className={inputClass(validation.expiryDaysError)}
               value={draft.expiry_days}
               aria-invalid={!!validation.expiryDaysError}
@@ -199,15 +225,16 @@ export function ExpiryScheduleManager() {
               <option value="csv">CSV</option>
             </select>
           </Field>
-          <Field label="Recipients (comma separated)" error={validation.recipientsError}>
-            <input
-              className={inputClass(validation.recipientsError)}
-              placeholder="hr@company.com, admin@company.com"
-              value={draft.recipients}
-              aria-invalid={!!validation.recipientsError}
-              onChange={(e) => setDraft({ ...draft, recipients: e.target.value })}
-            />
-          </Field>
+          <div className="md:col-span-3">
+            <Field label="Recipients" error={validation.recipientsError}>
+              <EmailChipsInput
+                inputRef={recipientsRef}
+                value={draft.recipients}
+                invalid={!!validation.recipientsError}
+                onChange={(recipients) => setDraft({ ...draft, recipients })}
+              />
+            </Field>
+          </div>
           <div className="flex items-end gap-2 md:col-span-3">
             <label className="flex items-center gap-2 text-xs font-medium">
               <input type="checkbox" checked={draft.enabled} onChange={(e) => setDraft({ ...draft, enabled: e.target.checked })} />
@@ -215,8 +242,15 @@ export function ExpiryScheduleManager() {
             </label>
             <div className="flex-1" />
             <button
-              disabled={saveMut.isPending || !validation.ok}
-              onClick={() => saveMut.mutate(draft)}
+              disabled={saveMut.isPending}
+              onClick={() => {
+                if (!validation.ok) {
+                  focusFirstInvalid();
+                  toast.error("Please fix the highlighted fields");
+                  return;
+                }
+                saveMut.mutate(draft);
+              }}
               className="rounded-full bg-foreground px-4 py-1.5 text-[11px] font-semibold text-background disabled:opacity-50"
             >
               {saveMut.isPending ? "Saving…" : "Save schedule"}
@@ -267,6 +301,111 @@ export function ExpiryScheduleManager() {
         </ul>
       )}
     </section>
+  );
+}
+
+function EmailChipsInput({
+  value,
+  onChange,
+  invalid,
+  inputRef,
+}: {
+  value: string[];
+  onChange: (v: string[]) => void;
+  invalid?: boolean;
+  inputRef?: React.RefObject<HTMLInputElement | null>;
+}) {
+  const [text, setText] = useState("");
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+
+  function commit(raw: string) {
+    const parts = raw.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean);
+    if (!parts.length) return;
+    const next = [...value];
+    for (const p of parts) if (!next.includes(p)) next.push(p);
+    onChange(next);
+    setText("");
+  }
+
+  function move(from: number, to: number) {
+    if (from === to || to < 0 || to >= value.length) return;
+    const next = [...value];
+    const [item] = next.splice(from, 1);
+    next.splice(to, 0, item);
+    onChange(next);
+  }
+
+  return (
+    <div
+      onClick={() => inputRef?.current?.focus()}
+      className={`flex min-h-[42px] flex-wrap items-center gap-1.5 rounded-xl border bg-background px-2 py-1.5 focus-within:ring-1 ${
+        invalid ? "border-destructive focus-within:ring-destructive" : "border-border focus-within:ring-ring"
+      }`}
+    >
+      {value.map((email, i) => {
+        const bad = !EMAIL_RE.test(email);
+        return (
+          <span
+            key={`${email}-${i}`}
+            draggable
+            onDragStart={() => setDragIndex(i)}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              if (dragIndex !== null) move(dragIndex, i);
+              setDragIndex(null);
+            }}
+            onDragEnd={() => setDragIndex(null)}
+            className={`inline-flex cursor-grab items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium active:cursor-grabbing ${
+              bad ? "bg-destructive/10 text-destructive" : "bg-muted text-foreground"
+            } ${dragIndex === i ? "opacity-50" : ""}`}
+          >
+            <GripVertical className="h-3 w-3 opacity-50" />
+            {email}
+            <button
+              type="button"
+              aria-label={`Remove ${email}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onChange(value.filter((_, idx) => idx !== i));
+              }}
+              className="rounded-full p-0.5 hover:bg-foreground/10"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </span>
+        );
+      })}
+      <input
+        ref={inputRef}
+        className="min-w-[160px] flex-1 bg-transparent px-1 py-0.5 text-xs outline-none"
+        placeholder={value.length ? "Add another…" : "hr@company.com, admin@company.com"}
+        value={text}
+        onChange={(e) => {
+          const v = e.target.value;
+          if (/[,;]/.test(v)) commit(v);
+          else setText(v);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === "Tab" || e.key === " ") {
+            if (text.trim()) {
+              e.preventDefault();
+              commit(text);
+            }
+          } else if (e.key === "Backspace" && !text && value.length) {
+            onChange(value.slice(0, -1));
+          }
+        }}
+        onPaste={(e) => {
+          const pasted = e.clipboardData.getData("text");
+          if (/[,;\s]/.test(pasted)) {
+            e.preventDefault();
+            commit(`${text} ${pasted}`);
+          }
+        }}
+        onBlur={() => text.trim() && commit(text)}
+      />
+    </div>
   );
 }
 
