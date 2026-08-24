@@ -43,6 +43,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { formatDate } from "@/lib/date-format";
 
 type FormState = {
   id?: string;
@@ -317,7 +318,7 @@ export function HolidaysManager() {
                 <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
                   {liveConflicts.map((c) => (
                     <li key={c.leave_id}>
-                      <span className="font-medium text-foreground">{c.employee_name}</span> — {c.leave_type ?? "Leave"} ({c.start_date} → {c.end_date}, {c.status})
+                      <span className="font-medium text-foreground">{c.employee_name}</span> — {c.leave_type ?? "Leave"} ({formatDate(c.start_date)} → {formatDate(c.end_date)}, {c.status})
                     </li>
                   ))}
                 </ul>
@@ -412,7 +413,7 @@ function HolidayCard({
         </span>
         {h.recurring && <span className="text-[10px] text-muted-foreground">Recurring</span>}
       </div>
-      <p className="mt-3 font-mono text-sm font-semibold tabular-nums text-brand">{h.date}</p>
+      <p className="mt-3 font-mono text-sm font-semibold tabular-nums text-brand">{formatDate(h.date)}</p>
       {h.notes && <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{h.notes}</p>}
     </div>
   );

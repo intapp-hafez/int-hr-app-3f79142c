@@ -9,6 +9,7 @@ import { listMyDevices } from "@/backend/functions/devices.functions";
 import { submitLeave, listMyLeaves, cancelLeave, listActiveLeaveTypes } from "@/backend/functions/leaves.functions";
 import { useSession, useAuthReady } from "@/lib/auth";
 import { getCurrentDeviceId } from "@/lib/store";
+import { formatDate } from "@/lib/date-format";
 
 export const Route = createFileRoute("/manager/check")({ component: CheckPage });
 
@@ -139,7 +140,7 @@ function AttendanceList() {
         {(q.data ?? []).slice(0, 10).map((a: any) => (
           <li key={a.id} className="flex items-center justify-between rounded-2xl border border-border bg-card px-4 py-3">
             <div>
-              <p className="text-sm font-semibold">{a.date}</p>
+              <p className="text-sm font-semibold">{formatDate(a.date)}</p>
               <p className="text-[11px] text-muted-foreground">
                 {a.in_time ? new Date(a.in_time).toLocaleTimeString() : "—"} → {a.out_time ? new Date(a.out_time).toLocaleTimeString() : "—"}
               </p>
@@ -183,7 +184,7 @@ function LeavesSection() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-sm font-semibold">{l.leave_type_name ?? "Leave"}</p>
-                <p className="text-xs text-muted-foreground">{l.start_date} → {l.end_date} • {l.days}d</p>
+                <p className="text-xs text-muted-foreground">{formatDate(l.start_date)} → {formatDate(l.end_date)} • {l.days}d</p>
                 {l.reason && <p className="mt-1 text-[11px] italic text-muted-foreground">"{l.reason}"</p>}
               </div>
               <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider">{l.status}</span>

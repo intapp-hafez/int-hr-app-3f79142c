@@ -14,6 +14,7 @@ import { getAdminStats, getAdminDashboard } from "@/backend/functions/dashboard.
 import { decideLeave } from "@/backend/functions/leaves.functions";
 import { NotificationsCenter } from "@/components/admin/NotificationsCenter";
 import { AttendanceTrendChart } from "@/components/admin/AttendanceTrendChart";
+import { formatDate } from "@/lib/date-format";
 
 export const Route = createFileRoute("/admin/")({
   component: AdminDashboard,
@@ -223,7 +224,7 @@ function AdminDashboard() {
                       <p className="text-sm font-medium">{h.name}</p>
                       <p className="text-[11px] capitalize text-muted-foreground">{h.type}</p>
                     </div>
-                    <span className="text-xs font-semibold tabular-nums">{h.date}</span>
+                    <span className="text-xs font-semibold tabular-nums">{formatDate(h.date)}</span>
                   </li>
                 ))}
               </ul>

@@ -5,6 +5,7 @@ import { useI18n, useTranslators } from "@/lib/i18n";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { listMyDeliveries } from "@/backend/functions/notifications.functions";
+import { formatDate } from "@/lib/date-format";
 
 export const Route = createFileRoute("/employee/messages")({
   component: MessagesPage,
@@ -19,7 +20,7 @@ function previewFor(d: any): string {
   if (p.kind === "leave_decision") {
     const status = p.status ?? "updated";
     const label = p.leave_type_name ?? "Leave";
-    return `${label} request ${status} for ${p.start_date ?? ""}${p.end_date && p.end_date !== p.start_date ? ` → ${p.end_date}` : ""}.`;
+    return `${label} request ${status} for ${p.start_date ? formatDate(p.start_date) : ""}${p.end_date && p.end_date !== p.start_date ? ` → ${formatDate(p.end_date)}` : ""}.`;
   }
   return d.subject ?? "";
 }

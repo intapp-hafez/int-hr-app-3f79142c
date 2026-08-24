@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Check, X, Paperclip } from "lucide-react";
 import { listAllLeaves, decideLeave } from "@/backend/functions/leaves.functions";
+import { formatDate } from "@/lib/date-format";
 
 export const Route = createFileRoute("/admin/leaves-requests")({ component: LeaveRequests });
 
@@ -52,8 +53,8 @@ function LeaveRequests() {
               <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${tone[l.status] ?? "bg-muted"}`}>{l.status}</span>
             </div>
             <div className="mt-3 rounded-xl bg-muted/60 p-3 text-xs">
-              <div className="flex justify-between"><span className="text-muted-foreground">From</span><span className="font-medium">{l.start_date}</span></div>
-              <div className="mt-1 flex justify-between"><span className="text-muted-foreground">To</span><span className="font-medium">{l.end_date}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">From</span><span className="font-medium">{formatDate(l.start_date)}</span></div>
+              <div className="mt-1 flex justify-between"><span className="text-muted-foreground">To</span><span className="font-medium">{formatDate(l.end_date)}</span></div>
               <div className="mt-1 flex justify-between"><span className="text-muted-foreground">Days</span><span className="font-medium">{l.days}</span></div>
               {l.reason && <p className="mt-2 italic text-muted-foreground">"{l.reason}"</p>}
             </div>

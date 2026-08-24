@@ -13,6 +13,7 @@ import { listTasks } from "@/backend/functions/tasks.functions";
 import { mapTaskRow, type TaskRow } from "@/lib/task-mapping";
 import { useStore, getCurrentDeviceId } from "@/lib/store";
 import { useSession } from "@/lib/auth";
+import { formatDate } from "@/lib/date-format";
 
 export function EmployeeDashboard() {
   const { t, lang } = useI18n();
@@ -320,7 +321,7 @@ export function EmployeeDashboard() {
                 <div className="flex items-center gap-3">
                   <CheckCircle2 className="h-4 w-4 text-success" />
                   <div>
-                    <p className="text-sm font-medium">{a.date}</p>
+                    <p className="text-sm font-medium">{formatDate(a.date)}</p>
                     <p className="text-[11px] text-muted-foreground">
                       {a.in_time ? new Date(a.in_time).toLocaleTimeString(localeTag, { hour: "2-digit", minute: "2-digit" }) : "—"}
                       {" → "}
@@ -352,7 +353,7 @@ export function EmployeeDashboard() {
                   <Calendar className="h-4 w-4 text-muted-foreground" />
                   <p className="text-sm font-medium">{tHoliday(h.name)}</p>
                 </div>
-                <span className="text-xs font-semibold tabular-nums">{h.date}</span>
+                <span className="text-xs font-semibold tabular-nums">{formatDate(h.date)}</span>
               </li>
             ))}
           </ul>

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Check, X, Paperclip, AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { staffListLeaves, staffDecideLeave } from "@/backend/functions/staff.functions";
+import { formatDate } from "@/lib/date-format";
 
 export const Route = createFileRoute("/staff/leaves")({
   component: StaffLeaves,
@@ -85,8 +86,8 @@ function StaffLeaves() {
               </span>
             </div>
             <div className="mt-2 rounded-xl bg-muted/50 p-2 text-[11px]">
-              <div className="flex justify-between"><span className="text-muted-foreground">From</span><span className="font-medium">{l.start_date}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">To</span><span className="font-medium">{l.end_date}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">From</span><span className="font-medium">{formatDate(l.start_date)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">To</span><span className="font-medium">{formatDate(l.end_date)}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Days</span><span className="font-medium">{l.days}</span></div>
               {l.reason && <p className="mt-1 italic text-muted-foreground">"{l.reason}"</p>}
             </div>
