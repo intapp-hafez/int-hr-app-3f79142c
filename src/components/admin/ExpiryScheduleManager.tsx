@@ -406,6 +406,29 @@ function EmailChipsInput({
     if (fileRef.current) fileRef.current.value = "";
   }
 
+  function downloadRecipientTemplate() {
+    const rows = [
+      "email",
+      "hr@company.com",
+      "admin@company.com",
+      "people-ops@company.com",
+      "",
+      "# Tips:",
+      "# - One email per line, or separate with commas/semicolons/spaces.",
+      "# - Duplicate emails will be skipped automatically.",
+      "# - Lines starting with # are ignored.",
+    ];
+    const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "recipients-template.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
   function onChipKeyDown(e: React.KeyboardEvent, i: number) {
     if (e.key === "ArrowLeft") {
       e.preventDefault();
@@ -532,6 +555,14 @@ function EmailChipsInput({
           className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 font-semibold text-foreground hover:bg-muted/70"
         >
           <Upload className="h-3 w-3" /> Import CSV / text
+        </button>
+        <button
+          type="button"
+          onClick={downloadRecipientTemplate}
+          className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-semibold text-muted-foreground hover:text-foreground"
+          title="Download a template with correctly formatted example emails"
+        >
+          Download template
         </button>
         {value.length > 0 && (
           <button
