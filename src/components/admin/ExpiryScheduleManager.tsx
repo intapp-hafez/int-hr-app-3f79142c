@@ -533,6 +533,14 @@ function EmailChipsInput({
         >
           <Upload className="h-3 w-3" /> Import CSV / text
         </button>
+        <button
+          type="button"
+          onClick={downloadRecipientTemplate}
+          className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-semibold text-muted-foreground hover:text-foreground"
+          title="Download a template with correctly formatted example emails"
+        >
+          Download template
+        </button>
         {value.length > 0 && (
           <button
             type="button"
