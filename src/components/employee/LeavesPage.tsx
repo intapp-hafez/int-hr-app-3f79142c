@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { Plus, X, Loader2, Trash2, Paperclip, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { useI18n, useTranslators } from "@/lib/i18n";
+import { formatDate } from "@/lib/date-format";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { submitLeave, listMyLeaves, cancelLeave, listActiveLeaveTypes } from "@/backend/functions/leaves.functions";
@@ -83,7 +84,7 @@ export function LeavesPage() {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold">{tLeaveType(l.leave_type_name ?? "Other")}</p>
-                  <p className="text-xs text-muted-foreground">{l.start_date} → {l.end_date} • {l.days}d</p>
+                  <p className="text-xs text-muted-foreground">{formatDate(l.start_date)} → {formatDate(l.end_date)} • {l.days}d</p>
                   {l.reason && <p className="mt-1 text-[11px] text-muted-foreground">"{l.reason}"</p>}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
