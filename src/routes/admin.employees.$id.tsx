@@ -2065,7 +2065,7 @@ function LeavesHistoryPanel({ employeeId }: { employeeId: string }) {
             <li key={l.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-background p-3">
               <div className="min-w-0">
                 <p className="text-sm font-semibold">{l.leave_type_name ?? "Leave"} · {l.days ?? "—"}d {l.paid === false ? "(unpaid)" : ""}</p>
-                <p className="text-[11px] text-muted-foreground font-mono">{l.start_date} → {l.end_date}</p>
+                <p className="text-[11px] text-muted-foreground font-mono">{formatDate(l.start_date)} → {formatDate(l.end_date)}</p>
                 {l.reason && <p className="mt-0.5 text-[11px] text-muted-foreground truncate">{l.reason}</p>}
               </div>
               <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${tone(l.status)}`}>{l.status}</span>

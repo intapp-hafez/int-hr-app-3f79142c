@@ -12,6 +12,7 @@ import { LeaveTypesManager } from "@/components/admin/LeaveTypesManager";
 import { HolidayTypesManager } from "@/components/admin/HolidayTypesManager";
 import { HolidaysManager } from "@/components/HolidaysManager";
 import { LEAVES_TABS, TAB_LABELS, type LeavesTab } from "@/lib/leaves-tabs";
+import { formatDate } from "@/lib/date-format";
 
 const tone: Record<string, string> = {
   approved: "bg-success/15 text-success",
@@ -261,8 +262,8 @@ function AdminLeaves() {
               </span>
             </div>
             <div className="mt-4 rounded-xl bg-muted/60 p-3 text-xs">
-              <div className="flex justify-between"><span className="text-muted-foreground">{t("fromWord")}</span><span className="font-medium">{l.start_date}</span></div>
-              <div className="mt-1 flex justify-between"><span className="text-muted-foreground">{t("toWord")}</span><span className="font-medium">{l.end_date}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">{t("fromWord")}</span><span className="font-medium">{formatDate(l.start_date)}</span></div>
+              <div className="mt-1 flex justify-between"><span className="text-muted-foreground">{t("toWord")}</span><span className="font-medium">{formatDate(l.end_date)}</span></div>
               {l.reason && <p className="mt-2 text-[11px] italic text-muted-foreground">"{l.reason}"</p>}
             </div>
             {(l as any).proof_url && (
