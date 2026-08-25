@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { AttendanceCheckSchema, AdminAttendanceSchema } from "../schemas";
+import { isoWeekday } from "@/lib/date-format";
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -26,7 +27,7 @@ export const checkIn = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const now = new Date().toISOString();
     const today = now.slice(0, 10);
-    const dow = new Date(today + "T00:00:00Z").getUTCDay(); // 0 Sun … 6 Sat
+    const dow = isoWeekday(today); // 0 Sun … 6 Sat, local-noon safe
     const isWeekend = dow === 5 || dow === 6; // Fri / Sat
 
     // 0. One check-in per day
@@ -250,7 +251,7 @@ export const checkOut = createServerFn({ method: "POST" })
       };
     }
 
-    const dow = new Date(today + "T00:00:00Z").getUTCDay();
+    const dow = isoWeekday(today); // local-noon safe
     const isWeekend = dow === 5 || dow === 6;
     const [{ data: leaveRow }, { data: holidayRow }, { data: profileRow }] = await Promise.all([
       supabase

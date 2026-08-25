@@ -1532,8 +1532,8 @@ function AttendanceHistoryPanel({ employeeId }: { employeeId: string }) {
       if (!l?.start_date || !l?.end_date) return;
       const status = String(l.status ?? "").toLowerCase();
       if (!priority[status]) return;
-      const start = new Date(l.start_date + "T00:00:00");
-      const end = new Date(l.end_date + "T00:00:00");
+      const start = (parseISODate(l.start_date) as Date);
+      const end = (parseISODate(l.end_date) as Date);
       for (let d = new Date(start); d.getTime() <= end.getTime(); d.setDate(d.getDate() + 1)) {
         const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
         const existing = m.get(iso);
@@ -1575,8 +1575,8 @@ function AttendanceHistoryPanel({ employeeId }: { employeeId: string }) {
     const l = leaveById.get(id);
     if (!l) return [];
     const out: string[] = [];
-    const start = new Date(l.start + "T00:00:00");
-    const end = new Date(l.end + "T00:00:00");
+    const start = (parseISODate(l.start) as Date);
+    const end = (parseISODate(l.end) as Date);
     for (let d = new Date(start); d.getTime() <= end.getTime(); d.setDate(d.getDate() + 1)) {
       out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
     }
@@ -1592,7 +1592,7 @@ function AttendanceHistoryPanel({ employeeId }: { employeeId: string }) {
     const overlaps: Array<{ id: string; type: string; date: string }> = [];
     for (const iso of dates) {
       if (holidayByDate.has(iso)) holidays.push(iso);
-      const dt = new Date(iso + "T00:00:00");
+      const dt = (parseISODate(iso) as Date);
       if (!isWorkingDate(dt)) weekendOff.push(iso);
       const other = leaveByDate.get(iso);
       if (other && other.id !== id && other.status === "approved") {
@@ -2191,7 +2191,7 @@ function InfoTab({ employee }: { employee: Employee }) {
     if (form.nationalId.trim()) {
       if (!exp) { setErr(t("idExpiryRequired")); return; }
       if (!/^\d{4}-\d{2}-\d{2}$/.test(exp)) { setErr(t("idExpiryInvalid")); return; }
-      const d = new Date(exp + "T00:00:00");
+      const d = (parseISODate(exp) as Date);
       if (Number.isNaN(d.getTime())) { setErr(t("idExpiryInvalid")); return; }
       const today = new Date(); today.setHours(0, 0, 0, 0);
       if (d.getTime() < today.getTime()) { setErr(t("idExpiryInPast")); return; }
