@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -61,6 +61,10 @@ function StaffAttendance() {
   const [to, setTo] = useState(todayStr());
   const [editing, setEditing] = useState<Row | null>(null);
   const [editDate, setEditDate] = useState("");
+
+  useEffect(() => {
+    if (editing) setEditDate(editing.date);
+  }, [editing]);
 
   const listFn = useServerFn(staffListAttendance);
   const upsertFn = useServerFn(staffUpsertAttendance);
