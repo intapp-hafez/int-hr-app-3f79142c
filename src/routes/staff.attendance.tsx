@@ -100,16 +100,7 @@ function StaffAttendance() {
         <p className="text-xs text-muted-foreground">Approve or edit employee attendance entries.</p>
       </header>
 
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <Label className="text-[11px]">From</Label>
-          <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-        </div>
-        <div>
-          <Label className="text-[11px]">To</Label>
-          <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-        </div>
-      </div>
+      <DateRangeField from={from} to={to} onFromChange={setFrom} onToChange={setTo} error={rangeError} />
 
       <div className="flex items-center justify-between text-xs">
         <span className="text-muted-foreground">{rows.length} entries</span>
