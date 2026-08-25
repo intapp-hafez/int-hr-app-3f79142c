@@ -76,3 +76,41 @@ export function formatDateRange(from?: string | null, to?: string | null): strin
   if (from && to && from === to) return formatDate(from);
   return `${formatDate(from)} → ${formatDate(to)}`;
 }
+
+/** Weekday index (0 = Sunday) for an ISO date, using local-noon parsing (no DST/UTC off-by-one). */
+export function isoWeekday(value: string): number {
+  const d = parseISODate(value);
+  return d ? d.getDay() : NaN;
+}
+
+/** Whole days between two ISO dates (b - a), computed at local noon so DST never shifts the result. */
+export function daysBetweenIso(a: string, b: string): number {
+  const da = parseISODate(a);
+  const db = parseISODate(b);
+  if (!da || !db) return NaN;
+  return Math.round((db.getTime() - da.getTime()) / 86400000);
+}
+
+/**
+ * Validate a date range. Returns a human message in dd-mm-yyyy, or null when valid.
+ * Empty values are allowed unless `required` is set.
+ */
+export function validateDateRange(
+  from?: string | null,
+  to?: string | null,
+  opts: { required?: boolean; maxDays?: number; label?: { from: string; to: string } } = {},
+): string | null {
+  const L = opts.label ?? { from: "From", to: "To" };
+  const hasFrom = !!from;
+  const hasTo = !!to;
+  if (opts.required && (!hasFrom || !hasTo)) return `${L.from} and ${L.to} dates are required (dd-mm-yyyy).`;
+  if (hasFrom && !isIsoDate(from!.slice(0, 10))) return `${L.from} date is not a valid date (dd-mm-yyyy).`;
+  if (hasTo && !isIsoDate(to!.slice(0, 10))) return `${L.to} date is not a valid date (dd-mm-yyyy).`;
+  if (hasFrom && hasTo) {
+    const diff = daysBetweenIso(from!, to!);
+    if (diff < 0) return `${L.to} date (${formatDate(to)}) must be on or after ${L.from.toLowerCase()} date (${formatDate(from)}).`;
+    if (opts.maxDays && diff + 1 > opts.maxDays)
+      return `Range ${formatDateRange(from, to)} is longer than ${opts.maxDays} days.`;
+  }
+  return null;
+}
