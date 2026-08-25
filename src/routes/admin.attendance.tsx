@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
+import { DateInput } from "@/components/ui/date-input";
 import { formatDate } from "@/lib/date-format";
 import { useStore } from "@/lib/store";
 import {
@@ -561,8 +562,8 @@ function AdminAttendance() {
         <TabsContent value="records" className="space-y-5">
           <div className="flex flex-wrap items-end gap-2 rounded-2xl border border-border bg-card p-3">
         <label className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
-          <span>Date</span>
-          <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="rounded-lg border border-input bg-background px-2 py-1.5 text-sm" />
+          <span>Date (dd-mm-yyyy)</span>
+          <DateInput value={dateFilter} onChange={setDateFilter} aria-label="Date (dd-mm-yyyy)" className="w-40" />
         </label>
         <label className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
           <span>{t("filterEmployee")}</span>
@@ -795,7 +796,7 @@ function AdminAttendance() {
               {errs.employee_id && <p className="text-xs text-destructive">{errs.employee_id}</p>}
             </div>
             <div className="grid grid-cols-3 gap-3">
-              <div className="col-span-1"><Label>Date</Label><Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />{errs.date && <p className="text-xs text-destructive">{errs.date}</p>}</div>
+              <div className="col-span-1"><Label>Date (dd-mm-yyyy)</Label><DateInput value={form.date} onChange={(v) => setForm({ ...form, date: v })} />{errs.date && <p className="text-xs text-destructive">{errs.date}</p>}</div>
               <div className="col-span-1"><Label>In</Label><Input type="time" value={form.in_time} onChange={(e) => setForm({ ...form, in_time: e.target.value })} />{errs.in_time && <p className="text-xs text-destructive">{errs.in_time}</p>}</div>
               <div className="col-span-1"><Label>Out</Label><Input type="time" value={form.out_time} onChange={(e) => setForm({ ...form, out_time: e.target.value })} />{errs.out_time && <p className="text-xs text-destructive">{errs.out_time}</p>}</div>
             </div>
