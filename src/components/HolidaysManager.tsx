@@ -43,6 +43,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { DateInput } from "@/components/ui/date-input";
 import { formatDate } from "@/lib/date-format";
 
 type FormState = {
@@ -273,8 +274,8 @@ export function HolidaysManager() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label htmlFor="h-date">Date</Label>
-                <Input id="h-date" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+                <Label htmlFor="h-date">Date (dd-mm-yyyy)</Label>
+                <DateInput id="h-date" value={form.date} onChange={(v) => setForm({ ...form, date: v })} />
                 {errors.date && <p className="text-xs text-destructive">{errors.date}</p>}
               </div>
               <div className="space-y-1.5">

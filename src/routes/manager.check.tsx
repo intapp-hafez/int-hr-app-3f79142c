@@ -9,6 +9,7 @@ import { listMyDevices } from "@/backend/functions/devices.functions";
 import { submitLeave, listMyLeaves, cancelLeave, listActiveLeaveTypes } from "@/backend/functions/leaves.functions";
 import { useSession, useAuthReady } from "@/lib/auth";
 import { getCurrentDeviceId } from "@/lib/store";
+import { DateRangeField } from "@/components/ui/date-input";
 import { formatDate } from "@/lib/date-format";
 
 export const Route = createFileRoute("/manager/check")({ component: CheckPage });
@@ -245,7 +246,8 @@ function LeaveModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (d: 
     e.preventDefault();
     setErr(null);
     if (!start || !end) return setErr("Start and end required");
-    if (new Date(end) < new Date(start)) return setErr("End before start");
+    const rangeErr = validateDateRange(start, end, { required: true, label: { from: "Start", to: "End" } });
+    if (rangeErr) return setErr(rangeErr);
     if (requiresProof && !proof) return setErr("A doctor proof attachment is required for this leave type.");
     await onSubmit({
       leave_type_id: selectedType?.id ?? null,
@@ -279,10 +281,15 @@ function LeaveModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (d: 
               <option key={tp.id} value={tp.name}>{tp.name}</option>
             ))}
           </select>
-          <div className="grid grid-cols-2 gap-3">
-            <input required type="date" value={start} onChange={(e) => setStart(e.target.value)} className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm" />
-            <input required type="date" value={end} onChange={(e) => setEnd(e.target.value)} className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm" />
-          </div>
+          <DateRangeField
+            from={start}
+            to={end}
+            onFromChange={setStart}
+            onToChange={setEnd}
+            fromLabel="Start"
+            toLabel="End"
+            error={validateDateRange(start, end)}
+          />
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={paid} onChange={(e) => setPaid(e.target.checked)} /> Paid</label>
           <textarea value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} rows={3} className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm" placeholder="Reason (optional)" />
     {requiresProof && (

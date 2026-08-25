@@ -18,6 +18,7 @@ import {
 } from "@/backend/functions/biometrics.functions";
 import { FaceCapture } from "@/components/biometrics/FaceCapture";
 import { useI18n } from "@/lib/i18n";
+import { DateRangeField } from "@/components/ui/date-input";
 import { formatDate } from "@/lib/date-format";
 
 export const Route = createFileRoute("/employee/check")({ component: CheckPage });
@@ -393,7 +394,8 @@ function LeaveModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (d: 
     e.preventDefault();
     setErr(null);
     if (!start || !end) return setErr("Start and end required");
-    if (new Date(end) < new Date(start)) return setErr("End before start");
+    const rangeErr = validateDateRange(start, end, { required: true, label: { from: "Start", to: "End" } });
+    if (rangeErr) return setErr(rangeErr);
     await onSubmit({ leave_type_name: type, start_date: start, end_date: end, days: days(start, end), paid, reason: reason.trim() || undefined });
   }
 
@@ -406,10 +408,15 @@ function LeaveModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (d: 
         </div>
         <form className="space-y-3" onSubmit={submit}>
           <input className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm" value={type} onChange={(e) => setType(e.target.value)} placeholder="Leave type" />
-          <div className="grid grid-cols-2 gap-3">
-            <input required type="date" value={start} onChange={(e) => setStart(e.target.value)} className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm" />
-            <input required type="date" value={end} onChange={(e) => setEnd(e.target.value)} className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm" />
-          </div>
+          <DateRangeField
+            from={start}
+            to={end}
+            onFromChange={setStart}
+            onToChange={setEnd}
+            fromLabel="Start"
+            toLabel="End"
+            error={validateDateRange(start, end)}
+          />
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={paid} onChange={(e) => setPaid(e.target.checked)} /> Paid</label>
           <textarea value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} rows={3} className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm" placeholder="Reason (optional)" />
           {err && <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{err}</p>}
