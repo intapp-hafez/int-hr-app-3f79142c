@@ -4,7 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Check, Loader2 } from "lucide-react";
-import { formatDate } from "@/lib/date-format";
+import { formatDate, validateDateRange } from "@/lib/date-format";
+import { DateInput, DateRangeField } from "@/components/ui/date-input";
 import {
   staffListAttendance,
   staffUpsertAttendance,
@@ -59,15 +60,19 @@ function StaffAttendance() {
   const [from, setFrom] = useState(weekAgoStr());
   const [to, setTo] = useState(todayStr());
   const [editing, setEditing] = useState<Row | null>(null);
+  const [editDate, setEditDate] = useState("");
 
   const listFn = useServerFn(staffListAttendance);
   const upsertFn = useServerFn(staffUpsertAttendance);
   const approveFn = useServerFn(staffApproveAttendance);
   const empFn = useServerFn(staffListEmployees);
 
+  const rangeError = validateDateRange(from, to, { required: true });
+
   const list = useQuery({
     queryKey: ["staff-att", from, to],
     queryFn: () => listFn({ data: { from, to } }),
+    enabled: !rangeError,
   });
   const employees = useQuery({ queryKey: ["staff-emp"], queryFn: () => empFn() });
 
@@ -163,7 +168,7 @@ function StaffAttendance() {
                 upsert.mutate({
                   id: editing.id,
                   employee_id: editing.employee_id,
-                  date: String(f.get("date") || editing.date),
+                  date: editDate || editing.date,
                   in_time: (f.get("in_time") as string) || null,
                   out_time: (f.get("out_time") as string) || null,
                   branch: (f.get("branch") as string) || null,
@@ -175,8 +180,8 @@ function StaffAttendance() {
             >
               <p className="text-xs text-muted-foreground">{editing.employee_name}</p>
               <div>
-                <Label className="text-[11px]">Date</Label>
-                <Input name="date" type="date" defaultValue={editing.date} required />
+                <Label className="text-[11px]">Date (dd-mm-yyyy)</Label>
+                <DateInput name="date" value={editDate} onChange={setEditDate} required />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
