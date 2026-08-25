@@ -10,7 +10,7 @@ import { submitLeave, listMyLeaves, cancelLeave, listActiveLeaveTypes } from "@/
 import { useSession, useAuthReady } from "@/lib/auth";
 import { getCurrentDeviceId } from "@/lib/store";
 import { DateRangeField } from "@/components/ui/date-input";
-import { formatDate } from "@/lib/date-format";
+import { formatDate, validateDateRange } from "@/lib/date-format";
 
 export const Route = createFileRoute("/manager/check")({ component: CheckPage });
 

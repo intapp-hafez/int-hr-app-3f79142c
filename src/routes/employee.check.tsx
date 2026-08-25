@@ -19,7 +19,7 @@ import {
 import { FaceCapture } from "@/components/biometrics/FaceCapture";
 import { useI18n } from "@/lib/i18n";
 import { DateRangeField } from "@/components/ui/date-input";
-import { formatDate } from "@/lib/date-format";
+import { formatDate, validateDateRange } from "@/lib/date-format";
 
 export const Route = createFileRoute("/employee/check")({ component: CheckPage });
 
