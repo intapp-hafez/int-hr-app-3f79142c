@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { EmployeeAvatar } from "@/components/EmployeeAvatar";
-import { formatDate } from "@/lib/date-format";
+import { formatDate, parseISODate } from "@/lib/date-format";
 import { EmployeeTripsPanel } from "@/components/employee/EmployeeTripsPanel";
 import { EmployeeCustodyPanel } from "@/components/admin/EmployeeCustodyPanel";
 import { AvatarUploader } from "@/components/AvatarUploader";
