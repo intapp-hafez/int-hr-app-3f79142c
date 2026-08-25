@@ -5,16 +5,17 @@ import { useServerFn } from "@tanstack/react-start";
 import { ArrowLeft, MapPin, Play, CheckCircle2, Route as RouteIcon, Flag, StickyNote, Calendar } from "lucide-react";
 import { listActivityRange } from "@/backend/functions/activity.functions";
 import { useStore } from "@/lib/store";
+import { DateRangeField } from "@/components/ui/date-input";
+import { formatDateRange, todayISO, toISODate, validateDateRange } from "@/lib/date-format";
 
 export const Route = createFileRoute("/admin/activity-timeline/$id")({
   component: EmployeeActivityTimeline,
 });
 
-function todayISO() { return new Date().toISOString().slice(0, 10); }
 function daysAgoISO(days: number) {
   const d = new Date();
   d.setDate(d.getDate() - days);
-  return d.toISOString().slice(0, 10);
+  return toISODate(d);
 }
 
 const KIND_META: Record<string, { label: string; Icon: typeof Play; tone: string }> = {
@@ -32,10 +33,13 @@ function EmployeeActivityTimeline() {
   const [from, setFrom] = useState(daysAgoISO(30));
   const [to, setTo] = useState(todayISO());
 
+  const rangeError = validateDateRange(from, to, { required: true });
+
   const fn = useServerFn(listActivityRange);
   const q = useQuery({
     queryKey: ["employee-activity-timeline", id, from, to],
     queryFn: () => fn({ data: { from, to, employeeIds: [id] } }),
+    enabled: !rangeError,
   });
 
   const grouped = useMemo(() => {
