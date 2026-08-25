@@ -107,3 +107,54 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(func
     </div>
   );
 });
+
+export interface DateRangeFieldProps {
+  from: string;
+  to: string;
+  onFromChange: (iso: string) => void;
+  onToChange: (iso: string) => void;
+  fromLabel?: string;
+  toLabel?: string;
+  error?: string | null;
+  helper?: string;
+  className?: string;
+  disabled?: boolean;
+}
+
+/**
+ * Unified date-range filter: identical labels, placeholders and helper text
+ * everywhere (Leaves, Attendance, Holidays, Reports). Values are ISO,
+ * display is always dd-mm-yyyy.
+ */
+export function DateRangeField({
+  from,
+  to,
+  onFromChange,
+  onToChange,
+  fromLabel = "From",
+  toLabel = "To",
+  error,
+  helper = "Format: dd-mm-yyyy",
+  className,
+  disabled,
+}: DateRangeFieldProps) {
+  return (
+    <div className={cn("w-full space-y-1", className)}>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
+          <span>{fromLabel} (dd-mm-yyyy)</span>
+          <DateInput value={from} onChange={onFromChange} max={to || undefined} disabled={disabled} aria-label={`${fromLabel} date (dd-mm-yyyy)`} />
+        </label>
+        <label className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
+          <span>{toLabel} (dd-mm-yyyy)</span>
+          <DateInput value={to} onChange={onToChange} min={from || undefined} disabled={disabled} aria-label={`${toLabel} date (dd-mm-yyyy)`} />
+        </label>
+      </div>
+      {error ? (
+        <p className="text-xs font-medium text-destructive">{error}</p>
+      ) : (
+        <p className="text-[11px] text-muted-foreground">{helper}</p>
+      )}
+    </div>
+  );
+}
