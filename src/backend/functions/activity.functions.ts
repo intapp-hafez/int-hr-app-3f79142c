@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import { dateRangeSchema } from "../schemas/date-range";
 import { TaskActivitySchema } from "../schemas";
 
 export const logTaskActivity = createServerFn({ method: "POST" })
@@ -41,11 +42,11 @@ export const logTaskActivity = createServerFn({ method: "POST" })
 
 export const listActivityRange = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => z.object({
-    from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    employeeIds: z.array(z.string().uuid()).optional(),
-  }).parse(input))
+  .inputValidator((input) =>
+    dateRangeSchema({ maxDays: 366 })
+      .and(z.object({ employeeIds: z.array(z.string().uuid()).optional() }))
+      .parse(input),
+  )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
     let q = supabase

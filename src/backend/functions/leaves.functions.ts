@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { LeaveSubmitSchema, LeaveDecideSchema } from "../schemas";
+import { dateRangeSchema } from "../schemas/date-range";
 
 export const submitLeave = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -58,6 +59,27 @@ export const decideLeave = createServerFn({ method: "POST" })
     }).eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
+  });
+
+export const listLeavesRange = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) =>
+    dateRangeSchema({ maxDays: 366 })
+      .and(z.object({ employeeIds: z.array(z.string().uuid()).optional() }))
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    let q = context.supabase
+      .from("leaves")
+      .select("*")
+      .lte("start_date", data.to)
+      .gte("end_date", data.from)
+      .order("start_date", { ascending: false })
+      .limit(2000);
+    if (data.employeeIds?.length) q = q.in("employee_id", data.employeeIds);
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+    return rows ?? [];
   });
 
 export const listMyLeaves = createServerFn({ method: "GET" })
