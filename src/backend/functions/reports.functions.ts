@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { checkDateRange } from "../schemas/date-range";
 import { requireAdminAccess } from "@/integrations/supabase/admin-auth-middleware";
 
 export const getAdminReportsData = createServerFn({ method: "POST" })
@@ -10,6 +11,12 @@ export const getAdminReportsData = createServerFn({ method: "POST" })
         range: z.string(),
         branch: z.string(),
         expiryDays: z.number().int().min(1).max(365).optional(),
+        from: z.string().optional().nullable(),
+        to: z.string().optional().nullable(),
+      })
+      .superRefine((v, ctx) => {
+        const message = checkDateRange(v.from, v.to, { maxDays: 366, optional: true });
+        if (message) ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: ["to"] });
       })
       .parse(input)
   )

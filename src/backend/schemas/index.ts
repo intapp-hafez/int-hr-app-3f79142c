@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { withDateRange, isoDateSchema } from "./date-range";
+export * from "./date-range";
 
 export const SmtpConfigSchema = z.object({
   host: z.string().min(1).max(255),
@@ -106,11 +108,11 @@ export const AttendanceCheckSchema = z.object({
 });
 
 // ── Leaves ────────────────────────────────────────────────
-export const LeaveSubmitSchema = z.object({
+const LeaveSubmitBase = z.object({
   leave_type_id: z.string().uuid().optional().nullable(),
   leave_type_name: z.string().max(120).optional().nullable(),
-  start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  start_date: isoDateSchema("Start"),
+  end_date: isoDateSchema("End"),
   days: z.number().int().min(1).max(365),
   paid: z.boolean().default(true),
   reason: z.string().max(1000).optional(),
@@ -118,6 +120,12 @@ export const LeaveSubmitSchema = z.object({
   proof_mime: z.string().max(64).optional().nullable(),
   proof_name: z.string().max(255).optional().nullable(),
 });
+
+export const LeaveSubmitSchema = withDateRange(
+  LeaveSubmitBase,
+  (v) => ({ from: v.start_date, to: v.end_date }),
+  { label: { from: "Start", to: "End" }, maxDays: 365 },
+);
 export const LeaveDecideSchema = z.object({
   id: z.string().uuid(),
   status: z.enum(["approved", "rejected", "cancelled"]),

@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireAdminAccess } from "@/integrations/supabase/admin-auth-middleware";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { dateRangeSchema, isoDateSchema } from "../schemas/date-range";
 
 async function assertAdmin(context: { supabase: any; userId: string }) {
   const { data, error } = await context.supabase.rpc("has_role", {
@@ -15,7 +16,7 @@ async function assertAdmin(context: { supabase: any; userId: string }) {
 export const HolidayInputSchema = z.object({
   id: z.string().uuid().optional(),
   name: z.string().trim().min(1).max(255),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
+  date: isoDateSchema("Holiday"),
   type: z.enum(["public", "company", "weekend"]),
   country: z.string().trim().max(80).optional().nullable(),
   recurring: z.boolean().optional(),
@@ -43,6 +44,23 @@ export const listHolidays = createServerFn({ method: "GET" })
       .limit(500);
     if (error) throw new Error(error.message);
     return (data ?? []) as HolidayRow[];
+  });
+
+export const HolidayRangeSchema = dateRangeSchema({ maxDays: 732 });
+
+export const listHolidaysRange = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => HolidayRangeSchema.parse(i))
+  .handler(async ({ data, context }): Promise<HolidayRow[]> => {
+    const { data: rows, error } = await context.supabase
+      .from("holidays")
+      .select("id, name, date, type, country, recurring, notes")
+      .gte("date", data.from)
+      .lte("date", data.to)
+      .order("date", { ascending: true })
+      .limit(1000);
+    if (error) throw new Error(error.message);
+    return (rows ?? []) as HolidayRow[];
   });
 
 export type HolidayConflict = {
@@ -113,7 +131,7 @@ export const checkHolidayConflicts = createServerFn({ method: "POST" })
   .middleware([requireAdminAccess])
   .inputValidator((i) =>
     z.object({
-      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      date: isoDateSchema("Holiday"),
       excludeId: z.string().uuid().optional().nullable(),
     }).parse(i),
   )
