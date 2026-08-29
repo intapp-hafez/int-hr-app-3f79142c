@@ -607,3 +607,74 @@ export const listEmployeesForAttendance = createServerFn({ method: "GET" })
       name: (r.full_name ?? r.email ?? r.id) as string,
     }));
   });
+
+export type CheckValidationRow = {
+  id: string;
+  date: string;
+  in_time: string | null;
+  out_time: string | null;
+  free_check: boolean;
+  in_geofence: { ok: boolean; name: string | null; distance_m: number | null; allowed_m: number | null } | null;
+  out_geofence: { ok: boolean; name: string | null; distance_m: number | null; allowed_m: number | null } | null;
+  network_ok: boolean | null;
+  in_place: string | null;
+  out_place: string | null;
+};
+
+/**
+ * Per-employee geofence + network validation history for recent check-ins and
+ * check-outs, recomputed against the employee's current assignments.
+ */
+export const listMyCheckValidations = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => parseInput(z.object({ limit: z.number().int().min(1).max(90).optional() }), i ?? {}))
+  .handler(async ({ data, context }): Promise<CheckValidationRow[]> => {
+    const { supabase, userId } = context;
+    const limit = data.limit ?? 30;
+
+    const [{ data: rows, error }, { data: assigns }] = await Promise.all([
+      supabase
+        .from("attendance")
+        .select("id, date, in_time, out_time, lat, lng, out_lat, out_lng, network_ok, free_check, city, district, street, out_city, out_district, out_street")
+        .eq("employee_id", userId)
+        .order("date", { ascending: false })
+        .limit(limit),
+      supabase
+        .from("geofence_assignments")
+        .select("geofence_locations(id, name, lat, lng, radius_m, active)")
+        .eq("profile_id", userId) as any,
+    ]);
+    if (error) throw new Error(error.message);
+
+    const locs = ((assigns ?? []) as any[])
+      .map((a) => a.geofence_locations)
+      .filter((l: any) => l && l.active);
+
+    const evaluate = (lat: number | null, lng: number | null) => {
+      if (locs.length === 0 || lat == null || lng == null) return null;
+      let best: { ok: boolean; name: string | null; distance_m: number; allowed_m: number } | null = null;
+      for (const l of locs as any[]) {
+        const d = distMeters(Number(lat), Number(lng), Number(l.lat), Number(l.lng));
+        const r = Number(l.radius_m ?? 100);
+        if (!best || d < best.distance_m) {
+          best = { ok: d <= r, name: l.name ?? null, distance_m: Math.round(d), allowed_m: r };
+        }
+      }
+      return best;
+    };
+    const place = (city: any, district: any, street: any) =>
+      [street, district, city].filter(Boolean).join(", ") || null;
+
+    return (rows ?? []).map((r: any) => ({
+      id: r.id,
+      date: r.date,
+      in_time: r.in_time ?? null,
+      out_time: r.out_time ?? null,
+      free_check: !!r.free_check,
+      in_geofence: evaluate(r.lat, r.lng),
+      out_geofence: evaluate(r.out_lat, r.out_lng),
+      network_ok: r.network_ok ?? null,
+      in_place: place(r.city, r.district, r.street),
+      out_place: place(r.out_city, r.out_district, r.out_street),
+    }));
+  });
