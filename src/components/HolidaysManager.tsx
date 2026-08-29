@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { DateInput } from "@/components/ui/date-input";
+import { toastValidationError, fieldError } from "@/lib/validation-error";
 import { formatDate } from "@/lib/date-format";
 
 type FormState = {
@@ -129,7 +130,14 @@ export function HolidaysManager() {
       setOpen(false);
       setConflicts(null);
     },
-    onError: (e: any) => toast.error(e?.message ?? "Failed"),
+    onError: (e: any) => {
+      const parsed = toastValidationError(e, "Failed");
+      setErrors((prev) => ({
+        ...prev,
+        ...(fieldError(parsed, "date") ? { date: fieldError(parsed, "date")! } : {}),
+        ...(fieldError(parsed, "name") ? { name: fieldError(parsed, "name")! } : {}),
+      }));
+    },
   });
 
   const deleteMut = useMutation({
@@ -140,7 +148,7 @@ export function HolidaysManager() {
       qc.invalidateQueries({ queryKey: ["admin-dashboard"] });
       setDeleteId(null);
     },
-    onError: (e: any) => toast.error(e?.message ?? "Failed"),
+    onError: (e: any) => toastValidationError(e, "Failed"),
   });
 
   function openCreate() {

@@ -6,6 +6,7 @@ import { formatDate } from "@/lib/date-format";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { submitLeave, listMyLeaves, cancelLeave, listActiveLeaveTypes } from "@/backend/functions/leaves.functions";
+import { parseValidationError, fieldError, toastValidationError } from "@/lib/validation-error";
 
 const statusTone: Record<string, string> = {
   approved: "bg-success/15 text-success",
@@ -29,7 +30,7 @@ export function LeavesPage() {
   const cancelMut = useMutation({
     mutationFn: (id: string) => cancelFn({ data: { id } }),
     onSuccess: () => { toast.success("Leave cancelled"); qc.invalidateQueries({ queryKey: ["my-leaves"] }); },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => { toastValidationError(e, "Failed"); },
   });
 
   const counts = myLeaves.reduce(
@@ -168,7 +169,12 @@ function LeaveModal({ onClose }: { onClose: () => void }) {
       toast.success(t("leaveSubmitted"), { description: `${type}: ${start} → ${end}. ${t("awaitingReview")}` });
       onClose();
     } catch (e: any) {
-      setErr(e?.message ?? "Failed to submit");
+      const parsed = parseValidationError(e, "Failed to submit");
+      setErr(
+        fieldError(parsed, "from", "start_date") ??
+          fieldError(parsed, "to", "end_date") ??
+          parsed.message,
+      );
     } finally {
       setBusy(false);
     }
