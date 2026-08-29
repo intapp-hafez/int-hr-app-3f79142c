@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireAdminAccess } from "@/integrations/supabase/admin-auth-middleware";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { dateRangeSchema, isoDateSchema } from "../schemas/date-range";
+import { parseInput } from "../schemas/validation-error";
 
 async function assertAdmin(context: { supabase: any; userId: string }) {
   const { data, error } = await context.supabase.rpc("has_role", {
@@ -50,7 +51,7 @@ export const HolidayRangeSchema = dateRangeSchema({ maxDays: 732 });
 
 export const listHolidaysRange = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) => HolidayRangeSchema.parse(i))
+  .inputValidator((i) => parseInput(HolidayRangeSchema, i))
   .handler(async ({ data, context }): Promise<HolidayRow[]> => {
     const { data: rows, error } = await context.supabase
       .from("holidays")
@@ -74,7 +75,7 @@ export type HolidayConflict = {
 
 export const upsertHoliday = createServerFn({ method: "POST" })
   .middleware([requireAdminAccess])
-  .inputValidator((i) => HolidayInputSchema.parse(i))
+  .inputValidator((i) => parseInput(HolidayInputSchema, i))
   .handler(async ({ data, context }): Promise<{ id: string; conflicts: HolidayConflict[] }> => {
     await assertAdmin(context);
     const { supabase, userId } = context;
@@ -130,10 +131,13 @@ export const deleteHoliday = createServerFn({ method: "POST" })
 export const checkHolidayConflicts = createServerFn({ method: "POST" })
   .middleware([requireAdminAccess])
   .inputValidator((i) =>
-    z.object({
+    parseInput(
+      z.object({
       date: isoDateSchema("Holiday"),
       excludeId: z.string().uuid().optional().nullable(),
-    }).parse(i),
+    }),
+    i,
+  ),
   )
   .handler(async ({ data, context }): Promise<{ conflicts: HolidayConflict[]; duplicate: { id: string; name: string } | null }> => {
     await assertAdmin(context);

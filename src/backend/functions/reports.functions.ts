@@ -1,12 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { checkDateRange } from "../schemas/date-range";
+import { parseInput } from "../schemas/validation-error";
 import { requireAdminAccess } from "@/integrations/supabase/admin-auth-middleware";
 
 export const getAdminReportsData = createServerFn({ method: "POST" })
   .middleware([requireAdminAccess])
   .inputValidator((input) =>
-    z
+    parseInput(
+      z
       .object({
         range: z.string(),
         branch: z.string(),
@@ -17,8 +19,9 @@ export const getAdminReportsData = createServerFn({ method: "POST" })
       .superRefine((v, ctx) => {
         const message = checkDateRange(v.from, v.to, { maxDays: 366, optional: true });
         if (message) ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: ["to"] });
-      })
-      .parse(input)
+      }),
+      input,
+    )
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;

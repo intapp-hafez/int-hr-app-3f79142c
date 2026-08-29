@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { dateRangeSchema } from "../schemas/date-range";
+import { parseInput } from "../schemas/validation-error";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { AttendanceCheckSchema, AdminAttendanceSchema } from "../schemas";
 import { isoWeekday } from "@/lib/date-format";
@@ -374,9 +375,12 @@ export const listMyAttendance = createServerFn({ method: "GET" })
 export const listAttendanceRange = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) =>
-    dateRangeSchema({ maxDays: 366 })
-      .and(z.object({ employeeIds: z.array(z.string().uuid()).optional() }))
-      .parse(i),
+    parseInput(
+      dateRangeSchema({ maxDays: 366 }).and(
+        z.object({ employeeIds: z.array(z.string().uuid()).optional() }),
+      ),
+      i,
+    ),
   )
   .handler(async ({ data, context }) => {
     let q = context.supabase.from("attendance").select("*")
@@ -459,9 +463,12 @@ export const adminReverseGeocode = createServerFn({ method: "POST" })
 export const adminListAttendance = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) =>
-    dateRangeSchema({ maxDays: 366 })
-      .and(z.object({ employeeIds: z.array(z.string().uuid()).optional() }))
-      .parse(i),
+    parseInput(
+      dateRangeSchema({ maxDays: 366 }).and(
+        z.object({ employeeIds: z.array(z.string().uuid()).optional() }),
+      ),
+      i,
+    ),
   )
   .handler(async ({ data, context }) => {
     await assertAdminOrHr(context.supabase, context.userId);

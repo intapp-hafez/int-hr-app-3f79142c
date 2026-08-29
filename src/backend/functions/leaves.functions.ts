@@ -3,10 +3,15 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { LeaveSubmitSchema, LeaveDecideSchema } from "../schemas";
 import { dateRangeSchema } from "../schemas/date-range";
+import { parseInput } from "../schemas/validation-error";
 
 export const submitLeave = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) => LeaveSubmitSchema.parse(i))
+  .inputValidator((i) =>
+    parseInput(LeaveSubmitSchema, i, {
+      fieldAliases: { start_date: "from", end_date: "to" },
+    }),
+  )
   .handler(async ({ data, context }) => {
     // Resolve requires_proof from the admin-managed leave type when possible.
     let requiresProof = false;
@@ -64,9 +69,12 @@ export const decideLeave = createServerFn({ method: "POST" })
 export const listLeavesRange = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) =>
-    dateRangeSchema({ maxDays: 366 })
-      .and(z.object({ employeeIds: z.array(z.string().uuid()).optional() }))
-      .parse(i),
+    parseInput(
+      dateRangeSchema({ maxDays: 366 }).and(
+        z.object({ employeeIds: z.array(z.string().uuid()).optional() }),
+      ),
+      i,
+    ),
   )
   .handler(async ({ data, context }) => {
     let q = context.supabase
