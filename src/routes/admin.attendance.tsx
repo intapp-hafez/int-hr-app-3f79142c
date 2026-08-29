@@ -6,6 +6,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
 import { DateInput } from "@/components/ui/date-input";
+import { toastValidationError } from "@/lib/validation-error";
 import { formatDate } from "@/lib/date-format";
 import { useStore } from "@/lib/store";
 import {
@@ -367,7 +368,7 @@ function AdminAttendance() {
       qc.invalidateQueries({ queryKey: ["admin", "attendance"] });
       setOpen(false);
     },
-    onError: (e: any) => toast.error(e?.message ?? "Failed"),
+    onError: (e: any) => { toastValidationError(e, "Failed"); },
   });
   const deleteM = useMutation({
     mutationFn: (id: string) => delFn({ data: { id } }),
@@ -376,7 +377,7 @@ function AdminAttendance() {
       qc.invalidateQueries({ queryKey: ["admin", "attendance"] });
       setDelId(null);
     },
-    onError: (e: any) => toast.error(e?.message ?? "Failed"),
+    onError: (e: any) => { toastValidationError(e, "Failed"); },
   });
 
   function openAdd() { setForm(blankForm()); setErrs({}); setOpen(true); }
