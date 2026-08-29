@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireAdminAccess } from "@/integrations/supabase/admin-auth-middleware";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { dateRangeSchema, isoDateSchema } from "../schemas/date-range";
+import { parseInput } from "../schemas/validation-error";
 
 async function assertAdmin(context: { supabase: any; userId: string }) {
   const { data, error } = await context.supabase.rpc("has_role", {
@@ -50,7 +51,7 @@ export const HolidayRangeSchema = dateRangeSchema({ maxDays: 732 });
 
 export const listHolidaysRange = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) => HolidayRangeSchema.parse(i))
+  .inputValidator((i) => parseInput(HolidayRangeSchema, i))
   .handler(async ({ data, context }): Promise<HolidayRow[]> => {
     const { data: rows, error } = await context.supabase
       .from("holidays")
@@ -74,7 +75,7 @@ export type HolidayConflict = {
 
 export const upsertHoliday = createServerFn({ method: "POST" })
   .middleware([requireAdminAccess])
-  .inputValidator((i) => HolidayInputSchema.parse(i))
+  .inputValidator((i) => parseInput(HolidayInputSchema, i))
   .handler(async ({ data, context }): Promise<{ id: string; conflicts: HolidayConflict[] }> => {
     await assertAdmin(context);
     const { supabase, userId } = context;
@@ -94,7 +95,8 @@ export const upsertHoliday = createServerFn({ method: "POST" })
       const { data: row, error } = await supabase
         .from("holidays")
         .insert({ ...payload, created_by: userId })
-        .select("id").single();
+        .select("id")
+        .single();
       if (error) throw new Error(error.message);
       id = row.id as string;
     }
@@ -130,34 +132,47 @@ export const deleteHoliday = createServerFn({ method: "POST" })
 export const checkHolidayConflicts = createServerFn({ method: "POST" })
   .middleware([requireAdminAccess])
   .inputValidator((i) =>
-    z.object({
-      date: isoDateSchema("Holiday"),
-      excludeId: z.string().uuid().optional().nullable(),
-    }).parse(i),
+    parseInput(
+      z.object({
+        date: isoDateSchema("Holiday"),
+        excludeId: z.string().uuid().optional().nullable(),
+      }),
+      i,
+    ),
   )
-  .handler(async ({ data, context }): Promise<{ conflicts: HolidayConflict[]; duplicate: { id: string; name: string } | null }> => {
-    await assertAdmin(context);
-    const { supabase } = context;
-    const [lvRes, dupRes] = await Promise.all([
-      supabase
-        .from("leaves")
-        .select("id, leave_type_name, start_date, end_date, status, profiles:employee_id(full_name)")
-        .lte("start_date", data.date)
-        .gte("end_date", data.date)
-        .in("status", ["pending", "approved"])
-        .limit(50),
-      supabase.from("holidays").select("id, name").eq("date", data.date).limit(2),
-    ]);
-    if (lvRes.error) throw new Error(lvRes.error.message);
-    if (dupRes.error) throw new Error(dupRes.error.message);
-    const conflicts: HolidayConflict[] = (lvRes.data ?? []).map((r: any) => ({
-      leave_id: r.id,
-      employee_name: r.profiles?.full_name ?? "—",
-      leave_type: r.leave_type_name ?? null,
-      start_date: r.start_date,
-      end_date: r.end_date,
-      status: r.status,
-    }));
-    const dup = (dupRes.data ?? []).find((h: any) => h.id !== data.excludeId) ?? null;
-    return { conflicts, duplicate: dup ? { id: dup.id, name: dup.name } : null };
-  });
+  .handler(
+    async ({
+      data,
+      context,
+    }): Promise<{
+      conflicts: HolidayConflict[];
+      duplicate: { id: string; name: string } | null;
+    }> => {
+      await assertAdmin(context);
+      const { supabase } = context;
+      const [lvRes, dupRes] = await Promise.all([
+        supabase
+          .from("leaves")
+          .select(
+            "id, leave_type_name, start_date, end_date, status, profiles:employee_id(full_name)",
+          )
+          .lte("start_date", data.date)
+          .gte("end_date", data.date)
+          .in("status", ["pending", "approved"])
+          .limit(50),
+        supabase.from("holidays").select("id, name").eq("date", data.date).limit(2),
+      ]);
+      if (lvRes.error) throw new Error(lvRes.error.message);
+      if (dupRes.error) throw new Error(dupRes.error.message);
+      const conflicts: HolidayConflict[] = (lvRes.data ?? []).map((r: any) => ({
+        leave_id: r.id,
+        employee_name: r.profiles?.full_name ?? "—",
+        leave_type: r.leave_type_name ?? null,
+        start_date: r.start_date,
+        end_date: r.end_date,
+        status: r.status,
+      }));
+      const dup = (dupRes.data ?? []).find((h: any) => h.id !== data.excludeId) ?? null;
+      return { conflicts, duplicate: dup ? { id: dup.id, name: dup.name } : null };
+    },
+  );

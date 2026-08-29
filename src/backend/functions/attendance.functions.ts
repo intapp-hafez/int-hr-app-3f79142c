@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { dateRangeSchema } from "../schemas/date-range";
+import { parseInput } from "../schemas/validation-error";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { AttendanceCheckSchema, AdminAttendanceSchema } from "../schemas";
 import { isoWeekday } from "@/lib/date-format";
@@ -50,16 +51,23 @@ export const checkIn = createServerFn({ method: "POST" })
 
     if (!data.device_id) {
       return {
-        ok: false as const, blocked: true as const,
+        ok: false as const,
+        blocked: true as const,
         code: "device_unauthorized" as const,
         params: {} as Record<string, any>,
         reason: "Check-in blocked · device not recognized. Please register it in your profile.",
       };
     }
-    const { data: dev } = await supabase.from("employee_devices").select("status").eq("id", data.device_id).eq("user_id", userId).maybeSingle();
+    const { data: dev } = await supabase
+      .from("employee_devices")
+      .select("status")
+      .eq("id", data.device_id)
+      .eq("user_id", userId)
+      .maybeSingle();
     if (!dev || dev.status !== "approved") {
       return {
-        ok: false as const, blocked: true as const,
+        ok: false as const,
+        blocked: true as const,
         code: "device_unauthorized" as const,
         params: {} as Record<string, any>,
         reason: "Check-in blocked · this device is not approved.",
@@ -67,7 +75,13 @@ export const checkIn = createServerFn({ method: "POST" })
     }
 
     // Resolve assigned geofences + per-employee authorized networks + branch-level networks
-    const [{ data: assigns }, { data: netAssigns }, { data: leaveRow }, { data: holidayRow }, { data: profileRow }] = await Promise.all([
+    const [
+      { data: assigns },
+      { data: netAssigns },
+      { data: leaveRow },
+      { data: holidayRow },
+      { data: profileRow },
+    ] = await Promise.all([
       supabase
         .from("geofence_assignments")
         .select("geofence_locations(id, name, lat, lng, radius_m, active)")
@@ -84,32 +98,23 @@ export const checkIn = createServerFn({ method: "POST" })
         .lte("start_date", today)
         .gte("end_date", today)
         .maybeSingle() as any,
-      supabase
-        .from("holidays")
-        .select("name, type")
-        .eq("date", today)
-        .maybeSingle() as any,
-      supabase
-        .from("profiles")
-        .select("approved_work_date")
-        .eq("id", userId)
-        .maybeSingle() as any,
+      supabase.from("holidays").select("name, type").eq("date", today).maybeSingle() as any,
+      supabase.from("profiles").select("approved_work_date").eq("id", userId).maybeSingle() as any,
     ]);
 
     const isApprovedToWork = profileRow?.approved_work_date === today;
 
     // 1. Approved leave
     if (leaveRow && !isApprovedToWork) {
-      const raw = (leaveRow.leave_type_name ?? '').trim();
+      const raw = (leaveRow.leave_type_name ?? "").trim();
       const hasName = !!raw;
-      const leaveName = raw
-        ? (/leave$/i.test(raw) ? raw : `${raw} leave`)
-        : 'a leave day';
-      const start = leaveRow.start_date ?? '';
-      const end = leaveRow.end_date ?? '';
+      const leaveName = raw ? (/leave$/i.test(raw) ? raw : `${raw} leave`) : "a leave day";
+      const start = leaveRow.start_date ?? "";
+      const end = leaveRow.end_date ?? "";
       const dateRange = start === end ? start : `${start} – ${end}`;
       return {
-        ok: false as const, blocked: true as const,
+        ok: false as const,
+        blocked: true as const,
         code: (hasName ? "leave" : "leave_noname") as "leave" | "leave_noname",
         params: { action: "check_in", name: leaveName, range: dateRange } as Record<string, any>,
         reason: `Check-in blocked · Today is ${leaveName} (${dateRange}).`,
@@ -118,7 +123,8 @@ export const checkIn = createServerFn({ method: "POST" })
     // 2. Holiday
     if (holidayRow && !isApprovedToWork) {
       return {
-        ok: false as const, blocked: true as const,
+        ok: false as const,
+        blocked: true as const,
         code: "holiday" as const,
         params: { action: "check_in", name: holidayRow.name } as Record<string, any>,
         reason: `Check-in blocked · today is a holiday (${holidayRow.name}).`,
@@ -127,7 +133,8 @@ export const checkIn = createServerFn({ method: "POST" })
     // 3. Weekend (Fri/Sat)
     if (isWeekend && !isApprovedToWork) {
       return {
-        ok: false as const, blocked: true as const,
+        ok: false as const,
+        blocked: true as const,
         code: "weekend" as const,
         params: { action: "check_in" } as Record<string, any>,
         reason: "Check-in blocked · today is a weekend (Friday / Saturday).",
@@ -152,8 +159,14 @@ export const checkIn = createServerFn({ method: "POST" })
       for (const l of locs as any[]) {
         const d = distMeters(data.lat!, data.lng!, Number(l.lat), Number(l.lng));
         const r = Number(l.radius_m ?? 100);
-        if (nearestDistance == null || d < nearestDistance) { nearestDistance = d; nearestRadius = r; }
-        if (d <= r) { withinGeofence = true; break; }
+        if (nearestDistance == null || d < nearestDistance) {
+          nearestDistance = d;
+          nearestRadius = r;
+        }
+        if (d <= r) {
+          withinGeofence = true;
+          break;
+        }
       }
     }
     const onAuthorizedNetwork =
@@ -167,41 +180,62 @@ export const checkIn = createServerFn({ method: "POST" })
           reasonCodes.push({ code: "gps_unavailable" });
           reasons.push("GPS location not available");
         } else if (nearestDistance != null) {
-          reasonCodes.push({ code: "gps_outside_fence", params: { dist: Math.round(nearestDistance), allowed: nearestRadius } });
-          reasons.push(`GPS outside assigned fence (${Math.round(nearestDistance)} m away, allowed ${nearestRadius} m)`);
+          reasonCodes.push({
+            code: "gps_outside_fence",
+            params: { dist: Math.round(nearestDistance), allowed: nearestRadius },
+          });
+          reasons.push(
+            `GPS outside assigned fence (${Math.round(nearestDistance)} m away, allowed ${nearestRadius} m)`,
+          );
         } else {
           reasonCodes.push({ code: "gps_outside_any" });
           reasons.push("GPS outside any assigned location");
         }
       }
       if (nets.length > 0) {
-        if (!data.ssid) { reasonCodes.push({ code: "ssid_undetected" }); reasons.push("network SSID not detected"); }
-        else { reasonCodes.push({ code: "ssid_not_authorized", params: { ssid: data.ssid } }); reasons.push(`network "${data.ssid}" is not authorized for you`); }
+        if (!data.ssid) {
+          reasonCodes.push({ code: "ssid_undetected" });
+          reasons.push("network SSID not detected");
+        } else {
+          reasonCodes.push({ code: "ssid_not_authorized", params: { ssid: data.ssid } });
+          reasons.push(`network "${data.ssid}" is not authorized for you`);
+        }
       }
       return {
-        ok: false as const, blocked: true as const,
+        ok: false as const,
+        blocked: true as const,
         code: "constraints" as const,
         params: { action: "check_in", reasons: reasonCodes } as Record<string, any>,
         reason: `Check-in blocked · ${reasons.join(" · ")}.`,
       };
     }
 
-    const { error } = await supabase.from("attendance").upsert({
-      employee_id: userId,
-      date: today,
-      in_time: now,
-      branch: data.branch,
-      lat: data.lat, lng: data.lng,
-      network_ok: data.network_ok,
-      note: data.note,
-      city: data.city ?? null,
-      district: data.district ?? null,
-      street: data.street ?? null,
-      free_check: freeCheck,
-      status: "present",
-    }, { onConflict: "employee_id,date" });
+    const { error } = await supabase.from("attendance").upsert(
+      {
+        employee_id: userId,
+        date: today,
+        in_time: now,
+        branch: data.branch,
+        lat: data.lat,
+        lng: data.lng,
+        network_ok: data.network_ok,
+        note: data.note,
+        city: data.city ?? null,
+        district: data.district ?? null,
+        street: data.street ?? null,
+        free_check: freeCheck,
+        status: "present",
+      },
+      { onConflict: "employee_id,date" },
+    );
     if (error) throw new Error(error.message);
-    return { ok: true as const, blocked: false as const, free_check: freeCheck, within_geofence: withinGeofence, network_match: onAuthorizedNetwork };
+    return {
+      ok: true as const,
+      blocked: false as const,
+      free_check: freeCheck,
+      within_geofence: withinGeofence,
+      network_match: onAuthorizedNetwork,
+    };
   });
 
 export const checkOut = createServerFn({ method: "POST" })
@@ -219,7 +253,8 @@ export const checkOut = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!row?.in_time) {
       return {
-        ok: false as const, blocked: true as const,
+        ok: false as const,
+        blocked: true as const,
         code: "check_out_not_in" as const,
         params: {} as Record<string, any>,
         reason: "Check-out blocked · you have not checked in today.",
@@ -227,7 +262,8 @@ export const checkOut = createServerFn({ method: "POST" })
     }
     if (row.out_time) {
       return {
-        ok: false as const, blocked: true as const,
+        ok: false as const,
+        blocked: true as const,
         code: "check_out_already" as const,
         params: {} as Record<string, any>,
         reason: "Check-out blocked · you have already checked out today.",
@@ -236,16 +272,23 @@ export const checkOut = createServerFn({ method: "POST" })
 
     if (!data.device_id) {
       return {
-        ok: false as const, blocked: true as const,
+        ok: false as const,
+        blocked: true as const,
         code: "device_unauthorized" as const,
         params: {} as Record<string, any>,
         reason: "Check-out blocked · device not recognized. Please register it in your profile.",
       };
     }
-    const { data: dev } = await supabase.from("employee_devices").select("status").eq("id", data.device_id).eq("user_id", userId).maybeSingle();
+    const { data: dev } = await supabase
+      .from("employee_devices")
+      .select("status")
+      .eq("id", data.device_id)
+      .eq("user_id", userId)
+      .maybeSingle();
     if (!dev || dev.status !== "approved") {
       return {
-        ok: false as const, blocked: true as const,
+        ok: false as const,
+        blocked: true as const,
         code: "device_unauthorized" as const,
         params: {} as Record<string, any>,
         reason: "Check-out blocked · this device is not approved.",
@@ -263,31 +306,22 @@ export const checkOut = createServerFn({ method: "POST" })
         .lte("start_date", today)
         .gte("end_date", today)
         .maybeSingle() as any,
-      supabase
-        .from("holidays")
-        .select("name, type")
-        .eq("date", today)
-        .maybeSingle() as any,
-      supabase
-        .from("profiles")
-        .select("approved_work_date")
-        .eq("id", userId)
-        .maybeSingle() as any,
+      supabase.from("holidays").select("name, type").eq("date", today).maybeSingle() as any,
+      supabase.from("profiles").select("approved_work_date").eq("id", userId).maybeSingle() as any,
     ]);
 
     const isApprovedToWork = profileRow?.approved_work_date === today;
 
     if (leaveRow && !isApprovedToWork) {
-      const raw = (leaveRow.leave_type_name ?? '').trim();
+      const raw = (leaveRow.leave_type_name ?? "").trim();
       const hasName = !!raw;
-      const leaveName = raw
-        ? (/leave$/i.test(raw) ? raw : `${raw} leave`)
-        : 'a leave day';
-      const start = leaveRow.start_date ?? '';
-      const end = leaveRow.end_date ?? '';
+      const leaveName = raw ? (/leave$/i.test(raw) ? raw : `${raw} leave`) : "a leave day";
+      const start = leaveRow.start_date ?? "";
+      const end = leaveRow.end_date ?? "";
       const dateRange = start === end ? start : `${start} – ${end}`;
       return {
-        ok: false as const, blocked: true as const,
+        ok: false as const,
+        blocked: true as const,
         code: (hasName ? "leave" : "leave_noname") as "leave" | "leave_noname",
         params: { action: "check_out", name: leaveName, range: dateRange } as Record<string, any>,
         reason: `Check-out blocked · Today is ${leaveName} (${dateRange}).`,
@@ -295,7 +329,8 @@ export const checkOut = createServerFn({ method: "POST" })
     }
     if (holidayRow && !isApprovedToWork) {
       return {
-        ok: false as const, blocked: true as const,
+        ok: false as const,
+        blocked: true as const,
         code: "holiday" as const,
         params: { action: "check_out", name: holidayRow.name } as Record<string, any>,
         reason: `Check-out blocked · today is a holiday (${holidayRow.name}).`,
@@ -303,14 +338,16 @@ export const checkOut = createServerFn({ method: "POST" })
     }
     if (isWeekend && !isApprovedToWork) {
       return {
-        ok: false as const, blocked: true as const,
+        ok: false as const,
+        blocked: true as const,
         code: "weekend" as const,
         params: { action: "check_out" } as Record<string, any>,
         reason: "Check-out blocked · today is a weekend (Friday / Saturday).",
       };
     }
 
-    const { error } = await supabase.from("attendance")
+    const { error } = await supabase
+      .from("attendance")
       .update({
         out_time: now,
         note: data.note,
@@ -320,7 +357,8 @@ export const checkOut = createServerFn({ method: "POST" })
         out_district: data.district ?? null,
         out_street: data.street ?? null,
       })
-      .eq("employee_id", userId).eq("date", today);
+      .eq("employee_id", userId)
+      .eq("date", today);
     if (error) throw new Error(error.message);
     return { ok: true as const, blocked: false as const };
   });
@@ -365,8 +403,11 @@ export const listMyAttendance = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
-      .from("attendance").select("*").eq("employee_id", context.userId)
-      .order("date", { ascending: false }).limit(120);
+      .from("attendance")
+      .select("*")
+      .eq("employee_id", context.userId)
+      .order("date", { ascending: false })
+      .limit(120);
     if (error) throw new Error(error.message);
     return data ?? [];
   });
@@ -374,14 +415,21 @@ export const listMyAttendance = createServerFn({ method: "GET" })
 export const listAttendanceRange = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) =>
-    dateRangeSchema({ maxDays: 366 })
-      .and(z.object({ employeeIds: z.array(z.string().uuid()).optional() }))
-      .parse(i),
+    parseInput(
+      dateRangeSchema({ maxDays: 366 }).and(
+        z.object({ employeeIds: z.array(z.string().uuid()).optional() }),
+      ),
+      i,
+    ),
   )
   .handler(async ({ data, context }) => {
-    let q = context.supabase.from("attendance").select("*")
-      .gte("date", data.from).lte("date", data.to)
-      .order("date", { ascending: false }).limit(5000);
+    let q = context.supabase
+      .from("attendance")
+      .select("*")
+      .gte("date", data.from)
+      .lte("date", data.to)
+      .order("date", { ascending: false })
+      .limit(5000);
     if (data.employeeIds?.length) q = q.in("employee_id", data.employeeIds);
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
@@ -417,7 +465,9 @@ function dedupeLocationParts(parts: Array<string | null | undefined>) {
 
 export const adminReverseGeocode = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) => z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }).parse(i))
+  .inputValidator((i) =>
+    z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }).parse(i),
+  )
   .handler(async ({ data, context }) => {
     await assertAdminOrHr(context.supabase, context.userId);
     try {
@@ -445,7 +495,8 @@ export const adminReverseGeocode = createServerFn({ method: "POST" })
         const j: any = await r.json();
         const address = j.address ?? {};
         const road = [address.house_number, address.road].filter(Boolean).join(" ");
-        const locality = address.suburb || address.neighbourhood || address.city_district || address.town || "";
+        const locality =
+          address.suburb || address.neighbourhood || address.city_district || address.town || "";
         const city = address.city || address.state || address.county || "";
         const label = dedupeLocationParts([road, locality, city]);
         if (label) return label;
@@ -459,16 +510,24 @@ export const adminReverseGeocode = createServerFn({ method: "POST" })
 export const adminListAttendance = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) =>
-    dateRangeSchema({ maxDays: 366 })
-      .and(z.object({ employeeIds: z.array(z.string().uuid()).optional() }))
-      .parse(i),
+    parseInput(
+      dateRangeSchema({ maxDays: 366 }).and(
+        z.object({ employeeIds: z.array(z.string().uuid()).optional() }),
+      ),
+      i,
+    ),
   )
   .handler(async ({ data, context }) => {
     await assertAdminOrHr(context.supabase, context.userId);
-    let q = context.supabase.from("attendance")
-      .select("id, employee_id, date, in_time, out_time, branch, status, note, city, district, street, free_check, lat, lng, out_lat, out_lng, out_city, out_district, out_street, profiles:employee_id(full_name, email)")
-      .gte("date", data.from).lte("date", data.to)
-      .order("date", { ascending: false }).limit(5000);
+    let q = context.supabase
+      .from("attendance")
+      .select(
+        "id, employee_id, date, in_time, out_time, branch, status, note, city, district, street, free_check, lat, lng, out_lat, out_lng, out_city, out_district, out_street, profiles:employee_id(full_name, email)",
+      )
+      .gte("date", data.from)
+      .lte("date", data.to)
+      .order("date", { ascending: false })
+      .limit(5000);
     if (data.employeeIds?.length) q = q.in("employee_id", data.employeeIds);
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
@@ -518,7 +577,8 @@ export const adminUpsertAttendance = createServerFn({ method: "POST" })
     const { data: row, error } = await context.supabase
       .from("attendance")
       .upsert(payload, { onConflict: "employee_id,date" })
-      .select("id").single();
+      .select("id")
+      .single();
     if (error) throw new Error(error.message);
     return { id: row.id as string };
   });
@@ -537,8 +597,13 @@ export const listEmployeesForAttendance = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
-      .from("profiles").select("id, full_name, email")
-      .order("full_name", { ascending: true }).limit(1000);
+      .from("profiles")
+      .select("id, full_name, email")
+      .order("full_name", { ascending: true })
+      .limit(1000);
     if (error) throw new Error(error.message);
-    return (data ?? []).map((r: any) => ({ id: r.id as string, name: (r.full_name ?? r.email ?? r.id) as string }));
+    return (data ?? []).map((r: any) => ({
+      id: r.id as string,
+      name: (r.full_name ?? r.email ?? r.id) as string,
+    }));
   });

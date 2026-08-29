@@ -6,6 +6,8 @@ import {
   startEndRangeSchema,
 } from "./date-range";
 import { LeaveSubmitSchema } from "./index";
+import { parseInput } from "./validation-error";
+import { parseValidationError, fieldError } from "@/lib/validation-error";
 
 const parseErr = (schema: any, input: unknown): string => {
   const res = schema.safeParse(input);
@@ -130,5 +132,45 @@ describe("LeaveSubmitSchema", () => {
     expect(
       parseErr(LeaveSubmitSchema, { ...base, start_date: "2026-02-30", end_date: "2026-03-02" }),
     ).toContain("Start must be a valid date (dd-mm-yyyy).");
+  });
+});
+
+describe("unified validation payload", () => {
+  const rangeSchema = dateRangeSchema({ maxDays: 366 });
+
+  function capture(fn: () => unknown) {
+    try {
+      fn();
+      return null;
+    } catch (e) {
+      return parseValidationError(e);
+    }
+  }
+
+  it("tags the payload and maps messages to fields", () => {
+    const parsed = capture(() => parseInput(rangeSchema, { from: "2026-05-01", to: "2026-04-01" }))!;
+    expect(parsed.structured).toBe(true);
+    expect(parsed.message).toMatch(/\d{2}-\d{2}-\d{4}/);
+    expect(fieldError(parsed, "to")).toBeTruthy();
+  });
+
+  it("reports missing dates per field", () => {
+    const parsed = capture(() => parseInput(rangeSchema, {}))!;
+    expect(parsed.structured).toBe(true);
+    expect(Object.keys(parsed.fieldErrors).sort()).toEqual(["from", "to"]);
+  });
+
+  it("rejects malformed dates with dd-mm-yyyy guidance", () => {
+    const parsed = capture(() => parseInput(rangeSchema, { from: "01-05-2026", to: "2026-05-02" }))!;
+    expect(fieldError(parsed, "from")).toMatch(/dd-mm-yyyy/i);
+  });
+
+  it("applies field aliases", () => {
+    const parsed = capture(() =>
+      parseInput(startEndRangeSchema(), { start_date: "2026-05-10", end_date: "2026-05-01" }, {
+        fieldAliases: { start_date: "from", end_date: "to" },
+      }),
+    )!;
+    expect(fieldError(parsed, "to", "end_date")).toBeTruthy();
   });
 });

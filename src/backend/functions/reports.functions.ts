@@ -1,24 +1,27 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { checkDateRange } from "../schemas/date-range";
+import { parseInput } from "../schemas/validation-error";
 import { requireAdminAccess } from "@/integrations/supabase/admin-auth-middleware";
 
 export const getAdminReportsData = createServerFn({ method: "POST" })
   .middleware([requireAdminAccess])
   .inputValidator((input) =>
-    z
-      .object({
-        range: z.string(),
-        branch: z.string(),
-        expiryDays: z.number().int().min(1).max(365).optional(),
-        from: z.string().optional().nullable(),
-        to: z.string().optional().nullable(),
-      })
-      .superRefine((v, ctx) => {
-        const message = checkDateRange(v.from, v.to, { maxDays: 366, optional: true });
-        if (message) ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: ["to"] });
-      })
-      .parse(input)
+    parseInput(
+      z
+        .object({
+          range: z.string(),
+          branch: z.string(),
+          expiryDays: z.number().int().min(1).max(365).optional(),
+          from: z.string().optional().nullable(),
+          to: z.string().optional().nullable(),
+        })
+        .superRefine((v, ctx) => {
+          const message = checkDateRange(v.from, v.to, { maxDays: 366, optional: true });
+          if (message) ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: ["to"] });
+        }),
+      input,
+    ),
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
@@ -27,9 +30,9 @@ export const getAdminReportsData = createServerFn({ method: "POST" })
     let startDateStr = "";
     let endDateStr = "";
     let seed = 1;
-    
+
     const now = new Date();
-    
+
     if (data.range === "today") {
       startDateStr = now.toISOString().split("T")[0];
       endDateStr = startDateStr;
@@ -64,12 +67,12 @@ export const getAdminReportsData = createServerFn({ method: "POST" })
     let profilesQuery = supabase
       .from("profiles")
       .select("id, full_name, city, department_id, status");
-    
+
     if (data.branch !== "all") {
       profilesQuery = profilesQuery.eq("city", data.branch);
     }
     const { data: profiles } = await profilesQuery;
-    
+
     // Create lookup map for profiles
     const empMap = new Map(profiles?.map((p: any) => [p.id, p]));
 
@@ -83,7 +86,7 @@ export const getAdminReportsData = createServerFn({ method: "POST" })
       .select("id, employee_id, date, in_time, out_time, status, branch, note")
       .gte("date", startDateStr)
       .lte("date", endDateStr);
-    
+
     if (data.branch !== "all") {
       attQuery = attQuery.eq("branch", data.branch);
     }
@@ -104,29 +107,31 @@ export const getAdminReportsData = createServerFn({ method: "POST" })
 
     // Calculate basic stats
     const headcount = profiles?.length || 0;
-    
+
     // Calculate late & overtime
     let lateCount = 0;
     let totalOvertimeHrs = 0;
     let totalPresent = 0;
-    
+
     const lateList: any[] = [];
     const overtimeList: any[] = [];
-    
+
     attendance.forEach((a: any) => {
       if (a.status === "present") totalPresent++;
-      
+
       // Rough mock calculation for late (assuming shift starts at 09:00)
       if (a.in_time) {
         const inTimeStr = new Date(a.in_time).toTimeString().slice(0, 5);
         if (inTimeStr > "09:05") {
           lateCount++;
-          const minsLate = Math.floor((new Date(a.in_time).getTime() - new Date(a.date + "T09:00:00Z").getTime()) / 60000);
+          const minsLate = Math.floor(
+            (new Date(a.in_time).getTime() - new Date(a.date + "T09:00:00Z").getTime()) / 60000,
+          );
           lateList.push({
             employee: empMap.get(a.employee_id)?.full_name || a.employee_id,
             date: a.date,
             checkInTime: inTimeStr,
-            minutesLate: Math.max(1, minsLate)
+            minutesLate: Math.max(1, minsLate),
           });
         }
       }
@@ -134,20 +139,22 @@ export const getAdminReportsData = createServerFn({ method: "POST" })
       if (a.out_time) {
         const outTimeStr = new Date(a.out_time).toTimeString().slice(0, 5);
         if (outTimeStr > "17:30") {
-          const otHrs = Math.floor((new Date(a.out_time).getTime() - new Date(a.date + "T17:00:00Z").getTime()) / 3600000);
+          const otHrs = Math.floor(
+            (new Date(a.out_time).getTime() - new Date(a.date + "T17:00:00Z").getTime()) / 3600000,
+          );
           totalOvertimeHrs += otHrs;
           if (otHrs > 0) {
             overtimeList.push({
               employee: empMap.get(a.employee_id)?.full_name || a.employee_id,
               date: a.date,
-              hours: otHrs
+              hours: otHrs,
             });
           }
         }
       }
     });
 
-    const avgLate = totalPresent ? (lateCount / (seed)).toFixed(1) : "0.0";
+    const avgLate = totalPresent ? (lateCount / seed).toFixed(1) : "0.0";
     const attendanceRate = totalPresent ? Math.round((totalPresent / (headcount * seed)) * 100) : 0;
 
     // Process lists for tables
@@ -157,18 +164,19 @@ export const getAdminReportsData = createServerFn({ method: "POST" })
         employee: empMap.get(a.employee_id)?.full_name || a.employee_id,
         branch: a.branch || "-",
         date: a.date,
-        status: a.status
+        status: a.status,
       }));
 
     // Group by employee for monthly summary
     const empAttMap = new Map();
     attendance.forEach((a: any) => {
-      if (!empAttMap.has(a.employee_id)) empAttMap.set(a.employee_id, { present: 0, absent: 0, late: 0 });
+      if (!empAttMap.has(a.employee_id))
+        empAttMap.set(a.employee_id, { present: 0, absent: 0, late: 0 });
       const stats = empAttMap.get(a.employee_id);
       if (a.status === "present") stats.present++;
       else if (a.status === "absent") stats.absent++;
       // late is counted if in_time > 09:05
-      if (a.in_time && new Date(a.in_time).toTimeString().slice(0,5) > "09:05") stats.late++;
+      if (a.in_time && new Date(a.in_time).toTimeString().slice(0, 5) > "09:05") stats.late++;
     });
 
     const monthlyAttendance = Array.from(empAttMap.entries()).map(([empId, stats]) => {
@@ -178,7 +186,7 @@ export const getAdminReportsData = createServerFn({ method: "POST" })
         branch: p?.city || "-",
         daysPresent: stats.present,
         daysAbsent: stats.absent,
-        lateCount: stats.late
+        lateCount: stats.late,
       };
     });
 
@@ -187,7 +195,7 @@ export const getAdminReportsData = createServerFn({ method: "POST" })
       type: l.leave_type_name || "Leave",
       start: l.start_date,
       end: l.end_date,
-      status: l.status
+      status: l.status,
     }));
 
     const absenceReport = attendance
@@ -195,16 +203,21 @@ export const getAdminReportsData = createServerFn({ method: "POST" })
       .map((a: any) => ({
         employee: empMap.get(a.employee_id)?.full_name || a.employee_id,
         date: a.date,
-        reason: a.note || "No reason provided"
+        reason: a.note || "No reason provided",
       }));
 
     // Expiry reports — window configurable, independent of the selected range
     const todayD = new Date();
     const todayIso = todayD.toISOString().split("T")[0];
     const expiryWindowDays = data.expiryDays ?? 30;
-    const in30Iso = new Date(todayD.getTime() + expiryWindowDays * 86400000).toISOString().split("T")[0];
+    const in30Iso = new Date(todayD.getTime() + expiryWindowDays * 86400000)
+      .toISOString()
+      .split("T")[0];
     const daysLeft = (iso: string) =>
-      Math.ceil((new Date(iso + "T00:00:00Z").getTime() - new Date(todayIso + "T00:00:00Z").getTime()) / 86400000);
+      Math.ceil(
+        (new Date(iso + "T00:00:00Z").getTime() - new Date(todayIso + "T00:00:00Z").getTime()) /
+          86400000,
+      );
 
     let idExpQ = supabase
       .from("profiles")
@@ -230,7 +243,9 @@ export const getAdminReportsData = createServerFn({ method: "POST" })
 
     let ctrExpQ = supabase
       .from("profiles")
-      .select("id, full_name, emp_code, city, department_id, contract_type, contract_end_date, contract_cancelled, status")
+      .select(
+        "id, full_name, emp_code, city, department_id, contract_type, contract_end_date, contract_cancelled, status",
+      )
       .eq("status", "Active")
       .not("contract_end_date", "is", null)
       .gte("contract_end_date", todayIso)
@@ -253,7 +268,10 @@ export const getAdminReportsData = createServerFn({ method: "POST" })
       }));
 
     return {
-      employees: (profiles || []).map((p: any) => ({ ...p, dept: deptMap.get(p.department_id) || "Unknown" })),
+      employees: (profiles || []).map((p: any) => ({
+        ...p,
+        dept: deptMap.get(p.department_id) || "Unknown",
+      })),
       locations: cities?.map((c: any) => ({ id: c.id, name: c.name_en })) || [],
       attendance: attendance,
       leaves: leaves,
@@ -261,7 +279,7 @@ export const getAdminReportsData = createServerFn({ method: "POST" })
         attendanceRate: Math.min(100, attendanceRate),
         avgLate,
         totalOvertimeHrs,
-        headcount
+        headcount,
       },
       tables: {
         daily: dailyAttendance,
@@ -271,16 +289,14 @@ export const getAdminReportsData = createServerFn({ method: "POST" })
         leaves: leaveSummary,
         absence: absenceReport,
         idExpiry,
-        contractExpiry
-      }
+        contractExpiry,
+      },
     };
   });
 
 export const getMonthlyAdvances = createServerFn({ method: "POST" })
   .middleware([requireAdminAccess])
-  .inputValidator((input) =>
-    z.object({ month: z.string() }).parse(input)
-  )
+  .inputValidator((input) => z.object({ month: z.string() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
     const [year, mon] = data.month.split("-");
@@ -289,12 +305,16 @@ export const getMonthlyAdvances = createServerFn({ method: "POST" })
 
     const { data: advances } = await (supabase as any)
       .from("employee_advances")
-      .select("id, request_number, employee_id, requested_amount, approved_amount, status, created_at, currency, repayment_status")
+      .select(
+        "id, request_number, employee_id, requested_amount, approved_amount, status, created_at, currency, repayment_status",
+      )
       .gte("created_at", `${startDate}T00:00:00Z`)
       .lte("created_at", `${endDate}T23:59:59Z`)
       .order("created_at", { ascending: false });
 
-    const empIds = [...new Set((advances || []).map((a: any) => a.employee_id as string))] as string[];
+    const empIds = [
+      ...new Set((advances || []).map((a: any) => a.employee_id as string)),
+    ] as string[];
     const { data: profiles } = await supabase
       .from("profiles")
       .select("id, full_name")
@@ -314,4 +334,3 @@ export const getMonthlyAdvances = createServerFn({ method: "POST" })
       createdAt: a.created_at,
     }));
   });
-
