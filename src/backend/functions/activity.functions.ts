@@ -25,8 +25,13 @@ export const logTaskActivity = createServerFn({ method: "POST" })
       .maybeSingle();
     const { dispatchTaskNotification } = await import("../server/notification-dispatch.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const hrIds = (await supabaseAdmin.from("user_roles").select("user_id").eq("role", "hr")).data?.map((r) => r.user_id) ?? [];
-    const recipients = Array.from(new Set([...(prof?.manager_id ? [prof.manager_id] : []), ...hrIds]));
+    const hrIds =
+      (await supabaseAdmin.from("user_roles").select("user_id").eq("role", "hr")).data?.map(
+        (r) => r.user_id,
+      ) ?? [];
+    const recipients = Array.from(
+      new Set([...(prof?.manager_id ? [prof.manager_id] : []), ...hrIds]),
+    );
     if (recipients.length > 0) {
       // fire-and-forget; we already have the row written
       await dispatchTaskNotification({
@@ -35,7 +40,9 @@ export const logTaskActivity = createServerFn({ method: "POST" })
         kind: data.kind,
         taskName: data.task_name || "",
         occurredAt: row.occurred_at,
-        city: data.city, district: data.district, note: data.note,
+        city: data.city,
+        district: data.district,
+        note: data.note,
       });
     }
     return { id: row.id };

@@ -17,7 +17,10 @@ export const submitLeave = createServerFn({ method: "POST" })
     let requiresProof = false;
     if (data.leave_type_id) {
       const { data: lt } = await context.supabase
-        .from("leave_types").select("requires_proof, name").eq("id", data.leave_type_id).maybeSingle();
+        .from("leave_types")
+        .select("requires_proof, name")
+        .eq("id", data.leave_type_id)
+        .maybeSingle();
       requiresProof = !!lt?.requires_proof;
     }
     if (requiresProof && !data.proof_url) {
@@ -35,20 +38,24 @@ export const submitLeave = createServerFn({ method: "POST" })
         throw new Error("Proof file must be 1.5 MB or smaller.");
       }
     }
-    const { error, data: row } = await context.supabase.from("leaves").insert({
-      employee_id: context.userId,
-      leave_type_id: data.leave_type_id ?? null,
-      leave_type_name: data.leave_type_name ?? null,
-      start_date: data.start_date,
-      end_date: data.end_date,
-      days: data.days,
-      paid: data.paid,
-      reason: data.reason ?? null,
-      status: "pending",
-      proof_url: data.proof_url ?? null,
-      proof_mime: data.proof_mime ?? null,
-      proof_name: data.proof_name ?? null,
-    }).select("id").single();
+    const { error, data: row } = await context.supabase
+      .from("leaves")
+      .insert({
+        employee_id: context.userId,
+        leave_type_id: data.leave_type_id ?? null,
+        leave_type_name: data.leave_type_name ?? null,
+        start_date: data.start_date,
+        end_date: data.end_date,
+        days: data.days,
+        paid: data.paid,
+        reason: data.reason ?? null,
+        status: "pending",
+        proof_url: data.proof_url ?? null,
+        proof_mime: data.proof_mime ?? null,
+        proof_name: data.proof_name ?? null,
+      })
+      .select("id")
+      .single();
     if (error) throw new Error(error.message);
     return { id: row.id };
   });
@@ -57,11 +64,14 @@ export const decideLeave = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => LeaveDecideSchema.parse(i))
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.from("leaves").update({
-      status: data.status,
-      decided_by: context.userId,
-      decided_at: new Date().toISOString(),
-    }).eq("id", data.id);
+    const { error } = await context.supabase
+      .from("leaves")
+      .update({
+        status: data.status,
+        decided_by: context.userId,
+        decided_at: new Date().toISOString(),
+      })
+      .eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -93,9 +103,12 @@ export const listLeavesRange = createServerFn({ method: "POST" })
 export const listMyLeaves = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase.from("leaves")
-      .select("*").eq("employee_id", context.userId)
-      .order("created_at", { ascending: false }).limit(200);
+    const { data, error } = await context.supabase
+      .from("leaves")
+      .select("*")
+      .eq("employee_id", context.userId)
+      .order("created_at", { ascending: false })
+      .limit(200);
     if (error) throw new Error(error.message);
     return data ?? [];
   });
@@ -103,8 +116,11 @@ export const listMyLeaves = createServerFn({ method: "GET" })
 export const listAllLeaves = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase.from("leaves")
-      .select("*").order("created_at", { ascending: false }).limit(500);
+    const { data, error } = await context.supabase
+      .from("leaves")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(500);
     if (error) throw new Error(error.message);
     return data ?? [];
   });
@@ -129,7 +145,9 @@ export const listAllLeavesAdmin = createServerFn({ method: "GET" })
   .handler(async ({ context }): Promise<AdminLeaveRow[]> => {
     const { data, error } = await context.supabase
       .from("leaves")
-      .select("id, leave_type_name, start_date, end_date, days, paid, reason, status, proof_url, proof_mime, proof_name, profiles:employee_id(full_name)")
+      .select(
+        "id, leave_type_name, start_date, end_date, days, paid, reason, status, proof_url, proof_mime, proof_name, profiles:employee_id(full_name)",
+      )
       .order("created_at", { ascending: false })
       .limit(500);
     if (error) throw new Error(error.message);
@@ -153,7 +171,10 @@ export const cancelLeave = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => z.object({ id: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.from("leaves").update({ status: "cancelled" }).eq("id", data.id);
+    const { error } = await context.supabase
+      .from("leaves")
+      .update({ status: "cancelled" })
+      .eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -174,7 +195,9 @@ export const listActiveLeaveTypes = createServerFn({ method: "GET" })
 
 export const adminBulkLeaveDeduction = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) => z.object({ days: z.number().positive(), reason: z.string().optional() }).parse(i))
+  .inputValidator((i) =>
+    z.object({ days: z.number().positive(), reason: z.string().optional() }).parse(i),
+  )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
     // Fetch all profiles
@@ -183,8 +206,8 @@ export const adminBulkLeaveDeduction = createServerFn({ method: "POST" })
 
     // Fetch leave types
     const { data: types } = await supabase.from("leave_types").select("id, name");
-    const annual = types?.find(t => t.name === "Annual leaves");
-    const unpaid = types?.find(t => t.name === "Unpaid Leaves");
+    const annual = types?.find((t) => t.name === "Annual leaves");
+    const unpaid = types?.find((t) => t.name === "Unpaid Leaves");
 
     if (!annual || !unpaid) throw new Error("Annual leaves or Unpaid Leaves not found in DB.");
 
@@ -192,7 +215,7 @@ export const adminBulkLeaveDeduction = createServerFn({ method: "POST" })
     const now = new Date().toISOString();
     const today = now.slice(0, 10);
 
-    const inserts = profiles.map(p => {
+    const inserts = profiles.map((p) => {
       const isProbation = p.contract_type === "Probation3M";
       const targetType = isProbation ? unpaid : annual;
       count++;
@@ -207,7 +230,7 @@ export const adminBulkLeaveDeduction = createServerFn({ method: "POST" })
         reason: data.reason ?? "Bulk admin deduction",
         status: "approved",
         decided_by: context.userId,
-        decided_at: now
+        decided_at: now,
       };
     });
 
