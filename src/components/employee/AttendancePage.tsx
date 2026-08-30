@@ -6,6 +6,7 @@ import { useI18n } from "@/lib/i18n";
 import { formatDate } from "@/lib/date-format";
 import { listMyAttendance } from "@/backend/functions/attendance.functions";
 import { listMyLeaves } from "@/backend/functions/leaves.functions";
+import { ValidationHistoryPanel } from "./ValidationHistoryPanel";
 
 const statusStyle: Record<string, string> = {
   present: "bg-success/15 text-success",
