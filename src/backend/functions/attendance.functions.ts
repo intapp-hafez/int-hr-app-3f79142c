@@ -5,6 +5,7 @@ import { parseInput } from "../schemas/validation-error";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { AttendanceCheckSchema, AdminAttendanceSchema } from "../schemas";
 import { isoWeekday } from "@/lib/date-format";
+import { enforceAttendanceRateLimit } from "./attendance-rate-limit.server";
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -27,6 +28,16 @@ export const checkIn = createServerFn({ method: "POST" })
   .inputValidator((i) => AttendanceCheckSchema.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const rl = await enforceAttendanceRateLimit(supabase as any, userId, "check_in");
+    if (rl.limited) {
+      return {
+        ok: false as const,
+        blocked: true as const,
+        code: "rate_limited" as const,
+        params: { retryAfterSeconds: rl.retryAfterSeconds, max: rl.max, windowSeconds: rl.windowSeconds } as Record<string, any>,
+        reason: `Check-in blocked · too many attempts (${rl.max} per ${rl.windowSeconds}s). Try again in ${rl.retryAfterSeconds}s.`,
+      };
+    }
     const now = new Date().toISOString();
     const today = now.slice(0, 10);
     const dow = isoWeekday(today); // 0 Sun … 6 Sat, local-noon safe
@@ -243,6 +254,16 @@ export const checkOut = createServerFn({ method: "POST" })
   .inputValidator((i) => AttendanceCheckSchema.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const rl = await enforceAttendanceRateLimit(supabase as any, userId, "check_out");
+    if (rl.limited) {
+      return {
+        ok: false as const,
+        blocked: true as const,
+        code: "rate_limited" as const,
+        params: { retryAfterSeconds: rl.retryAfterSeconds, max: rl.max, windowSeconds: rl.windowSeconds } as Record<string, any>,
+        reason: `Check-out blocked · too many attempts (${rl.max} per ${rl.windowSeconds}s). Try again in ${rl.retryAfterSeconds}s.`,
+      };
+    }
     const now = new Date().toISOString();
     const today = now.slice(0, 10);
     const { data: row } = await supabase

@@ -63,6 +63,9 @@ type SettingsRow = {
   block_sql_keywords: boolean;
   sanitize_html_inputs: boolean;
   cdn_subresource_integrity: boolean;
+  attendance_rate_limit_enabled: boolean;
+  attendance_rate_limit_attempts: number;
+  attendance_rate_limit_window_seconds: number;
 };
 
 const DEFAULTS: SettingsRow = {
@@ -78,6 +81,9 @@ const DEFAULTS: SettingsRow = {
   block_sql_keywords: true,
   sanitize_html_inputs: true,
   cdn_subresource_integrity: false,
+  attendance_rate_limit_enabled: true,
+  attendance_rate_limit_attempts: 5,
+  attendance_rate_limit_window_seconds: 60,
 };
 
 const OWASP_2025 = [
@@ -291,7 +297,7 @@ export function SecurityPanel() {
 
   useEffect(() => {
     if (q.data) {
-      const d = q.data as SettingsRow;
+      const d = { ...DEFAULTS, ...(q.data as unknown as Partial<SettingsRow>) } as SettingsRow;
       setDraft(d);
       setIpText((d.ip_allowlist ?? []).join(", "));
     }
@@ -781,6 +787,40 @@ export function SecurityPanel() {
               className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring"
             />
           </Field>
+        </div>
+        <div className="space-y-3 rounded-xl border border-border bg-background/40 p-3">
+          <h5 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Attendance check-in / check-out rate limit
+          </h5>
+          <Toggle
+            label="Enable attendance rate limiting"
+            hint="Throttles repeated check-in / check-out attempts per employee."
+            checked={draft.attendance_rate_limit_enabled}
+            onChange={(v) => setDraft({ ...draft, attendance_rate_limit_enabled: v })}
+          />
+          <div className="grid gap-3 md:grid-cols-2">
+            <Field label="Max attempts (N)" hint="Attempts allowed per employee within the window (1–100).">
+              <input
+                type="number" min={1} max={100}
+                disabled={!draft.attendance_rate_limit_enabled}
+                value={draft.attendance_rate_limit_attempts}
+                onChange={(e) => setDraft({ ...draft, attendance_rate_limit_attempts: Number(e.target.value) })}
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring disabled:opacity-50"
+              />
+            </Field>
+            <Field label="Window size (seconds)" hint="Rolling window length, 10–3600 seconds.">
+              <input
+                type="number" min={10} max={3600}
+                disabled={!draft.attendance_rate_limit_enabled}
+                value={draft.attendance_rate_limit_window_seconds}
+                onChange={(e) => setDraft({ ...draft, attendance_rate_limit_window_seconds: Number(e.target.value) })}
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring disabled:opacity-50"
+              />
+            </Field>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Applies separately to check-in and check-out; blocked attempts are logged for audit.
+          </p>
         </div>
         <div className="flex items-start gap-2 rounded-xl border border-warning/30 bg-warning/5 p-3 text-[11px] text-muted-foreground">
           <Globe className="mt-0.5 h-4 w-4 text-warning" />
