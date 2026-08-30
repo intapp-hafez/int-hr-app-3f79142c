@@ -297,7 +297,7 @@ export function SecurityPanel() {
 
   useEffect(() => {
     if (q.data) {
-      const d = q.data as SettingsRow;
+      const d = { ...DEFAULTS, ...(q.data as unknown as Partial<SettingsRow>) } as SettingsRow;
       setDraft(d);
       setIpText((d.ip_allowlist ?? []).join(", "));
     }
