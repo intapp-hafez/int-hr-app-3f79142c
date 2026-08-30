@@ -64,3 +64,31 @@ export const updateSecuritySettings = createServerFn({ method: "POST" })
     }
     return { ok: true };
   });
+
+/**
+ * Admin action: clear a specific employee's logged check-in / check-out attempts
+ * after investigating abuse, effectively resetting their rate-limit counters.
+ */
+export const resetEmployeeAttendanceRateLimit = createServerFn({ method: "POST" })
+  .middleware([requireAdminRole])
+  .inputValidator((i) => z.object({ employee_id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { error, count } = await context.supabase
+      .from("attendance_check_attempts")
+      .delete({ count: "exact" })
+      .eq("user_id", data.employee_id);
+    if (error) throw new Error(error.message);
+
+    // Best-effort audit trail; never blocks the reset.
+    try {
+      await context.supabase.from("security_audit_events").insert({
+        event_type: "attendance_rate_limit_reset",
+        actor_id: context.userId,
+        details: { employee_id: data.employee_id, cleared_attempts: count ?? 0 },
+      } as never);
+    } catch {
+      /* audit table/columns may vary — ignore */
+    }
+
+    return { ok: true, cleared: count ?? 0 };
+  });
