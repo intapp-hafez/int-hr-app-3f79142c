@@ -139,6 +139,30 @@ export type Database = {
           },
         ]
       }
+      attendance_check_attempts: {
+        Row: {
+          action: string
+          allowed: boolean
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          allowed?: boolean
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          allowed?: boolean
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       cities: {
         Row: {
           created_at: string
@@ -2729,6 +2753,9 @@ export type Database = {
       }
       security_settings: {
         Row: {
+          attendance_rate_limit_attempts: number
+          attendance_rate_limit_enabled: boolean
+          attendance_rate_limit_window_seconds: number
           block_sql_keywords: boolean
           cdn_subresource_integrity: boolean
           csp_enabled: boolean
@@ -2746,6 +2773,9 @@ export type Database = {
           x_frame_deny: boolean
         }
         Insert: {
+          attendance_rate_limit_attempts?: number
+          attendance_rate_limit_enabled?: boolean
+          attendance_rate_limit_window_seconds?: number
           block_sql_keywords?: boolean
           cdn_subresource_integrity?: boolean
           csp_enabled?: boolean
@@ -2763,6 +2793,9 @@ export type Database = {
           x_frame_deny?: boolean
         }
         Update: {
+          attendance_rate_limit_attempts?: number
+          attendance_rate_limit_enabled?: boolean
+          attendance_rate_limit_window_seconds?: number
           block_sql_keywords?: boolean
           cdn_subresource_integrity?: boolean
           csp_enabled?: boolean
