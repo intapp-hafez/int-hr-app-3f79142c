@@ -141,6 +141,8 @@ export function AttendancePage() {
           );
         })}
       </section>
+
+      <ValidationHistoryPanel />
     </div>
   );
 }
