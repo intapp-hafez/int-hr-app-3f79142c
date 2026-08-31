@@ -34,8 +34,10 @@ import {
 import {
   getSecuritySettings,
   updateSecuritySettings,
+  resetEmployeeAttendanceRateLimit,
   type SecuritySettingsInput,
 } from "@/backend/functions/security-settings.functions";
+import { listEmployeesForAttendance } from "@/backend/functions/attendance.functions";
 import {
   runSecurityScan,
   applySecurityFix,
@@ -310,6 +312,22 @@ export function SecurityPanel() {
       qc.invalidateQueries({ queryKey: ["security-settings"] });
     },
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed to save"),
+  });
+
+  const resetFn = useServerFn(resetEmployeeAttendanceRateLimit);
+  const [resetEmpId, setResetEmpId] = useState("");
+  const employeesQ = useQuery({
+    queryKey: ["attendance-employees"],
+    queryFn: () => listEmployeesForAttendance(),
+    staleTime: 60_000,
+  });
+  const resetM = useMutation({
+    mutationFn: (employeeId: string) => resetFn({ data: { employee_id: employeeId } }),
+    onSuccess: (r) => {
+      toast.success(`Rate-limit counters cleared (${r?.cleared ?? 0} logged attempts removed)`);
+      setResetEmpId("");
+    },
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed to reset counters"),
   });
 
   const isAdmin = !q.isError; // getSecuritySettings is admin-area gated; error implies forbidden
@@ -821,6 +839,32 @@ export function SecurityPanel() {
           <p className="text-[11px] text-muted-foreground">
             Applies separately to check-in and check-out; blocked attempts are logged for audit.
           </p>
+          <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end rounded-lg border border-border bg-background/60 p-3">
+            <Field
+              label="Reset employee rate-limit counters"
+              hint="Clears the logged check-in / check-out attempts for one employee after an abuse investigation."
+            >
+              <select
+                value={resetEmpId}
+                onChange={(e) => setResetEmpId(e.target.value)}
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring"
+              >
+                <option value="">Select employee…</option>
+                {(employeesQ.data ?? []).map((e) => (
+                  <option key={e.id} value={e.id}>{e.name}</option>
+                ))}
+              </select>
+            </Field>
+            <button
+              type="button"
+              disabled={!resetEmpId || resetM.isPending}
+              onClick={() => resetM.mutate(resetEmpId)}
+              className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted px-3 py-2 text-sm font-medium hover:bg-muted/70 disabled:opacity-50"
+            >
+              {resetM.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              Reset counters
+            </button>
+          </div>
         </div>
         <div className="flex items-start gap-2 rounded-xl border border-warning/30 bg-warning/5 p-3 text-[11px] text-muted-foreground">
           <Globe className="mt-0.5 h-4 w-4 text-warning" />
