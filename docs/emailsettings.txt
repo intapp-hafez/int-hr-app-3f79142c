@@ -1,0 +1,111 @@
+================================================================================
+EMAIL / SMTP — HOW THIS PROJECT HANDLES OUTGOING EMAIL
+================================================================================
+
+OVERVIEW
+--------
+All outgoing email goes through one configured SMTP account, stored in the
+`smtp_config` table (singleton row, id = 1). Because the app runtime cannot
+open raw TCP/TLS sockets, the actual SMTP conversation is delegated to a
+Supabase Edge Function (`send-smtp-email`, Deno runtime) which uses the
+`denomailer` SMTP client. Frontend/server code builds the message and calls
+the edge function; the edge function talks to the SMTP server.
+
+
+ARCHITECTURE / FLOW
+-------------------
+1. Admin configures SMTP in: Admin Panel → Settings → SMTP section.
+   Fields: host, port, secure (465 implicit TLS vs STARTTLS), username,
+   password, from_email, from_name.
+
+2. Config is persisted by server function `saveSmtpConfig`
+   (src/backend/functions/smtp.functions.ts, admin-only):
+   - Non-secret fields are upserted into `smtp_config` row id=1.
+   - The password is stored ENCRYPTED via Postgres pgcrypto:
+     RPC `smtp_config_set_password(_key, _password)` runs
+     `pgp_sym_encrypt(password, key)`.
+   - The encryption key comes from server env `SMTP_ENCRYPTION_KEY`
+     (fallback "dev-fallback-key-change-me" — set a real key in production).
+
+3. When an email must be sent, server code loads config via
+   `loadSmtpConfig()` (src/backend/server/smtp-config.server.ts):
+   - Calls RPC `smtp_config_decrypt(_key)` (SECURITY DEFINER, only
+     admin/HR may call) to decrypt the password just-in-time.
+   - Falls back to reading the raw row WITHOUT the password if the RPC
+     is missing (send will then fail with "SMTP not configured").
+
+4. `sendEmail(auth, msg)` (src/backend/server/smtp-client.server.ts) calls:
+       supabase.functions.invoke("send-smtp-email", { body: { auth, msg } })
+   Message shape: { from, fromEmail, to[], subject, text?, html? }.
+   Attachments are NOT supported over this path yet.
+
+5. Edge function `supabase/functions/send-smtp-email/index.ts`:
+   - Requires an Authorization bearer token; validates the user with
+     supabase.auth.getUser().
+   - Authorizes: caller must pass has_role(uid,'admin') OR
+     has_role(uid,'hr') — otherwise 403.
+   - Validates auth + message fields (host, port, username, password,
+     fromEmail, to[], subject required).
+   - Sends via denomailer SMTPClient (tls = secure flag), returns
+     { ok: true } or { ok: false, error }.
+
+6. Result handling: senders treat email as BEST-EFFORT — e.g.
+   `sendWelcomeEmail` returns { ok:false, error } instead of throwing so a
+   mail failure never breaks employee creation.
+
+
+WHERE EMAIL IS SENT FROM
+------------------------
+- Welcome email on employee create / Excel import:
+  `src/backend/server/welcome-email.server.ts` (sendWelcomeEmail) — sends
+  username, temporary password, and the /auth login URL. Triggered from
+  `employees.functions.ts` and the `create-employee-account` edge function.
+- Test email from the SMTP settings panel: `sendTestEmail`
+  (src/backend/functions/smtp.functions.ts).
+- Leave decision notifications: `src/backend/server/leave-decision-dispatch.server.ts`.
+- Scheduled report exports: `src/backend/server/scheduler.server.ts`
+  (renderExportEmail in `email-render.server.ts`).
+- Task activity notifications: `alert-dispatch.server.ts` /
+  `notification-dispatch.server.ts` (renderTaskNotifEmail).
+
+Templates/renderers live in `src/backend/server/email-render.server.ts`
+(plain-text + HTML pairs; all user data is HTML-escaped).
+
+
+SECURITY RULES
+--------------
+- Password is encrypted at rest (pgp_sym_encrypt) and only decrypted
+  server-side just before sending; it never reaches the browser. The
+  settings panel GET (`getSmtpConfig`) selects everything EXCEPT the
+  password.
+- `SMTP_ENCRYPTION_KEY` must stay server-only; never expose it as VITE_*.
+- The edge function refuses non-admin/non-HR callers, so the SMTP
+  credentials can only be used by privileged users.
+- smtp_config RLS restricts access; decrypt RPCs enforce has_role checks.
+
+
+COMMON FAILURE MODES / TROUBLESHOOTING
+--------------------------------------
+- "SMTP not configured (host/password missing)": row id=1 missing or the
+  password was never saved / decrypt RPC missing. Re-save settings with a
+  password.
+- "Edge function error" / 403: caller isn't admin/HR, or the edge function
+  isn't deployed — deploy `send-smtp-email` and check its logs.
+- Wrong port/secure combo: secure=true is implicit TLS (usually 465);
+  secure=false is STARTTLS (usually 587). Mismatches cause timeouts.
+- Provider blocking: many providers need an "app password" and 2FA on the
+  account (e.g. Gmail); regular passwords get rejected with 535.
+
+
+HOW TO SEND AN EMAIL FROM NEW CODE (recipe)
+-------------------------------------------
+  const { loadSmtpConfig } = await import("./smtp-config.server");
+  const { sendEmail } = await import("./smtp-client.server");
+  const smtp = await loadSmtpConfig();
+  if (!smtp || !smtp.host || !smtp.password) return { ok: false, error: "SMTP not configured" };
+  const res = await sendEmail(
+    { host: smtp.host, port: smtp.port, secure: smtp.secure, username: smtp.username, password: smtp.password },
+    { from: `${smtp.from_name} <${smtp.from_email}>`, fromEmail: smtp.from_email,
+      to: ["user@example.com"], subject: "Hi", text: "Hello", html: "<p>Hello</p>" },
+  );
+  // res.ok === true on success; otherwise res.message has the error.
