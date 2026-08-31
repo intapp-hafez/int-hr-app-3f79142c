@@ -314,6 +314,22 @@ export function SecurityPanel() {
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed to save"),
   });
 
+  const resetFn = useServerFn(resetEmployeeAttendanceRateLimit);
+  const [resetEmpId, setResetEmpId] = useState("");
+  const employeesQ = useQuery({
+    queryKey: ["attendance-employees"],
+    queryFn: () => listEmployeesForAttendance(),
+    staleTime: 60_000,
+  });
+  const resetM = useMutation({
+    mutationFn: (employeeId: string) => resetFn({ data: { employee_id: employeeId } }),
+    onSuccess: (r) => {
+      toast.success(`Rate-limit counters cleared (${r?.cleared ?? 0} logged attempts removed)`);
+      setResetEmpId("");
+    },
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed to reset counters"),
+  });
+
   const isAdmin = !q.isError; // getSecuritySettings is admin-area gated; error implies forbidden
   const headerSnapshot = useMemo(() => {
     if (typeof document === "undefined") return [] as string[];
