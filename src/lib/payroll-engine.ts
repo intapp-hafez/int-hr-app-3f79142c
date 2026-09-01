@@ -42,6 +42,7 @@ export type PayrollBreakdown = {
   employee_insurance: number;
   employer_insurance: number;
   martyrs_fund: number;
+  emergency_fund: number;
   tax: number;
   taxable_annual: number;
   employer_cost: number; // gross + employer_insurance
@@ -87,7 +88,7 @@ export function calcInsuranceWage(gross: number, s: PayrollSettings, opts: Appli
 
 export function calcEmployeeInsurance(gross: number, s: PayrollSettings, opts: Applicability = {}): number {
   if (opts.insurance_applicable === false) return 0;
-  return round2(calcInsuranceWage(gross, s) * s.employee_insurance_rate);
+  return round2(calcInsuranceWage(gross, s, opts) * s.employee_insurance_rate);
 }
 
 export function calcEmployerInsurance(gross: number, s: PayrollSettings, opts: Applicability = {}): number {
