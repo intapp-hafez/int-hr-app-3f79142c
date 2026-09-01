@@ -146,12 +146,13 @@ export function grossToNet(
   const employee_insurance = calcEmployeeInsurance(g, settings, opts);
   const employer_insurance = calcEmployerInsurance(g, settings, opts);
   const martyrs_fund = calcMartyrsFund(g, settings, opts);
+  const emergency_fund = round2(opts.emergency_fund ?? 0);
   const { tax, taxable_annual } = calcMonthlyTax(g, settings, brackets, opts);
   const medical_insurance = round2(opts.medical_insurance ?? 0);
   const other_deductions = round2(opts.other_deductions ?? 0);
   const external_income = round2(opts.external_income ?? 0);
   const external_tax_paid = round2(opts.external_tax_paid ?? 0);
-  const net = round2(g - employee_insurance - tax - martyrs_fund - medical_insurance - other_deductions);
+  const net = round2(g - employee_insurance - tax - martyrs_fund - emergency_fund - medical_insurance - other_deductions);
   return {
     gross: g,
     net,
@@ -159,6 +160,7 @@ export function grossToNet(
     employee_insurance,
     employer_insurance,
     martyrs_fund,
+    emergency_fund,
     tax,
     taxable_annual,
     employer_cost: round2(g + employer_insurance),
