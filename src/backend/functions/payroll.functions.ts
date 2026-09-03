@@ -231,6 +231,7 @@ async function computeRows(
       employee_insurance: 0,
       employer_insurance: 0,
       martyrs_fund: 0,
+      emergency_fund: 0,
       tax: 0,
       taxable_annual: 0,
       employer_cost: salaryAmount,
