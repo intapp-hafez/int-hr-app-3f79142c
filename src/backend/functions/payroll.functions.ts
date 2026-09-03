@@ -251,6 +251,7 @@ async function computeRows(
             external_tax_paid: p.external_tax_paid ? Number(p.external_tax_paid) : undefined,
             medical_insurance: p.medical_insurance ? Number(p.medical_insurance) : undefined,
             other_deductions: p.other_deductions ? Number(p.other_deductions) : undefined,
+            emergency_fund: p.emergency_fund ? Number(p.emergency_fund) : undefined,
           })
         : empty;
 
