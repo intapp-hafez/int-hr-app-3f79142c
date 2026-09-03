@@ -33,6 +33,7 @@ export type Applicability = {
   external_tax_paid?: number;     // monthly EGP tax already paid by other employers
   medical_insurance?: number;     // monthly deduction
   other_deductions?: number;      // monthly other deductions
+  emergency_fund?: number;        // monthly emergency / martyrs fund contribution
 };
 
 export type PayrollBreakdown = {

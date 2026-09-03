@@ -231,6 +231,7 @@ async function computeRows(
       employee_insurance: 0,
       employer_insurance: 0,
       martyrs_fund: 0,
+      emergency_fund: 0,
       tax: 0,
       taxable_annual: 0,
       employer_cost: salaryAmount,
@@ -250,6 +251,7 @@ async function computeRows(
             external_tax_paid: p.external_tax_paid ? Number(p.external_tax_paid) : undefined,
             medical_insurance: p.medical_insurance ? Number(p.medical_insurance) : undefined,
             other_deductions: p.other_deductions ? Number(p.other_deductions) : undefined,
+            emergency_fund: p.emergency_fund ? Number(p.emergency_fund) : undefined,
           })
         : empty;
 
