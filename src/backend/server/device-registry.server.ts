@@ -112,7 +112,7 @@ export async function touchDeviceCheck(deviceId: string, kind: "in" | "out") {
           ? { last_checkin: new Date().toISOString() }
           : { last_checkout: new Date().toISOString() }),
         ip_address: requestIp(),
-      })
+      } as any)
       .eq("id", deviceId);
   } catch {
     /* non-fatal */
