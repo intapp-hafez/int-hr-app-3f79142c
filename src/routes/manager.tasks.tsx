@@ -375,7 +375,12 @@ function ManagerTasksPage() {
                     {tk.estimatedHours ? ` • ${tk.estimatedHours}${t("hoursShort")}` : ""}
                   </td>
                   <td className="px-3 py-2 text-xs text-muted-foreground">
-                    {[tk.district, tk.address].filter(Boolean).join(" — ") || "—"}
+                    {[
+                      tk.city && tk.district && tk.city.toLowerCase() !== tk.district.toLowerCase()
+                        ? `${tk.city}, ${tk.district}`
+                        : tk.city || tk.district,
+                      tk.address,
+                    ].filter(Boolean).join(" — ") || "—"}
                   </td>
                   <td className="px-3 py-2">
                     <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${priorityClass(tk.priority)}`}>{labelPriority(tk.priority)}</span>
@@ -440,10 +445,15 @@ function ManagerTasksPage() {
                 <div className="min-w-0">
                   <p className="font-medium">{tk.title}</p>
                   {tk.description && <p className="mt-0.5 text-xs text-muted-foreground">{tk.description}</p>}
-                  {(tk.district || tk.address) && (
+                  {(tk.city || tk.district || tk.address) && (
                     <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
                       <MapPin className="h-3 w-3" />
-                      {[tk.district, tk.address].filter(Boolean).join(" — ")}
+                      {[
+                        tk.city && tk.district && tk.city.toLowerCase() !== tk.district.toLowerCase()
+                          ? `${tk.city}, ${tk.district}`
+                          : tk.city || tk.district,
+                        tk.address,
+                      ].filter(Boolean).join(" — ")}
                     </p>
                   )}
                   <p className="mt-1 text-xs text-muted-foreground">
@@ -603,22 +613,26 @@ function AddTaskModal({ me, team, onClose, onCreated }: { me: string; team: Arra
     const cleaned = rows.filter((r) => r.title.trim());
     if (cleaned.length === 0) return toast.error(t("rowTitle"));
     setSaving(true);
-    const payloads = cleaned.map((r) => ({
-      title: r.title.trim(),
-      description: r.description.trim(),
-      date,
-      dueTime: dueTime || undefined,
-      priority,
-      assignees,
-      status: "pending" as TaskStatus,
-      createdBy: me,
-      district: r.district || undefined,
-      address: r.address.trim() || undefined,
-      lat: r.lat,
-      lng: r.lng,
-      radius_m: r.radius_m,
-      estimatedHours: r.hours ? Number(r.hours) : undefined,
-    }));
+    const payloads = cleaned.map((r) => {
+      const cityObj = cities.find((c: any) => c.id === r.cityId);
+      return {
+        title: r.title.trim(),
+        description: r.description.trim(),
+        date,
+        dueTime: dueTime || undefined,
+        priority,
+        assignees,
+        status: "pending" as TaskStatus,
+        createdBy: me,
+        city: cityObj?.name_en || undefined,
+        district: r.district || undefined,
+        address: r.address.trim() || undefined,
+        lat: r.lat,
+        lng: r.lng,
+        radius_m: r.radius_m,
+        estimatedHours: r.hours ? Number(r.hours) : undefined,
+      };
+    });
     try {
       await Promise.all(
         payloads.map((p) =>
@@ -629,6 +643,7 @@ function AddTaskModal({ me, team, onClose, onCreated }: { me: string; team: Arra
               priority: p.priority,
               due_date: p.date,
               due_time: p.dueTime ?? null,
+              city: p.city ?? null,
               district: p.district ?? null,
               address: p.address ?? null,
               lat: p.lat ?? null,

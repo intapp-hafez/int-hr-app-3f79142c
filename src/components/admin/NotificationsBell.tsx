@@ -1,7 +1,23 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Bell, CalendarClock, Clock, UserX, LogIn, LogOut, CheckCheck, ArrowRight, Settings2 } from "lucide-react";
+import {
+  Bell,
+  CalendarClock,
+  Clock,
+  UserX,
+  LogIn,
+  LogOut,
+  CheckCheck,
+  ArrowRight,
+  Settings2,
+  CreditCard,
+  FileText,
+  ShieldAlert,
+  Award,
+  Timer,
+  DollarSign,
+} from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { supabase } from "@/integrations/supabase/client";
 import { getAdminAlerts, type AdminAlert } from "@/backend/functions/admin-dashboard-extras.functions";
@@ -14,6 +30,12 @@ const ICONS: Record<AdminAlert["kind"], typeof Bell> = {
   absent: UserX,
   checkin: LogIn,
   checkout: LogOut,
+  id_expiry: CreditCard,
+  contract_expiry: FileText,
+  insurance_expiry: ShieldAlert,
+  military_expiry: Award,
+  probation_end: Timer,
+  advance_payment: DollarSign,
 };
 const TONES: Record<AdminAlert["severity"], string> = {
   info: "bg-sky-500/10 text-sky-600 dark:text-sky-400",

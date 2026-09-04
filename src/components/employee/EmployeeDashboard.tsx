@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { MapPin, Wifi, WifiOff, CheckCircle2, Calendar, Sparkles, AlertTriangle, Loader2, LogIn, LogOut, Radio, ShieldCheck, ListChecks } from "lucide-react";
@@ -39,7 +40,7 @@ export function EmployeeDashboard() {
   const lvQ = useQuery({ queryKey: ["my-leaves"], queryFn: () => lvFn() });
   const holQ = useQuery({ queryKey: ["holidays"], queryFn: () => holFn() });
   const accessQ = useQuery({ queryKey: ["my-access"], queryFn: () => accessFn() });
-  const devQ = useQuery({ queryKey: ["my-devices"], queryFn: () => devicesFn() });
+  const devQ = useQuery({ queryKey: ["my-devices"], queryFn: () => devicesFn(), refetchInterval: 10_000 });
 
   const session = useSession();
   const employees = useStore((s) => s.employees);
@@ -234,40 +235,81 @@ export function EmployeeDashboard() {
             value={
               liveGeo?.err
                 ? liveGeo.err
-                : [liveGeo?.district, liveGeo?.city].filter(Boolean).join(", ") ||
-                  (liveGeo?.lat != null ? `${liveGeo.lat.toFixed(4)}, ${liveGeo.lng?.toFixed(4)}` : "Locating…")
-            }
-            state={liveGeo?.err ? "fail" : liveGeo?.lat != null ? "ok" : "checking"}
-          />
-          <StatusPill
-            icon={online ? Wifi : WifiOff}
-            label={t("networkStatus")}
-            value={
-              !online
-                ? "Offline"
                 : nearest
                   ? nearest.inside
                     ? `${nearest.name} · ${Math.round(nearest.distance)} m`
                     : `Outside · ${Math.round(nearest.distance)} m`
-                  : ((accessQ.data as any)?.locations?.length ?? 0) === 0
-                    ? "Unrestricted"
-                    : "Online"
+                  : [liveGeo?.district, liveGeo?.city].filter(Boolean).join(", ") ||
+                    (liveGeo?.lat != null ? `${liveGeo.lat.toFixed(4)}, ${liveGeo.lng?.toFixed(4)}` : "Locating…")
             }
-            state={!online ? "fail" : nearest ? (nearest.inside ? "ok" : "fail") : "ok"}
+            state={liveGeo?.err ? "fail" : nearest ? (nearest.inside ? "ok" : "fail") : liveGeo?.lat != null ? "ok" : "checking"}
+          />
+          <StatusPill
+            icon={online ? Wifi : WifiOff}
+            label={t("networkStatus")}
+            value={!online ? "Offline" : "Online"}
+            state={!online ? "fail" : "ok"}
           />
         </div>
 
-        <button
-          onClick={handleAction}
-          disabled={submitting || loading || dayComplete || !deviceApproved}
-          className={`mt-5 flex w-full items-center justify-center gap-2 rounded-2xl py-4 font-display text-base font-semibold shadow-brand transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 ${
-            !deviceApproved ? "bg-black/30 text-white/50 shadow-none backdrop-blur-sm" : isCheckedIn ? "bg-white text-foreground" : "bg-gradient-brand text-brand-foreground"
-          }`}
-        >
-          {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-          {!submitting && (isCheckedIn ? <LogOut className="h-4 w-4" /> : <LogIn className="h-4 w-4" />)}
-          {!deviceApproved ? "Device Not Approved" : dayComplete ? t("checkOut") + " ✓" : isCheckedIn ? t("checkOut") : t("checkIn")}
-        </button>
+        {(() => {
+          const isOutsideFence = nearest !== null && !nearest.inside;
+          const isDisabled = submitting || loading || dayComplete || !deviceApproved || devQ.isLoading || isOutsideFence;
+
+          return (
+            <button
+              onClick={handleAction}
+              disabled={isDisabled}
+              className={`mt-5 flex w-full items-center justify-center gap-2 rounded-2xl py-4 font-display text-base font-semibold shadow-brand transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 ${
+                !deviceApproved || isOutsideFence
+                  ? "bg-black/30 text-white/50 shadow-none backdrop-blur-sm"
+                  : isCheckedIn
+                    ? "bg-white text-foreground"
+                    : "bg-gradient-brand text-brand-foreground"
+              }`}
+            >
+              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {!submitting && (isCheckedIn ? <LogOut className="h-4 w-4" /> : <LogIn className="h-4 w-4" />)}
+              {devQ.isLoading
+                ? "Checking Device…"
+                : !deviceApproved
+                  ? !currentDevice
+                    ? "Device Not Registered"
+                    : currentDevice.status === "pending"
+                      ? "Awaiting Admin Approval"
+                      : `Device ${currentDevice.status}`
+                  : isOutsideFence
+                    ? `${isCheckedIn ? t("checkOut") : t("checkIn")} (${t("outsideGeofence") || "Outside fence"})`
+                    : dayComplete
+                      ? t("checkOut") + " ✓"
+                      : isCheckedIn
+                        ? t("checkOut")
+                        : t("checkIn")}
+            </button>
+          );
+        })()}
+
+        {!devQ.isLoading && !deviceApproved && (
+          <div className="mt-3 rounded-xl bg-black/40 p-3 text-center text-xs text-white/90 backdrop-blur border border-white/10 space-y-1">
+            <p className="font-semibold">
+              {!currentDevice
+                ? devQ.data && devQ.data.length > 0
+                  ? `Your account is registered to device ${devQ.data[0].id}. This browser (${getCurrentDeviceId()}) is not registered.`
+                  : `This browser (${getCurrentDeviceId()}) is not registered yet.`
+                : currentDevice.status === "pending"
+                  ? `Device ${currentDevice.id} is awaiting administrator approval.`
+                  : `Device ${currentDevice.id} was ${currentDevice.status} by an administrator.`}
+            </p>
+            <Link
+              to="/employee/settings"
+              className="inline-block pt-1 font-semibold text-white underline underline-offset-4 hover:opacity-90"
+            >
+              {!currentDevice && devQ.data && devQ.data.length > 0
+                ? "Go to Settings to switch to this device →"
+                : "Go to Settings to register this device →"}
+            </Link>
+          </div>
+        )}
         {todayRow?.in_time && (
           <p className="mt-2 text-center text-[11px] text-white/70">
             {new Date(todayRow.in_time).toLocaleTimeString(localeTag, { hour: "2-digit", minute: "2-digit" })}

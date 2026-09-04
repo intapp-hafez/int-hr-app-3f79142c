@@ -57,7 +57,7 @@ import {
   EyeOff,
   Lock,
 } from "lucide-react";
-import { User as UserIcon, ShieldCheck, IdCard, Briefcase, CalendarDays, Plane, AlertCircle, StickyNote as StickyNoteIcon, Plus, Banknote, Loader2 } from "lucide-react";
+import { User as UserIcon, ShieldCheck, IdCard, Briefcase, CalendarDays, Plane, AlertCircle, StickyNote as StickyNoteIcon, Plus, Banknote, Loader2, ExternalLink, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -1011,7 +1011,11 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
             )}
 
             {sideTab === "offboarding" && (
-              <AdminOffboarding employeeId={detail.id} resignationDate={detail.contract_end_date || new Date().toISOString().slice(0, 10)} />
+              <AdminOffboarding
+                employeeId={detail.id}
+                resignationDate={detail.contract_end_date || new Date().toISOString().slice(0, 10)}
+                onNavigateTab={(tab) => setSideTab(tab)}
+              />
             )}
 
             {sideTab === "trips" && (
@@ -1050,9 +1054,18 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
 
 import { calculateFinalSettlement, saveFinalSettlement } from "@/backend/functions/offboarding.functions";
 
-function AdminOffboarding({ employeeId, resignationDate }: { employeeId: string; resignationDate: string }) {
+function AdminOffboarding({
+  employeeId,
+  resignationDate,
+  onNavigateTab,
+}: {
+  employeeId: string;
+  resignationDate: string;
+  onNavigateTab?: (tab: any) => void;
+}) {
   const qc = useQueryClient();
   const [date, setDate] = useState(resignationDate);
+  const [confirmCustodyOpen, setConfirmCustodyOpen] = useState(false);
   const calcFn = useServerFn(calculateFinalSettlement);
   const saveFn = useServerFn(saveFinalSettlement);
 
@@ -1064,7 +1077,7 @@ function AdminOffboarding({ employeeId, resignationDate }: { employeeId: string;
 
   const [saving, setSaving] = useState(false);
 
-  async function handleApprove() {
+  async function executeApprove() {
     if (!settlement) return;
     setSaving(true);
     try {
@@ -1080,7 +1093,7 @@ function AdminOffboarding({ employeeId, resignationDate }: { employeeId: string;
           outstanding_advances: settlement.outstanding_advances,
           other_additions: 0,
           other_deductions: 0,
-        }
+        },
       });
       toast.success("Final settlement approved and saved!");
       qc.invalidateQueries({ queryKey: ["admin"] });
@@ -1088,26 +1101,51 @@ function AdminOffboarding({ employeeId, resignationDate }: { employeeId: string;
       toast.error(e.message);
     } finally {
       setSaving(false);
+      setConfirmCustodyOpen(false);
     }
   }
 
+  function handleApproveClick() {
+    if (settlement && (settlement as any).unreturned_custody_count > 0) {
+      setConfirmCustodyOpen(true);
+    } else {
+      executeApprove();
+    }
+  }
+
+  const unreturnedCustodyCount = (settlement as any)?.unreturned_custody_count ?? 0;
+  const unreturnedCustodyItems = (settlement as any)?.unreturned_custody_items ?? [];
+  const totalCustodyCount = (settlement as any)?.total_custody_count ?? 0;
+  const advancesList = (settlement as any)?.advances_list ?? [];
+
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-      <div className="mb-4 flex flex-col gap-1">
-        <h3 className="text-lg font-semibold">Final Settlement</h3>
-        <p className="text-sm text-muted-foreground">Calculate end of service dues based on the resignation date.</p>
+    <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-5">
+      <div className="flex flex-col gap-1">
+        <h3 className="text-lg font-semibold">Final Settlement & Offboarding</h3>
+        <p className="text-sm text-muted-foreground">
+          Calculate end of service dues, verify company asset returns, and resolve outstanding loan balances.
+        </p>
       </div>
 
-      <div className="max-w-xl rounded-2xl border border-border bg-card p-5">
-        <label className="mb-4 block text-sm font-semibold">
+      <div className="max-w-2xl rounded-2xl border border-border bg-card p-6 space-y-6">
+        <label className="block text-sm font-semibold">
           Resignation Date
-          <input type="date" className="input mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm" value={date} onChange={(e) => setDate(e.target.value)} />
+          <input
+            type="date"
+            className="input mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+          />
         </label>
 
         {isLoading ? (
-          <div className="p-4 text-center text-sm text-muted-foreground">Calculating...</div>
+          <div className="p-8 text-center text-sm text-muted-foreground">
+            <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-brand" />
+            Calculating settlement dues, custody, and advances...
+          </div>
         ) : settlement ? (
-          <div className="space-y-4">
+          <div className="space-y-6">
+            {/* Dues Calculation Grid */}
             <div className="grid grid-cols-2 gap-4 rounded-xl bg-muted/30 p-4 text-sm">
               <div>
                 <p className="text-xs text-muted-foreground">Daily Rate</p>
@@ -1119,31 +1157,282 @@ function AdminOffboarding({ employeeId, resignationDate }: { employeeId: string;
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Unpaid Salary</p>
-                <p className="font-mono font-medium text-green-600">+{settlement.unpaid_salary} EGP</p>
+                <p className="font-mono font-medium text-emerald-600 dark:text-emerald-400">
+                  +{settlement.unpaid_salary} EGP
+                </p>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Remaining Leaves ({settlement.remaining_leave_days})</p>
-                <p className="font-mono font-medium text-green-600">+{settlement.leave_cash_out} EGP</p>
+                <p className="text-xs text-muted-foreground">
+                  Remaining Leaves ({settlement.remaining_leave_days})
+                </p>
+                <p className="font-mono font-medium text-emerald-600 dark:text-emerald-400">
+                  +{settlement.leave_cash_out} EGP
+                </p>
               </div>
-              <div className="col-span-2">
-                <p className="text-xs text-muted-foreground">Outstanding Advances/Loans</p>
-                <p className="font-mono font-medium text-destructive">-{settlement.outstanding_advances} EGP</p>
+              <div className="col-span-2 flex items-center justify-between border-t border-border/50 pt-2">
+                <div>
+                  <p className="text-xs text-muted-foreground">Outstanding Advances/Loans</p>
+                  <p className={`font-mono font-medium ${settlement.outstanding_advances > 0 ? "text-destructive" : "text-muted-foreground"}`}>
+                    -{settlement.outstanding_advances} EGP
+                  </p>
+                </div>
+                {settlement.outstanding_advances > 0 && (
+                  <span className="rounded-full bg-destructive/10 px-2.5 py-0.5 text-xs font-semibold text-destructive">
+                    {advancesList.length} Active Loan(s)
+                  </span>
+                )}
               </div>
             </div>
 
-            <div className="flex items-center justify-between rounded-xl bg-gradient-brand/10 p-4 border border-brand/20">
-              <span className="font-semibold text-brand">Net Settlement</span>
-              <span className="font-mono text-xl font-bold text-brand">{settlement.net_settlement} EGP</span>
+            {/* 1. Custody Clearance Section */}
+            <div className="rounded-xl border border-border bg-background p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand/10 text-brand">
+                    <Package className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-foreground">Company Custody & Equipment</h4>
+                    <p className="text-xs text-muted-foreground">Clearance of company property and equipment</p>
+                  </div>
+                </div>
+
+                {unreturnedCustodyCount > 0 ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                    <AlertTriangle className="h-3 w-3" />
+                    {unreturnedCustodyCount} Unreturned
+                  </span>
+                ) : totalCustodyCount > 0 ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                    <CheckCircle2 className="h-3 w-3" />
+                    All {totalCustodyCount} Returned
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                    <CheckCircle2 className="h-3 w-3" />
+                    No Custody Assigned
+                  </span>
+                )}
+              </div>
+
+              {unreturnedCustodyCount > 0 ? (
+                <div className="space-y-3 pt-1">
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-800 dark:text-amber-300">
+                    <p className="font-semibold flex items-center gap-1.5">
+                      <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                      Employee still holds {unreturnedCustodyCount} company asset(s) that must be returned:
+                    </p>
+                  </div>
+
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {unreturnedCustodyItems.map((item: any) => (
+                      <div
+                        key={item.id}
+                        className="flex flex-col justify-between rounded-xl border border-amber-500/20 bg-amber-500/5 p-3"
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="font-semibold text-sm text-foreground truncate">{item.name}</span>
+                            <span className="rounded bg-background px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground border border-border">
+                              {item.category}
+                            </span>
+                          </div>
+                          {(item.model || item.serial_number) && (
+                            <p className="text-xs text-muted-foreground truncate">
+                              {item.model ? `Model: ${item.model}` : ""}
+                              {item.model && item.serial_number ? " • " : ""}
+                              {item.serial_number ? `S/N: ${item.serial_number}` : ""}
+                            </p>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-muted-foreground mt-2">
+                          Handed over: <span className="font-medium text-foreground">{formatDate(item.custody_date)}</span>
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {onNavigateTab && (
+                    <div className="flex justify-end pt-1">
+                      <button
+                        type="button"
+                        onClick={() => onNavigateTab("custody")}
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand hover:underline"
+                      >
+                        Open Custody Tab to process returns
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 rounded-lg bg-emerald-500/5 border border-emerald-500/20 p-3 text-xs text-emerald-700 dark:text-emerald-300">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <span>
+                    {totalCustodyCount > 0
+                      ? `All ${totalCustodyCount} assigned custody item(s) have been verified and returned.`
+                      : "No active custody items or equipment currently assigned to this employee."}
+                  </span>
+                </div>
+              )}
             </div>
 
-            <div className="pt-4 flex justify-end gap-3">
-              <button disabled={saving} onClick={handleApprove} className="rounded-xl bg-gradient-brand px-6 py-2 text-sm font-semibold text-brand-foreground shadow-brand disabled:opacity-60">
+            {/* 2. Advances & Loans Clearance Section */}
+            <div className="rounded-xl border border-border bg-background p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                    <Banknote className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-foreground">Advance Payments & Loans</h4>
+                    <p className="text-xs text-muted-foreground">Unsettled salary advance balances</p>
+                  </div>
+                </div>
+
+                {settlement.outstanding_advances > 0 ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2.5 py-0.5 text-xs font-semibold text-destructive border border-destructive/20">
+                    -{settlement.outstanding_advances.toLocaleString()} EGP Total
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                    <CheckCircle2 className="h-3 w-3" />
+                    0 EGP Outstanding
+                  </span>
+                )}
+              </div>
+
+              {advancesList.length > 0 ? (
+                <div className="space-y-3 pt-1">
+                  <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs text-destructive">
+                    <p className="font-semibold flex items-center gap-1.5">
+                      <AlertCircle className="h-4 w-4 shrink-0" />
+                      The following {advancesList.length} advance balance(s) will be deducted from the settlement:
+                    </p>
+                  </div>
+
+                  <div className="divide-y divide-border/60 rounded-xl border border-border bg-card">
+                    {advancesList.map((adv: any) => (
+                      <div key={adv.id} className="flex items-center justify-between p-3 text-xs">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-semibold text-foreground">{adv.request_number}</span>
+                            <span className="rounded bg-muted px-1.5 py-0.2 text-[10px] uppercase font-medium text-muted-foreground">
+                              {adv.status}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground">
+                            Approved: {adv.approved_amount?.toLocaleString()} EGP
+                            {adv.installment_amount ? ` • ${adv.installment_amount} EGP / installment` : ""}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[11px] text-muted-foreground">Remaining</p>
+                          <p className="font-mono font-semibold text-destructive">
+                            -{adv.remaining_balance?.toLocaleString()} EGP
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {onNavigateTab && (
+                    <div className="flex justify-end pt-1">
+                      <button
+                        type="button"
+                        onClick={() => onNavigateTab("advances")}
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand hover:underline"
+                      >
+                        Open Advances Tab to review history
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 rounded-lg bg-emerald-500/5 border border-emerald-500/20 p-3 text-xs text-emerald-700 dark:text-emerald-300">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <span>No active salary advances or unpaid loans found for this employee.</span>
+                </div>
+              )}
+            </div>
+
+            {/* Net Settlement Banner */}
+            <div className="rounded-xl bg-gradient-brand/10 p-5 border border-brand/20 space-y-1">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="font-semibold text-brand text-base block">Net Settlement Amount</span>
+                  <span className="text-xs text-muted-foreground">
+                    (Unpaid Salary + Leave Cash-Out) - Outstanding Advances
+                  </span>
+                </div>
+                <span className="font-mono text-2xl font-bold text-brand">
+                  {settlement.net_settlement.toLocaleString()} EGP
+                </span>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3">
+              {unreturnedCustodyCount > 0 ? (
+                <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1.5 font-medium">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  {unreturnedCustodyCount} custody item(s) pending return
+                </p>
+              ) : (
+                <span className="text-xs text-muted-foreground">
+                  Ready to approve end-of-service clearance
+                </span>
+              )}
+
+              <button
+                disabled={saving}
+                onClick={handleApproveClick}
+                className="w-full sm:w-auto rounded-xl bg-gradient-brand px-6 py-2.5 text-sm font-semibold text-brand-foreground shadow-brand disabled:opacity-60 transition-transform active:scale-95"
+              >
                 {saving ? "Saving..." : "Approve & Mark Resigned"}
               </button>
             </div>
           </div>
         ) : null}
       </div>
+
+      {/* Confirmation Dialog if unreturned custody exists */}
+      <AlertDialog open={confirmCustodyOpen} onOpenChange={setConfirmCustodyOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-amber-600">
+              <AlertTriangle className="h-5 w-5" />
+              Unreturned Custody Warning
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                This employee still has <strong>{unreturnedCustodyCount} unreturned company asset(s)</strong>:
+              </p>
+              <ul className="list-disc pl-5 text-sm font-medium text-foreground">
+                {unreturnedCustodyItems.map((c: any) => (
+                  <li key={c.id}>
+                    {c.name} ({c.category}){c.serial_number ? ` - S/N: ${c.serial_number}` : ""}
+                  </li>
+                ))}
+              </ul>
+              <p className="pt-2 text-xs text-muted-foreground">
+                It is strongly recommended to collect and confirm return of all assets before approving the final settlement.
+                Are you sure you want to proceed and mark the employee as Resigned now?
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Go Back & Collect Assets</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={executeApprove}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              Approve Anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -1186,7 +1475,7 @@ function ContractDaysBadge({ endDate, cancelled }: { endDate: string; cancelled?
         <Tooltip>
           <TooltipTrigger asChild>
             <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-[11px] font-semibold text-destructive">
-              <AlertCircle className="h-3 w-3" /> Expired {absDays} day{plural}
+              <AlertCircle className="h-3 w-3" /> Expired {absDays} day{plural} ago
             </span>
           </TooltipTrigger>
           <TooltipContent>Contract ended {absDays} day{plural} ago</TooltipContent>
@@ -2836,7 +3125,7 @@ function ContractCard({
 
   const remainingText =
     info.remaining < 0
-      ? `${Math.abs(info.remaining)} ${t("daysAgo")}`
+      ? `${t("expired")} ${Math.abs(info.remaining)} ${t("daysAgo")}`
       : info.remaining === 0
         ? t("endsToday")
         : `${info.remaining} ${t("days")}`;
@@ -2873,7 +3162,9 @@ function ContractCard({
           <p className="mt-1 font-mono text-sm font-semibold">{endIso}</p>
         </div>
         <div className="rounded-2xl bg-muted/40 p-3">
-          <p className="text-[11px] text-muted-foreground">{t("remainingDays")}</p>
+          <p className="text-[11px] text-muted-foreground">
+            {info.remaining < 0 ? t("status") : (t("timeRemaining") || t("remainingDays"))}
+          </p>
           <p className={`mt-1 text-sm font-semibold tabular-nums ${tone.text}`}>{remainingText}</p>
         </div>
       </div>

@@ -7,6 +7,9 @@ import { UserMenu } from "@/components/UserMenu";
 import { LanguageToggle, useI18n } from "@/lib/i18n";
 import { useSession, useAuthReady } from "@/lib/auth";
 import { useExportScheduler } from "@/lib/export-scheduler";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { getChatUnreadTotal } from "@/backend/functions/chat.functions";
 import { usePermissions } from "@/lib/permissions";
 import { GlobalSearch } from "@/components/admin/GlobalSearch";
 
@@ -34,8 +37,18 @@ function AdminLayout() {
     return <Navigate to={target} replace />;
   }
 
+  const unreadFn = useServerFn(getChatUnreadTotal);
+  const { data: unreadData } = useQuery({
+    queryKey: ["chat-unread-total"],
+    queryFn: () => unreadFn(),
+    refetchInterval: 10000,
+    enabled: !!session,
+  });
+  const unreadMessagesCount = unreadData?.total ?? 0;
+
   const navAll = [
     { to: "/admin", icon: LayoutDashboard, label: t("dashboard"), exact: true, page: null },
+    { to: "/admin/chat", icon: MessageSquare, label: "Messages & Chat", page: null },
     { to: "/admin/employees", icon: Users, label: t("employees"), page: "employees" },
     { to: "/admin/contracts", icon: FileSignature, label: t("contracts"), page: "contracts" },
     { to: "/admin/geofencing", icon: MapPin, label: t("geofencing"), page: "geofencing" },
@@ -78,6 +91,11 @@ function AdminLayout() {
               >
                 <n.icon className="h-4 w-4 shrink-0" />
                 <span>{n.label}</span>
+                {n.to === "/admin/chat" && unreadMessagesCount > 0 && (
+                  <span className="ms-auto grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 text-[10px] font-bold text-brand-foreground shadow-sm">
+                    {unreadMessagesCount}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -126,6 +144,18 @@ function AdminLayout() {
             <GlobalSearch />
           </div>
           <div className="flex items-center gap-2">
+            <Link
+              to="/admin/chat"
+              className="relative rounded-full p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              title="Messages & Chat"
+            >
+              <MessageSquare className="h-5 w-5" />
+              {unreadMessagesCount > 0 && (
+                <span className="absolute end-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 text-[10px] font-bold text-brand-foreground shadow-sm">
+                  {unreadMessagesCount}
+                </span>
+              )}
+            </Link>
             <Link to="/admin/sticky-notes" className="rounded-full p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors" title={t("stickyNotes")}>
               <StickyNote className="h-5 w-5" />
             </Link>

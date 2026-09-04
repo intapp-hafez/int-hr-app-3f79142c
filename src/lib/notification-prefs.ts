@@ -1,17 +1,120 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-export type AlertCategory = "pending_leave" | "late" | "absent" | "checkin" | "checkout";
+export type AlertCategory =
+  | "id_expiry"
+  | "contract_expiry"
+  | "insurance_expiry"
+  | "military_expiry"
+  | "probation_end"
+  | "pending_leave"
+  | "advance_payment"
+  | "late"
+  | "absent"
+  | "checkin"
+  | "checkout";
+
+export type AlertCategoryGroup = "expirations" | "requests" | "attendance";
+
 export type AlertChannel = "inapp" | "email" | "push";
 
 export type CategoryPrefs = Record<AlertCategory, Record<AlertChannel, boolean>>;
 
-export const CATEGORY_META: { id: AlertCategory; label: string; description: string }[] = [
-  { id: "pending_leave", label: "Leave requests", description: "New leave requests awaiting approval" },
-  { id: "late", label: "Late check-ins", description: "Employees arriving after their shift start" },
-  { id: "absent", label: "Absences", description: "Employees who have not checked in" },
-  { id: "checkin", label: "Check-ins", description: "Employees clocking in" },
-  { id: "checkout", label: "Check-outs", description: "Employees clocking out" },
+export const CATEGORY_GROUPS: { id: AlertCategoryGroup; label: string; description: string }[] = [
+  {
+    id: "expirations",
+    label: "Document & Status Expirations",
+    description: "Alerts for expiring employee credentials, contracts, and compliance dates",
+  },
+  {
+    id: "requests",
+    label: "Requests & Approvals",
+    description: "Employee requests requiring HR or administrative decision",
+  },
+  {
+    id: "attendance",
+    label: "Attendance & Clocking",
+    description: "Daily workforce attendance events and shift anomalies",
+  },
+];
+
+export const CATEGORY_META: {
+  id: AlertCategory;
+  label: string;
+  description: string;
+  group: AlertCategoryGroup;
+}[] = [
+  // Expirations
+  {
+    id: "id_expiry",
+    label: "National ID expiration",
+    description: "National IDs expiring within 30 days or already expired",
+    group: "expirations",
+  },
+  {
+    id: "contract_expiry",
+    label: "Contract expiration",
+    description: "Employment contracts expiring within 30 days or expired",
+    group: "expirations",
+  },
+  {
+    id: "insurance_expiry",
+    label: "Insurance renewal",
+    description: "Medical & social insurance renewal dates and cards",
+    group: "expirations",
+  },
+  {
+    id: "military_expiry",
+    label: "Military status expiry",
+    description: "Military exemption or service certificate expiration",
+    group: "expirations",
+  },
+  {
+    id: "probation_end",
+    label: "Probation period ending",
+    description: "Employees approaching completion of 3-month probation",
+    group: "expirations",
+  },
+
+  // Requests
+  {
+    id: "pending_leave",
+    label: "Leave requests",
+    description: "New employee leave requests awaiting approval",
+    group: "requests",
+  },
+  {
+    id: "advance_payment",
+    label: "Advance payment requests",
+    description: "Salary advance & loan requests awaiting review",
+    group: "requests",
+  },
+
+  // Attendance
+  {
+    id: "late",
+    label: "Late check-ins",
+    description: "Employees arriving after scheduled shift start",
+    group: "attendance",
+  },
+  {
+    id: "absent",
+    label: "Absences",
+    description: "Employees who have not checked in today",
+    group: "attendance",
+  },
+  {
+    id: "checkin",
+    label: "Check-ins",
+    description: "Employees clocking in at branch",
+    group: "attendance",
+  },
+  {
+    id: "checkout",
+    label: "Check-outs",
+    description: "Employees clocking out",
+    group: "attendance",
+  },
 ];
 
 export const CHANNEL_META: { id: AlertChannel; label: string; description: string }[] = [
@@ -21,11 +124,17 @@ export const CHANNEL_META: { id: AlertChannel; label: string; description: strin
 ];
 
 const DEFAULT: CategoryPrefs = {
-  pending_leave: { inapp: true, email: true, push: false },
-  late:          { inapp: true, email: true, push: true },
-  absent:        { inapp: true, email: true, push: false },
-  checkin:       { inapp: true, email: false, push: false },
-  checkout:      { inapp: true, email: false, push: false },
+  id_expiry:       { inapp: true, email: true,  push: true  },
+  contract_expiry: { inapp: true, email: true,  push: true  },
+  insurance_expiry:{ inapp: true, email: true,  push: false },
+  military_expiry: { inapp: true, email: false, push: false },
+  probation_end:   { inapp: true, email: true,  push: false },
+  pending_leave:   { inapp: true, email: true,  push: false },
+  advance_payment: { inapp: true, email: true,  push: false },
+  late:            { inapp: true, email: true,  push: true  },
+  absent:          { inapp: true, email: true,  push: false },
+  checkin:         { inapp: true, email: false, push: false },
+  checkout:        { inapp: true, email: false, push: false },
 };
 
 const KEY = "notification-prefs:v1";

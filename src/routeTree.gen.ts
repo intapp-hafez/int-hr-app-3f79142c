@@ -42,6 +42,7 @@ import { Route as EmployeeNotificationsRouteImport } from './routes/employee.not
 import { Route as EmployeeMessagesRouteImport } from './routes/employee.messages'
 import { Route as EmployeeLeavesRouteImport } from './routes/employee.leaves'
 import { Route as EmployeeCheckRouteImport } from './routes/employee.check'
+import { Route as EmployeeChatRouteImport } from './routes/employee.chat'
 import { Route as EmployeeBiometricsRouteImport } from './routes/employee.biometrics'
 import { Route as EmployeeAttendanceRouteImport } from './routes/employee.attendance'
 import { Route as EmployeeAdvancesRouteImport } from './routes/employee.advances'
@@ -69,6 +70,7 @@ import { Route as AdminEmployeeAccessRouteImport } from './routes/admin.employee
 import { Route as AdminDirectoryRouteImport } from './routes/admin.directory'
 import { Route as AdminDevicesRouteImport } from './routes/admin.devices'
 import { Route as AdminContractsRouteImport } from './routes/admin.contracts'
+import { Route as AdminChatRouteImport } from './routes/admin.chat'
 import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 import { Route as AdminAttendanceRouteImport } from './routes/admin.attendance'
 import { Route as AdminAllowancesRouteImport } from './routes/admin.allowances'
@@ -245,6 +247,11 @@ const EmployeeCheckRoute = EmployeeCheckRouteImport.update({
   path: '/check',
   getParentRoute: () => EmployeeRoute,
 } as any)
+const EmployeeChatRoute = EmployeeChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
+  getParentRoute: () => EmployeeRoute,
+} as any)
 const EmployeeBiometricsRoute = EmployeeBiometricsRouteImport.update({
   id: '/biometrics',
   path: '/biometrics',
@@ -381,6 +388,11 @@ const AdminContractsRoute = AdminContractsRouteImport.update({
   path: '/contracts',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminChatRoute = AdminChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminAuditRoute = AdminAuditRouteImport.update({
   id: '/audit',
   path: '/audit',
@@ -445,6 +457,7 @@ export interface FileRoutesByFullPath {
   '/admin/allowances': typeof AdminAllowancesRoute
   '/admin/attendance': typeof AdminAttendanceRoute
   '/admin/audit': typeof AdminAuditRoute
+  '/admin/chat': typeof AdminChatRoute
   '/admin/contracts': typeof AdminContractsRoute
   '/admin/devices': typeof AdminDevicesRoute
   '/admin/directory': typeof AdminDirectoryRoute
@@ -472,6 +485,7 @@ export interface FileRoutesByFullPath {
   '/employee/advances': typeof EmployeeAdvancesRoute
   '/employee/attendance': typeof EmployeeAttendanceRoute
   '/employee/biometrics': typeof EmployeeBiometricsRoute
+  '/employee/chat': typeof EmployeeChatRoute
   '/employee/check': typeof EmployeeCheckRoute
   '/employee/leaves': typeof EmployeeLeavesRoute
   '/employee/messages': typeof EmployeeMessagesRoute
@@ -512,6 +526,7 @@ export interface FileRoutesByTo {
   '/admin/allowances': typeof AdminAllowancesRoute
   '/admin/attendance': typeof AdminAttendanceRoute
   '/admin/audit': typeof AdminAuditRoute
+  '/admin/chat': typeof AdminChatRoute
   '/admin/contracts': typeof AdminContractsRoute
   '/admin/devices': typeof AdminDevicesRoute
   '/admin/directory': typeof AdminDirectoryRoute
@@ -538,6 +553,7 @@ export interface FileRoutesByTo {
   '/employee/advances': typeof EmployeeAdvancesRoute
   '/employee/attendance': typeof EmployeeAttendanceRoute
   '/employee/biometrics': typeof EmployeeBiometricsRoute
+  '/employee/chat': typeof EmployeeChatRoute
   '/employee/check': typeof EmployeeCheckRoute
   '/employee/leaves': typeof EmployeeLeavesRoute
   '/employee/messages': typeof EmployeeMessagesRoute
@@ -584,6 +600,7 @@ export interface FileRoutesById {
   '/admin/allowances': typeof AdminAllowancesRoute
   '/admin/attendance': typeof AdminAttendanceRoute
   '/admin/audit': typeof AdminAuditRoute
+  '/admin/chat': typeof AdminChatRoute
   '/admin/contracts': typeof AdminContractsRoute
   '/admin/devices': typeof AdminDevicesRoute
   '/admin/directory': typeof AdminDirectoryRoute
@@ -611,6 +628,7 @@ export interface FileRoutesById {
   '/employee/advances': typeof EmployeeAdvancesRoute
   '/employee/attendance': typeof EmployeeAttendanceRoute
   '/employee/biometrics': typeof EmployeeBiometricsRoute
+  '/employee/chat': typeof EmployeeChatRoute
   '/employee/check': typeof EmployeeCheckRoute
   '/employee/leaves': typeof EmployeeLeavesRoute
   '/employee/messages': typeof EmployeeMessagesRoute
@@ -658,6 +676,7 @@ export interface FileRouteTypes {
     | '/admin/allowances'
     | '/admin/attendance'
     | '/admin/audit'
+    | '/admin/chat'
     | '/admin/contracts'
     | '/admin/devices'
     | '/admin/directory'
@@ -685,6 +704,7 @@ export interface FileRouteTypes {
     | '/employee/advances'
     | '/employee/attendance'
     | '/employee/biometrics'
+    | '/employee/chat'
     | '/employee/check'
     | '/employee/leaves'
     | '/employee/messages'
@@ -725,6 +745,7 @@ export interface FileRouteTypes {
     | '/admin/allowances'
     | '/admin/attendance'
     | '/admin/audit'
+    | '/admin/chat'
     | '/admin/contracts'
     | '/admin/devices'
     | '/admin/directory'
@@ -751,6 +772,7 @@ export interface FileRouteTypes {
     | '/employee/advances'
     | '/employee/attendance'
     | '/employee/biometrics'
+    | '/employee/chat'
     | '/employee/check'
     | '/employee/leaves'
     | '/employee/messages'
@@ -796,6 +818,7 @@ export interface FileRouteTypes {
     | '/admin/allowances'
     | '/admin/attendance'
     | '/admin/audit'
+    | '/admin/chat'
     | '/admin/contracts'
     | '/admin/devices'
     | '/admin/directory'
@@ -823,6 +846,7 @@ export interface FileRouteTypes {
     | '/employee/advances'
     | '/employee/attendance'
     | '/employee/biometrics'
+    | '/employee/chat'
     | '/employee/check'
     | '/employee/leaves'
     | '/employee/messages'
@@ -1102,6 +1126,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EmployeeCheckRouteImport
       parentRoute: typeof EmployeeRoute
     }
+    '/employee/chat': {
+      id: '/employee/chat'
+      path: '/chat'
+      fullPath: '/employee/chat'
+      preLoaderRoute: typeof EmployeeChatRouteImport
+      parentRoute: typeof EmployeeRoute
+    }
     '/employee/biometrics': {
       id: '/employee/biometrics'
       path: '/biometrics'
@@ -1291,6 +1322,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminContractsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/chat': {
+      id: '/admin/chat'
+      path: '/chat'
+      fullPath: '/admin/chat'
+      preLoaderRoute: typeof AdminChatRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/audit': {
       id: '/admin/audit'
       path: '/audit'
@@ -1383,6 +1421,7 @@ interface AdminRouteChildren {
   AdminAllowancesRoute: typeof AdminAllowancesRoute
   AdminAttendanceRoute: typeof AdminAttendanceRoute
   AdminAuditRoute: typeof AdminAuditRoute
+  AdminChatRoute: typeof AdminChatRoute
   AdminContractsRoute: typeof AdminContractsRoute
   AdminDevicesRoute: typeof AdminDevicesRoute
   AdminDirectoryRoute: typeof AdminDirectoryRoute
@@ -1417,6 +1456,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminAllowancesRoute: AdminAllowancesRoute,
   AdminAttendanceRoute: AdminAttendanceRoute,
   AdminAuditRoute: AdminAuditRoute,
+  AdminChatRoute: AdminChatRoute,
   AdminContractsRoute: AdminContractsRoute,
   AdminDevicesRoute: AdminDevicesRoute,
   AdminDirectoryRoute: AdminDirectoryRoute,
@@ -1452,6 +1492,7 @@ interface EmployeeRouteChildren {
   EmployeeAdvancesRoute: typeof EmployeeAdvancesRoute
   EmployeeAttendanceRoute: typeof EmployeeAttendanceRoute
   EmployeeBiometricsRoute: typeof EmployeeBiometricsRoute
+  EmployeeChatRoute: typeof EmployeeChatRoute
   EmployeeCheckRoute: typeof EmployeeCheckRoute
   EmployeeLeavesRoute: typeof EmployeeLeavesRoute
   EmployeeMessagesRoute: typeof EmployeeMessagesRoute
@@ -1466,6 +1507,7 @@ const EmployeeRouteChildren: EmployeeRouteChildren = {
   EmployeeAdvancesRoute: EmployeeAdvancesRoute,
   EmployeeAttendanceRoute: EmployeeAttendanceRoute,
   EmployeeBiometricsRoute: EmployeeBiometricsRoute,
+  EmployeeChatRoute: EmployeeChatRoute,
   EmployeeCheckRoute: EmployeeCheckRoute,
   EmployeeLeavesRoute: EmployeeLeavesRoute,
   EmployeeMessagesRoute: EmployeeMessagesRoute,

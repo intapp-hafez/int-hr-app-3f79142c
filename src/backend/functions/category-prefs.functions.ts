@@ -2,7 +2,19 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const CategoryEnum = z.enum(["pending_leave", "late", "absent", "checkin", "checkout"]);
+const CategoryEnum = z.enum([
+  "id_expiry",
+  "contract_expiry",
+  "insurance_expiry",
+  "military_expiry",
+  "probation_end",
+  "pending_leave",
+  "advance_payment",
+  "late",
+  "absent",
+  "checkin",
+  "checkout",
+]);
 const ChannelEnum = z.enum(["inapp", "email", "push"]);
 
 export const getMyCategoryPrefs = createServerFn({ method: "GET" })

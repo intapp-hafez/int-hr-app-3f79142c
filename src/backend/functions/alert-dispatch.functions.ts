@@ -7,7 +7,19 @@ const Input = z.object({
     .array(
       z.object({
         alertId: z.string(),
-        category: z.enum(["pending_leave", "late", "absent", "checkin", "checkout"]),
+        category: z.enum([
+          "id_expiry",
+          "contract_expiry",
+          "insurance_expiry",
+          "military_expiry",
+          "probation_end",
+          "pending_leave",
+          "advance_payment",
+          "late",
+          "absent",
+          "checkin",
+          "checkout",
+        ]),
         title: z.string(),
         body: z.string(),
         url: z.string().optional(),

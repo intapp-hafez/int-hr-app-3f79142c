@@ -54,14 +54,43 @@ export const calculateFinalSettlement = createServerFn({ method: "POST" })
 
     // 3. Outstanding advances
     const { data: advances } = await (supabase.from("employee_advances") as any)
-      .select("id, remaining_balance")
+      .select("id, request_number, requested_amount, approved_amount, remaining_balance, paid_amount, repayment_status, status, deduction_start_date, installment_count, installment_amount, created_at")
       .eq("employee_id", data.employee_id)
-      .in("repayment_status", ["active", "pending"]);
+      .not("status", "in", '("rejected","cancelled")')
+      .order("created_at", { ascending: false });
 
-    let outstandingAdvances = 0;
-    if (advances) {
-      outstandingAdvances = advances.reduce((sum: number, a: any) => sum + Number(a.remaining_balance || 0), 0);
-    }
+    const activeAdvances = (advances || []).filter((a: any) => {
+      const rem = a.remaining_balance != null ? Number(a.remaining_balance) : Number(a.approved_amount || a.requested_amount || 0);
+      const isCompleted = a.repayment_status === "completed" || a.repayment_status === "closed";
+      return rem > 0 && !isCompleted && (a.status === "paid" || a.status === "approved_for_payment" || a.repayment_status === "active" || a.repayment_status === "pending");
+    });
+
+    const outstandingAdvances = Number(
+      activeAdvances.reduce((sum: number, a: any) => {
+        const rem = a.remaining_balance != null ? Number(a.remaining_balance) : Number(a.approved_amount || a.requested_amount || 0);
+        return sum + rem;
+      }, 0).toFixed(2)
+    );
+
+    // 4. Employee Custody items
+    const { data: custodyRows } = await (supabase.from("employee_custody") as any)
+      .select("id, name, category, serial_number, model, custody_date, return_date, return_notes")
+      .eq("profile_id", data.employee_id)
+      .order("custody_date", { ascending: false });
+
+    const custodyItems = (custodyRows || []).map((c: any) => ({
+      id: c.id,
+      name: c.name,
+      category: c.category || "General",
+      serial_number: c.serial_number,
+      model: c.model,
+      custody_date: c.custody_date,
+      return_date: c.return_date,
+      return_notes: c.return_notes,
+      is_returned: Boolean(c.return_date),
+    }));
+
+    const unreturnedCustody = custodyItems.filter((c: any) => !c.is_returned);
 
     return {
       employee_id: profile.id,
@@ -73,6 +102,22 @@ export const calculateFinalSettlement = createServerFn({ method: "POST" })
       remaining_leave_days: remainingLeaveDays,
       leave_cash_out: leaveCashOut,
       outstanding_advances: outstandingAdvances,
+      advances_list: activeAdvances.map((a: any) => ({
+        id: a.id,
+        request_number: a.request_number,
+        approved_amount: Number(a.approved_amount ?? a.requested_amount ?? 0),
+        remaining_balance: Number(a.remaining_balance ?? a.approved_amount ?? a.requested_amount ?? 0),
+        repayment_status: a.repayment_status,
+        status: a.status,
+        installment_amount: a.installment_amount ? Number(a.installment_amount) : null,
+        installment_count: a.installment_count ? Number(a.installment_count) : null,
+        deduction_start_date: a.deduction_start_date,
+        created_at: a.created_at,
+      })),
+      unreturned_custody_count: unreturnedCustody.length,
+      total_custody_count: custodyItems.length,
+      custody_items: custodyItems,
+      unreturned_custody_items: unreturnedCustody,
       other_additions: 0,
       other_deductions: 0,
       net_settlement: Number((unpaidSalary + leaveCashOut - outstandingAdvances).toFixed(2)),

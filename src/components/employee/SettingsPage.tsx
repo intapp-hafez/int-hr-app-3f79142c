@@ -16,6 +16,16 @@ import { getMe, getMyProfileDetails } from "@/backend/functions/auth.functions";
 import { listMyDevices, registerMyDevice, removeMyDevice } from "@/backend/functions/devices.functions";
 import { AvatarUploader } from "@/components/AvatarUploader";
 import { collectDeviceProfile } from "@/lib/device-fingerprint";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export function SettingsPage() {
   const { t, lang, setLang } = useI18n();
@@ -56,9 +66,20 @@ export function SettingsPage() {
     myDevice?.status === "rejected" ? "rejected" :
     myDevice?.status === "blocked" ? "blocked" : "unregistered";
 
-  async function handleRegister() {
+  const otherDevices = myDevices.filter((d: any) => d.id !== deviceId);
+  const [confirmReplaceOpen, setConfirmReplaceOpen] = useState(false);
+  const [replacingDevice, setReplacingDevice] = useState<any>(null);
+
+  async function handleRegister(replaceOldId?: string) {
     if (!deviceId) return;
     try {
+      if (replaceOldId) {
+        await removeFn({ data: { device_id: replaceOldId } });
+      } else if (otherDevices.length > 0) {
+        setReplacingDevice(otherDevices[0]);
+        setConfirmReplaceOpen(true);
+        return;
+      }
       const p = await collectDeviceProfile();
       await registerFn({
         data: {
@@ -76,6 +97,34 @@ export function SettingsPage() {
       qc.invalidateQueries({ queryKey: ["my-devices"] });
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to register device");
+    }
+  }
+
+  async function executeReplace() {
+    if (!replacingDevice) return;
+    const oldId = replacingDevice.id;
+    setConfirmReplaceOpen(false);
+    try {
+      await removeFn({ data: { device_id: oldId } });
+      const p = await collectDeviceProfile();
+      await registerFn({
+        data: {
+          device_id: p.device_id || deviceId,
+          label: p.label || deviceLabelGuess(),
+          user_agent: p.user_agent || (typeof navigator !== "undefined" ? navigator.userAgent : null),
+          fingerprint: p.fingerprint,
+          device_key: p.device_key,
+          device_type: p.device_type,
+          os: p.os,
+          browser: p.browser,
+        },
+      });
+      toast.success("Device replaced successfully", { description: t("awaitingApproval") });
+      qc.invalidateQueries({ queryKey: ["my-devices"] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to replace device");
+    } finally {
+      setReplacingDevice(null);
     }
   }
 
@@ -274,59 +323,163 @@ export function SettingsPage() {
       </section>
 
       {/* Device */}
-      <section className="rounded-2xl border border-border bg-card p-4">
-        <div className="mb-3 flex items-center gap-3">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-muted text-muted-foreground"><Smartphone className="h-4 w-4" /></span>
-          <div className="flex-1">
+      <section className="rounded-2xl border border-border bg-card p-4 space-y-3">
+        <div className="flex items-center gap-3">
+          <span className="grid h-9 w-9 place-items-center rounded-xl bg-muted text-muted-foreground">
+            <Smartphone className="h-4 w-4" />
+          </span>
+          <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold">{t("registeredDevice")}</p>
-            <p className="font-mono text-[11px] text-muted-foreground">{deviceId || "…"}</p>
+            <p className="font-mono text-[11px] text-muted-foreground truncate" title={deviceId}>
+              Current: {deviceId || "…"}
+            </p>
           </div>
-          <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${
-            status === "approved" ? "bg-success/15 text-success" :
-            status === "pending" ? "bg-warning/20 text-warning-foreground" :
-            "bg-destructive/15 text-destructive"
-          }`}>
-            {status === "approved" ? t("approved") : status === "pending" ? t("pending") : t("deviceBlocked")}
+          <span
+            className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${
+              status === "approved"
+                ? "bg-success/15 text-success"
+                : status === "pending"
+                  ? "bg-warning/20 text-warning-foreground"
+                  : status === "unregistered"
+                    ? "bg-muted text-muted-foreground"
+                    : "bg-destructive/15 text-destructive"
+            }`}
+          >
+            {status === "approved"
+              ? t("approved")
+              : status === "pending"
+                ? t("pending")
+                : status === "unregistered"
+                  ? "Unregistered"
+                  : t("deviceBlocked")}
           </span>
         </div>
+
         {status === "approved" ? (
-          <p className="inline-flex items-center gap-1.5 text-xs text-success"><Check className="h-3 w-3" /> {t("deviceApproved")}</p>
+          <div className="flex items-center justify-between rounded-xl bg-success/10 p-3 text-xs text-success">
+            <span className="inline-flex items-center gap-1.5 font-medium">
+              <Check className="h-4 w-4" /> {t("deviceApproved")}
+            </span>
+            <button
+              onClick={() => handleRemove(deviceId)}
+              className="rounded-lg border border-success/30 px-2.5 py-1 text-xs hover:bg-success/20 text-foreground font-medium"
+            >
+              Unbind
+            </button>
+          </div>
         ) : status === "pending" ? (
-          <p className="text-xs text-muted-foreground">{t("awaitingApproval")}</p>
+          <div className="flex items-center justify-between rounded-xl bg-warning/10 p-3 text-xs text-warning-foreground">
+            <span>{t("awaitingApproval")}</span>
+            <button
+              onClick={() => handleRemove(deviceId)}
+              className="rounded-lg border border-border px-2.5 py-1 text-xs hover:bg-muted text-foreground"
+            >
+              Cancel
+            </button>
+          </div>
         ) : status === "revoked" || status === "rejected" || status === "blocked" ? (
-          <div className="space-y-2">
-            <p className="text-xs text-destructive">
-              Device not approved — this device was {status} by an administrator. Attendance is blocked from it.
-              Please contact your administrator.
+          <div className="space-y-2 rounded-xl bg-destructive/10 p-3 text-xs text-destructive">
+            <p>
+              This device was <strong>{status}</strong> by an administrator. Attendance is blocked from it.
             </p>
-            <button onClick={() => handleRemove(deviceId)} className="w-full rounded-xl border border-border bg-card py-2 text-xs font-semibold">Remove</button>
+            <button
+              onClick={() => handleRemove(deviceId)}
+              className="w-full rounded-xl border border-border bg-card py-2 text-xs font-semibold text-foreground"
+            >
+              Remove
+            </button>
           </div>
         ) : (
-          <button onClick={handleRegister} className="w-full rounded-xl bg-gradient-brand py-2.5 text-sm font-semibold text-brand-foreground shadow-brand">
-            {t("registerDevice")}
-          </button>
+          <div className="space-y-3">
+            {otherDevices.length > 0 && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
+                <p className="font-semibold">Your account has a device registered on another browser or phone.</p>
+                <p className="mt-1 opacity-85">
+                  To record attendance from this browser, replace your registered device with this one.
+                </p>
+              </div>
+            )}
+            <button
+              onClick={() => handleRegister()}
+              className="w-full rounded-xl bg-gradient-brand py-2.5 text-sm font-semibold text-brand-foreground shadow-brand active:scale-[0.98] transition-transform"
+            >
+              {otherDevices.length > 0 ? "Replace & Register this device" : t("registerDevice")}
+            </button>
+          </div>
         )}
-        {myDevices.length > 1 && (
-          <ul className="mt-3 space-y-2 border-t border-border pt-3">
-            {myDevices.filter((d: any) => d.id !== deviceId).map((d: any) => (
-              <li key={d.id} className="flex items-center justify-between gap-2 text-xs">
-                <div className="min-w-0">
-                  <p className="truncate font-semibold">{d.label}</p>
-                  <p className="font-mono text-[10px] text-muted-foreground truncate">{d.id}</p>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase ${
-                    d.status === "approved" ? "bg-success/15 text-success" :
-                    d.status === "pending" ? "bg-warning/20 text-warning-foreground" :
-                    "bg-destructive/15 text-destructive"
-                  }`}>{d.status}</span>
-                  <button onClick={() => handleRemove(d.id)} className="rounded-md border border-border px-2 py-0.5">Remove</button>
-                </div>
-              </li>
-            ))}
-          </ul>
+
+        {otherDevices.length > 0 && (
+          <div className="mt-4 border-t border-border pt-3 space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground">
+              {status === "unregistered" ? "Active device on your account:" : "Other registered devices:"}
+            </p>
+            <ul className="space-y-2">
+              {otherDevices.map((d: any) => (
+                <li
+                  key={d.id}
+                  className="flex items-center justify-between gap-2 rounded-xl border border-border bg-muted/30 p-2.5 text-xs"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-foreground">{d.label || "Device"}</p>
+                    <p className="font-mono text-[11px] text-muted-foreground truncate">{d.id}</p>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase ${
+                        d.status === "approved"
+                          ? "bg-success/15 text-success"
+                          : d.status === "pending"
+                            ? "bg-warning/20 text-warning-foreground"
+                            : "bg-destructive/15 text-destructive"
+                      }`}
+                    >
+                      {d.status}
+                    </span>
+                    <button
+                      onClick={() => handleRemove(d.id)}
+                      className="rounded-lg border border-destructive/30 bg-destructive/10 px-2.5 py-1 text-destructive hover:bg-destructive/20 font-medium"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </section>
+
+      {/* Confirmation Dialog to Replace Device */}
+      <AlertDialog open={confirmReplaceOpen} onOpenChange={setConfirmReplaceOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Replace Registered Device?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                Your account already has registered device{" "}
+                <strong className="font-mono text-foreground">{replacingDevice?.id}</strong>{" "}
+                ({replacingDevice?.label || "Device"}).
+              </p>
+              <p>
+                Each employee can only have one active attendance device. Do you want to remove the old device and register this browser (
+                <strong className="font-mono text-foreground">{deviceId}</strong>) instead?
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Note: The new device will require administrator approval before you can record attendance.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Old Device</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={executeReplace}
+              className="bg-brand text-brand-foreground hover:bg-brand/90"
+            >
+              Replace Device
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <section className="flex items-center justify-between rounded-2xl border border-border bg-card p-4">
         <div>

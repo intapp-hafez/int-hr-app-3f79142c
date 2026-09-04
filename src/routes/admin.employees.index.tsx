@@ -2040,7 +2040,7 @@ function ContractDaysBadge({ endDate, cancelled }: { endDate: string | null; can
         <Tooltip>
           <TooltipTrigger asChild>
             <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold text-destructive">
-              <AlertCircle className="h-3 w-3" /> Expired {absDays} day{plural}
+              <AlertCircle className="h-3 w-3" /> Expired {absDays} day{plural} ago
             </span>
           </TooltipTrigger>
           <TooltipContent>Contract ended {absDays} day{plural} ago</TooltipContent>

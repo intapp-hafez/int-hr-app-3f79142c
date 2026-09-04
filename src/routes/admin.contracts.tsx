@@ -242,7 +242,7 @@ function ContractsPage() {
                 <TableHead>{t("role")}</TableHead>
                 <TableHead className="hidden lg:table-cell">{t("contractStart")}</TableHead>
                 <TableHead className="hidden lg:table-cell">{t("contractEnd")}</TableHead>
-                <TableHead className="w-[120px]">{t("remainingDays")}</TableHead>
+                <TableHead className="w-[140px]">{t("timeRemaining")}</TableHead>
                 <TableHead className="w-[100px]">{t("status")}</TableHead>
                 <TableHead className="w-[220px]">{t("actions")}</TableHead>
               </TableRow>
@@ -271,7 +271,9 @@ function ContractsPage() {
                           : r.remaining === null
                             ? `—`
                             : r.remaining < 0
-                            ? `${Math.abs(r.remaining)} ${t("daysAgo")}`
+                            ? `${t("expired")} ${Math.abs(r.remaining)} ${t("daysAgo")}`
+                            : r.remaining === 0
+                            ? t("endsToday")
                             : `${r.remaining} ${t("days")}`}
                       </span>
                     </TableCell>
@@ -371,9 +373,19 @@ function ContractsPage() {
                   </div>
                   <div className="col-span-2 flex items-center gap-1.5 border-t border-border pt-2">
                     {r.remaining !== null && r.remaining < 0 ? <AlertTriangle className="h-3.5 w-3.5 text-destructive" /> : <CheckCircle2 className={`h-3.5 w-3.5 ${tone.icon}`} />}
-                    <span className="text-muted-foreground">{t("remainingDays")}:</span>
+                    <span className="text-muted-foreground">
+                      {r.remaining !== null && r.remaining < 0 ? `${t("status")}:` : `${t("timeRemaining") || t("remainingDays")}:`}
+                    </span>
                     <span className={`font-semibold ${tone.text}`}>
-                      {r.remaining === null ? `—` : r.remaining < 0 ? `${Math.abs(r.remaining)} ${t("daysAgo")}` : `${r.remaining} ${t("days")}`}
+                      {r.cancelled
+                        ? `—`
+                        : r.remaining === null
+                        ? `—`
+                        : r.remaining < 0
+                        ? `${t("expired")} ${Math.abs(r.remaining)} ${t("daysAgo")}`
+                        : r.remaining === 0
+                        ? t("endsToday")
+                        : `${r.remaining} ${t("days")}`}
                     </span>
                   </div>
                 </div>

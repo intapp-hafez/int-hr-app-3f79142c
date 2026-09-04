@@ -13,11 +13,30 @@ export const listTasks = createServerFn({ method: "GET" })
     const tasks = data ?? [];
     if (tasks.length > 0) {
       const taskIds = tasks.map((t: any) => t.id);
-      const { data: acts } = await context.supabase
-        .from("task_activity")
-        .select("id, task_id, kind, occurred_at, note, employee_id")
-        .in("task_id", taskIds);
+      const [{ data: acts }, { data: dists }, { data: cities }] = await Promise.all([
+        context.supabase
+          .from("task_activity")
+          .select("id, task_id, kind, occurred_at, note, employee_id")
+          .in("task_id", taskIds),
+        context.supabase
+          .from("districts")
+          .select("id, city_id, name_en, name_ar"),
+        context.supabase
+          .from("cities")
+          .select("id, name_en, name_ar"),
+      ]);
       
+      const cityMap = new Map((cities ?? []).map((c: any) => [c.id, c.name_en]));
+      const distToCity = new Map<string, { city: string; district: string }>();
+      for (const d of (dists ?? [])) {
+        const cName = cityMap.get(d.city_id);
+        if (cName) {
+          distToCity.set(d.name_en.toLowerCase(), { city: cName, district: d.name_en });
+          if (d.name_ar) distToCity.set(d.name_ar.toLowerCase(), { city: cName, district: d.name_en });
+          distToCity.set(d.id, { city: cName, district: d.name_en });
+        }
+      }
+
       if (acts && acts.length > 0) {
         const byTask = new Map<string, any[]>();
         for (const a of acts) {
@@ -28,6 +47,18 @@ export const listTasks = createServerFn({ method: "GET" })
         }
         for (const t of tasks) {
           (t as any).task_activity = byTask.get(t.id) ?? [];
+        }
+      }
+
+      for (const t of tasks) {
+        if (!t.city && t.district) {
+          const match = distToCity.get(t.district.toLowerCase()) || distToCity.get(t.district);
+          if (match) {
+            t.city = match.city;
+            t.district = match.district;
+          }
+        } else if (t.city && cityMap.has(t.city)) {
+          t.city = cityMap.get(t.city);
         }
       }
     }

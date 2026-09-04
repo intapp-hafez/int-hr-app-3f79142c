@@ -70,7 +70,19 @@ export const getAttendanceTrend = createServerFn({ method: "GET" })
     };
   });
 
-export type AlertKind = "pending_leave" | "late" | "absent" | "checkin" | "checkout";
+export type AlertKind =
+  | "id_expiry"
+  | "contract_expiry"
+  | "insurance_expiry"
+  | "military_expiry"
+  | "probation_end"
+  | "pending_leave"
+  | "advance_payment"
+  | "late"
+  | "absent"
+  | "checkin"
+  | "checkout";
+
 export type AdminAlert = {
   id: string;
   kind: AlertKind;
@@ -85,8 +97,12 @@ export const getAdminAlerts = createServerFn({ method: "GET" })
   .middleware([requireAdminAccess])
   .handler(async ({ context }) => {
     const today = dateKey(new Date());
+    const todayMs = new Date(today + "T00:00:00Z").getTime();
+    const in30Iso = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+    const past30Iso = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+
     const { supabase } = context;
-    const [pend, att, totalEmp] = await Promise.all([
+    const [pend, att, totalEmp, expiringProfiles, pendingAdvances] = await Promise.all([
       supabase
         .from("leaves")
         .select("id, leave_type_name, start_date, end_date, created_at, profiles:employee_id(full_name)")
@@ -100,10 +116,25 @@ export const getAdminAlerts = createServerFn({ method: "GET" })
         .order("in_time", { ascending: false })
         .limit(40),
       supabase.from("profiles").select("id", { count: "exact", head: true }),
+      // Profiles with upcoming or recent expirations
+      supabase
+        .from("profiles")
+        .select("id, full_name, emp_code, id_expiry_date, contract_end_date, contract_cancelled, contract_start_date, contract_type, social_insurance_date, military_expire_date, status")
+        .neq("status", "Inactive")
+        .or(`id_expiry_date.lte.${in30Iso},contract_end_date.lte.${in30Iso},military_expire_date.lte.${in30Iso}`)
+        .limit(60),
+      // Pending salary advances
+      (supabase as any)
+        .from("employee_advances")
+        .select("id, amount, created_at, status, profiles:employee_id(full_name)")
+        .eq("status", "pending")
+        .order("created_at", { ascending: false })
+        .limit(15),
     ]);
 
     const alerts: AdminAlert[] = [];
 
+    // 1. Pending Leaves
     for (const r of (pend.data ?? []) as any[]) {
       alerts.push({
         id: `leave-${r.id}`,
@@ -116,10 +147,100 @@ export const getAdminAlerts = createServerFn({ method: "GET" })
       });
     }
 
+    // 2. Pending Advances
+    for (const adv of (pendingAdvances?.data ?? []) as any[]) {
+      alerts.push({
+        id: `adv-${adv.id}`,
+        kind: "advance_payment",
+        severity: "warning",
+        title: `${adv.profiles?.full_name ?? "Employee"} requested advance payment`,
+        description: `Amount: ${adv.amount ?? 0} • Pending approval`,
+        ts: adv.created_at ?? new Date().toISOString(),
+        link: "/admin/payroll",
+      });
+    }
+
+    // 3. Document and Contract Expirations
+    for (const p of (expiringProfiles.data ?? []) as any[]) {
+      const name = p.full_name || p.emp_code || "Employee";
+
+      // National ID Expiration
+      if (p.id_expiry_date) {
+        const expMs = new Date(p.id_expiry_date + "T00:00:00Z").getTime();
+        const diffDays = Math.ceil((expMs - todayMs) / 86400000);
+        if (diffDays <= 30 && diffDays >= -60) {
+          const isExpired = diffDays <= 0;
+          alerts.push({
+            id: `id-exp-${p.id}-${p.id_expiry_date}`,
+            kind: "id_expiry",
+            severity: isExpired ? "danger" : diffDays <= 7 ? "warning" : "info",
+            title: `National ID ${isExpired ? "Expired" : "Expiring Soon"}: ${name}`,
+            description: `Expires ${p.id_expiry_date} (${isExpired ? `${Math.abs(diffDays)}d ago` : `in ${diffDays}d`})`,
+            ts: new Date().toISOString(),
+            link: `/admin/employees/${p.id}`,
+          });
+        }
+      }
+
+      // Contract Expiration
+      if (p.contract_end_date && !p.contract_cancelled) {
+        const expMs = new Date(p.contract_end_date + "T00:00:00Z").getTime();
+        const diffDays = Math.ceil((expMs - todayMs) / 86400000);
+        if (diffDays <= 30 && diffDays >= -60) {
+          const isExpired = diffDays <= 0;
+          alerts.push({
+            id: `contract-exp-${p.id}-${p.contract_end_date}`,
+            kind: "contract_expiry",
+            severity: isExpired ? "danger" : diffDays <= 7 ? "warning" : "info",
+            title: `Contract ${isExpired ? "Expired" : "Ending Soon"}: ${name}`,
+            description: `Ends ${p.contract_end_date} (${isExpired ? `${Math.abs(diffDays)}d ago` : `in ${diffDays}d`})`,
+            ts: new Date().toISOString(),
+            link: `/admin/contracts`,
+          });
+        }
+      }
+
+      // Military Status Expiration
+      if (p.military_expire_date) {
+        const expMs = new Date(p.military_expire_date + "T00:00:00Z").getTime();
+        const diffDays = Math.ceil((expMs - todayMs) / 86400000);
+        if (diffDays <= 30 && diffDays >= -60) {
+          const isExpired = diffDays <= 0;
+          alerts.push({
+            id: `mil-exp-${p.id}-${p.military_expire_date}`,
+            kind: "military_expiry",
+            severity: isExpired ? "danger" : "warning",
+            title: `Military Certificate ${isExpired ? "Expired" : "Expiring"}: ${name}`,
+            description: `Expires ${p.military_expire_date} (${isExpired ? `${Math.abs(diffDays)}d ago` : `in ${diffDays}d`})`,
+            ts: new Date().toISOString(),
+            link: `/admin/employees/${p.id}`,
+          });
+        }
+      }
+
+      // Probation Period Ending (for Probation contracts or first 3 months)
+      if (p.contract_type === "Probation3M" && p.contract_start_date) {
+        const startMs = new Date(p.contract_start_date + "T00:00:00Z").getTime();
+        const probEndMs = startMs + 90 * 86400000;
+        const diffDays = Math.ceil((probEndMs - todayMs) / 86400000);
+        if (diffDays <= 14 && diffDays >= -14) {
+          alerts.push({
+            id: `prob-end-${p.id}`,
+            kind: "probation_end",
+            severity: diffDays <= 0 ? "warning" : "info",
+            title: `Probation Ending: ${name}`,
+            description: `3-month probation period concludes in ${Math.max(0, diffDays)} days`,
+            ts: new Date().toISOString(),
+            link: `/admin/employees/${p.id}`,
+          });
+        }
+      }
+    }
+
+    // 4. Attendance
     let lateCount = 0;
     let checkoutCount = 0;
     for (const r of (att.data ?? []) as any[]) {
-      // Check-out event (if employee already left)
       if (r.out_time) {
         checkoutCount++;
         alerts.push({
@@ -174,7 +295,7 @@ export const getAdminAlerts = createServerFn({ method: "GET" })
     alerts.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
 
     return {
-      alerts: alerts.slice(0, 40),
+      alerts: alerts.slice(0, 50),
       counts: {
         pendingLeaves: (pend.data ?? []).length,
         late: lateCount,

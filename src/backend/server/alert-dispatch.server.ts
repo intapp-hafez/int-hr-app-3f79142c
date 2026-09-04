@@ -8,7 +8,18 @@ import { loadSmtpConfig } from "./smtp-config.server";
 import { sendEmail } from "./smtp-client.server";
 import { sendPushTo } from "./web-push.server";
 
-export type AlertCategory = "pending_leave" | "late" | "absent" | "checkin" | "checkout";
+export type AlertCategory =
+  | "id_expiry"
+  | "contract_expiry"
+  | "insurance_expiry"
+  | "military_expiry"
+  | "probation_end"
+  | "pending_leave"
+  | "advance_payment"
+  | "late"
+  | "absent"
+  | "checkin"
+  | "checkout";
 
 export type AlertDispatchInput = {
   alertId: string; // stable id (e.g. `att-<row>`, `leave-<row>`)
@@ -25,12 +36,17 @@ function escapeHtml(s: string) {
 }
 
 function renderEmail(input: AlertDispatchInput) {
-  const subject = `[HR] ${input.title}`;
-  const text = `${input.title}\n\n${input.body}`;
-  const html = `<div style="font-family:system-ui,sans-serif;padding:16px">
-    <h2 style="margin:0 0 8px">${escapeHtml(input.title)}</h2>
-    <p style="margin:0 0 8px;color:#444">${escapeHtml(input.body)}</p>
-    ${input.url ? `<p style="margin:12px 0 0"><a href="${escapeHtml(input.url)}" style="color:#2563eb">Open in dashboard</a></p>` : ""}
+  const isExp = input.category.includes("expiry") || input.category === "probation_end";
+  const badgeColor = isExp ? "#dc2626" : input.category === "late" ? "#ea580c" : "#2563eb";
+  const subject = isExp ? `[HR Urgent] ${input.title}` : `[HR Alert] ${input.title}`;
+  const text = `${input.title}\n\n${input.body}${input.url ? `\n\nLink: ${input.url}` : ""}`;
+  const html = `<div style="font-family:system-ui,sans-serif;padding:20px;border-radius:12px;border:1px solid #e2e8f0;background:#ffffff;max-width:560px;margin:0 auto">
+    <div style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:${badgeColor}15;color:${badgeColor};margin-bottom:12px">
+      ${isExp ? "DOCUMENT & STATUS EXPIRATION" : "HR NOTIFICATION"}
+    </div>
+    <h2 style="margin:0 0 10px;font-size:18px;color:#0f172a">${escapeHtml(input.title)}</h2>
+    <p style="margin:0 0 16px;color:#334155;font-size:14px;line-height:1.5">${escapeHtml(input.body)}</p>
+    ${input.url ? `<a href="${escapeHtml(input.url)}" style="display:inline-block;padding:8px 16px;border-radius:8px;background:#2563eb;color:#ffffff;text-decoration:none;font-size:13px;font-weight:500">Review in Dashboard</a>` : ""}
   </div>`;
   return { subject, html, text };
 }
@@ -57,11 +73,19 @@ async function loadPrefs(userIds: string[], category: AlertCategory) {
     .in("user_id", userIds)
     .eq("category", category);
   // sensible defaults when a user has no rows yet
-  const defaults = { pending_leave: { inapp: true, email: true, push: false },
-                     late:         { inapp: true, email: true, push: true  },
-                     absent:       { inapp: true, email: true, push: false },
-                     checkin:      { inapp: true, email: false, push: false },
-                     checkout:     { inapp: true, email: false, push: false } } as const;
+  const defaults: Record<AlertCategory, { inapp: boolean; email: boolean; push: boolean }> = {
+    id_expiry:       { inapp: true, email: true,  push: true  },
+    contract_expiry: { inapp: true, email: true,  push: true  },
+    insurance_expiry:{ inapp: true, email: true,  push: false },
+    military_expiry: { inapp: true, email: false, push: false },
+    probation_end:   { inapp: true, email: true,  push: false },
+    pending_leave:   { inapp: true, email: true,  push: false },
+    advance_payment: { inapp: true, email: true,  push: false },
+    late:            { inapp: true, email: true,  push: true  },
+    absent:          { inapp: true, email: true,  push: false },
+    checkin:         { inapp: true, email: false, push: false },
+    checkout:        { inapp: true, email: false, push: false },
+  };
   const map = new Map<string, { inapp: boolean; email: boolean; push: boolean }>();
   for (const uid of userIds) map.set(uid, { ...defaults[category] });
   for (const row of (data ?? []) as any[]) {

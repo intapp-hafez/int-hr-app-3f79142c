@@ -1,7 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from '@tanstack/react-router'
 import { useState, useEffect } from "react";
-import { ListChecks, Route as RouteIcon, MapPin, Play, Check, History, ChevronDown, ChevronUp, Plus } from "lucide-react";
+import { ListChecks, Route as RouteIcon, MapPin, Play, Check, History, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import { useStore, transitionTrip, selfAssignTask, getState, type TaskStatus, type TaskPriority } from "@/lib/store";
 import { useSession } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
@@ -90,7 +91,19 @@ function EmployeeTasksPage() {
   const myTasks = tasks.filter((tk) => tk.assignees.some(myKey));
   const myTrips = trips.filter((tr) => myKey(tr.assignee));
 
-  const [liveGeo, setLiveGeo] = useState<{ district?: string; err?: string; lat?: number; lng?: number }>({});
+  const { data: geoData } = useQuery({
+    queryKey: ["geo", "cities-districts"],
+    queryFn: async () => {
+      const [{ data: cities }, { data: districts }] = await Promise.all([
+        supabase.from("cities").select("id, name_en, name_ar").order("name_en"),
+        supabase.from("districts").select("id, city_id, name_en, name_ar").order("name_en"),
+      ]);
+      return { cities: cities ?? [], districts: districts ?? [] };
+    },
+    staleTime: 5 * 60_000,
+  });
+
+  const [liveGeo, setLiveGeo] = useState<{ city?: string; district?: string; err?: string; lat?: number; lng?: number }>({});
   useEffect(() => {
     let cancelled = false;
     async function refresh() {
@@ -103,6 +116,7 @@ function EmployeeTasksPage() {
         const j = await r.json();
         if (cancelled) return;
         setLiveGeo({ 
+          city: j.city || j.locality || j.principalSubdivision || undefined,
           district: j.localityInfo?.administrative?.find((a: any) => a.adminLevel >= 6)?.name || j.locality || undefined,
           lat: coords.lat,
           lng: coords.lng
@@ -113,6 +127,64 @@ function EmployeeTasksPage() {
     const id = setInterval(refresh, 60000);
     return () => { cancelled = true; clearInterval(id); };
   }, []);
+
+  const [taskGeo, setTaskGeo] = useState<Record<string, { city?: string; district?: string }>>({});
+
+  useEffect(() => {
+    const needGeocode = myTasks.filter((t) => (!t.city || !t.district) && t.lat != null && t.lng != null && !taskGeo[t.id]);
+    if (needGeocode.length === 0) return;
+
+    needGeocode.forEach(async (t) => {
+      try {
+        const r = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${t.lat}&longitude=${t.lng}&localityLanguage=en`);
+        if (!r.ok) return;
+        const j = await r.json();
+        const city = j.city || j.locality || j.principalSubdivision || undefined;
+        const district = j.localityInfo?.administrative?.find((a: any) => a.adminLevel >= 6)?.name || j.locality || undefined;
+        if (city || district) {
+          setTaskGeo((prev) => ({ ...prev, [t.id]: { city, district } }));
+        }
+      } catch { }
+    });
+  }, [myTasks]);
+
+  const formatLocation = (tk: (typeof myTasks)[number]) => {
+    const geo = taskGeo[tk.id];
+    let city = tk.city || geo?.city;
+    let district = tk.district || geo?.district;
+
+    // If city is missing, infer from district via geoData
+    const targetDistrict = district?.toLowerCase();
+    if (!city && district && targetDistrict && geoData) {
+      const d = geoData.districts.find(
+        (x: any) =>
+          x.id === district ||
+          x.name_en?.toLowerCase() === targetDistrict ||
+          x.name_ar === district
+      );
+      if (d) {
+        district = d.name_en;
+        const c = geoData.cities.find((x: any) => x.id === d.city_id);
+        if (c) city = c.name_en;
+      }
+    }
+
+    if (city && geoData) {
+      const c = geoData.cities.find((x: any) => x.id === city);
+      if (c) city = c.name_en;
+    }
+
+    if (district && geoData) {
+      const d = geoData.districts.find((x: any) => x.id === district);
+      if (d) district = d.name_en;
+    }
+
+    const cityDistrict = city && district && city.toLowerCase() !== district.toLowerCase()
+      ? `${city}, ${district}`
+      : city || district;
+
+    return [cityDistrict, tk.address].filter(Boolean).join(" — ");
+  };
 
   const isLocationValid = (tk: any) => {
     if (tk.lat != null && tk.lng != null && liveGeo.lat != null && liveGeo.lng != null) {
@@ -127,14 +199,23 @@ function EmployeeTasksPage() {
       const radius = tk.radius_m || 500;
       return distance <= radius;
     }
-    if (!tk.district) return true;
-    if (!liveGeo.district) return false;
-    return liveGeo.district.toLowerCase().includes(tk.district.toLowerCase()) || tk.district.toLowerCase().includes(liveGeo.district.toLowerCase());
+    if (!tk.district && !tk.city) return true;
+    if (tk.district && liveGeo.district) {
+      if (liveGeo.district.toLowerCase().includes(tk.district.toLowerCase()) || tk.district.toLowerCase().includes(liveGeo.district.toLowerCase())) {
+        return true;
+      }
+    }
+    if (tk.city && liveGeo.city) {
+      if (liveGeo.city.toLowerCase().includes(tk.city.toLowerCase()) || tk.city.toLowerCase().includes(liveGeo.city.toLowerCase())) {
+        return true;
+      }
+    }
+    if (!liveGeo.district && !liveGeo.city) return false;
+    return false;
   };
 
   const [prompt, setPrompt] = useState<null | { kind: "task" | "trip"; id: string; to: TaskStatus; label: string }>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [showNew, setShowNew] = useState(false);
 
   const labelStatus = (s: TaskStatus) =>
     s === "pending" ? t("statusPending") : s === "in_progress" ? t("statusInProgress") : s === "done" ? t("statusDone") : t("statusCancelled");
@@ -151,26 +232,22 @@ function EmployeeTasksPage() {
           <ListChecks className="h-4 w-4 text-brand" />
           <h2 className="font-display text-base font-semibold">{t("myTasks")}</h2>
           <span className="text-xs text-muted-foreground">({myTasks.length})</span>
-          <button
-            onClick={() => setShowNew(true)}
-            className="ms-auto inline-flex items-center gap-1 rounded-full bg-gradient-brand px-2.5 py-1 text-[11px] font-semibold text-brand-foreground shadow-brand"
-          >
-            <Plus className="h-3 w-3" /> {t("newTask")}
-          </button>
         </div>
         {myTasks.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border bg-muted/30 p-6 text-center text-sm text-muted-foreground">{t("noTasks")}</div>
         ) : (
           <ul className="space-y-3">
-            {myTasks.map((tk) => (
+            {myTasks.map((tk) => {
+              const locStr = formatLocation(tk);
+              return (
               <li key={tk.id} className="rounded-2xl border border-border bg-card p-4 shadow-soft">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-medium">{tk.title}</p>
                     {tk.description && <p className="mt-0.5 text-xs text-muted-foreground">{tk.description}</p>}
-                    {(tk.district || tk.address) && (
+                    {locStr && (
                       <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                        <MapPin className="h-3 w-3" />{[tk.district, tk.address].filter(Boolean).join(" — ")}
+                        <MapPin className="h-3 w-3" />{locStr}
                       </p>
                     )}
                     <p className="mt-1 text-xs text-muted-foreground">
@@ -220,7 +297,8 @@ function EmployeeTasksPage() {
                   </ul>
                 )}
               </li>
-            ))}
+            );
+          })}
           </ul>
         )}
       </section>
@@ -298,13 +376,6 @@ function EmployeeTasksPage() {
             toast.success(prompt.label);
             setPrompt(null);
           }}
-        />
-      )}
-      {showNew && (
-        <SelfAssignModal
-          meId={meId}
-          meName={employees.find((e) => e.id === meId)?.name ?? meId}
-          onClose={() => setShowNew(false)}
         />
       )}
     </div>

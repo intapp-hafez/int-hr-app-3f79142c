@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, Link, useRouterState, Navigate } from "@tanstack/react-router";
-import { Home, Clock, Bell, ListChecks, LogIn, MoreHorizontal, Banknote } from "lucide-react";
+import { Home, Clock, Bell, ListChecks, LogIn, MoreHorizontal, Banknote, MessageSquare } from "lucide-react";
 import { AppLogo } from "@/components/AppLogo";
 import { LanguageToggle, useI18n } from "@/lib/i18n";
 import { useSession, useAuthReady } from "@/lib/auth";
@@ -7,6 +7,7 @@ import { UserMenu } from "@/components/UserMenu";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { listMyDeliveries } from "@/backend/functions/notifications.functions";
+import { getChatUnreadTotal } from "@/backend/functions/chat.functions";
 
 export const Route = createFileRoute("/employee")({
   component: EmployeeLayout,
@@ -25,6 +26,15 @@ function EmployeeLayout() {
     enabled: !!session,
   });
   const unreadCount = deliveries.length;
+
+  const unreadChatFn = useServerFn(getChatUnreadTotal);
+  const { data: chatUnreadData } = useQuery({
+    queryKey: ["my-chat-unread"],
+    queryFn: () => unreadChatFn(),
+    refetchInterval: 10000,
+    enabled: !!session,
+  });
+  const chatUnreadCount = chatUnreadData?.total ?? 0;
 
   if (typeof window === "undefined") return null;
   if (!ready) return null;
@@ -47,6 +57,18 @@ function EmployeeLayout() {
         <header className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-background/80 px-4 py-3 backdrop-blur">
           <Link to="/"><AppLogo size={24} /></Link>
           <div className="flex items-center gap-2">
+            <Link
+              to="/employee/chat"
+              aria-label="Messages & Chat"
+              className="relative grid h-9 w-9 place-items-center rounded-full border border-border bg-card text-foreground transition-colors hover:bg-muted"
+            >
+              <MessageSquare className="h-4 w-4" />
+              {chatUnreadCount > 0 && (
+                <span className="absolute -end-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 text-[10px] font-semibold text-brand-foreground shadow-sm">
+                  {chatUnreadCount}
+                </span>
+              )}
+            </Link>
             <Link
               to="/employee/notifications"
               aria-label={t("notifications")}

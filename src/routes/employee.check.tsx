@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { LogIn, LogOut, MapPin, Plus, X, Wifi, WifiOff, Radio, ShieldCheck, ListChecks } from "lucide-react";
 import { checkIn, checkOut, listMyAttendance, listMyAccess } from "@/backend/functions/attendance.functions";
@@ -102,6 +102,18 @@ function CheckInOutCard() {
     } catch { return {}; }
   }
 
+  const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
+
+  useEffect(() => {
+    const upd = () => setOnline(navigator.onLine);
+    window.addEventListener("online", upd);
+    window.addEventListener("offline", upd);
+    return () => {
+      window.removeEventListener("online", upd);
+      window.removeEventListener("offline", upd);
+    };
+  }, []);
+
   function distMeters(aLat: number, aLng: number, bLat: number, bLng: number) {
     const R = 6371000;
     const toRad = (d: number) => (d * Math.PI) / 180;
@@ -122,7 +134,31 @@ function CheckInOutCard() {
     return best;
   }
 
+  // Live GPS: read coords on mount + every 60s, and compute nearest geofence.
+  useEffect(() => {
+    let cancelled = false;
+    async function refresh() {
+      const coords = await getCoords();
+      if (cancelled) return;
+      if (coords.lat == null || coords.lng == null) return;
+      const near = computeNearest(coords.lat, coords.lng);
+      if (!cancelled) setNearest(near);
+    }
+    refresh();
+    const id = setInterval(refresh, 60000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [accessQ.data]);
+
+  const isOutsideFence = nearest !== null && !nearest.inside;
+
   async function go(kind: "in" | "out") {
+    if (isOutsideFence) {
+      toast.error(t("outsideGeofence") || "Outside allowed geofence area");
+      return;
+    }
     if (!hasFace) {
       toast.error("Face recognition is required. Please enroll your face in the Biometrics tab first.");
       return;
@@ -140,15 +176,18 @@ function CheckInOutCard() {
         near = computeNearest(coords.lat, coords.lng);
         setNearest(near);
         if (near) {
-          const msg = near.inside
-            ? `Inside "${near.name}" (${Math.round(near.distance)} m / ${near.radius} m)`
-            : `Nearest: "${near.name}" — ${Math.round(near.distance)} m away (allowed ${near.radius} m)`;
-          toast.message(msg);
+          if (!near.inside) {
+            toast.error(
+              `${t("outsideGeofence") || "Outside fence"}: ${near.name} (${Math.round(near.distance)} m / ${near.radius} m)`
+            );
+            return;
+          }
+          toast.message(`Inside "${near.name}" (${Math.round(near.distance)} m / ${near.radius} m)`);
         }
       }
-      const online = typeof navigator !== "undefined" ? navigator.onLine : true;
+      const isOnline = typeof navigator !== "undefined" ? navigator.onLine : true;
       const geo = coords.lat != null && coords.lng != null ? await reverseGeocode(coords.lat, coords.lng) : {};
-      const payload = { branch, lat: coords.lat, lng: coords.lng, network_ok: online, note: note.trim() || undefined, device_id: getCurrentDeviceId(), ...geo };
+      const payload = { branch, lat: coords.lat, lng: coords.lng, network_ok: isOnline, note: note.trim() || undefined, device_id: getCurrentDeviceId(), ...geo };
       const addr = [geo.street, geo.district, geo.city].filter(Boolean).join(", ");
       if (kind === "in") {
         const res: any = await inFn({ data: payload });
@@ -193,8 +232,6 @@ function CheckInOutCard() {
     }
   }
 
-  const online = typeof navigator !== "undefined" ? navigator.onLine : true;
-
   return (
     <section className="rounded-3xl border border-border bg-card p-5 space-y-3">
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -221,11 +258,41 @@ function CheckInOutCard() {
           </div>
         ) : (
           <>
-            <button disabled={busy !== null || hasCheckedIn} onClick={() => go("in")} className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-brand py-3 text-sm font-semibold text-brand-foreground shadow-brand disabled:opacity-60">
-              <LogIn className="h-4 w-4" /> {busy === "in" ? "Checking in…" : hasCheckedIn ? "Checked in" : "Check in"}
+            <button
+              disabled={busy !== null || hasCheckedIn || isOutsideFence}
+              onClick={() => go("in")}
+              className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                isOutsideFence
+                  ? "bg-muted text-muted-foreground shadow-none"
+                  : "bg-gradient-brand text-brand-foreground shadow-brand"
+              }`}
+            >
+              <LogIn className="h-4 w-4" />{" "}
+              {busy === "in"
+                ? "Checking in…"
+                : hasCheckedIn
+                  ? "Checked in"
+                  : isOutsideFence
+                    ? `${t("checkIn")} (${t("outsideGeofence") || "Outside fence"})`
+                    : t("checkIn")}
             </button>
-            <button disabled={busy !== null || !hasCheckedIn || hasCheckedOut} onClick={() => go("out")} className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-border bg-card py-3 text-sm font-semibold disabled:opacity-60">
-              <LogOut className="h-4 w-4" /> {busy === "out" ? "Checking out…" : hasCheckedOut ? "Checked out" : "Check out"}
+            <button
+              disabled={busy !== null || !hasCheckedIn || hasCheckedOut || isOutsideFence}
+              onClick={() => go("out")}
+              className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-border py-3 text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                isOutsideFence
+                  ? "bg-muted text-muted-foreground shadow-none"
+                  : "bg-card text-foreground"
+              }`}
+            >
+              <LogOut className="h-4 w-4" />{" "}
+              {busy === "out"
+                ? "Checking out…"
+                : hasCheckedOut
+                  ? "Checked out"
+                  : isOutsideFence
+                    ? `${t("checkOut")} (${t("outsideGeofence") || "Outside fence"})`
+                    : t("checkOut")}
             </button>
           </>
         )}

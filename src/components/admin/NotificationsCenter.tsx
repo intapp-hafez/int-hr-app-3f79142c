@@ -1,16 +1,35 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Bell, CalendarClock, Clock, UserX, LogIn, LogOut, ArrowRight, RefreshCw, Zap } from "lucide-react";
+import {
+  Bell,
+  CalendarClock,
+  Clock,
+  UserX,
+  LogIn,
+  LogOut,
+  ArrowRight,
+  RefreshCw,
+  Zap,
+  CreditCard,
+  FileText,
+  ShieldAlert,
+  Award,
+  Timer,
+  DollarSign,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getAdminAlerts, type AdminAlert } from "@/backend/functions/admin-dashboard-extras.functions";
 import { useNotificationPrefs } from "@/lib/notification-prefs";
 
-type Filter = "all" | "pending_leave" | "late" | "absent" | "checkin" | "checkout";
+type Filter = "all" | AdminAlert["kind"];
 
 const FILTERS: { id: Filter; label: string }[] = [
   { id: "all", label: "All" },
-  { id: "pending_leave", label: "Pending leaves" },
+  { id: "id_expiry", label: "National ID" },
+  { id: "contract_expiry", label: "Contracts" },
+  { id: "pending_leave", label: "Leaves" },
+  { id: "advance_payment", label: "Advances" },
   { id: "late", label: "Late" },
   { id: "absent", label: "Absent" },
   { id: "checkin", label: "Check-ins" },
@@ -23,6 +42,12 @@ const ICONS: Record<AdminAlert["kind"], typeof Bell> = {
   absent: UserX,
   checkin: LogIn,
   checkout: LogOut,
+  id_expiry: CreditCard,
+  contract_expiry: FileText,
+  insurance_expiry: ShieldAlert,
+  military_expiry: Award,
+  probation_end: Timer,
+  advance_payment: DollarSign,
 };
 
 const TONES: Record<AdminAlert["severity"], string> = {
