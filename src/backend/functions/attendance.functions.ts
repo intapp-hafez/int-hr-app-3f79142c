@@ -60,29 +60,18 @@ export const checkIn = createServerFn({ method: "POST" })
       };
     }
 
-    if (!data.device_id) {
-      return {
-        ok: false as const,
-        blocked: true as const,
-        code: "device_unauthorized" as const,
-        params: {} as Record<string, any>,
-        reason: "Check-in blocked · device not recognized. Please register it in your profile.",
-      };
-    }
-    const { data: dev } = await supabase
-      .from("employee_devices")
-      .select("status")
-      .eq("id", data.device_id)
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (!dev || dev.status !== "approved") {
-      return {
-        ok: false as const,
-        blocked: true as const,
-        code: "device_unauthorized" as const,
-        params: {} as Record<string, any>,
-        reason: "Check-in blocked · this device is not approved.",
-      };
+    {
+      const { checkDeviceAccess } = await import("@/backend/server/device-registry.server");
+      const gate = await checkDeviceAccess(userId, data.device_id, "in");
+      if (!gate.ok) {
+        return {
+          ok: false as const,
+          blocked: true as const,
+          code: "device_unauthorized" as const,
+          params: {} as Record<string, any>,
+          reason: gate.reason,
+        };
+      }
     }
 
     // Resolve assigned geofences + per-employee authorized networks + branch-level networks
