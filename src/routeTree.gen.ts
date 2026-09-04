@@ -67,6 +67,7 @@ import { Route as AdminGeofencingRouteImport } from './routes/admin.geofencing'
 import { Route as AdminEmployeesRouteImport } from './routes/admin.employees'
 import { Route as AdminEmployeeAccessRouteImport } from './routes/admin.employee-access'
 import { Route as AdminDirectoryRouteImport } from './routes/admin.directory'
+import { Route as AdminDevicesRouteImport } from './routes/admin.devices'
 import { Route as AdminContractsRouteImport } from './routes/admin.contracts'
 import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 import { Route as AdminAttendanceRouteImport } from './routes/admin.attendance'
@@ -370,6 +371,11 @@ const AdminDirectoryRoute = AdminDirectoryRouteImport.update({
   path: '/directory',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminDevicesRoute = AdminDevicesRouteImport.update({
+  id: '/devices',
+  path: '/devices',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminContractsRoute = AdminContractsRouteImport.update({
   id: '/contracts',
   path: '/contracts',
@@ -440,6 +446,7 @@ export interface FileRoutesByFullPath {
   '/admin/attendance': typeof AdminAttendanceRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/contracts': typeof AdminContractsRoute
+  '/admin/devices': typeof AdminDevicesRoute
   '/admin/directory': typeof AdminDirectoryRoute
   '/admin/employee-access': typeof AdminEmployeeAccessRoute
   '/admin/employees': typeof AdminEmployeesRouteWithChildren
@@ -506,6 +513,7 @@ export interface FileRoutesByTo {
   '/admin/attendance': typeof AdminAttendanceRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/contracts': typeof AdminContractsRoute
+  '/admin/devices': typeof AdminDevicesRoute
   '/admin/directory': typeof AdminDirectoryRoute
   '/admin/employee-access': typeof AdminEmployeeAccessRoute
   '/admin/geofencing': typeof AdminGeofencingRoute
@@ -577,6 +585,7 @@ export interface FileRoutesById {
   '/admin/attendance': typeof AdminAttendanceRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/contracts': typeof AdminContractsRoute
+  '/admin/devices': typeof AdminDevicesRoute
   '/admin/directory': typeof AdminDirectoryRoute
   '/admin/employee-access': typeof AdminEmployeeAccessRoute
   '/admin/employees': typeof AdminEmployeesRouteWithChildren
@@ -650,6 +659,7 @@ export interface FileRouteTypes {
     | '/admin/attendance'
     | '/admin/audit'
     | '/admin/contracts'
+    | '/admin/devices'
     | '/admin/directory'
     | '/admin/employee-access'
     | '/admin/employees'
@@ -716,6 +726,7 @@ export interface FileRouteTypes {
     | '/admin/attendance'
     | '/admin/audit'
     | '/admin/contracts'
+    | '/admin/devices'
     | '/admin/directory'
     | '/admin/employee-access'
     | '/admin/geofencing'
@@ -786,6 +797,7 @@ export interface FileRouteTypes {
     | '/admin/attendance'
     | '/admin/audit'
     | '/admin/contracts'
+    | '/admin/devices'
     | '/admin/directory'
     | '/admin/employee-access'
     | '/admin/employees'
@@ -1265,6 +1277,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminDirectoryRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/devices': {
+      id: '/admin/devices'
+      path: '/devices'
+      fullPath: '/admin/devices'
+      preLoaderRoute: typeof AdminDevicesRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/contracts': {
       id: '/admin/contracts'
       path: '/contracts'
@@ -1365,6 +1384,7 @@ interface AdminRouteChildren {
   AdminAttendanceRoute: typeof AdminAttendanceRoute
   AdminAuditRoute: typeof AdminAuditRoute
   AdminContractsRoute: typeof AdminContractsRoute
+  AdminDevicesRoute: typeof AdminDevicesRoute
   AdminDirectoryRoute: typeof AdminDirectoryRoute
   AdminEmployeeAccessRoute: typeof AdminEmployeeAccessRoute
   AdminEmployeesRoute: typeof AdminEmployeesRouteWithChildren
@@ -1398,6 +1418,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminAttendanceRoute: AdminAttendanceRoute,
   AdminAuditRoute: AdminAuditRoute,
   AdminContractsRoute: AdminContractsRoute,
+  AdminDevicesRoute: AdminDevicesRoute,
   AdminDirectoryRoute: AdminDirectoryRoute,
   AdminEmployeeAccessRoute: AdminEmployeeAccessRoute,
   AdminEmployeesRoute: AdminEmployeesRouteWithChildren,

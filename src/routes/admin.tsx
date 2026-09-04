@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, Link, useRouterState, Navigate, useNavigate } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
-import { LayoutDashboard, Users, MapPin, Clock, CalendarDays, FileBarChart2, ScrollText, Menu, X, Bell, Search, Wallet, Settings, FileSignature, Shield, Building2, KeyRound, Calculator, UserCog, Network, StickyNote, Banknote, Plane, BarChart3, MessageSquare } from "lucide-react";
+import { LayoutDashboard, Users, MapPin, Clock, CalendarDays, FileBarChart2, ScrollText, Menu, X, Bell, Search, Wallet, Settings, FileSignature, Shield, Building2, KeyRound, Calculator, UserCog, Network, StickyNote, Banknote, Plane, BarChart3, MessageSquare , Smartphone } from "lucide-react";
 import { NotificationsBell } from "@/components/admin/NotificationsBell";
 import { AppLogo } from "@/components/AppLogo";
 import { UserMenu } from "@/components/UserMenu";
@@ -40,6 +40,7 @@ function AdminLayout() {
     { to: "/admin/contracts", icon: FileSignature, label: t("contracts"), page: "contracts" },
     { to: "/admin/geofencing", icon: MapPin, label: t("geofencing"), page: "geofencing" },
     { to: "/admin/attendance", icon: Clock, label: t("attendance"), page: "attendance" },
+    { to: "/admin/devices", icon: Smartphone, label: "Devices", page: "employees" },
     { to: "/admin/leaves", icon: CalendarDays, label: t("leaves"), page: "leaves" },
     { to: "/admin/payroll", icon: Wallet, label: t("payroll"), page: "payroll" },
     { to: "/admin/advances", icon: Banknote, label: t("advancesTitle"), page: "advances" },
