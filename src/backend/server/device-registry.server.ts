@@ -101,6 +101,25 @@ export async function assertDeviceAllowed(userId: string, deviceId: string | und
   return device;
 }
 
+/**
+ * Non-throwing variant used by attendance check-in / check-out, which return a
+ * structured `blocked` payload instead of raising.
+ */
+export async function checkDeviceAccess(
+  userId: string,
+  deviceId: string | undefined | null,
+  kind: "in" | "out",
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const verb = kind === "in" ? "Check-in" : "Check-out";
+  try {
+    await assertDeviceAllowed(userId, deviceId);
+    return { ok: true };
+  } catch (e: any) {
+    const msg = String(e?.message ?? DEVICE_ERRORS.PENDING);
+    return { ok: false, reason: `${verb} blocked · ${msg.split("· ").slice(1).join("· ") || msg}` };
+  }
+}
+
 export async function touchDeviceCheck(deviceId: string, kind: "in" | "out") {
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

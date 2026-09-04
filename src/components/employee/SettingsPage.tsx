@@ -15,6 +15,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { getMe, getMyProfileDetails } from "@/backend/functions/auth.functions";
 import { listMyDevices, registerMyDevice, removeMyDevice } from "@/backend/functions/devices.functions";
 import { AvatarUploader } from "@/components/AvatarUploader";
+import { collectDeviceProfile } from "@/lib/device-fingerprint";
 
 export function SettingsPage() {
   const { t, lang, setLang } = useI18n();
@@ -48,19 +49,27 @@ export function SettingsPage() {
     enabled: !!realProfile?.id,
   });
   const myDevice = myDevices.find((d: any) => d.id === deviceId);
-  const status: "approved" | "pending" | "revoked" | "unregistered" =
+  const status: "approved" | "pending" | "revoked" | "rejected" | "blocked" | "unregistered" =
     myDevice?.status === "approved" ? "approved" :
     myDevice?.status === "pending" ? "pending" :
-    myDevice?.status === "revoked" ? "revoked" : "unregistered";
+    myDevice?.status === "revoked" ? "revoked" :
+    myDevice?.status === "rejected" ? "rejected" :
+    myDevice?.status === "blocked" ? "blocked" : "unregistered";
 
   async function handleRegister() {
     if (!deviceId) return;
     try {
+      const p = await collectDeviceProfile();
       await registerFn({
         data: {
-          device_id: deviceId,
-          label: deviceLabelGuess(),
-          user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
+          device_id: p.device_id || deviceId,
+          label: p.label || deviceLabelGuess(),
+          user_agent: p.user_agent || (typeof navigator !== "undefined" ? navigator.userAgent : null),
+          fingerprint: p.fingerprint,
+          device_key: p.device_key,
+          device_type: p.device_type,
+          os: p.os,
+          browser: p.browser,
         },
       });
       toast.success(t("registerDevice"), { description: t("awaitingApproval") });
@@ -284,9 +293,12 @@ export function SettingsPage() {
           <p className="inline-flex items-center gap-1.5 text-xs text-success"><Check className="h-3 w-3" /> {t("deviceApproved")}</p>
         ) : status === "pending" ? (
           <p className="text-xs text-muted-foreground">{t("awaitingApproval")}</p>
-        ) : status === "revoked" ? (
+        ) : status === "revoked" || status === "rejected" || status === "blocked" ? (
           <div className="space-y-2">
-            <p className="text-xs text-destructive">This device was revoked by an administrator.</p>
+            <p className="text-xs text-destructive">
+              Device not approved — this device was {status} by an administrator. Attendance is blocked from it.
+              Please contact your administrator.
+            </p>
             <button onClick={() => handleRemove(deviceId)} className="w-full rounded-xl border border-border bg-card py-2 text-xs font-semibold">Remove</button>
           </div>
         ) : (

@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
@@ -67,6 +67,11 @@ function CheckInOutCard() {
 
   const currentDevice = devQ.data?.find((d: any) => d.id === getCurrentDeviceId());
   const deviceApproved = currentDevice?.status === "approved";
+  const deviceMessage = !currentDevice
+    ? "This device is not registered. Open Settings to register it, then ask your administrator to approve it."
+    : currentDevice.status === "pending"
+      ? "This device is awaiting administrator approval."
+      : `This device was ${currentDevice.status} by an administrator. Please contact your administrator.`;
 
   const today = new Date().toISOString().slice(0, 10);
   const todayRow: any = ((attQ.data as any[]) ?? []).find((a) => a.date === today);
@@ -205,9 +210,15 @@ function CheckInOutCard() {
 
       <div className="flex gap-2">
         {!deviceApproved ? (
-          <button disabled className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-black/5 py-3 text-sm font-semibold text-muted-foreground disabled:opacity-60">
-            <ShieldCheck className="h-4 w-4" /> Device Not Approved
-          </button>
+          <div className="w-full space-y-2">
+            <button disabled className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-black/5 py-3 text-sm font-semibold text-muted-foreground disabled:opacity-60">
+              <ShieldCheck className="h-4 w-4" /> Device Not Approved
+            </button>
+            <p className="rounded-xl bg-destructive/10 px-3 py-2 text-xs text-destructive">{deviceMessage}</p>
+            <Link to="/employee/settings" className="block text-center text-xs font-semibold underline">
+              Go to Settings
+            </Link>
+          </div>
         ) : (
           <>
             <button disabled={busy !== null || hasCheckedIn} onClick={() => go("in")} className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-brand py-3 text-sm font-semibold text-brand-foreground shadow-brand disabled:opacity-60">
