@@ -229,6 +229,10 @@ export const checkIn = createServerFn({ method: "POST" })
       { onConflict: "employee_id,date" },
     );
     if (error) throw new Error(error.message);
+    {
+      const { touchDeviceCheck } = await import("@/backend/server/device-registry.server");
+      await touchDeviceCheck(data.device_id!, "in");
+    }
     return {
       ok: true as const,
       blocked: false as const,
@@ -359,6 +363,10 @@ export const checkOut = createServerFn({ method: "POST" })
       .eq("employee_id", userId)
       .eq("date", today);
     if (error) throw new Error(error.message);
+    {
+      const { touchDeviceCheck } = await import("@/backend/server/device-registry.server");
+      await touchDeviceCheck(data.device_id!, "out");
+    }
     return { ok: true as const, blocked: false as const };
   });
 
