@@ -99,6 +99,7 @@ import { Trash2, Pencil, Save } from "lucide-react";
 import { EmployeeAssignmentsPicker } from "@/components/EmployeeAssignmentsPicker";
 import { Target } from "lucide-react";
 import { Package } from "lucide-react";
+import { safeRandomUUID } from "@/lib/utils";
 
 
 export const Route = createFileRoute("/admin/employees/$id")({
@@ -715,9 +716,18 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
               <div className="flex items-center justify-between">
                 <label className="block text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Custom Notes / Fields</label>
                 <button type="button" onClick={() => {
-                  let arr = [];
-                  try { arr = JSON.parse(form.custom_field || "[]"); if (!Array.isArray(arr)) arr = []; } catch { arr = []; }
-                  arr.push({ id: crypto.randomUUID(), title: "", details: "", type: "text", value: "" });
+                  let arr: any[] = [];
+                  try { 
+                    arr = JSON.parse(form.custom_field || "[]"); 
+                    if (!Array.isArray(arr)) arr = []; 
+                  } catch { 
+                    if (form.custom_field) {
+                      arr = [{ id: 'legacy', title: "Legacy Note", details: "", type: "text", value: form.custom_field }];
+                    } else {
+                      arr = [];
+                    }
+                  }
+                  arr.push({ id: safeRandomUUID(), title: "", details: "", type: "text", value: "" });
                   upd("custom_field", JSON.stringify(arr));
                 }} className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-1 text-[10px] font-semibold hover:bg-muted">
                   <Plus className="h-3 w-3" /> Add Field

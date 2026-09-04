@@ -35,6 +35,7 @@ import {
 import { useRef } from "react";
 import { EmployeeAvatar } from "@/components/EmployeeAvatar";
 import { SubTabs } from "@/components/SubTabs";
+import { safeRandomUUID } from "@/lib/utils";
 
 
 
@@ -1187,9 +1188,18 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
               <div className="flex items-center justify-between">
                 <label className="block text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Custom Notes / Fields</label>
                 <button type="button" onClick={() => {
-                  let arr = [];
-                  try { arr = JSON.parse(form.customField || "[]"); if (!Array.isArray(arr)) arr = []; } catch { arr = []; }
-                  arr.push({ id: crypto.randomUUID(), title: "", details: "", type: "text", value: "" });
+                  let arr: any[] = [];
+                  try { 
+                    arr = JSON.parse(form.customField || "[]"); 
+                    if (!Array.isArray(arr)) arr = []; 
+                  } catch { 
+                    if (form.customField) {
+                      arr = [{ id: 'legacy', title: "Legacy Note", details: "", type: "text", value: form.customField }];
+                    } else {
+                      arr = [];
+                    }
+                  }
+                  arr.push({ id: safeRandomUUID(), title: "", details: "", type: "text", value: "" });
                   upd("customField", JSON.stringify(arr));
                 }} className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-1 text-[10px] font-semibold hover:bg-muted">
                   <Plus className="h-3 w-3" /> Add Field
