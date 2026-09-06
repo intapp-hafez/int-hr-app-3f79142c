@@ -185,3 +185,9 @@
     border-color: var(--color-ring);
   }
 }
+
+@media print {
+  body * { visibility: hidden; }
+  #hr-doc-print-area, #hr-doc-print-area * { visibility: visible; }
+  #hr-doc-print-area { position: absolute; inset: 0; margin: 0; width: 100%; }
+}

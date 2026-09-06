@@ -163,6 +163,141 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_channels: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          department_id: string | null
+          department_name: string | null
+          id: string
+          last_message_at: string
+          name: string | null
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          department_id?: string | null
+          department_name?: string | null
+          id?: string
+          last_message_at?: string
+          name?: string | null
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          department_id?: string | null
+          department_name?: string | null
+          id?: string
+          last_message_at?: string
+          name?: string | null
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_channels_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_channels_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_messages: {
+        Row: {
+          attachments: Json | null
+          channel_id: string
+          content: string
+          created_at: string
+          id: string
+          is_system: boolean
+          sender_id: string
+        }
+        Insert: {
+          attachments?: Json | null
+          channel_id: string
+          content: string
+          created_at?: string
+          id?: string
+          is_system?: boolean
+          sender_id: string
+        }
+        Update: {
+          attachments?: Json | null
+          channel_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          is_system?: boolean
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "chat_channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_participants: {
+        Row: {
+          channel_id: string
+          id: string
+          joined_at: string
+          last_read_at: string
+          user_id: string
+        }
+        Insert: {
+          channel_id: string
+          id?: string
+          joined_at?: string
+          last_read_at?: string
+          user_id: string
+        }
+        Update: {
+          channel_id?: string
+          id?: string
+          joined_at?: string
+          last_read_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_participants_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "chat_channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_participants_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cities: {
         Row: {
           created_at: string
@@ -473,6 +608,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      device_approval_logs: {
+        Row: {
+          action: string
+          actor_id: string | null
+          created_at: string
+          device_id: string
+          from_status: string | null
+          id: string
+          ip_address: string | null
+          reason: string | null
+          to_status: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          created_at?: string
+          device_id: string
+          from_status?: string | null
+          id?: string
+          ip_address?: string | null
+          reason?: string | null
+          to_status?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          created_at?: string
+          device_id?: string
+          from_status?: string | null
+          id?: string
+          ip_address?: string | null
+          reason?: string | null
+          to_status?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
       }
       districts: {
         Row: {
@@ -824,30 +998,72 @@ export type Database = {
       }
       employee_devices: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
+          blocked_at: string | null
+          blocked_by: string | null
+          browser: string | null
           created_at: string
+          device_key: string | null
+          device_type: string | null
+          fingerprint: string | null
+          first_seen_at: string
           id: string
+          ip_address: string | null
+          is_primary: boolean
           label: string
+          last_checkin: string | null
+          last_checkout: string | null
           last_seen_at: string | null
+          os: string | null
           status: string
           updated_at: string
           user_agent: string | null
           user_id: string
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          blocked_at?: string | null
+          blocked_by?: string | null
+          browser?: string | null
           created_at?: string
+          device_key?: string | null
+          device_type?: string | null
+          fingerprint?: string | null
+          first_seen_at?: string
           id: string
+          ip_address?: string | null
+          is_primary?: boolean
           label?: string
+          last_checkin?: string | null
+          last_checkout?: string | null
           last_seen_at?: string | null
+          os?: string | null
           status?: string
           updated_at?: string
           user_agent?: string | null
           user_id: string
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          blocked_at?: string | null
+          blocked_by?: string | null
+          browser?: string | null
           created_at?: string
+          device_key?: string | null
+          device_type?: string | null
+          fingerprint?: string | null
+          first_seen_at?: string
           id?: string
+          ip_address?: string | null
+          is_primary?: boolean
           label?: string
+          last_checkin?: string | null
+          last_checkout?: string | null
           last_seen_at?: string | null
+          os?: string | null
           status?: string
           updated_at?: string
           user_agent?: string | null
@@ -3532,6 +3748,10 @@ export type Database = {
           _status?: string
         }
         Returns: string
+      }
+      is_chat_channel_member: {
+        Args: { p_channel_id: string; p_user_id: string }
+        Returns: boolean
       }
       security_scan_exec: { Args: { _sql: string }; Returns: undefined }
       security_scan_query: { Args: { _sql: string }; Returns: Json[] }
