@@ -8,6 +8,7 @@ import { useI18n } from "@/lib/i18n";
 import { getPayrollPeriod, lockPayrollRun, unlockPayrollRun, type PayrollRow } from "@/backend/functions/payroll.functions";
 import { AdvancedSettingsTab } from "@/components/payroll/AdvancedSettingsTab";
 import { Settings2 } from "lucide-react";
+import { formatName3Words } from "@/lib/utils";
 
 
 export const Route = createFileRoute("/finance/payroll")({
@@ -461,12 +462,12 @@ function FinancePayroll() {
               <tr key={r.employee_id} className="border-b border-border last:border-b-0 hover:bg-muted/40">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
-                    <div className="grid h-8 w-8 place-items-center rounded-full bg-gradient-brand text-[10px] font-semibold text-brand-foreground">
+                    <div className="grid h-8 w-8 place-items-center rounded-full bg-gradient-brand text-[10px] font-semibold text-brand-foreground shrink-0">
                       {r.employee_name.split(" ").map((s) => s[0]).slice(0, 2).join("")}
                     </div>
                     <div>
-                      <p className="font-medium">{r.employee_name}</p>
-                      <p className="text-[11px] text-muted-foreground">{r.emp_code ?? "—"}{r.department ? ` · ${r.department}` : ""}</p>
+                      <p className="font-medium whitespace-pre-line leading-snug">{formatName3Words(r.employee_name)}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">{r.emp_code ?? "—"}{r.department ? ` · ${r.department}` : ""}</p>
                     </div>
                   </div>
                 </td>

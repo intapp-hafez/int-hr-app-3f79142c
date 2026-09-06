@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Loader2, Wallet, Pencil, ChevronLeft, ChevronRight, Search, Download, CheckSquare } from "lucide-react";
+import { Loader2, Wallet, Pencil, ChevronLeft, ChevronRight, Search, Download, CheckSquare, LayoutGrid, Table as TableIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { listAllLeavesAdmin, decideLeave, adminBulkLeaveDeduction } from "@/backend/functions/leaves.functions";
@@ -54,6 +54,7 @@ function AdminLeaves() {
   const [balSearchInput, setBalSearchInput] = useState("");
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [exporting, setExporting] = useState(false);
+  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
   const { data: leaves = [], isLoading } = useQuery({
     queryKey: ["admin", "leaves"],
@@ -224,13 +225,44 @@ function AdminLeaves() {
 
       {tab === "requests" && (
         <>
-      <div className="flex flex-wrap gap-2">
-        {STATUSES.map((s) => (
-          <button key={s} onClick={() => setFilter(s)}
-            className={`rounded-full px-3 py-1.5 text-xs font-semibold capitalize transition ${filter === s ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
-            {t(s as any) || s} <span className="ml-1 opacity-70">{counts[s] ?? 0}</span>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2">
+          {STATUSES.map((s) => (
+            <button key={s} onClick={() => setFilter(s)}
+              className={`rounded-full px-3 py-1.5 text-xs font-semibold capitalize transition ${filter === s ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
+              {t(s as any) || s} <span className="ml-1 opacity-70">{counts[s] ?? 0}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-1 rounded-xl border border-border bg-card p-1 shadow-xs">
+          <button
+            type="button"
+            onClick={() => setViewMode("grid")}
+            title="Cards View"
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+              viewMode === "grid"
+                ? "bg-primary text-primary-foreground shadow-xs"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            }`}
+          >
+            <LayoutGrid className="h-3.5 w-3.5" />
+            <span>Cards</span>
           </button>
-        ))}
+          <button
+            type="button"
+            onClick={() => setViewMode("table")}
+            title="Table View"
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+              viewMode === "table"
+                ? "bg-primary text-primary-foreground shadow-xs"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            }`}
+          >
+            <TableIcon className="h-3.5 w-3.5" />
+            <span>Table</span>
+          </button>
+        </div>
       </div>
 
       {isLoading && (
@@ -244,53 +276,160 @@ function AdminLeaves() {
         </div>
       )}
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {visible.map((l) => (
-          <div key={l.id} className="rounded-3xl border border-border bg-card p-5">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <div className="grid h-10 w-10 place-items-center rounded-full bg-gradient-brand text-xs font-semibold text-brand-foreground">
-                  {l.employee_name.split(" ").map((s) => s[0]).slice(0, 2).join("")}
+      {!isLoading && visible.length > 0 && (
+        viewMode === "grid" ? (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {visible.map((l) => (
+              <div key={l.id} className="rounded-3xl border border-border bg-card p-5">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="grid h-10 w-10 place-items-center rounded-full bg-gradient-brand text-xs font-semibold text-brand-foreground">
+                      {l.employee_name.split(" ").map((s) => s[0]).slice(0, 2).join("")}
+                    </div>
+                    <div>
+                      <p className="font-semibold">{l.employee_name}</p>
+                      <p className="text-[11px] text-muted-foreground">{l.leave_type_name ?? "Leave"}{l.days ? ` · ${l.days}d` : ""}{l.paid === false ? " · unpaid" : ""}</p>
+                    </div>
+                  </div>
+                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${tone[l.status] ?? "bg-muted text-muted-foreground"}`}>
+                    {t(l.status as any) || l.status}
+                  </span>
                 </div>
-                <div>
-                  <p className="font-semibold">{l.employee_name}</p>
-                  <p className="text-[11px] text-muted-foreground">{l.leave_type_name ?? "Leave"}{l.days ? ` · ${l.days}d` : ""}{l.paid === false ? " · unpaid" : ""}</p>
+                <div className="mt-4 rounded-xl bg-muted/60 p-3 text-xs">
+                  <div className="flex justify-between"><span className="text-muted-foreground">{t("fromWord")}</span><span className="font-medium">{formatDate(l.start_date)}</span></div>
+                  <div className="mt-1 flex justify-between"><span className="text-muted-foreground">{t("toWord")}</span><span className="font-medium">{formatDate(l.end_date)}</span></div>
+                  {l.reason && <p className="mt-2 text-[11px] italic text-muted-foreground">"{l.reason}"</p>}
                 </div>
+                {(l as any).proof_url && (
+                  <a
+                    href={(l as any).proof_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    download={(l as any).proof_name ?? undefined}
+                    className="mt-2 inline-flex items-center gap-1 rounded-lg bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary"
+                  >
+                    📎 {(l as any).proof_name ?? "View proof"}
+                  </a>
+                )}
+                {l.status === "pending" ? (
+                  <div className="mt-3 flex gap-2">
+                    <button disabled={mut.isPending} onClick={() => mut.mutate({ id: l.id, status: "approved", name: l.employee_name })} className="flex-1 rounded-xl bg-success px-3 py-2 text-xs font-semibold text-success-foreground disabled:opacity-50">{t("approve")}</button>
+                    <button disabled={mut.isPending} onClick={() => mut.mutate({ id: l.id, status: "rejected", name: l.employee_name })} className="flex-1 rounded-xl bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive disabled:opacity-50">{t("reject")}</button>
+                    <button disabled={mut.isPending} onClick={() => mut.mutate({ id: l.id, status: "cancelled", name: l.employee_name })} className="flex-1 rounded-xl bg-muted px-3 py-2 text-xs font-semibold text-muted-foreground disabled:opacity-50">{t("cancel") || "Cancel"}</button>
+                  </div>
+                ) : l.status === "approved" && l.end_date >= new Date().toISOString().slice(0, 10) ? (
+                  <div className="mt-3">
+                    <button disabled={mut.isPending} onClick={() => mut.mutate({ id: l.id, status: "cancelled", name: l.employee_name })} className="w-full rounded-xl bg-muted px-3 py-2 text-xs font-semibold text-muted-foreground disabled:opacity-50">{t("cancelApproval") || "Cancel approval"}</button>
+                  </div>
+                ) : null}
               </div>
-              <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${tone[l.status] ?? "bg-muted text-muted-foreground"}`}>
-                {t(l.status as any) || l.status}
-              </span>
-            </div>
-            <div className="mt-4 rounded-xl bg-muted/60 p-3 text-xs">
-              <div className="flex justify-between"><span className="text-muted-foreground">{t("fromWord")}</span><span className="font-medium">{formatDate(l.start_date)}</span></div>
-              <div className="mt-1 flex justify-between"><span className="text-muted-foreground">{t("toWord")}</span><span className="font-medium">{formatDate(l.end_date)}</span></div>
-              {l.reason && <p className="mt-2 text-[11px] italic text-muted-foreground">"{l.reason}"</p>}
-            </div>
-            {(l as any).proof_url && (
-              <a
-                href={(l as any).proof_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                download={(l as any).proof_name ?? undefined}
-                className="mt-2 inline-flex items-center gap-1 rounded-lg bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary"
-              >
-                📎 {(l as any).proof_name ?? "View proof"}
-              </a>
-            )}
-            {l.status === "pending" ? (
-              <div className="mt-3 flex gap-2">
-                <button disabled={mut.isPending} onClick={() => mut.mutate({ id: l.id, status: "approved", name: l.employee_name })} className="flex-1 rounded-xl bg-success px-3 py-2 text-xs font-semibold text-success-foreground disabled:opacity-50">{t("approve")}</button>
-                <button disabled={mut.isPending} onClick={() => mut.mutate({ id: l.id, status: "rejected", name: l.employee_name })} className="flex-1 rounded-xl bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive disabled:opacity-50">{t("reject")}</button>
-                <button disabled={mut.isPending} onClick={() => mut.mutate({ id: l.id, status: "cancelled", name: l.employee_name })} className="flex-1 rounded-xl bg-muted px-3 py-2 text-xs font-semibold text-muted-foreground disabled:opacity-50">{t("cancel") || "Cancel"}</button>
-              </div>
-            ) : l.status === "approved" && l.end_date >= new Date().toISOString().slice(0, 10) ? (
-              <div className="mt-3">
-                <button disabled={mut.isPending} onClick={() => mut.mutate({ id: l.id, status: "cancelled", name: l.employee_name })} className="w-full rounded-xl bg-muted px-3 py-2 text-xs font-semibold text-muted-foreground disabled:opacity-50">{t("cancelApproval") || "Cancel approval"}</button>
-              </div>
-            ) : null}
+            ))}
           </div>
-        ))}
-      </div>
+        ) : (
+          <div className="overflow-x-auto rounded-3xl border border-border bg-card">
+            <table className="w-full text-sm">
+              <thead className="border-b border-border bg-muted/40 text-[11px] uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-3 text-start">{t("employee") || "Employee"}</th>
+                  <th className="px-4 py-3 text-start">{t("leaveType") || "Leave Type"}</th>
+                  <th className="px-4 py-3 text-start">{t("duration") || "Duration"}</th>
+                  <th className="px-4 py-3 text-center">{t("days") || "Days"}</th>
+                  <th className="px-4 py-3 text-start">{t("reason") || "Reason"}</th>
+                  <th className="px-4 py-3 text-center">{t("proof") || "Attachment"}</th>
+                  <th className="px-4 py-3 text-center">{t("status") || "Status"}</th>
+                  <th className="px-4 py-3 text-end">{t("actions") || "Actions"}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {visible.map((l) => (
+                  <tr key={l.id} className="transition-colors hover:bg-muted/30">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="grid h-8 w-8 place-items-center rounded-full bg-gradient-brand text-[10px] font-semibold text-brand-foreground shrink-0">
+                          {l.employee_name.split(" ").map((s) => s[0]).slice(0, 2).join("")}
+                        </div>
+                        <span className="font-medium text-foreground">{l.employee_name}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="font-medium">{l.leave_type_name ?? "Leave"}</div>
+                      {l.paid === false && <span className="text-[10px] text-muted-foreground">unpaid</span>}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-xs">
+                      <div><span className="text-muted-foreground">{t("fromWord")} </span><span className="font-medium">{formatDate(l.start_date)}</span></div>
+                      <div className="mt-0.5"><span className="text-muted-foreground">{t("toWord")} </span><span className="font-medium">{formatDate(l.end_date)}</span></div>
+                    </td>
+                    <td className="px-4 py-3 text-center font-mono font-medium tabular-nums">
+                      {l.days ? `${l.days}d` : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-xs max-w-xs truncate text-muted-foreground" title={l.reason ?? ""}>
+                      {l.reason ? `"${l.reason}"` : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-center whitespace-nowrap">
+                      {(l as any).proof_url ? (
+                        <a
+                          href={(l as any).proof_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          download={(l as any).proof_name ?? undefined}
+                          className="inline-flex items-center gap-1 rounded-lg bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary hover:bg-primary/20"
+                          title={(l as any).proof_name ?? "Attachment"}
+                        >
+                          📎 {(l as any).proof_name ?? "Attachment"}
+                        </a>
+                      ) : (
+                        <span className="text-xs text-muted-foreground/50">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center whitespace-nowrap">
+                      <span className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${tone[l.status] ?? "bg-muted text-muted-foreground"}`}>
+                        {t(l.status as any) || l.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-end whitespace-nowrap">
+                      {l.status === "pending" ? (
+                        <div className="inline-flex items-center gap-1.5">
+                          <button
+                            disabled={mut.isPending}
+                            onClick={() => mut.mutate({ id: l.id, status: "approved", name: l.employee_name })}
+                            className="rounded-lg bg-success px-2.5 py-1 text-xs font-semibold text-success-foreground hover:bg-success/90 disabled:opacity-50"
+                          >
+                            {t("approve")}
+                          </button>
+                          <button
+                            disabled={mut.isPending}
+                            onClick={() => mut.mutate({ id: l.id, status: "rejected", name: l.employee_name })}
+                            className="rounded-lg bg-destructive/10 px-2.5 py-1 text-xs font-semibold text-destructive hover:bg-destructive/20 disabled:opacity-50"
+                          >
+                            {t("reject")}
+                          </button>
+                          <button
+                            disabled={mut.isPending}
+                            onClick={() => mut.mutate({ id: l.id, status: "cancelled", name: l.employee_name })}
+                            className="rounded-lg bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground hover:bg-muted/80 disabled:opacity-50"
+                          >
+                            {t("cancel") || "Cancel"}
+                          </button>
+                        </div>
+                      ) : l.status === "approved" && l.end_date >= new Date().toISOString().slice(0, 10) ? (
+                        <button
+                          disabled={mut.isPending}
+                          onClick={() => mut.mutate({ id: l.id, status: "cancelled", name: l.employee_name })}
+                          className="rounded-lg bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground hover:bg-muted/80 disabled:opacity-50"
+                        >
+                          {t("cancelApproval") || "Cancel approval"}
+                        </button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground/50">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      )}
         </>
       )}
 

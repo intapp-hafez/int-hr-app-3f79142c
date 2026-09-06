@@ -6,6 +6,7 @@ import { Save, FileUp, FileDown, Search, Loader2, ChevronLeft, ChevronRight } fr
 import * as XLSX from 'xlsx';
 import { useI18n } from '@/lib/i18n';
 import { getAdvancedPayrollSettings, saveAdvancedPayrollSettings, saveBulkAdvancedPayrollSettings } from '@/backend/functions/payroll.functions';
+import { formatName3Words } from '@/lib/utils';
 
 export type AdvRow = {
   id: string;
@@ -236,7 +237,7 @@ export function AdvancedSettingsTab() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t("searchEmployees")}
-              className="w-full rounded-full border border-border bg-card py-2 ps-9 pe-4 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+              className="w-full rounded-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 py-2 ps-9 pe-4 text-sm text-foreground shadow-xs outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/25"
             />
           </div>
           <span className="text-xs text-muted-foreground">
@@ -298,34 +299,50 @@ export function AdvancedSettingsTab() {
             )}
             {paginated.map((row) => {
               const isDirty = !!edits[row.id] && Object.keys(edits[row.id]).length > 0;
+              const rowEdits = edits[row.id] || {};
               return (
                 <tr key={row.id} className={`transition-colors hover:bg-muted/20 ${isDirty ? "bg-primary/5" : ""}`}>
-                  <td className="px-4 py-2.5 whitespace-nowrap">
-                    <div className="font-medium">{row.full_name}</div>
+                  <td className="px-4 py-2.5">
+                    <div className="font-medium whitespace-pre-line leading-snug">{formatName3Words(row.full_name)}</div>
                     <div className="font-mono text-xs text-muted-foreground mt-0.5">{row.emp_code ?? "—"}</div>
                   </td>
                   <td className="px-4 py-2">
                     <input
                       type="text"
+                      placeholder="—"
                       value={getVal(row.id, "insurance_number", row.insurance_number)}
                       onChange={(e) => setEdit(row.id, "insurance_number", e.target.value)}
-                      className="w-32 rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                      className={`w-36 rounded-md border bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-foreground shadow-xs transition hover:border-slate-400 dark:hover:border-slate-500 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 ${
+                        rowEdits.insurance_number !== undefined
+                          ? "border-brand ring-1 ring-brand/30 bg-brand/5"
+                          : "border-slate-300 dark:border-slate-600"
+                      }`}
                     />
                   </td>
                   <td className="px-4 py-2">
                     <input
                       type="text"
+                      placeholder="—"
                       value={getVal(row.id, "bank_account_name", row.bank_account_name)}
                       onChange={(e) => setEdit(row.id, "bank_account_name", e.target.value)}
-                      className="w-40 rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                      className={`w-44 rounded-md border bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-foreground shadow-xs transition hover:border-slate-400 dark:hover:border-slate-500 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 ${
+                        rowEdits.bank_account_name !== undefined
+                          ? "border-brand ring-1 ring-brand/30 bg-brand/5"
+                          : "border-slate-300 dark:border-slate-600"
+                      }`}
                     />
                   </td>
                   <td className="px-4 py-2">
                     <input
                       type="text"
+                      placeholder="—"
                       value={getVal(row.id, "bank_account_number", row.bank_account_number)}
                       onChange={(e) => setEdit(row.id, "bank_account_number", e.target.value)}
-                      className="w-40 rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                      className={`w-44 rounded-md border bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-foreground shadow-xs transition hover:border-slate-400 dark:hover:border-slate-500 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 ${
+                        rowEdits.bank_account_number !== undefined
+                          ? "border-brand ring-1 ring-brand/30 bg-brand/5"
+                          : "border-slate-300 dark:border-slate-600"
+                      }`}
                     />
                   </td>
                   {(["external_income", "external_tax_paid", "medical_insurance", "insurance_salary", "emergency_fund", "other_deductions"] as const).map((field) => (
@@ -336,7 +353,11 @@ export function AdvancedSettingsTab() {
                         step={0.01}
                         value={getVal(row.id, field, row[field])}
                         onChange={(e) => setEdit(row.id, field, Number(e.target.value))}
-                        className="w-28 rounded-lg border border-border bg-background px-2.5 py-1.5 text-center text-sm font-mono tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        className={`w-28 rounded-md border bg-white dark:bg-slate-900 px-2.5 py-1.5 text-center text-sm font-mono tabular-nums text-foreground shadow-xs transition hover:border-slate-400 dark:hover:border-slate-500 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 ${
+                          rowEdits[field] !== undefined
+                            ? "border-brand ring-1 ring-brand/30 bg-brand/5"
+                            : "border-slate-300 dark:border-slate-600"
+                        }`}
                       />
                     </td>
                   ))}
