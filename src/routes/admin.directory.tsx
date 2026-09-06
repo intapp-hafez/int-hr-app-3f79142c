@@ -18,9 +18,11 @@ import { SectionsManager } from "@/components/admin/SectionsManager";
 import { SmsBroadcastTab } from "@/components/admin/SmsBroadcastTab";
 
 const ContractTemplatesManager = lazy(() => import("@/components/ContractTemplatesManager").then((mod) => ({ default: mod.ContractTemplatesManager })));
+const ExperienceSalaryCertificate = lazy(() => import("@/components/admin/HrDocuments").then((mod) => ({ default: mod.ExperienceSalaryCertificate })));
+const AdvancesCustodyAcknowledgment = lazy(() => import("@/components/admin/HrDocuments").then((mod) => ({ default: mod.AdvancesCustodyAcknowledgment })));
 
-type Tab = "departments" | "sections" | "positions" | "job_grades" | "cities" | "networks" | "contractTemplates" | "sms";
-const validTabs: Tab[] = ["departments", "sections", "positions", "job_grades", "cities", "networks", "contractTemplates", "sms"];
+type Tab = "departments" | "sections" | "positions" | "job_grades" | "cities" | "networks" | "contractTemplates" | "sms" | "expSalary" | "advCustodyAck";
+const validTabs: Tab[] = ["departments", "sections", "positions", "job_grades", "cities", "networks", "contractTemplates", "sms", "expSalary", "advCustodyAck"];
 
 export const Route = createFileRoute("/admin/directory")({
   component: DirectoryPage,
@@ -39,6 +41,8 @@ const tabs: { id: Tab; label: string }[] = [
   { id: "networks", label: "Networks" },
   { id: "contractTemplates", label: "Contract Templates" },
   { id: "sms", label: "SMS Broadcast" },
+  { id: "expSalary", label: "شهادة الخبرة ومفردات المرتب" },
+  { id: "advCustodyAck", label: "إقرار على سلف وعهد" },
 ];
 
 const PAGE_SIZE = 10;
@@ -109,6 +113,16 @@ function DirectoryPage() {
           </Suspense>
         )}
         {tab === "sms" && <SmsBroadcastTab />}
+        {tab === "expSalary" && (
+          <Suspense fallback={<div className="h-40 rounded-2xl bg-muted/30" />}>
+            <ExperienceSalaryCertificate />
+          </Suspense>
+        )}
+        {tab === "advCustodyAck" && (
+          <Suspense fallback={<div className="h-40 rounded-2xl bg-muted/30" />}>
+            <AdvancesCustodyAcknowledgment />
+          </Suspense>
+        )}
       </div>
     </div>
   );
