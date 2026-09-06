@@ -28,15 +28,7 @@ function AdminLayout() {
   useExportScheduler();
   const { can, isAdmin, loading: permsLoading } = usePermissions();
 
-  if (typeof window === "undefined") return null;
-  if (!ready) return null;
-  if (!session) return <Navigate to="/auth" replace />;
-  const hasAdminAccess = session.roles?.some((r) => ["admin", "hr", "manager", "user", "finance"].includes(r));
-  if (!hasAdminAccess) {
-    const target = session.roles?.includes("staff") ? "/staff" : "/employee";
-    return <Navigate to={target} replace />;
-  }
-
+  // Hooks must run unconditionally before any early return below.
   const unreadFn = useServerFn(getChatUnreadTotal);
   const { data: unreadData } = useQuery({
     queryKey: ["chat-unread-total"],
@@ -45,6 +37,15 @@ function AdminLayout() {
     enabled: !!session,
   });
   const unreadMessagesCount = unreadData?.total ?? 0;
+
+  if (typeof window === "undefined") return null;
+  if (!ready) return null;
+  if (!session) return <Navigate to="/auth" replace />;
+  const hasAdminAccess = session.roles?.some((r) => ["admin", "hr", "manager", "user", "finance"].includes(r));
+  if (!hasAdminAccess) {
+    const target = session.roles?.includes("staff") ? "/staff" : "/employee";
+    return <Navigate to={target} replace />;
+  }
 
   const navAll = [
     { to: "/admin", icon: LayoutDashboard, label: t("dashboard"), exact: true, page: null },
