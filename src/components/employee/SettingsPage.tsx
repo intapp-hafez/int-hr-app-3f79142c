@@ -356,16 +356,11 @@ export function SettingsPage() {
         </div>
 
         {status === "approved" ? (
-          <div className="flex items-center justify-between rounded-xl bg-success/10 p-3 text-xs text-success">
+          <div className="flex items-center rounded-xl bg-success/10 p-3 text-xs text-success">
             <span className="inline-flex items-center gap-1.5 font-medium">
               <Check className="h-4 w-4" /> {t("deviceApproved")}
             </span>
-            <button
-              onClick={() => handleRemove(deviceId)}
-              className="rounded-lg border border-success/30 px-2.5 py-1 text-xs hover:bg-success/20 text-foreground font-medium"
-            >
-              Unbind
-            </button>
+            <span className="ms-auto text-[10px] opacity-80">Contact admin to remove</span>
           </div>
         ) : status === "pending" ? (
           <div className="flex items-center justify-between rounded-xl bg-warning/10 p-3 text-xs text-warning-foreground">
@@ -435,12 +430,14 @@ export function SettingsPage() {
                     >
                       {d.status}
                     </span>
-                    <button
-                      onClick={() => handleRemove(d.id)}
-                      className="rounded-lg border border-destructive/30 bg-destructive/10 px-2.5 py-1 text-destructive hover:bg-destructive/20 font-medium"
-                    >
-                      Remove
-                    </button>
+                    {d.status !== "approved" && (
+                      <button
+                        onClick={() => handleRemove(d.id)}
+                        className="rounded-lg border border-destructive/30 bg-destructive/10 px-2.5 py-1 text-destructive hover:bg-destructive/20 font-medium"
+                      >
+                        Remove
+                      </button>
+                    )}
                   </div>
                 </li>
               ))}
