@@ -21,19 +21,46 @@ export type DeviceProfile = {
   user_agent: string;
 };
 
+// Stable, browser-independent hardware signature: same machine → same ID,
+// even across browsers/profiles or after clearing site data.
+export function hardwareSignature(): string {
+  if (typeof window === "undefined") return "ssr";
+  const nav = navigator as any;
+  return [
+    nav.userAgentData?.platform ?? navigator.platform ?? "",
+    /Windows NT [\d.]+|Mac OS X [\d_]+|Android \d+|iPhone OS \d+|CrOS|Linux/.exec(navigator.userAgent)?.[0] ?? "",
+    `${screen.width}x${screen.height}x${screen.colorDepth}`,
+    String(nav.hardwareConcurrency ?? 0),
+    String(nav.deviceMemory ?? 0),
+    String(nav.maxTouchPoints ?? 0),
+    Intl.DateTimeFormat().resolvedOptions().timeZone ?? "",
+    webglSignature(),
+  ].join("|");
+}
+
+function fnv1a(str: string): string {
+  let h1 = 0x811c9dc5;
+  let h2 = 0x01000193;
+  for (let i = 0; i < str.length; i++) {
+    h1 ^= str.charCodeAt(i);
+    h1 = Math.imul(h1, 0x01000193) >>> 0;
+    h2 = (Math.imul(h2 ^ str.charCodeAt(i), 0x85ebca6b) + i) >>> 0;
+  }
+  return (h1.toString(36) + h2.toString(36)).toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8).padEnd(8, "0");
+}
+
+// The real device identifier used everywhere (registration, attendance, admin).
 export function getInstallationUuid(): string {
   if (typeof window === "undefined") return "DEV-SSR";
-  let id = localStorage.getItem(DEVICE_KEY_STORAGE);
-  if (!id) {
-    const uuid =
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase()
-        : Math.random().toString(36).slice(2, 10).toUpperCase();
-    id = `DEV-${uuid}`;
+  const id = `DEV-${fnv1a(hardwareSignature())}`;
+  try {
     localStorage.setItem(DEVICE_KEY_STORAGE, id);
+  } catch {
+    /* storage blocked — the ID is derived, so it still stays stable */
   }
   return id;
 }
+
 
 async function sha256Hex(input: string): Promise<string> {
   if (typeof crypto === "undefined" || !crypto.subtle) {
