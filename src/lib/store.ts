@@ -946,13 +946,13 @@ export function logAudit(ev: Omit<AuditEvent, "id" | "ts">) {
 const DEVICE_KEY = "int-device-id";
 export function getCurrentDeviceId(): string {
   if (typeof window === "undefined") return SEED_DEVICE_ID;
-  let id = localStorage.getItem(DEVICE_KEY);
-  if (!id) {
-    id = `DEV-${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
-    localStorage.setItem(DEVICE_KEY, id);
-  }
+  // Derived from the machine signature (see device-fingerprint.ts) so every
+  // browser/tab on the same device reports one and the same ID.
+  const id = getInstallationUuid();
+  localStorage.setItem(DEVICE_KEY, id);
   return id;
 }
+
 
 export function deviceLabelGuess(): string {
   if (typeof navigator === "undefined") return "Device";
