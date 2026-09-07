@@ -5,6 +5,8 @@ import {
   leaveRequests as initialLeaves,
   wifiNetworks as initialNetworks,
 } from "./mock-data";
+import { getInstallationUuid } from "./device-fingerprint";
+
 
 export type Employee = (typeof initialEmployees)[number];
 export type PayrollOverrides = {
