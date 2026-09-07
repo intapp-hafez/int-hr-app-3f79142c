@@ -101,6 +101,17 @@ export const removeMyDevice = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { device_id: string }) => z.object({ device_id: z.string() }).parse(d))
   .handler(async ({ data, context }) => {
+    const { data: current, error: fetchError } = await context.supabase
+      .from("employee_devices")
+      .select("status")
+      .eq("id", data.device_id)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (fetchError) throw new Error(fetchError.message);
+    if (!current) throw new Error("Device not found");
+    if (current.status === "approved") {
+      throw new Error("Approved devices cannot be removed. Please ask your administrator to revoke or block it first.");
+    }
     const { error } = await context.supabase
       .from("employee_devices")
       .delete()
