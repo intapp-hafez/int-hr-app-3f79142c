@@ -360,3 +360,79 @@ export const listDeviceLogs = createServerFn({ method: "POST" })
       created_at: string;
     }>;
   });
+
+// ── Approval / attempt history grouped by employee and status ─────────────
+export type DeviceAttemptGroup = {
+  user_id: string;
+  employee_name: string;
+  employee_email: string | null;
+  total: number;
+  byStatus: { status: string; count: number; last_at: string | null }[];
+  entries: {
+    id: string;
+    device_id: string;
+    action: string;
+    from_status: string | null;
+    to_status: string | null;
+    reason: string | null;
+    ip_address: string | null;
+    created_at: string;
+  }[];
+};
+
+export const listDeviceAttemptHistory = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { search?: string }) => z.object({ search: z.string().max(120).optional() }).parse(d ?? {}))
+  .handler(async ({ data, context }): Promise<DeviceAttemptGroup[]> => {
+    await assertAdmin(context.supabase, context.userId);
+    const { data: rows, error } = await (context.supabase.from("device_approval_logs" as any) as any)
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(2000);
+    if (error) throw new Error(error.message);
+    const logs = (rows ?? []) as any[];
+
+    const ids = Array.from(new Set(logs.map((l) => l.user_id).filter(Boolean)));
+    const nameMap = new Map<string, { name: string; email: string | null }>();
+    if (ids.length) {
+      const { data: profs } = await context.supabase
+        .from("profiles").select("id, full_name, email").in("id", ids as string[]);
+      for (const p of (profs ?? []) as any[]) {
+        nameMap.set(p.id, { name: p.full_name ?? p.email ?? p.id, email: p.email ?? null });
+      }
+    }
+
+    const term = (data.search ?? "").trim().toLowerCase();
+    const groups = new Map<string, DeviceAttemptGroup>();
+    for (const l of logs) {
+      const uid = (l.user_id ?? "unknown") as string;
+      const meta = nameMap.get(uid);
+      const g = groups.get(uid) ?? {
+        user_id: uid,
+        employee_name: meta?.name ?? "Unknown employee",
+        employee_email: meta?.email ?? null,
+        total: 0,
+        byStatus: [],
+        entries: [],
+      };
+      const key = (l.to_status ?? l.action) as string;
+      const bucket = g.byStatus.find((b) => b.status === key);
+      if (bucket) {
+        bucket.count += 1;
+        if (!bucket.last_at || l.created_at > bucket.last_at) bucket.last_at = l.created_at;
+      } else {
+        g.byStatus.push({ status: key, count: 1, last_at: l.created_at });
+      }
+      g.total += 1;
+      g.entries.push({
+        id: l.id, device_id: l.device_id, action: l.action,
+        from_status: l.from_status ?? null, to_status: l.to_status ?? null,
+        reason: l.reason ?? null, ip_address: l.ip_address ?? null, created_at: l.created_at,
+      });
+      groups.set(uid, g);
+    }
+
+    return Array.from(groups.values())
+      .filter((g) => !term || [g.employee_name, g.employee_email].filter(Boolean).some((v) => String(v).toLowerCase().includes(term)))
+      .sort((a, b) => b.total - a.total);
+  });

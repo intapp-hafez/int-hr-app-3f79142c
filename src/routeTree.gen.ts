@@ -72,6 +72,7 @@ import { Route as AdminDevicesRouteImport } from './routes/admin.devices'
 import { Route as AdminContractsRouteImport } from './routes/admin.contracts'
 import { Route as AdminChatRouteImport } from './routes/admin.chat'
 import { Route as AdminAuditRouteImport } from './routes/admin.audit'
+import { Route as AdminAttendanceReportRouteImport } from './routes/admin.attendance-report'
 import { Route as AdminAttendanceRouteImport } from './routes/admin.attendance'
 import { Route as AdminAllowancesRouteImport } from './routes/admin.allowances'
 import { Route as AdminAdvancesRouteImport } from './routes/admin.advances'
@@ -398,6 +399,11 @@ const AdminAuditRoute = AdminAuditRouteImport.update({
   path: '/audit',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminAttendanceReportRoute = AdminAttendanceReportRouteImport.update({
+  id: '/attendance-report',
+  path: '/attendance-report',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminAttendanceRoute = AdminAttendanceRouteImport.update({
   id: '/attendance',
   path: '/attendance',
@@ -456,6 +462,7 @@ export interface FileRoutesByFullPath {
   '/admin/advances': typeof AdminAdvancesRoute
   '/admin/allowances': typeof AdminAllowancesRoute
   '/admin/attendance': typeof AdminAttendanceRoute
+  '/admin/attendance-report': typeof AdminAttendanceReportRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/chat': typeof AdminChatRoute
   '/admin/contracts': typeof AdminContractsRoute
@@ -525,6 +532,7 @@ export interface FileRoutesByTo {
   '/admin/advances': typeof AdminAdvancesRoute
   '/admin/allowances': typeof AdminAllowancesRoute
   '/admin/attendance': typeof AdminAttendanceRoute
+  '/admin/attendance-report': typeof AdminAttendanceReportRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/chat': typeof AdminChatRoute
   '/admin/contracts': typeof AdminContractsRoute
@@ -599,6 +607,7 @@ export interface FileRoutesById {
   '/admin/advances': typeof AdminAdvancesRoute
   '/admin/allowances': typeof AdminAllowancesRoute
   '/admin/attendance': typeof AdminAttendanceRoute
+  '/admin/attendance-report': typeof AdminAttendanceReportRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/chat': typeof AdminChatRoute
   '/admin/contracts': typeof AdminContractsRoute
@@ -675,6 +684,7 @@ export interface FileRouteTypes {
     | '/admin/advances'
     | '/admin/allowances'
     | '/admin/attendance'
+    | '/admin/attendance-report'
     | '/admin/audit'
     | '/admin/chat'
     | '/admin/contracts'
@@ -744,6 +754,7 @@ export interface FileRouteTypes {
     | '/admin/advances'
     | '/admin/allowances'
     | '/admin/attendance'
+    | '/admin/attendance-report'
     | '/admin/audit'
     | '/admin/chat'
     | '/admin/contracts'
@@ -817,6 +828,7 @@ export interface FileRouteTypes {
     | '/admin/advances'
     | '/admin/allowances'
     | '/admin/attendance'
+    | '/admin/attendance-report'
     | '/admin/audit'
     | '/admin/chat'
     | '/admin/contracts'
@@ -1336,6 +1348,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAuditRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/attendance-report': {
+      id: '/admin/attendance-report'
+      path: '/attendance-report'
+      fullPath: '/admin/attendance-report'
+      preLoaderRoute: typeof AdminAttendanceReportRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/attendance': {
       id: '/admin/attendance'
       path: '/attendance'
@@ -1420,6 +1439,7 @@ interface AdminRouteChildren {
   AdminAdvancesRoute: typeof AdminAdvancesRoute
   AdminAllowancesRoute: typeof AdminAllowancesRoute
   AdminAttendanceRoute: typeof AdminAttendanceRoute
+  AdminAttendanceReportRoute: typeof AdminAttendanceReportRoute
   AdminAuditRoute: typeof AdminAuditRoute
   AdminChatRoute: typeof AdminChatRoute
   AdminContractsRoute: typeof AdminContractsRoute
@@ -1455,6 +1475,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminAdvancesRoute: AdminAdvancesRoute,
   AdminAllowancesRoute: AdminAllowancesRoute,
   AdminAttendanceRoute: AdminAttendanceRoute,
+  AdminAttendanceReportRoute: AdminAttendanceReportRoute,
   AdminAuditRoute: AdminAuditRoute,
   AdminChatRoute: AdminChatRoute,
   AdminContractsRoute: AdminContractsRoute,

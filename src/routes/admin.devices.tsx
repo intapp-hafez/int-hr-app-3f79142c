@@ -9,6 +9,7 @@ import {
   listAllDevices,
   decideDevice,
   listDeviceLogs,
+  listDeviceAttemptHistory,
   type AdminDeviceRow,
 } from "@/backend/functions/devices.functions";
 
@@ -231,6 +232,89 @@ function DevicesPage() {
           </ul>
         )}
       </section>
+
+      <ApprovalHistory search={search} />
     </div>
+  );
+}
+
+function statusBadge(status: string) {
+  return status === "approved"
+    ? "bg-success/15 text-success"
+    : status === "pending" || status === "register"
+      ? "bg-warning/20 text-warning-foreground"
+      : "bg-destructive/15 text-destructive";
+}
+
+function ApprovalHistory({ search }: { search: string }) {
+  const historyFn = useServerFn(listDeviceAttemptHistory);
+  const [open, setOpen] = useState<string | null>(null);
+  const { data: groups = [], isLoading } = useQuery({
+    queryKey: ["admin", "device-attempts", search],
+    queryFn: () => historyFn({ data: { search } }),
+  });
+
+  return (
+    <section className="rounded-2xl border border-border bg-card">
+      <div className="border-b border-border px-4 py-3">
+        <h2 className="inline-flex items-center gap-2 text-sm font-semibold">
+          <ScrollText className="h-4 w-4" /> Approval History
+        </h2>
+        <p className="text-xs text-muted-foreground">
+          Each employee&apos;s check-in / check-out device attempts, grouped by status.
+        </p>
+      </div>
+      {isLoading ? (
+        <p className="p-4 text-sm text-muted-foreground">Loading history…</p>
+      ) : groups.length === 0 ? (
+        <p className="p-4 text-sm text-muted-foreground">No attempts recorded yet.</p>
+      ) : (
+        <ul className="divide-y divide-border">
+          {groups.map((g) => (
+            <li key={g.user_id} className="px-4 py-3">
+              <button
+                onClick={() => setOpen(open === g.user_id ? null : g.user_id)}
+                className="flex w-full flex-wrap items-center justify-between gap-3 text-left"
+              >
+                <span>
+                  <span className="block text-sm font-semibold">{g.employee_name}</span>
+                  <span className="block text-xs text-muted-foreground">{g.employee_email ?? "—"}</span>
+                </span>
+                <span className="flex flex-wrap items-center gap-1.5">
+                  {g.byStatus.map((b) => (
+                    <span
+                      key={b.status}
+                      className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase ${statusBadge(b.status)}`}
+                      title={b.last_at ? `Last: ${when(b.last_at)}` : undefined}
+                    >
+                      {b.status} · {b.count}
+                    </span>
+                  ))}
+                  <span className="ml-1 text-xs text-muted-foreground">{g.total} total</span>
+                </span>
+              </button>
+              {open === g.user_id && (
+                <ul className="mt-3 space-y-1.5 border-l-2 border-border pl-3">
+                  {g.entries.map((e) => (
+                    <li key={e.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                      <span className="w-40 text-muted-foreground">{when(e.created_at)}</span>
+                      <span className={`rounded-full px-2 py-0.5 font-semibold uppercase ${statusBadge(e.to_status ?? e.action)}`}>
+                        {e.action}
+                      </span>
+                      <span className="font-mono text-[11px]">{e.device_id}</span>
+                      <span className="text-muted-foreground">
+                        {e.from_status ?? "—"} → {e.to_status ?? "—"}
+                      </span>
+                      {e.ip_address && <span className="text-muted-foreground">IP {e.ip_address}</span>}
+                      {e.reason && <span className="text-muted-foreground">· {e.reason}</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
