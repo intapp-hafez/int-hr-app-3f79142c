@@ -685,3 +685,65 @@ export const listMyCheckValidations = createServerFn({ method: "POST" })
       out_place: place(r.out_city, r.out_district, r.out_street),
     }));
   });
+
+// ── Printable attendance report grouped by department ─────────────────────
+export type AttendanceReportRow = {
+  employee_id: string;
+  employee_name: string;
+  emp_code: string | null;
+  department: string;
+  date: string;
+  in_time: string | null;
+  out_time: string | null;
+  status: string;
+  branch: string | null;
+  device_status: string;
+};
+
+export const adminAttendanceReport = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => parseInput(dateRangeSchema, i))
+  .handler(async ({ data, context }): Promise<AttendanceReportRow[]> => {
+    await assertAdminOrHr(context.supabase, context.userId);
+    const { data: rows, error } = await context.supabase
+      .from("attendance")
+      .select("employee_id, date, in_time, out_time, status, branch")
+      .gte("date", data.from).lte("date", data.to)
+      .order("date", { ascending: true })
+      .limit(5000);
+    if (error) throw new Error(error.message);
+    const list = (rows ?? []) as any[];
+    const ids = Array.from(new Set(list.map((r) => r.employee_id)));
+    if (!ids.length) return [];
+
+    const [{ data: profs }, { data: devices }] = await Promise.all([
+      context.supabase
+        .from("profiles")
+        .select("id, full_name, email, emp_code, departments:department_id(name_en)")
+        .in("id", ids),
+      context.supabase.from("employee_devices").select("user_id, status").in("user_id", ids),
+    ]);
+
+    const pMap = new Map<string, any>(((profs ?? []) as any[]).map((p) => [p.id, p]));
+    const dMap = new Map<string, string>();
+    for (const d of ((devices ?? []) as any[])) {
+      const prev = dMap.get(d.user_id);
+      if (!prev || d.status === "approved") dMap.set(d.user_id, d.status);
+    }
+
+    return list.map((r) => {
+      const p = pMap.get(r.employee_id);
+      return {
+        employee_id: r.employee_id as string,
+        employee_name: (p?.full_name ?? p?.email ?? r.employee_id) as string,
+        emp_code: (p?.emp_code ?? null) as string | null,
+        department: (p?.departments?.name_en ?? "Unassigned") as string,
+        date: r.date as string,
+        in_time: r.in_time as string | null,
+        out_time: r.out_time as string | null,
+        status: (r.status ?? "—") as string,
+        branch: (r.branch ?? null) as string | null,
+        device_status: dMap.get(r.employee_id) ?? "none",
+      };
+    });
+  });
