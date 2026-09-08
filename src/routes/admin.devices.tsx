@@ -9,6 +9,7 @@ import {
   listAllDevices,
   decideDevice,
   listDeviceLogs,
+  listDeviceAttemptHistory,
   type AdminDeviceRow,
 } from "@/backend/functions/devices.functions";
 

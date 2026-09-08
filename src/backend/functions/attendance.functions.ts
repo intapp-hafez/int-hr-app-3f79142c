@@ -702,7 +702,7 @@ export type AttendanceReportRow = {
 
 export const adminAttendanceReport = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) => parseInput(dateRangeSchema, i))
+  .inputValidator((i) => parseInput(dateRangeSchema(), i))
   .handler(async ({ data, context }): Promise<AttendanceReportRow[]> => {
     await assertAdminOrHr(context.supabase, context.userId);
     const { data: rows, error } = await context.supabase
