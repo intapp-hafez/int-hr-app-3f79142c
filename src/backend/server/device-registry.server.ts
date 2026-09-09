@@ -142,7 +142,8 @@ export async function checkDeviceAccess(
   }
 }
 
-export async function touchDeviceCheck(deviceId: string, kind: "in" | "out") {
+export async function touchDeviceCheck(deviceId: string | undefined | null, kind: "in" | "out") {
+  if (!deviceId) return;
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin
