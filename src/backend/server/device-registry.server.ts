@@ -131,6 +131,8 @@ export async function checkDeviceAccess(
   kind: "in" | "out",
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
   const verb = kind === "in" ? "Check-in" : "Check-out";
+  // Device approval is opt-in per employee.
+  if (!(await isDeviceCheckRequired(userId))) return { ok: true };
   try {
     await assertDeviceAllowed(userId, deviceId);
     return { ok: true };
