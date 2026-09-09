@@ -166,3 +166,67 @@ export async function dispatchLeaveDecision(input: DispatchLeaveDecision) {
 
   return { ok: true, verb };
 }
+/**
+ * Copies the decision to the employee's manager and to all admins / HR, so the
+ * chain of command sees approvals and rejections, not just the employee.
+ */
+export async function dispatchLeaveDecisionToStaff(
+  input: DispatchLeaveDecision & { employeeName?: string | null },
+) {
+  try {
+    const { data: employee } = await supabaseAdmin
+      .from("profiles")
+      .select("full_name, email, manager_id")
+      .eq("id", input.employeeId)
+      .maybeSingle();
+
+    const recipients = new Set<string>();
+    if ((employee as any)?.manager_id) {
+      const { data: mgr } = await supabaseAdmin
+        .from("profiles")
+        .select("email")
+        .eq("id", (employee as any).manager_id)
+        .maybeSingle();
+      if (mgr?.email) recipients.add(mgr.email);
+    }
+    const { data: staff } = await supabaseAdmin
+      .from("user_roles")
+      .select("user_id, role")
+      .in("role", ["admin", "hr"]);
+    const ids = ((staff ?? []) as any[]).map((r) => r.user_id);
+    if (ids.length) {
+      const { data: rows } = await supabaseAdmin.from("profiles").select("email").in("id", ids);
+      for (const r of (rows ?? []) as any[]) if (r.email) recipients.add(r.email);
+    }
+    if ((employee as any)?.email) recipients.delete((employee as any).email);
+    if (recipients.size === 0) return { ok: false, reason: "no-recipients" };
+
+    const who = (employee as any)?.full_name ?? (employee as any)?.email ?? input.employeeId;
+    const base = render(input, who);
+    const subject = `[Team] ${who}: ${input.leaveTypeName ?? "Leave"} ${base.verb}`;
+    const text = `${who}'s ${input.leaveTypeName ?? "leave"} request for ${base.range} has been ${base.verb}${
+      input.decidedByName ? ` by ${input.decidedByName}` : ""
+    }.`;
+    const html = `<div style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;padding:20px;color:#111">
+      <h2 style="margin:0 0 12px">${esc(subject)}</h2>
+      <p style="margin:0 0 8px">${esc(text)}</p>
+    </div>`;
+
+    const smtp = await loadSmtpConfig();
+    if (!smtp || !smtp.host || !smtp.password) return { ok: false, reason: "smtp-not-configured" };
+    const res = await sendEmail(
+      { host: smtp.host, port: smtp.port, secure: smtp.secure, username: smtp.username, password: smtp.password },
+      {
+        from: smtp.from_name ? `${smtp.from_name} <${smtp.from_email}>` : smtp.from_email,
+        fromEmail: smtp.from_email,
+        to: Array.from(recipients),
+        subject,
+        html,
+        text,
+      },
+    );
+    return { ok: res.ok };
+  } catch {
+    return { ok: false, reason: "error" };
+  }
+}
