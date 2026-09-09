@@ -3416,6 +3416,8 @@ function EmployeeDevicesPanel({ userId, canManage }: { userId: string; canManage
         <h2 className="font-display text-base font-semibold">Devices</h2>
         <span className="text-xs text-muted-foreground">{rows.length} registered</span>
       </div>
+
+      <DeviceRequirementToggle userId={userId} canManage={canManage} />
       {isLoading ? (
         <p className="text-center text-sm text-muted-foreground">Loading…</p>
       ) : rows.length === 0 ? (
