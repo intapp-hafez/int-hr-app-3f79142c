@@ -26,6 +26,8 @@ import {
   listEmployeeDevices,
   setEmployeeDeviceStatus,
   deleteEmployeeDevice,
+  getDeviceRequirement,
+  setDeviceRequirement,
 } from "@/backend/functions/devices.functions";
 import { listJobGrades } from "@/backend/functions/directory.functions";
 import {
