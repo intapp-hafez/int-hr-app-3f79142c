@@ -3381,6 +3381,54 @@ function attTone(s: string) {
   return s === "present" ? "bg-success/15 text-success" : s === "late" ? "bg-warning/20 text-warning-foreground" : s === "leave" ? "bg-info/15 text-info" : "bg-muted text-muted-foreground";
 }
 
+function DeviceRequirementToggle({ userId, canManage }: { userId: string; canManage: boolean }) {
+  const getFn = useServerFn(getDeviceRequirement);
+  const setFn = useServerFn(setDeviceRequirement);
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["employee-device-requirement", userId],
+    queryFn: () => getFn({ data: { user_id: userId } }),
+  });
+  const required = !!data?.required;
+
+  async function toggle() {
+    try {
+      await setFn({ data: { user_id: userId, required: !required } });
+      toast.success(!required ? "Device approval is now required" : "Device approval is no longer required");
+      qc.invalidateQueries({ queryKey: ["employee-device-requirement", userId] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed");
+    }
+  }
+
+  return (
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-muted/40 p-3">
+      <div className="min-w-0">
+        <p className="text-sm font-semibold">Require an approved device to check in</p>
+        <p className="text-xs text-muted-foreground">
+          Off by default — the employee can check in from any device. Turn it on to allow attendance only from
+          an approved device.
+        </p>
+      </div>
+      <button
+        type="button"
+        disabled={!canManage}
+        onClick={toggle}
+        aria-pressed={required}
+        className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-50 ${
+          required ? "bg-gradient-brand" : "bg-border"
+        }`}
+      >
+        <span
+          className={`absolute top-1 h-5 w-5 rounded-full bg-card shadow transition-all ${
+            required ? "left-6" : "left-1"
+          }`}
+        />
+      </button>
+    </div>
+  );
+}
+
 function EmployeeDevicesPanel({ userId, canManage }: { userId: string; canManage: boolean }) {
   const listFn = useServerFn(listEmployeeDevices);
   const setStatusFn = useServerFn(setEmployeeDeviceStatus);
