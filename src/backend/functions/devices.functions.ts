@@ -475,3 +475,16 @@ export const listDeviceAttemptHistory = createServerFn({ method: "POST" })
       .filter((g) => !term || [g.employee_name, g.employee_email].filter(Boolean).some((v) => String(v).toLowerCase().includes(term)))
       .sort((a, b) => b.total - a.total);
   });
+
+/** Self-service: does the signed-in employee need an approved device? */
+export const getMyDeviceRequirement = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await (context.supabase as any)
+      .from("profiles")
+      .select("device_check_required")
+      .eq("id", context.userId)
+      .maybeSingle();
+    if (error) return { required: false };
+    return { required: !!data?.device_check_required };
+  });
