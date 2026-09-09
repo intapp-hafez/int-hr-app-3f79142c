@@ -55,6 +55,26 @@ export const DEVICE_ERRORS = {
 } as const;
 
 /**
+ * Per-employee switch (profiles.device_check_required). Device registration is
+ * OPTIONAL by default; an admin enables it per employee. If the column does not
+ * exist yet, we fail open (not required).
+ */
+export async function isDeviceCheckRequired(userId: string): Promise<boolean> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await (supabaseAdmin as any)
+      .from("profiles")
+      .select("device_check_required")
+      .eq("id", userId)
+      .maybeSingle();
+    if (error) return false;
+    return !!data?.device_check_required;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Final server-side gate for attendance actions.
  * Verifies: device exists → belongs to this employee → status is APPROVED.
  * Uses the service-role client so devices owned by other users are visible
@@ -111,6 +131,8 @@ export async function checkDeviceAccess(
   kind: "in" | "out",
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
   const verb = kind === "in" ? "Check-in" : "Check-out";
+  // Device approval is opt-in per employee.
+  if (!(await isDeviceCheckRequired(userId))) return { ok: true };
   try {
     await assertDeviceAllowed(userId, deviceId);
     return { ok: true };
@@ -120,7 +142,8 @@ export async function checkDeviceAccess(
   }
 }
 
-export async function touchDeviceCheck(deviceId: string, kind: "in" | "out") {
+export async function touchDeviceCheck(deviceId: string | undefined | null, kind: "in" | "out") {
+  if (!deviceId) return;
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin

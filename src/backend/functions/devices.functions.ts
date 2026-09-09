@@ -81,8 +81,47 @@ export const registerMyDevice = createServerFn({ method: "POST" })
         actor_id: userId,
         reason: data.label,
       });
+      const { notifyDeviceRegistration } = await import("@/backend/server/device-alert.server");
+      await notifyDeviceRegistration({
+        employeeId: userId,
+        deviceId: data.device_id,
+        label: data.label,
+        os: data.os ?? null,
+        browser: data.browser ?? null,
+        deviceType: data.device_type ?? null,
+        ip: requestIp(),
+      });
     }
     return row;
+  });
+
+// ── Per-employee device requirement (off by default) ──────
+export const getDeviceRequirement = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { user_id: string }) => z.object({ user_id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: row, error } = await (context.supabase as any)
+      .from("profiles")
+      .select("device_check_required")
+      .eq("id", data.user_id)
+      .maybeSingle();
+    if (error) return { required: false, available: false };
+    return { required: !!row?.device_check_required, available: true };
+  });
+
+export const setDeviceRequirement = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { user_id: string; required: boolean }) =>
+    z.object({ user_id: z.string().uuid(), required: z.boolean() }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.supabase, context.userId);
+    const { error } = await (context.supabase as any)
+      .from("profiles")
+      .update({ device_check_required: data.required })
+      .eq("id", data.user_id);
+    if (error) throw new Error(error.message);
+    return { ok: true, required: data.required };
   });
 
 export const listMyDevices = createServerFn({ method: "GET" })
@@ -435,4 +474,17 @@ export const listDeviceAttemptHistory = createServerFn({ method: "POST" })
     return Array.from(groups.values())
       .filter((g) => !term || [g.employee_name, g.employee_email].filter(Boolean).some((v) => String(v).toLowerCase().includes(term)))
       .sort((a, b) => b.total - a.total);
+  });
+
+/** Self-service: does the signed-in employee need an approved device? */
+export const getMyDeviceRequirement = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await (context.supabase as any)
+      .from("profiles")
+      .select("device_check_required")
+      .eq("id", context.userId)
+      .maybeSingle();
+    if (error) return { required: false };
+    return { required: !!data?.device_check_required };
   });

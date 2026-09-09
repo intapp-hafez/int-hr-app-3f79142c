@@ -43,10 +43,14 @@ function AttendanceReportPage() {
   const [from, setFrom] = useState(iso(new Date(now.getFullYear(), now.getMonth(), 1)));
   const [to, setTo] = useState(iso(now));
 
+  // Guard against a swapped range (e.g. picking "to" before "from").
+  const rangeFrom = from <= to ? from : to;
+  const rangeTo = from <= to ? to : from;
+
   const reportFn = useServerFn(adminAttendanceReport);
   const { data: rows = [], isLoading, error } = useQuery({
-    queryKey: ["admin", "attendance-report", from, to],
-    queryFn: () => reportFn({ data: { from, to } }),
+    queryKey: ["admin", "attendance-report", rangeFrom, rangeTo],
+    queryFn: () => reportFn({ data: { from: rangeFrom, to: rangeTo } }),
   });
 
   const byDept = useMemo(() => {
@@ -98,7 +102,7 @@ function AttendanceReportPage() {
         <div className="text-center">
           <h2 className="text-lg font-bold">Attendance Report</h2>
           <p className="text-sm text-muted-foreground">
-            {formatDate(from)} — {formatDate(to)}
+            {formatDate(rangeFrom)} — {formatDate(rangeTo)}
           </p>
         </div>
 
