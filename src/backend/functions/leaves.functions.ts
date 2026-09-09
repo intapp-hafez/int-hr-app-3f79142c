@@ -104,7 +104,7 @@ async function applyLeaveDecision(
   // Email / in-app / push fan-out happens only after the decision is stored.
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { dispatchLeaveDecision } = await import(
+    const { dispatchLeaveDecision, dispatchLeaveDecisionToStaff } = await import(
       "@/backend/server/leave-decision-dispatch.server"
     );
     const prevStatus = leave.status as string | null;
