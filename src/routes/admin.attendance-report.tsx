@@ -102,7 +102,7 @@ function AttendanceReportPage() {
         <div className="text-center">
           <h2 className="text-lg font-bold">Attendance Report</h2>
           <p className="text-sm text-muted-foreground">
-            {formatDate(from)} — {formatDate(to)}
+            {formatDate(rangeFrom)} — {formatDate(rangeTo)}
           </p>
         </div>
 
