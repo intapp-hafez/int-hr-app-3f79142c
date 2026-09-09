@@ -121,7 +121,7 @@ async function applyLeaveDecision(
       .select("full_name")
       .eq("id", context.userId)
       .maybeSingle();
-    await dispatchLeaveDecision({
+    const payload = {
       employeeId: leave.employee_id as string,
       leaveId: leave.id as string,
       kind: kind as any,
@@ -131,7 +131,9 @@ async function applyLeaveDecision(
       days: leave.days ?? null,
       paid: leave.paid ?? null,
       decidedByName: decider?.full_name ?? null,
-    });
+    };
+    await dispatchLeaveDecision(payload);
+    await dispatchLeaveDecisionToStaff(payload);
     return { ok: true, notified: true };
   } catch (e) {
     console.error("[decideLeave] notification dispatch failed", e);
