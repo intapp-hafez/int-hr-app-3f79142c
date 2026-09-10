@@ -10,6 +10,7 @@ import { listTasks } from "@/backend/functions/tasks.functions";
 import { mapTaskRow, type TaskRow } from "@/lib/task-mapping";
 import { useStore, getCurrentDeviceId } from "@/lib/store";
 import { useSession } from "@/lib/auth";
+import { getMe } from "@/backend/functions/auth.functions";
 import { submitLeave, listMyLeaves, cancelLeave } from "@/backend/functions/leaves.functions";
 import { Fingerprint, ScanFace } from "lucide-react";
 import {
@@ -20,6 +21,7 @@ import { FaceCapture } from "@/components/biometrics/FaceCapture";
 import { useI18n } from "@/lib/i18n";
 import { DateRangeField } from "@/components/ui/date-input";
 import { formatDate, validateDateRange } from "@/lib/date-format";
+import { reverseGeocodeCoords } from "@/lib/reverse-geocode";
 
 export const Route = createFileRoute("/employee/check")({ component: CheckPage });
 
@@ -47,9 +49,11 @@ function CheckInOutCard() {
   const accessFn = useServerFn(listMyAccess);
   const bioFn = useServerFn(listMyBiometrics);
   const devicesFn = useServerFn(listMyDevices);
+  const meFn = useServerFn(getMe);
   const verifyFaceFn = useServerFn(verifyFace);
   const fpOptsFn = useServerFn(webauthnAuthOptionsForSelf);
   const fpVerifyFn = useServerFn(webauthnAuthVerifyForSelf);
+  const meQ = useQuery({ queryKey: ["me"], queryFn: () => meFn() });
   const attQ = useQuery({ queryKey: ["my-attendance"], queryFn: () => attFn() });
   const accessQ = useQuery({ queryKey: ["my-access"], queryFn: () => accessFn() });
   const bioQ = useQuery({ queryKey: ["biometrics"], queryFn: () => bioFn() });
@@ -65,8 +69,9 @@ function CheckInOutCard() {
   const requiresBio = true;
   const bioOk = hasFace && verified.face;
 
+  const deviceCheckRequired = !!(meQ.data as any)?.profile?.device_check_required;
   const currentDevice = devQ.data?.find((d: any) => d.id === getCurrentDeviceId());
-  const deviceApproved = currentDevice?.status === "approved";
+  const deviceApproved = !deviceCheckRequired || currentDevice?.status === "approved";
   const deviceMessage = !currentDevice
     ? "This device is not registered. Open Settings to register it, then ask your administrator to approve it."
     : currentDevice.status === "pending"
@@ -87,19 +92,6 @@ function CheckInOutCard() {
         { timeout: 8000, enableHighAccuracy: true },
       );
     });
-  }
-
-  async function reverseGeocode(lat: number, lng: number): Promise<{ city?: string; district?: string; street?: string }> {
-    try {
-      const r = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`);
-      if (!r.ok) return {};
-      const j: any = await r.json();
-      return {
-        city: j.city || j.locality || j.principalSubdivision || undefined,
-        district: j.localityInfo?.administrative?.find((a: any) => a.adminLevel >= 6)?.name || j.locality || undefined,
-        street: [j.streetNumber, j.streetName].filter(Boolean).join(" ") || j.localityInfo?.informative?.[0]?.name || undefined,
-      };
-    } catch { return {}; }
   }
 
   const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
@@ -186,9 +178,19 @@ function CheckInOutCard() {
         }
       }
       const isOnline = typeof navigator !== "undefined" ? navigator.onLine : true;
-      const geo = coords.lat != null && coords.lng != null ? await reverseGeocode(coords.lat, coords.lng) : {};
-      const payload = { branch, lat: coords.lat, lng: coords.lng, network_ok: isOnline, note: note.trim() || undefined, device_id: getCurrentDeviceId(), ...geo };
-      const addr = [geo.street, geo.district, geo.city].filter(Boolean).join(", ");
+      const geo = coords.lat != null && coords.lng != null ? await reverseGeocodeCoords(coords.lat, coords.lng) : {};
+      const payload = {
+        branch,
+        lat: coords.lat,
+        lng: coords.lng,
+        network_ok: isOnline,
+        note: note.trim() || undefined,
+        device_id: getCurrentDeviceId(),
+        city: geo.city,
+        district: geo.district,
+        street: geo.street,
+      };
+      const addr = geo.formatted || [geo.street, geo.district, geo.city].filter(Boolean).join(", ");
       if (kind === "in") {
         const res: any = await inFn({ data: payload });
         if (res?.blocked) { toast.error(formatBlocked(res)); return; }

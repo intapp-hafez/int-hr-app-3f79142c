@@ -187,3 +187,152 @@ export const exportLeaveBalancesAdmin = createServerFn({ method: "GET" })
       remaining: Math.max(0, (r.total_days ?? 0) - (r.used_days ?? 0)),
     }));
   });
+
+function normalizeLeaveKey(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .replace(/leaves?$/i, "");
+}
+
+export const getEmployeeLeaveBalances = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) =>
+    z.object({
+      employee_id: z.string().uuid(),
+      year: z.number().int().optional(),
+    }).parse(i)
+  )
+  .handler(async ({ data, context }): Promise<LeaveBalanceRow[]> => {
+    const year = data.year ?? new Date().getFullYear();
+
+    const { data: rows, error } = await context.supabase
+      .from("leave_balances")
+      .select("id, employee_id, leave_type_id, year, total_days, used_days, leave_types:leave_type_id(id, name, active, annual_days)")
+      .eq("employee_id", data.employee_id)
+      .eq("year", year)
+      .order("year", { ascending: false });
+
+    if (error) throw new Error(error.message);
+
+    const { data: allTypes } = await context.supabase
+      .from("leave_types")
+      .select("id, name, annual_days, active")
+      .eq("active", true);
+
+    const map = new Map<string, LeaveBalanceRow & { active?: boolean }>();
+    const staleIdsToDelete: string[] = [];
+
+    for (const r of (rows ?? []) as any[]) {
+      const typeName = r.leave_types?.name ?? "—";
+      const key = normalizeLeaveKey(typeName);
+      const isActive = r.leave_types?.active !== false;
+
+      // If this record points to a deactivated leave type with zero usage, mark as stale
+      if (!isActive && (r.used_days ?? 0) === 0) {
+        staleIdsToDelete.push(r.id);
+        continue;
+      }
+
+      const candidate: LeaveBalanceRow & { active?: boolean } = {
+        id: r.id,
+        employee_id: r.employee_id,
+        employee_name: "",
+        leave_type_id: r.leave_type_id,
+        leave_type_name: typeName,
+        year: r.year,
+        total_days: r.total_days ?? 0,
+        used_days: r.used_days ?? 0,
+        remaining: Math.max(0, (r.total_days ?? 0) - (r.used_days ?? 0)),
+        active: isActive,
+      };
+
+      if (!map.has(key)) {
+        map.set(key, candidate);
+      } else {
+        const existing = map.get(key)!;
+        if (candidate.active && !existing.active) {
+          candidate.used_days = Math.max(candidate.used_days, existing.used_days);
+          candidate.remaining = Math.max(0, candidate.total_days - candidate.used_days);
+          map.set(key, candidate);
+          if (!existing.id.startsWith("virtual-") && existing.used_days === 0) {
+            staleIdsToDelete.push(existing.id);
+          }
+        } else if (!candidate.active && existing.active) {
+          if (existing.used_days === 0 && candidate.used_days > 0) {
+            existing.used_days = candidate.used_days;
+            existing.remaining = Math.max(0, existing.total_days - existing.used_days);
+          }
+          if (!candidate.id.startsWith("virtual-") && candidate.used_days === 0) {
+            staleIdsToDelete.push(candidate.id);
+          }
+        } else {
+          if (candidate.used_days > existing.used_days) {
+            map.set(key, candidate);
+          }
+        }
+      }
+    }
+
+    // Include any active leave types not yet present
+    for (const lt of (allTypes ?? [])) {
+      const key = normalizeLeaveKey(lt.name);
+      if (!map.has(key)) {
+        const defaultDays = Number((lt as any).annual_days) || 0;
+        map.set(key, {
+          id: `virtual-${lt.id}`,
+          employee_id: data.employee_id,
+          employee_name: "",
+          leave_type_id: lt.id,
+          leave_type_name: lt.name,
+          year,
+          total_days: defaultDays,
+          used_days: 0,
+          remaining: defaultDays,
+          active: true,
+        });
+      }
+    }
+
+    // Clean up stale zero-usage inactive rows in background
+    if (staleIdsToDelete.length > 0) {
+      context.supabase.from("leave_balances").delete().in("id", staleIdsToDelete).then(() => {});
+    }
+
+    const list = Array.from(map.values()).map(({ active: _, ...rest }) => rest);
+    return list.sort((a, b) => a.leave_type_name.localeCompare(b.leave_type_name));
+  });
+
+export const upsertEmployeeLeaveBalance = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) =>
+    z.object({
+      id: z.string().optional(),
+      employee_id: z.string().uuid(),
+      leave_type_id: z.string().uuid(),
+      year: z.number().int().default(() => new Date().getFullYear()),
+      total_days: z.number().int().min(0).max(365),
+      used_days: z.number().int().min(0).max(365).optional(),
+    }).parse(i)
+  )
+  .handler(async ({ data, context }) => {
+    const payload: any = {
+      employee_id: data.employee_id,
+      leave_type_id: data.leave_type_id,
+      year: data.year,
+      total_days: data.total_days,
+    };
+    if (data.used_days != null) {
+      payload.used_days = data.used_days;
+    }
+    if (data.id && !data.id.startsWith("virtual-")) {
+      payload.id = data.id;
+    }
+
+    const { error } = await context.supabase
+      .from("leave_balances")
+      .upsert(payload, { onConflict: "employee_id,leave_type_id,year" });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });

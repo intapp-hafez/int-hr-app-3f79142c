@@ -29,6 +29,7 @@ import { Route as ManagerTeamRouteImport } from './routes/manager.team'
 import { Route as ManagerTasksRouteImport } from './routes/manager.tasks'
 import { Route as ManagerProfileRouteImport } from './routes/manager.profile'
 import { Route as ManagerCheckRouteImport } from './routes/manager.check'
+import { Route as ManagerChatRouteImport } from './routes/manager.chat'
 import { Route as ManagerAdvancesRouteImport } from './routes/manager.advances'
 import { Route as FinanceStickyNotesRouteImport } from './routes/finance.sticky-notes'
 import { Route as FinanceProfileRouteImport } from './routes/finance.profile'
@@ -181,6 +182,11 @@ const ManagerProfileRoute = ManagerProfileRouteImport.update({
 const ManagerCheckRoute = ManagerCheckRouteImport.update({
   id: '/check',
   path: '/check',
+  getParentRoute: () => ManagerRoute,
+} as any)
+const ManagerChatRoute = ManagerChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
   getParentRoute: () => ManagerRoute,
 } as any)
 const ManagerAdvancesRoute = ManagerAdvancesRouteImport.update({
@@ -506,6 +512,7 @@ export interface FileRoutesByFullPath {
   '/finance/profile': typeof FinanceProfileRoute
   '/finance/sticky-notes': typeof FinanceStickyNotesRoute
   '/manager/advances': typeof ManagerAdvancesRoute
+  '/manager/chat': typeof ManagerChatRoute
   '/manager/check': typeof ManagerCheckRoute
   '/manager/profile': typeof ManagerProfileRoute
   '/manager/tasks': typeof ManagerTasksRoute
@@ -575,6 +582,7 @@ export interface FileRoutesByTo {
   '/finance/profile': typeof FinanceProfileRoute
   '/finance/sticky-notes': typeof FinanceStickyNotesRoute
   '/manager/advances': typeof ManagerAdvancesRoute
+  '/manager/chat': typeof ManagerChatRoute
   '/manager/check': typeof ManagerCheckRoute
   '/manager/profile': typeof ManagerProfileRoute
   '/manager/tasks': typeof ManagerTasksRoute
@@ -651,6 +659,7 @@ export interface FileRoutesById {
   '/finance/profile': typeof FinanceProfileRoute
   '/finance/sticky-notes': typeof FinanceStickyNotesRoute
   '/manager/advances': typeof ManagerAdvancesRoute
+  '/manager/chat': typeof ManagerChatRoute
   '/manager/check': typeof ManagerCheckRoute
   '/manager/profile': typeof ManagerProfileRoute
   '/manager/tasks': typeof ManagerTasksRoute
@@ -728,6 +737,7 @@ export interface FileRouteTypes {
     | '/finance/profile'
     | '/finance/sticky-notes'
     | '/manager/advances'
+    | '/manager/chat'
     | '/manager/check'
     | '/manager/profile'
     | '/manager/tasks'
@@ -797,6 +807,7 @@ export interface FileRouteTypes {
     | '/finance/profile'
     | '/finance/sticky-notes'
     | '/manager/advances'
+    | '/manager/chat'
     | '/manager/check'
     | '/manager/profile'
     | '/manager/tasks'
@@ -872,6 +883,7 @@ export interface FileRouteTypes {
     | '/finance/profile'
     | '/finance/sticky-notes'
     | '/manager/advances'
+    | '/manager/chat'
     | '/manager/check'
     | '/manager/profile'
     | '/manager/tasks'
@@ -1045,6 +1057,13 @@ declare module '@tanstack/react-router' {
       path: '/check'
       fullPath: '/manager/check'
       preLoaderRoute: typeof ManagerCheckRouteImport
+      parentRoute: typeof ManagerRoute
+    }
+    '/manager/chat': {
+      id: '/manager/chat'
+      path: '/chat'
+      fullPath: '/manager/chat'
+      preLoaderRoute: typeof ManagerChatRouteImport
       parentRoute: typeof ManagerRoute
     }
     '/manager/advances': {
@@ -1566,6 +1585,7 @@ const FinanceRouteWithChildren =
 
 interface ManagerRouteChildren {
   ManagerAdvancesRoute: typeof ManagerAdvancesRoute
+  ManagerChatRoute: typeof ManagerChatRoute
   ManagerCheckRoute: typeof ManagerCheckRoute
   ManagerProfileRoute: typeof ManagerProfileRoute
   ManagerTasksRoute: typeof ManagerTasksRoute
@@ -1576,6 +1596,7 @@ interface ManagerRouteChildren {
 
 const ManagerRouteChildren: ManagerRouteChildren = {
   ManagerAdvancesRoute: ManagerAdvancesRoute,
+  ManagerChatRoute: ManagerChatRoute,
   ManagerCheckRoute: ManagerCheckRoute,
   ManagerProfileRoute: ManagerProfileRoute,
   ManagerTasksRoute: ManagerTasksRoute,

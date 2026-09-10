@@ -4,6 +4,9 @@ import { AppLogo } from "@/components/AppLogo";
 import { LanguageToggle, useI18n } from "@/lib/i18n";
 import { useSession, useAuthReady, signOut } from "@/lib/auth";
 import { UserMenu } from "@/components/UserMenu";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { getChatUnreadTotal } from "@/backend/functions/chat.functions";
 
 export const Route = createFileRoute("/manager")({
   component: ManagerLayout,
@@ -16,6 +19,15 @@ function ManagerLayout() {
   const ready = useAuthReady();
   // navigate handled inside UserMenu / inline logout
 
+  const unreadFn = useServerFn(getChatUnreadTotal);
+  const { data: unreadData } = useQuery({
+    queryKey: ["chat-unread-total"],
+    queryFn: () => unreadFn(),
+    refetchInterval: 10000,
+    enabled: !!session,
+  });
+  const unreadMessagesCount = unreadData?.total ?? 0;
+
   if (typeof window === "undefined") return null;
   if (!ready) return null;
   if (!session) return <Navigate to="/auth" replace />;
@@ -27,7 +39,7 @@ function ManagerLayout() {
 
   const sidebarItems = [
     { to: "/manager", icon: Home, label: t("dashboard"), exact: true },
-    { to: "/admin/chat", icon: MessageSquare, label: "Messages & Chat" },
+    { to: "/manager/chat", icon: MessageSquare, label: "Messages & Chat" },
     { to: "/manager/check", icon: LogIn, label: "Check in/out" },
     { to: "/manager/team", icon: Users, label: t("myTeam") },
     { to: "/manager/advances", icon: Banknote, label: "Advances" },
@@ -38,7 +50,7 @@ function ManagerLayout() {
 
   const mobileItems = [
     { to: "/manager", icon: Home, label: t("dashboard"), exact: true },
-    { to: "/admin/chat", icon: MessageSquare, label: "Messages & Chat" },
+    { to: "/manager/chat", icon: MessageSquare, label: "Messages & Chat" },
     { to: "/manager/check", icon: LogIn, label: "Check in/out" },
     { to: "/manager/team", icon: Users, label: t("myTeam") },
     { to: "/manager/tasks", icon: ListChecks, label: t("tasks") },
@@ -52,9 +64,9 @@ function ManagerLayout() {
     <div dir={dir} className="min-h-screen bg-muted/40">
       <div className="flex min-h-screen">
         {/* Desktop sidebar */}
-        <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-e border-border bg-background lg:flex">
-          <div className="flex items-center gap-2 border-b border-border px-4 py-4">
-            <Link to="/"><AppLogo size={28} /></Link>
+        <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-e border-sidebar-border bg-sidebar text-sidebar-foreground lg:flex">
+          <div className="flex items-center gap-2 border-b border-sidebar-border px-4 py-4">
+            <Link to="/"><AppLogo size={28} tone="light" /></Link>
           </div>
           <nav className="flex-1 space-y-1 p-3">
             {sidebarItems.map((it) => {
@@ -63,22 +75,37 @@ function ManagerLayout() {
                 <Link
                   key={it.to}
                   to={it.to}
-                  className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
-                    active ? "bg-brand/10 text-brand" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  className={`group flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
+                    active
+                      ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-brand"
+                      : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                   }`}
                 >
-                  <it.icon className="h-4 w-4" />
-                  <span>{it.label}</span>
+                  <div className="flex items-center gap-3">
+                    <it.icon className="h-4 w-4 shrink-0" />
+                    <span>{it.label}</span>
+                  </div>
+                  {it.to === "/manager/chat" && unreadMessagesCount > 0 && (
+                    <span
+                      className={`grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[10px] font-bold shadow-sm ${
+                        active
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                          : "bg-sidebar-primary text-sidebar-primary-foreground"
+                      }`}
+                    >
+                      {unreadMessagesCount}
+                    </span>
+                  )}
                 </Link>
               );
             })}
           </nav>
-          <div className="border-t border-border p-3">
+          <div className="border-t border-sidebar-border p-3">
             <button
               onClick={doLogout}
-              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
             >
-              <LogOut className="h-4 w-4" /> {t("logout")}
+              <LogOut className="h-4 w-4 shrink-0" /> {t("logout")}
             </button>
           </div>
         </aside>
@@ -112,11 +139,18 @@ function ManagerLayout() {
                   <li key={it.to} className="flex-1">
                     <Link
                       to={it.to}
-                      className={`mx-auto flex flex-col items-center gap-1 rounded-xl px-2 py-1.5 text-[11px] font-medium transition-colors ${
+                      className={`relative mx-auto flex flex-col items-center gap-1 rounded-xl px-2 py-1.5 text-[11px] font-medium transition-colors ${
                         active ? "text-brand" : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
-                      <it.icon className={`h-5 w-5 ${active ? "stroke-[2.5]" : ""}`} />
+                      <div className="relative">
+                        <it.icon className={`h-5 w-5 ${active ? "stroke-[2.5]" : ""}`} />
+                        {it.to === "/manager/chat" && unreadMessagesCount > 0 && (
+                          <span className="absolute -end-2 -top-1 grid h-3.5 min-w-3.5 place-items-center rounded-full bg-brand px-1 text-[9px] font-bold text-brand-foreground shadow-sm">
+                            {unreadMessagesCount}
+                          </span>
+                        )}
+                      </div>
                       <span>{it.label}</span>
                     </Link>
                   </li>

@@ -5,6 +5,7 @@ import { parseInput } from "../schemas/validation-error";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { AttendanceCheckSchema, AdminAttendanceSchema } from "../schemas";
 import { isoWeekday } from "@/lib/date-format";
+import { reverseGeocodeCoords } from "@/lib/reverse-geocode";
 import { enforceAttendanceRateLimit } from "./attendance-rate-limit.server";
 
 function today() {
@@ -210,6 +211,19 @@ export const checkIn = createServerFn({ method: "POST" })
       };
     }
 
+    let city = data.city ?? null;
+    let district = data.district ?? null;
+    let street = data.street ?? null;
+
+    if ((!district || !city) && data.lat != null && data.lng != null) {
+      try {
+        const geo = await reverseGeocodeCoords(data.lat, data.lng);
+        if (!city && geo.city) city = geo.city;
+        if (!district && geo.district) district = geo.district;
+        if (!street && geo.street) street = geo.street;
+      } catch {}
+    }
+
     const { error } = await supabase.from("attendance").upsert(
       {
         employee_id: userId,
@@ -220,9 +234,9 @@ export const checkIn = createServerFn({ method: "POST" })
         lng: data.lng,
         network_ok: data.network_ok,
         note: data.note,
-        city: data.city ?? null,
-        district: data.district ?? null,
-        street: data.street ?? null,
+        city,
+        district,
+        street,
         free_check: freeCheck,
         status: "present",
       },
@@ -349,6 +363,19 @@ export const checkOut = createServerFn({ method: "POST" })
       };
     }
 
+    let outCity = data.city ?? null;
+    let outDistrict = data.district ?? null;
+    let outStreet = data.street ?? null;
+
+    if ((!outDistrict || !outCity) && data.lat != null && data.lng != null) {
+      try {
+        const geo = await reverseGeocodeCoords(data.lat, data.lng);
+        if (!outCity && geo.city) outCity = geo.city;
+        if (!outDistrict && geo.district) outDistrict = geo.district;
+        if (!outStreet && geo.street) outStreet = geo.street;
+      } catch {}
+    }
+
     const { error } = await supabase
       .from("attendance")
       .update({
@@ -356,9 +383,9 @@ export const checkOut = createServerFn({ method: "POST" })
         note: data.note,
         out_lat: data.lat ?? null,
         out_lng: data.lng ?? null,
-        out_city: data.city ?? null,
-        out_district: data.district ?? null,
-        out_street: data.street ?? null,
+        out_city: outCity,
+        out_district: outDistrict,
+        out_street: outStreet,
       })
       .eq("employee_id", userId)
       .eq("date", today);
@@ -478,38 +505,10 @@ export const adminReverseGeocode = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdminOrHr(context.supabase, context.userId);
     try {
-      const r = await fetch(
-        `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${data.lat}&longitude=${data.lng}&localityLanguage=en`,
-      );
-      if (r.ok) {
-        const j: any = await r.json();
-        const admin: any[] = j.localityInfo?.administrative ?? [];
-        const city = j.city || admin.find((a) => a.adminLevel === 4)?.name || "";
-        const locality = j.locality || admin.find((a) => a.adminLevel >= 7)?.name || "";
-        const street = [j.streetNumber, j.streetName].filter(Boolean).join(" ");
-        const label = dedupeLocationParts([street, locality, city]);
-        if (label) return label;
-      }
+      const geo = await reverseGeocodeCoords(data.lat, data.lng);
+      if (geo.formatted) return geo.formatted;
     } catch {
-      // Try OpenStreetMap fallback below.
-    }
-    try {
-      const r = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${data.lat}&lon=${data.lng}&accept-language=en&addressdetails=1`,
-        { headers: { "User-Agent": "HR-App attendance location lookup" } },
-      );
-      if (r.ok) {
-        const j: any = await r.json();
-        const address = j.address ?? {};
-        const road = [address.house_number, address.road].filter(Boolean).join(" ");
-        const locality =
-          address.suburb || address.neighbourhood || address.city_district || address.town || "";
-        const city = address.city || address.state || address.county || "";
-        const label = dedupeLocationParts([road, locality, city]);
-        if (label) return label;
-      }
-    } catch {
-      // Fall through to a non-coordinate placeholder.
+      // ignore
     }
     return "Location name unavailable";
   });

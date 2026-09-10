@@ -21,6 +21,10 @@ import {
 import { getEmployeeWorkingDays } from "@/backend/functions/employee-working-days.functions";
 import { listHolidays } from "@/backend/functions/holidays.functions";
 import { staffDecideLeave } from "@/backend/functions/staff.functions";
+import {
+  getEmployeeLeaveBalances,
+  upsertEmployeeLeaveBalance,
+} from "@/backend/functions/leave-balances.functions";
 import { getMe } from "@/backend/functions/auth.functions";
 import {
   listEmployeeDevices,
@@ -2342,37 +2346,264 @@ function AttendanceHistoryPanel({ employeeId }: { employeeId: string }) {
 }
 
 function LeavesHistoryPanel({ employeeId }: { employeeId: string }) {
+  const qc = useQueryClient();
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+  const [editingBalance, setEditingBalance] = useState<{
+    id: string;
+    leave_type_id: string;
+    leave_type_name: string;
+    year: number;
+    total_days: number;
+  } | null>(null);
+  const [editTotalDays, setEditTotalDays] = useState<number>(0);
+  const [savingBalance, setSavingBalance] = useState(false);
+
+  // Leave balances query
+  const balFn = useServerFn(getEmployeeLeaveBalances);
+  const { data: balances = [], isLoading: balLoading } = useQuery({
+    queryKey: ["employee", "leave-balances", employeeId, selectedYear],
+    queryFn: () => balFn({ data: { employee_id: employeeId, year: selectedYear } }),
+  });
+
+  // Leave requests history query
   const fn = useServerFn(getEmployeeLeavesHistory);
-  const { data, isLoading } = useQuery({
+  const { data: leavesData, isLoading: leavesLoading } = useQuery({
     queryKey: ["employee", "leaves", employeeId],
     queryFn: () => fn({ data: { employee_id: employeeId } }),
   });
-  const rows = (data ?? []) as any[];
+  const rows = (leavesData ?? []) as any[];
+
+  const upsertBalFn = useServerFn(upsertEmployeeLeaveBalance);
+
+  const totalEntitled = useMemo(() => balances.reduce((sum, b) => sum + (b.total_days || 0), 0), [balances]);
+  const totalUsed = useMemo(() => balances.reduce((sum, b) => sum + (b.used_days || 0), 0), [balances]);
+  const totalRemaining = useMemo(() => balances.reduce((sum, b) => sum + (b.remaining || 0), 0), [balances]);
+
   const tone = (s: string) =>
     s === "approved" ? "bg-emerald-500/10 text-emerald-600" :
       s === "rejected" ? "bg-destructive/10 text-destructive" :
         s === "cancelled" ? "bg-muted text-muted-foreground" :
           "bg-amber-500/10 text-amber-600";
+
+  async function handleSaveBalance() {
+    if (!editingBalance) return;
+    setSavingBalance(true);
+    try {
+      await upsertBalFn({
+        data: {
+          id: editingBalance.id.startsWith("virtual-") ? undefined : editingBalance.id,
+          employee_id: employeeId,
+          leave_type_id: editingBalance.leave_type_id,
+          year: editingBalance.year,
+          total_days: Number(editTotalDays) || 0,
+        },
+      });
+      toast.success("Leave balance updated");
+      await qc.invalidateQueries({ queryKey: ["employee", "leave-balances", employeeId] });
+      await qc.invalidateQueries({ queryKey: ["admin", "leave-balances"] });
+      setEditingBalance(null);
+    } catch (e: any) {
+      toast.error(e.message || "Failed to update balance");
+    } finally {
+      setSavingBalance(false);
+    }
+  }
+
   return (
-    <div className="rounded-3xl border border-border bg-card p-5">
-      <h2 className="mb-4 font-display text-base font-semibold">Leaves</h2>
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No leave requests.</p>
-      ) : (
-        <ul className="space-y-2">
-          {rows.map((l) => (
-            <li key={l.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-background p-3">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold">{l.leave_type_name ?? "Leave"} · {l.days ?? "—"}d {l.paid === false ? "(unpaid)" : ""}</p>
-                <p className="text-[11px] text-muted-foreground font-mono">{formatDate(l.start_date)} → {formatDate(l.end_date)}</p>
-                {l.reason && <p className="mt-0.5 text-[11px] text-muted-foreground truncate">{l.reason}</p>}
-              </div>
-              <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${tone(l.status)}`}>{l.status}</span>
-            </li>
-          ))}
-        </ul>
+    <div className="space-y-6">
+      {/* Leave Balances Section */}
+      <div className="rounded-3xl border border-border bg-card p-5">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-display text-base font-semibold">Leave Balances</h2>
+            <p className="text-xs text-muted-foreground">Annual entitlement, usage, and remaining leave balance</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-muted-foreground">Year</span>
+            <div className="inline-flex rounded-xl border border-border bg-background p-1 text-xs">
+              {[currentYear - 1, currentYear, currentYear + 1].map((y) => (
+                <button
+                  key={y}
+                  type="button"
+                  onClick={() => setSelectedYear(y)}
+                  className={`rounded-lg px-2.5 py-1 font-medium transition ${
+                    selectedYear === y
+                      ? "bg-primary text-primary-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {y}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* High-level Summary Cards */}
+        <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl border border-border bg-muted/30 p-4">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Total Entitlement</span>
+              <CalendarDays className="h-4 w-4 opacity-70" />
+            </div>
+            <div className="mt-2 font-display text-2xl font-bold tracking-tight">
+              {balLoading ? "…" : `${totalEntitled} days`}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-border bg-muted/30 p-4">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Days Used</span>
+              <Clock className="h-4 w-4 opacity-70" />
+            </div>
+            <div className="mt-2 font-display text-2xl font-bold tracking-tight text-amber-600">
+              {balLoading ? "…" : `${totalUsed} days`}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4">
+            <div className="flex items-center justify-between text-xs text-emerald-700 dark:text-emerald-400">
+              <span className="font-semibold">Remaining Balance</span>
+              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+            </div>
+            <div className="mt-2 font-display text-2xl font-bold tracking-tight text-emerald-700 dark:text-emerald-400">
+              {balLoading ? "…" : `${totalRemaining} days`}
+            </div>
+          </div>
+        </div>
+
+        {/* Leave Type Breakdown Cards */}
+        {balLoading ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">
+            <Loader2 className="mx-auto h-4 w-4 animate-spin text-muted-foreground" />
+          </p>
+        ) : balances.length === 0 ? (
+          <p className="py-4 text-center text-sm text-muted-foreground">No leave balances found for {selectedYear}.</p>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {balances.map((b) => {
+              const pct = b.total_days > 0 ? Math.min(100, Math.round((b.used_days / b.total_days) * 100)) : 0;
+              return (
+                <div key={b.id || b.leave_type_id} className="flex flex-col justify-between rounded-2xl border border-border bg-background p-4 shadow-xs">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h3 className="text-sm font-semibold">{b.leave_type_name}</h3>
+                      <p className="text-xs text-muted-foreground font-mono">
+                        {b.used_days} used / {b.total_days} total
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                        b.remaining > 0 ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" : "bg-destructive/15 text-destructive"
+                      }`}>
+                        {b.remaining}d left
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingBalance({
+                            id: b.id,
+                            leave_type_id: b.leave_type_id,
+                            leave_type_name: b.leave_type_name,
+                            year: b.year,
+                            total_days: b.total_days,
+                          });
+                          setEditTotalDays(b.total_days);
+                        }}
+                        title="Adjust balance"
+                        className="grid h-6 w-6 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-3">
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                      <div
+                        className={`h-full transition-all duration-300 ${
+                          pct >= 90 ? "bg-destructive" : pct >= 70 ? "bg-amber-500" : "bg-primary"
+                        }`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Leave Requests History */}
+      <div className="rounded-3xl border border-border bg-card p-5">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="font-display text-base font-semibold">Leave Requests History</h2>
+          <span className="text-xs text-muted-foreground font-mono">{rows.length} record{rows.length === 1 ? "" : "s"}</span>
+        </div>
+
+        {leavesLoading ? (
+          <p className="text-sm text-muted-foreground">Loading…</p>
+        ) : rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No leave requests recorded.</p>
+        ) : (
+          <ul className="space-y-2">
+            {rows.map((l) => (
+              <li key={l.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-background p-3.5">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold">{l.leave_type_name ?? "Leave"} · {l.days ?? "—"}d {l.paid === false ? "(unpaid)" : ""}</p>
+                  <p className="text-[11px] text-muted-foreground font-mono">{formatDate(l.start_date)} → {formatDate(l.end_date)}</p>
+                  {l.reason && <p className="mt-0.5 text-[11px] text-muted-foreground truncate">{l.reason}</p>}
+                </div>
+                <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${tone(l.status)}`}>{l.status}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* Dialog to adjust balance */}
+      {editingBalance && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-3xl border border-border bg-card p-6 shadow-xl">
+            <h3 className="text-base font-bold">Adjust Leave Entitlement</h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {editingBalance.leave_type_name} ({editingBalance.year})
+            </p>
+            <div className="mt-4 space-y-3">
+              <label className="block text-xs font-semibold text-muted-foreground">
+                Total Allowed Days
+                <input
+                  type="number"
+                  min="0"
+                  max="365"
+                  value={editTotalDays}
+                  onChange={(e) => setEditTotalDays(Math.max(0, parseInt(e.target.value) || 0))}
+                  className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:border-brand focus:outline-hidden"
+                />
+              </label>
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={savingBalance}
+                onClick={() => setEditingBalance(null)}
+                className="rounded-xl border border-border px-3.5 py-1.5 text-xs font-semibold hover:bg-muted"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={savingBalance}
+                onClick={handleSaveBalance}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-brand px-4 py-1.5 text-xs font-semibold text-brand-foreground shadow-brand"
+              >
+                {savingBalance && <Loader2 className="h-3 w-3 animate-spin" />} Save
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -2393,7 +2624,28 @@ function LeavesTab({ leaves }: { leaves: Array<{ id: number; type: string; start
   const filtered = filter === "All" ? leaves : leaves.filter((l) => l.status === filter);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      {/* Leave Balances Summary */}
+      <div className="rounded-3xl border border-border bg-card p-5">
+        <h2 className="mb-3 font-display text-base font-semibold">Leave Balances</h2>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="rounded-2xl border border-border bg-muted/30 p-3">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Total Entitlement</p>
+            <p className="mt-1 font-display text-lg font-bold">30 days</p>
+          </div>
+          <div className="rounded-2xl border border-border bg-muted/30 p-3">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Days Used</p>
+            <p className="mt-1 font-display text-lg font-bold text-amber-600">{leaves.filter(l => l.status === "Approved").length * 2} days</p>
+          </div>
+          <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-3">
+            <p className="text-[10px] uppercase tracking-wider text-emerald-700 dark:text-emerald-400 font-semibold">Remaining</p>
+            <p className="mt-1 font-display text-lg font-bold text-emerald-700 dark:text-emerald-400">
+              {Math.max(0, 30 - (leaves.filter(l => l.status === "Approved").length * 2))} days
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-4 gap-2">
         {(["All", "Pending", "Approved", "Rejected"] as LeaveStatus[]).map((k) => (
           <button

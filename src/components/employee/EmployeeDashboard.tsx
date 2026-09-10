@@ -15,6 +15,7 @@ import { mapTaskRow, type TaskRow } from "@/lib/task-mapping";
 import { useStore, getCurrentDeviceId } from "@/lib/store";
 import { useSession } from "@/lib/auth";
 import { formatDate } from "@/lib/date-format";
+import { reverseGeocodeCoords } from "@/lib/reverse-geocode";
 
 export function EmployeeDashboard() {
   const { t, lang } = useI18n();
@@ -47,8 +48,9 @@ export function EmployeeDashboard() {
   const currentEmpId = useStore((s) => s.currentEmployeeId);
   const meId = session?.employeeId ?? employees.find((e) => e.name === session?.name)?.id ?? currentEmpId;
 
+  const deviceCheckRequired = !!(meQ.data as any)?.profile?.device_check_required;
   const currentDevice = devQ.data?.find((d: any) => d.id === getCurrentDeviceId());
-  const deviceApproved = currentDevice?.status === "approved";
+  const deviceApproved = !deviceCheckRequired || currentDevice?.status === "approved";
 
   const listTasksFn = useServerFn(listTasks);
   const { data: taskRows = [] } = useQuery({
@@ -81,7 +83,7 @@ export function EmployeeDashboard() {
         setLiveGeo({ err: coords.err });
         return;
       }
-      const geo = await reverseGeocode(coords.lat, coords.lng);
+      const geo = await reverseGeocodeCoords(coords.lat, coords.lng);
       if (cancelled) return;
       setLiveGeo({ ...geo, lat: coords.lat, lng: coords.lng });
       const locs: any[] = (accessQ.data as any)?.locations ?? [];
@@ -143,19 +145,6 @@ export function EmployeeDashboard() {
     });
   }
 
-  async function reverseGeocode(lat: number, lng: number) {
-    try {
-      const r = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`);
-      if (!r.ok) return {};
-      const j: any = await r.json();
-      return {
-        city: j.city || j.locality || j.principalSubdivision || undefined,
-        district: j.localityInfo?.administrative?.find((a: any) => a.adminLevel >= 6)?.name || undefined,
-        street: [j.streetNumber, j.streetName].filter(Boolean).join(" ") || undefined,
-      };
-    } catch { return {}; }
-  }
-
   async function handleAction() {
     const kind: "in" | "out" = isCheckedIn ? "out" : "in";
     setBusy(kind);
@@ -182,16 +171,26 @@ export function EmployeeDashboard() {
           }
         }
       }
-      const geo = coords.lat != null && coords.lng != null ? await reverseGeocode(coords.lat, coords.lng) : {};
-      const payload = { branch: profile?.branch ?? "HQ", lat: coords.lat, lng: coords.lng, network_ok: online, device_id: getCurrentDeviceId(), ...geo };
+      const geo = coords.lat != null && coords.lng != null ? await reverseGeocodeCoords(coords.lat, coords.lng) : {};
+      const payload = {
+        branch: profile?.branch ?? "HQ",
+        lat: coords.lat,
+        lng: coords.lng,
+        network_ok: online,
+        device_id: getCurrentDeviceId(),
+        city: geo.city,
+        district: geo.district,
+        street: geo.street,
+      };
+      const locLabel = geo.formatted ? ` · ${geo.formatted}` : "";
       if (kind === "in") {
         const res: any = await inFn({ data: payload });
         if (res?.blocked) { toast.error(res.reason); return; }
-        toast.success(res?.free_check ? `${t("checkIn")} ✓ (free)` : `${t("checkIn")} ✓`);
+        toast.success(res?.free_check ? `${t("checkIn")} ✓ (free)${locLabel}` : `${t("checkIn")} ✓${locLabel}`);
       } else {
         const res: any = await outFn({ data: payload });
         if (res?.blocked) { toast.error(res.reason); return; }
-        toast.success(`${t("checkOut")} ✓`);
+        toast.success(`${t("checkOut")} ✓${locLabel}`);
       }
       qc.invalidateQueries({ queryKey: ["my-attendance"] });
     } catch (e) {
@@ -289,7 +288,7 @@ export function EmployeeDashboard() {
           );
         })()}
 
-        {!devQ.isLoading && !deviceApproved && (
+        {!devQ.isLoading && deviceCheckRequired && !deviceApproved && (
           <div className="mt-3 rounded-xl bg-black/40 p-3 text-center text-xs text-white/90 backdrop-blur border border-white/10 space-y-1">
             <p className="font-semibold">
               {!currentDevice

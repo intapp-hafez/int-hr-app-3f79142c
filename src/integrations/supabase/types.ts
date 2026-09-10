@@ -3417,6 +3417,9 @@ export type Database = {
           job_grade: string
           nightly_rate: number
           transport_expense: number
+          district: string | null
+          street: string | null
+          radius_m: number
         }
         Insert: {
           city_id: string
@@ -3425,6 +3428,9 @@ export type Database = {
           job_grade: string
           nightly_rate?: number
           transport_expense?: number
+          district?: string | null
+          street?: string | null
+          radius_m?: number
         }
         Update: {
           city_id?: string
@@ -3433,6 +3439,9 @@ export type Database = {
           job_grade?: string
           nightly_rate?: number
           transport_expense?: number
+          district?: string | null
+          street?: string | null
+          radius_m?: number
         }
         Relationships: [
           {

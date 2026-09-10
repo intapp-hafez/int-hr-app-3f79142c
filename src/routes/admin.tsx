@@ -46,6 +46,13 @@ function AdminLayout() {
     const target = session.roles?.includes("staff") ? "/staff" : "/employee";
     return <Navigate to={target} replace />;
   }
+  const isPureManager = session.roles?.includes("manager") && !session.roles?.some((r) => ["admin", "hr"].includes(r));
+  if (isPureManager) {
+    if (path.startsWith("/admin/chat")) {
+      return <Navigate to="/manager/chat" replace />;
+    }
+    return <Navigate to="/manager" replace />;
+  }
 
   const navAll = [
     { to: "/admin", icon: LayoutDashboard, label: t("dashboard"), exact: true, page: null },
@@ -54,8 +61,6 @@ function AdminLayout() {
     { to: "/admin/contracts", icon: FileSignature, label: t("contracts"), page: "contracts" },
     { to: "/admin/geofencing", icon: MapPin, label: t("geofencing"), page: "geofencing" },
     { to: "/admin/attendance", icon: Clock, label: t("attendance"), page: "attendance" },
-    { to: "/admin/devices", icon: Smartphone, label: "Devices", page: "employees" },
-    { to: "/admin/attendance-report", icon: Printer, label: "Attendance Report", page: "attendance" },
     { to: "/admin/leaves", icon: CalendarDays, label: t("leaves"), page: "leaves" },
     { to: "/admin/payroll", icon: Wallet, label: t("payroll"), page: "payroll" },
     { to: "/admin/advances", icon: Banknote, label: t("advancesTitle"), page: "advances" },

@@ -11,6 +11,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { listTasks, transitionTask as transitionTaskFn, getProfileNames } from "@/backend/functions/tasks.functions";
 import { mapTaskRow, type TaskRow } from "@/lib/task-mapping";
 import { useMemo } from "react";
+import { reverseGeocodeCoords } from "@/lib/reverse-geocode";
 
 export const Route = createFileRoute("/employee/tasks")({
   component: EmployeeTasksPage,
@@ -111,13 +112,11 @@ function EmployeeTasksPage() {
       if (cancelled) return;
       if (coords.lat == null || coords.lng == null) return setLiveGeo({ err: "Location unavailable" });
       try {
-        const r = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${coords.lat}&longitude=${coords.lng}&localityLanguage=en`);
-        if (!r.ok) return;
-        const j = await r.json();
+        const geo = await reverseGeocodeCoords(coords.lat, coords.lng);
         if (cancelled) return;
         setLiveGeo({ 
-          city: j.city || j.locality || j.principalSubdivision || undefined,
-          district: j.localityInfo?.administrative?.find((a: any) => a.adminLevel >= 6)?.name || j.locality || undefined,
+          city: geo.city,
+          district: geo.district,
           lat: coords.lat,
           lng: coords.lng
         });
@@ -136,13 +135,9 @@ function EmployeeTasksPage() {
 
     needGeocode.forEach(async (t) => {
       try {
-        const r = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${t.lat}&longitude=${t.lng}&localityLanguage=en`);
-        if (!r.ok) return;
-        const j = await r.json();
-        const city = j.city || j.locality || j.principalSubdivision || undefined;
-        const district = j.localityInfo?.administrative?.find((a: any) => a.adminLevel >= 6)?.name || j.locality || undefined;
-        if (city || district) {
-          setTaskGeo((prev) => ({ ...prev, [t.id]: { city, district } }));
+        const geo = await reverseGeocodeCoords(t.lat!, t.lng!);
+        if (geo.city || geo.district) {
+          setTaskGeo((prev) => ({ ...prev, [t.id]: { city: geo.city, district: geo.district } }));
         }
       } catch { }
     });

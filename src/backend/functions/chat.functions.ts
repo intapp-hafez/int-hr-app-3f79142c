@@ -39,6 +39,17 @@ export type ChatMessageItem = {
   is_mine: boolean;
 };
 
+function generateUUID(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 /**
  * List channels accessible to the current user with unread counts and last message previews
  */
@@ -99,13 +110,18 @@ export const listMyChannels = createServerFn({ method: "GET" })
       }
     });
 
+    // Check if caller is manager-only (manager without admin or hr role)
+    const { data: userRoles } = await sb.from("user_roles").select("role").eq("user_id", userId);
+    const roles = (userRoles ?? []).map((r: any) => r.role);
+    const isManagerOnly = roles.includes("manager") && !roles.some((r: string) => r === "admin" || r === "hr");
+
     // 4. Fetch profiles for other participants
     const profileMap = new Map<string, any>();
     if (otherUserIds.length > 0) {
       const [{ data: profiles }, { data: depts }] = await Promise.all([
         sb
           .from("profiles")
-          .select("id, full_name, email, department_id, avatar_url")
+          .select("id, full_name, email, department_id, avatar_url, manager_id")
           .in("id", Array.from(new Set(otherUserIds))),
         sb.from("departments").select("id, name_en"),
       ]);
@@ -141,7 +157,7 @@ export const listMyChannels = createServerFn({ method: "GET" })
     });
 
     // 6. Assemble result items
-    return channels.map((c: any): ChatChannelItem => {
+    const items = channels.map((c: any): ChatChannelItem => {
       const otherUserId = directChannelToOtherUser.get(c.id);
       const otherProfile = otherUserId ? profileMap.get(otherUserId) : null;
       const lastMsg = lastMessageMap.get(c.id);
@@ -184,6 +200,20 @@ export const listMyChannels = createServerFn({ method: "GET" })
           : null,
       };
     });
+
+    if (isManagerOnly) {
+      return items.filter((item: ChatChannelItem) => {
+        if (item.type === "broadcast") return true;
+        if (item.type === "direct") {
+          const otherId = directChannelToOtherUser.get(item.id);
+          const otherProfile = otherId ? profileMap.get(otherId) : null;
+          return otherProfile?.manager_id === userId;
+        }
+        return false;
+      });
+    }
+
+    return items;
   });
 
 /**
@@ -250,6 +280,45 @@ export const sendMessage = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const sb = supabase as any;
     const now = new Date().toISOString();
+    // Check if caller is manager-only
+    const { data: userRoles } = await sb.from("user_roles").select("role").eq("user_id", userId);
+    const roles = (userRoles ?? []).map((r: any) => r.role);
+    const isManagerOnly = roles.includes("manager") && !roles.some((r: string) => r === "admin" || r === "hr");
+
+    if (isManagerOnly) {
+      const { data: chan } = await sb
+        .from("chat_channels")
+        .select("id, type")
+        .eq("id", data.channelId)
+        .maybeSingle();
+
+      if (chan) {
+        if (chan.type === "broadcast") {
+          throw new Error("Company announcements are read-only");
+        }
+        if (chan.type === "department") {
+          throw new Error("Department channels are read-only for managers");
+        }
+        if (chan.type === "direct") {
+          const { data: parts } = await sb
+            .from("chat_participants")
+            .select("user_id")
+            .eq("channel_id", data.channelId)
+            .neq("user_id", userId);
+          const otherId = parts?.[0]?.user_id;
+          if (otherId) {
+            const { data: targetProfile } = await sb
+              .from("profiles")
+              .select("manager_id")
+              .eq("id", otherId)
+              .maybeSingle();
+            if (targetProfile && targetProfile.manager_id !== userId) {
+              throw new Error("You can only chat with members of your team");
+            }
+          }
+        }
+      }
+    }
 
     // 1. Insert message
     const { data: msg, error: mErr } = await sb
@@ -299,6 +368,29 @@ export const sendGroupOrDirectMessage = createServerFn({ method: "POST" })
     const sb = supabase as any;
     const now = new Date().toISOString();
 
+    // Check if caller is manager-only
+    const { data: userRoles } = await sb.from("user_roles").select("role").eq("user_id", userId);
+    const roles = (userRoles ?? []).map((r: any) => r.role);
+    const isManagerOnly = roles.includes("manager") && !roles.some((r: string) => r === "admin" || r === "hr");
+
+    if (isManagerOnly) {
+      if (data.targetType !== "direct") {
+        throw new Error("Managers can only send direct messages to their team members");
+      }
+      if (!data.targetId) {
+        throw new Error("Target team member ID is required");
+      }
+      const { data: targetProfile } = await sb
+        .from("profiles")
+        .select("id, manager_id")
+        .eq("id", data.targetId)
+        .maybeSingle();
+
+      if (!targetProfile || targetProfile.manager_id !== userId) {
+        throw new Error("You can only chat with members of your team");
+      }
+    }
+
     let targetChannelId: string | null = null;
 
     if (data.targetType === "direct") {
@@ -329,24 +421,25 @@ export const sendGroupOrDirectMessage = createServerFn({ method: "POST" })
 
       // If no direct channel exists, create one
       if (!targetChannelId) {
-        const { data: newChan, error: cErr } = await sb
+        const newChanId = generateUUID();
+        const { error: cErr } = await sb
           .from("chat_channels")
           .insert({
+            id: newChanId,
             type: "direct",
             created_by: userId,
             last_message_at: now,
-          })
-          .select("id")
-          .single();
+          });
 
         if (cErr) throw new Error(cErr.message);
-        targetChannelId = (newChan as any).id;
+        targetChannelId = newChanId;
 
         // Enroll both participants
-        await sb.from("chat_participants").insert([
+        const { error: pErr } = await sb.from("chat_participants").insert([
           { channel_id: targetChannelId, user_id: userId, last_read_at: now },
           { channel_id: targetChannelId, user_id: data.targetId, last_read_at: new Date(0).toISOString() },
         ]);
+        if (pErr) throw new Error(pErr.message);
       }
     } else if (data.targetType === "department") {
       if (!data.targetId) throw new Error("Department ID or name is required");
@@ -380,21 +473,21 @@ export const sendGroupOrDirectMessage = createServerFn({ method: "POST" })
       if (existingChan) {
         targetChannelId = (existingChan as any).id;
       } else {
-        const { data: newChan, error: cErr } = await sb
+        const newChanId = generateUUID();
+        const { error: cErr } = await sb
           .from("chat_channels")
           .insert({
+            id: newChanId,
             type: "department",
             name: `${deptName} Department`,
             department_id: deptIdIsUuid ? deptId : null,
             department_name: deptName,
             created_by: userId,
             last_message_at: now,
-          })
-          .select("id")
-          .single();
+          });
 
         if (cErr) throw new Error(cErr.message);
-        targetChannelId = (newChan as any).id;
+        targetChannelId = newChanId;
       }
 
       // Fetch all employees belonging to this department
@@ -433,19 +526,19 @@ export const sendGroupOrDirectMessage = createServerFn({ method: "POST" })
       if (existingChan) {
         targetChannelId = (existingChan as any).id;
       } else {
-        const { data: newChan, error: cErr } = await sb
+        const newChanId = generateUUID();
+        const { error: cErr } = await sb
           .from("chat_channels")
           .insert({
+            id: newChanId,
             type: "broadcast",
             name: "Company Announcements",
             created_by: userId,
             last_message_at: now,
-          })
-          .select("id")
-          .single();
+          });
 
         if (cErr) throw new Error(cErr.message);
-        targetChannelId = (newChan as any).id;
+        targetChannelId = newChanId;
       }
     }
 
@@ -485,8 +578,37 @@ export const sendGroupOrDirectMessage = createServerFn({ method: "POST" })
 export const listChatTargets = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
     const sb = supabase as any;
+
+    // Check if caller is manager-only
+    const { data: userRoles } = await sb.from("user_roles").select("role").eq("user_id", userId);
+    const roles = (userRoles ?? []).map((r: any) => r.role);
+    const isManagerOnly = roles.includes("manager") && !roles.some((r: string) => r === "admin" || r === "hr");
+
+    if (isManagerOnly) {
+      // Manager can only chat with members of their team
+      const { data: teamProfiles } = await sb
+        .from("profiles")
+        .select("id, full_name, email, department_id, avatar_url, status")
+        .eq("manager_id", userId)
+        .order("full_name");
+
+      const activeTeam = (teamProfiles ?? []).filter(
+        (p: any) => p.status !== "Inactive" && p.status !== "Terminated"
+      );
+
+      return {
+        departments: [],
+        employees: activeTeam.map((p: any) => ({
+          id: p.id,
+          name: p.full_name || p.email,
+          email: p.email,
+          department: "My Team",
+          avatar_url: p.avatar_url,
+        })),
+      };
+    }
 
     const [{ data: depts }, { data: profiles }] = await Promise.all([
       sb.from("departments").select("id, name_en, name_ar").order("name_en"),

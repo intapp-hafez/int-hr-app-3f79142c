@@ -5,12 +5,14 @@ import { useState, useRef } from "react";
 import { toast } from "sonner";
 import { LogIn, LogOut, MapPin, Plus, X, Wifi, WifiOff, Paperclip, FileText, ShieldCheck } from "lucide-react";
 import { checkIn, checkOut, listMyAttendance } from "@/backend/functions/attendance.functions";
-import { listMyDevices } from "@/backend/functions/devices.functions";
+import { listMyDevices, registerMyDevice } from "@/backend/functions/devices.functions";
+import { getMe } from "@/backend/functions/auth.functions";
 import { submitLeave, listMyLeaves, cancelLeave, listActiveLeaveTypes } from "@/backend/functions/leaves.functions";
 import { useSession, useAuthReady } from "@/lib/auth";
 import { getCurrentDeviceId } from "@/lib/store";
 import { DateRangeField } from "@/components/ui/date-input";
 import { formatDate, validateDateRange } from "@/lib/date-format";
+import { reverseGeocodeCoords } from "@/lib/reverse-geocode";
 
 export const Route = createFileRoute("/manager/check")({ component: CheckPage });
 
@@ -43,13 +45,47 @@ function CheckInOutCard() {
   const inFn = useServerFn(checkIn);
   const outFn = useServerFn(checkOut);
   const devicesFn = useServerFn(listMyDevices);
+  const registerFn = useServerFn(registerMyDevice);
+  const meFn = useServerFn(getMe);
+  const attFn = useServerFn(listMyAttendance);
+
+  const meQ = useQuery({ queryKey: ["me"], queryFn: () => meFn() });
   const devQ = useQuery({ queryKey: ["my-devices"], queryFn: () => devicesFn() });
+  const attQ = useQuery({ queryKey: ["my-attendance"], queryFn: () => attFn() });
+
   const [busy, setBusy] = useState<"in" | "out" | null>(null);
   const [note, setNote] = useState("");
   const [branch, setBranch] = useState("HQ");
 
+  const isoToday = new Date().toISOString().slice(0, 10);
+  const localToday = new Date().toLocaleDateString("en-CA");
+  const attendance = (attQ.data as any[]) ?? [];
+  const todayRow = attendance.find((a) => a.date === isoToday || a.date === localToday);
+  const latestRecord = attendance[0];
+  const activeRow = todayRow || (latestRecord && !latestRecord.out_time && (Date.now() - new Date(latestRecord.in_time).getTime() < 18 * 3600 * 1000) ? latestRecord : null);
+
+  const hasCheckedIn = !!activeRow?.in_time;
+  const hasCheckedOut = !!activeRow?.out_time;
+
+  const deviceCheckRequired = !!(meQ.data as any)?.profile?.device_check_required;
   const currentDevice = devQ.data?.find((d: any) => d.id === getCurrentDeviceId());
-  const deviceApproved = currentDevice?.status === "approved";
+  const deviceApproved = !deviceCheckRequired || currentDevice?.status === "approved";
+
+  async function handleRegisterDevice() {
+    try {
+      await registerFn({
+        data: {
+          device_id: getCurrentDeviceId(),
+          label: typeof navigator !== "undefined" && navigator.userAgent.includes("Windows") ? "Windows PC" : "Web Browser",
+          user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
+        },
+      });
+      toast.success("Device registered. Awaiting administrator approval.");
+      qc.invalidateQueries({ queryKey: ["my-devices"] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to register device");
+    }
+  }
 
   async function getCoords(): Promise<{ lat?: number; lng?: number; err?: string }> {
     if (typeof navigator === "undefined" || !navigator.geolocation) return { err: "Geolocation not supported" };
@@ -62,35 +98,33 @@ function CheckInOutCard() {
     });
   }
 
-  async function reverseGeocode(lat: number, lng: number): Promise<{ city?: string; district?: string; street?: string }> {
-    try {
-      const r = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`);
-      if (!r.ok) return {};
-      const j: any = await r.json();
-      return {
-        city: j.city || j.locality || j.principalSubdivision || undefined,
-        district: j.localityInfo?.administrative?.find((a: any) => a.adminLevel >= 6)?.name || j.locality || undefined,
-        street: [j.streetNumber, j.streetName].filter(Boolean).join(" ") || j.localityInfo?.informative?.[0]?.name || undefined,
-      };
-    } catch { return {}; }
-  }
-
   async function go(kind: "in" | "out") {
     setBusy(kind);
     try {
       const coords = await getCoords();
       if (coords.err) { toast.error(`Location error: ${coords.err}`); }
       const online = typeof navigator !== "undefined" ? navigator.onLine : true;
-      const geo = coords.lat != null && coords.lng != null ? await reverseGeocode(coords.lat, coords.lng) : {};
-      const payload = { branch, lat: coords.lat, lng: coords.lng, network_ok: online, note: note.trim() || undefined, device_id: getCurrentDeviceId(), ...geo };
+      const geo = coords.lat != null && coords.lng != null ? await reverseGeocodeCoords(coords.lat, coords.lng) : {};
+      const payload = {
+        branch,
+        lat: coords.lat,
+        lng: coords.lng,
+        network_ok: online,
+        note: note.trim() || undefined,
+        device_id: getCurrentDeviceId(),
+        city: geo.city,
+        district: geo.district,
+        street: geo.street,
+      };
+      const locLabel = geo.formatted ? ` · ${geo.formatted}` : "";
       if (kind === "in") {
         const res: any = await inFn({ data: payload });
         if (res?.blocked) { toast.error(res.reason); return; }
-        toast.success(res?.free_check ? "Checked in (free)" : "Checked in");
+        toast.success(res?.free_check ? `Checked in (free)${locLabel}` : `Checked in${locLabel}`);
       } else {
         const res: any = await outFn({ data: payload });
         if (res?.blocked) { toast.error(res.reason); return; }
-        toast.success("Checked out");
+        toast.success(`Checked out${locLabel}`);
       }
       setNote("");
       qc.invalidateQueries({ queryKey: ["my-attendance"] });
@@ -110,20 +144,71 @@ function CheckInOutCard() {
                 : <span className="inline-flex items-center gap-1 text-destructive"><WifiOff className="h-3.5 w-3.5" /> Offline</span>}
       </div>
 
-      <div className="flex gap-2">
-        {!deviceApproved ? (
-          <button disabled className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-black/5 py-3 text-sm font-semibold text-muted-foreground disabled:opacity-60">
-            <ShieldCheck className="h-4 w-4" /> Device Not Approved
-          </button>
+      <div className="space-y-2">
+        {deviceCheckRequired && !deviceApproved ? (
+          <div className="space-y-2">
+            <button disabled className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-black/5 py-3 text-sm font-semibold text-muted-foreground disabled:opacity-60">
+              <ShieldCheck className="h-4 w-4" /> Device Not Approved
+            </button>
+            <div className="rounded-xl border border-border bg-muted/40 p-3 text-center text-xs space-y-1">
+              <p className="text-muted-foreground">
+                {!currentDevice
+                  ? `Device ${getCurrentDeviceId()} is not registered for your account.`
+                  : `Device ${currentDevice.id} is ${currentDevice.status}.`}
+              </p>
+              {!currentDevice && (
+                <button
+                  onClick={handleRegisterDevice}
+                  className="font-semibold text-brand underline underline-offset-4 hover:opacity-90"
+                >
+                  Register this device →
+                </button>
+              )}
+            </div>
+          </div>
         ) : (
-          <>
-            <button disabled={busy !== null} onClick={() => go("in")} className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-brand py-3 text-sm font-semibold text-brand-foreground shadow-brand disabled:opacity-60">
-              <LogIn className="h-4 w-4" /> {busy === "in" ? "Checking in…" : "Check in"}
-            </button>
-            <button disabled={busy !== null} onClick={() => go("out")} className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-border bg-card py-3 text-sm font-semibold disabled:opacity-60">
-              <LogOut className="h-4 w-4" /> {busy === "out" ? "Checking out…" : "Check out"}
-            </button>
-          </>
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <button
+                disabled={busy !== null || hasCheckedIn}
+                onClick={() => go("in")}
+                className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-semibold transition-all ${
+                  hasCheckedIn
+                    ? "border border-border bg-muted/60 text-muted-foreground opacity-60 cursor-not-allowed shadow-none"
+                    : "bg-gradient-brand text-brand-foreground shadow-brand hover:opacity-95 active:scale-[0.98] disabled:opacity-60"
+                }`}
+              >
+                <LogIn className="h-4 w-4" />{" "}
+                {busy === "in" ? "Checking in…" : hasCheckedIn ? "Checked in ✓" : "Check in"}
+              </button>
+
+              <button
+                disabled={busy !== null || !hasCheckedIn || hasCheckedOut}
+                onClick={() => go("out")}
+                className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-semibold transition-all ${
+                  hasCheckedOut
+                    ? "border border-border bg-muted/60 text-muted-foreground opacity-60 cursor-not-allowed shadow-none"
+                    : hasCheckedIn
+                    ? "bg-gradient-brand text-brand-foreground shadow-brand hover:opacity-95 active:scale-[0.98]"
+                    : "border border-border bg-card text-muted-foreground opacity-50 cursor-not-allowed"
+                }`}
+              >
+                <LogOut className="h-4 w-4" />{" "}
+                {busy === "out" ? "Checking out…" : hasCheckedOut ? "Checked out ✓" : "Check out"}
+              </button>
+            </div>
+
+            {hasCheckedIn && !hasCheckedOut && activeRow?.in_time && (
+              <p className="text-center text-xs font-medium text-muted-foreground">
+                Checked in today at {new Date(activeRow.in_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              </p>
+            )}
+            {hasCheckedOut && (
+              <p className="text-center text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                Attendance completed for today
+              </p>
+            )}
+          </div>
         )}
       </div>
     </section>

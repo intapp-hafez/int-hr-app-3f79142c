@@ -54,7 +54,7 @@ function AdminLeaves() {
   const [balSearchInput, setBalSearchInput] = useState("");
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [exporting, setExporting] = useState(false);
-  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+  const [viewMode, setViewMode] = useState<"grid" | "table">("table");
 
   const { data: leaves = [], isLoading } = useQuery({
     queryKey: ["admin", "leaves"],

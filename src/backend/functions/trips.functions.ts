@@ -22,13 +22,26 @@ export const createTrip = createServerFn({ method: "POST" })
     } else if (data.overnight_nights > 0) {
       const profReq = await context.supabase.from("profiles").select("job_grade").eq("id", data.assignee).single();
       if (profReq.data?.job_grade && data.city) {
-        const policyReq = await context.supabase.from("trip_allowance_policies")
-          .select("nightly_rate")
+        const { data: policies } = await context.supabase.from("trip_allowance_policies")
+          .select("nightly_rate, district, street, radius_m")
           .eq("city_id", data.city)
-          .eq("job_grade", profReq.data.job_grade)
-          .maybeSingle();
-        if (policyReq.data) {
-          calculatedAllowance = (policyReq.data.nightly_rate || 0) * data.overnight_nights;
+          .eq("job_grade", profReq.data.job_grade);
+        if (policies && policies.length > 0) {
+          // 1. Exact match on district if provided
+          let matched = data.district
+            ? policies.find((p: any) => p.district?.toLowerCase() === data.district?.toLowerCase())
+            : undefined;
+          // 2. Fallback to general city policy (no district specified)
+          if (!matched) {
+            matched = policies.find((p: any) => !p.district);
+          }
+          // 3. Fallback to any policy in that city
+          if (!matched) {
+            matched = policies[0];
+          }
+          if (matched) {
+            calculatedAllowance = (matched.nightly_rate || 0) * data.overnight_nights;
+          }
         }
       }
     }

@@ -27,11 +27,20 @@ import { listAllGeofences } from "@/backend/functions/network-assignments.functi
 import { listActivityRange } from "@/backend/functions/activity.functions";
 import { EmployeeAvatar } from "@/components/EmployeeAvatar";
 
+import { AttendanceReportView } from "@/components/admin/AttendanceReportView";
+
 const LeafletMap = lazy(() => import("@/components/LeafletMap").then((mod) => ({ default: mod.LeafletMap })));
 const EgyptMap = lazy(() => import("@/components/admin/EgyptMap").then((mod) => ({ default: mod.EgyptMap })));
 
+const ATTENDANCE_TABS = ["overview", "records", "report", "map", "tasks"] as const;
+type AttendanceTab = (typeof ATTENDANCE_TABS)[number];
+
 export const Route = createFileRoute("/admin/attendance")({
   component: AdminAttendance,
+  validateSearch: (s: Record<string, unknown>): { tab?: AttendanceTab } => {
+    const t = s.tab as string | undefined;
+    return { tab: t && (ATTENDANCE_TABS as readonly string[]).includes(t) ? (t as AttendanceTab) : undefined };
+  },
 });
 
 const tone: Record<string, string> = {
@@ -134,11 +143,17 @@ function looksLikeCoordinates(value: string) {
 }
 
 function storedPlaceName(...parts: Array<string | null | undefined>) {
-  const label = parts
-    .map((part) => part?.trim())
-    .filter((part): part is string => !!part && !looksLikeCoordinates(part) && !/^-?\d{1,3}(?:\.\d+)?$/.test(part))
-    .join(", ");
-  return label && !looksLikeCoordinates(label) ? label : "";
+  const seen = new Set<string>();
+  const cleaned: string[] = [];
+  for (const part of parts) {
+    const trimmed = part?.trim();
+    if (!trimmed || looksLikeCoordinates(trimmed) || /^-?\d{1,3}(?:\.\d+)?$/.test(trimmed)) continue;
+    const lower = trimmed.toLowerCase();
+    if (seen.has(lower)) continue;
+    seen.add(lower);
+    cleaned.push(trimmed);
+  }
+  return cleaned.join(", ");
 }
 
 async function reverseGeocode(lat: number, lng: number, lookup: (args: { data: { lat: number; lng: number } }) => Promise<string>): Promise<string> {
@@ -162,14 +177,14 @@ async function reverseGeocode(lat: number, lng: number, lookup: (args: { data: {
   return p;
 }
 
-function AddressFromCoords({ lat, lng, lookup }: { lat: number; lng: number; lookup: (args: { data: { lat: number; lng: number } }) => Promise<string> }) {
+function AddressFromCoords({ lat, lng, lookup, fallback }: { lat: number; lng: number; lookup: (args: { data: { lat: number; lng: number } }) => Promise<string>; fallback?: string }) {
   const k = geoKey(lat, lng);
-  const [label, setLabel] = useState<string>(geoCache.get(k) ?? "");
+  const [label, setLabel] = useState<string>(geoCache.get(k) ?? fallback ?? "");
   useEffect(() => {
     let alive = true;
     if (!geoCache.has(k)) {
       reverseGeocode(lat, lng, lookup).then((v) => {
-        if (alive) setLabel(v);
+        if (alive) setLabel(v && v !== "Location name unavailable" ? v : (fallback || v));
       });
     } else {
       setLabel(geoCache.get(k)!);
@@ -177,13 +192,14 @@ function AddressFromCoords({ lat, lng, lookup }: { lat: number; lng: number; loo
     return () => {
       alive = false;
     };
-  }, [k, lat, lng, lookup]);
-  return <span>{label || "Locating…"}</span>;
+  }, [k, lat, lng, lookup, fallback]);
+  return <span>{label || fallback || "Locating…"}</span>;
 }
 
 function LocationName({ place, lat, lng, lookup }: { place: string; lat?: number | null; lng?: number | null; lookup: (args: { data: { lat: number; lng: number } }) => Promise<string> }) {
+  if (place && place.includes(",")) return <span>{place}</span>;
+  if (lat != null && lng != null) return <AddressFromCoords lat={lat} lng={lng} lookup={lookup} fallback={place} />;
   if (place) return <span>{place}</span>;
-  if (lat != null && lng != null) return <AddressFromCoords lat={lat} lng={lng} lookup={lookup} />;
   return null;
 }
 
@@ -297,6 +313,15 @@ function printAttendancePdf(rows: AttendanceRow[], title: string) {
 function AdminAttendance() {
   const { t } = useI18n();
   const qc = useQueryClient();
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const currentTab: AttendanceTab =
+    search.tab && (ATTENDANCE_TABS as readonly string[]).includes(search.tab)
+      ? search.tab
+      : "records";
+  const handleTabChange = (t: string) => {
+    navigate({ search: (prev: any) => ({ ...prev, tab: t as AttendanceTab }), replace: true });
+  };
   const fileRef = useRef<HTMLInputElement>(null);
   const tasks = useStore((s) => s.tasks);
 
@@ -530,7 +555,7 @@ function AdminAttendance() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3 print:hidden">
         <div>
           <h1 className="font-display text-2xl font-semibold tracking-tight md:text-3xl">{t("attendance")} log</h1>
           <p className="text-sm text-muted-foreground">DB-backed check-in & check-out records</p>
@@ -546,10 +571,11 @@ function AdminAttendance() {
         </div>
       </div>
 
-      <Tabs defaultValue="records" className="space-y-5">
-        <TabsList className="flex w-full flex-wrap justify-start gap-1">
+      <Tabs value={currentTab} onValueChange={handleTabChange} className="space-y-5">
+        <TabsList className="flex w-full flex-wrap justify-start gap-1 print:hidden">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="records">Records</TabsTrigger>
+          <TabsTrigger value="report">Attendance Report</TabsTrigger>
           <TabsTrigger value="map">Live map</TabsTrigger>
           <TabsTrigger value="tasks">Task activity</TabsTrigger>
         </TabsList>
@@ -656,6 +682,10 @@ function AdminAttendance() {
               </tbody>
             </table>
           </div>
+        </TabsContent>
+
+        <TabsContent value="report" className="space-y-5">
+          <AttendanceReportView />
         </TabsContent>
 
         <TabsContent value="map" className="space-y-5">
