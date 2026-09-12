@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { EmployeeWorkingDays } from "@/components/EmployeeWorkingDays";
+import { ManagerTeamTimeDashboard } from "@/components/manager/ManagerTeamTimeDashboard";
 
 export const Route = createFileRoute("/manager/team")({
   component: TeamPage,
@@ -33,6 +34,7 @@ function TeamPage() {
   const [status, setStatus] = useState<"all" | "present" | "absent">("all");
   const [from, setFrom] = useState(todayStr());
   const [to, setTo] = useState(todayStr());
+  const [viewMode, setViewMode] = useState<"time" | "roster">("time");
 
   useEffect(() => {
     const id = setTimeout(() => { setDebouncedSearch(search.trim()); setPage(1); }, 300);
@@ -113,17 +115,49 @@ function TeamPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="font-display text-xl font-semibold">{t("myTeam")}</h1>
-        <p className="text-sm text-muted-foreground">
-          {filtered.length} on this page • {total} total {t("employees")}
-        </p>
-        {error && (
-          <p className="mt-1 text-xs text-destructive">{(error as Error).message}</p>
-        )}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="font-display text-xl font-semibold">{t("myTeam")}</h1>
+          <p className="text-sm text-muted-foreground">
+            {filtered.length} on this page • {total} total {t("employees")}
+          </p>
+          {error && (
+            <p className="mt-1 text-xs text-destructive">{(error as Error).message}</p>
+          )}
+        </div>
+
+        {/* View Mode Toggle */}
+        <div className="flex items-center gap-1.5 rounded-full border border-border bg-card p-1 text-xs shadow-xs">
+          <button
+            type="button"
+            onClick={() => setViewMode("time")}
+            className={`rounded-full px-3.5 py-1.5 font-semibold transition-all ${
+              viewMode === "time"
+                ? "bg-gradient-brand text-brand-foreground shadow-brand"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {t("teamTime") || "Team Time & Timeline"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("roster")}
+            className={`rounded-full px-3.5 py-1.5 font-semibold transition-all ${
+              viewMode === "roster"
+                ? "bg-gradient-brand text-brand-foreground shadow-brand"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {t("memberDirectory") || "Member Directory & Presence"}
+          </button>
+        </div>
       </div>
 
-      <section className="rounded-2xl border border-border bg-card p-3">
+      {viewMode === "time" ? (
+        <ManagerTeamTimeDashboard />
+      ) : (
+        <>
+          <section className="rounded-2xl border border-border bg-card p-3">
         <div className="flex flex-wrap items-center gap-2">
           <ShieldCheck className="h-4 w-4 text-brand" />
           <span className="text-sm font-medium">Verify assignment</span>
@@ -270,6 +304,8 @@ function TeamPage() {
             </Button>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );

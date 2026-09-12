@@ -1,61 +1,46 @@
-import { useEffect, useState } from "react";
 import { Download } from "lucide-react";
+import { usePwa } from "@/lib/use-pwa";
+import { triggerPwaInstall } from "@/components/PwaInstallBanner";
+import { useI18n } from "@/lib/i18n";
 
-type BIPEvent = Event & {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
-};
+export function InstallButton({
+  className = "",
+  variant = "solid",
+}: {
+  className?: string;
+  variant?: "solid" | "ghost" | "outline";
+}) {
+  const { isInstalled, install, canInstall } = usePwa();
+  const { t } = useI18n();
 
-function isStandalone() {
-  if (typeof window === "undefined") return false;
-  return (
-    window.matchMedia?.("(display-mode: standalone)").matches ||
-    (window.navigator as any).standalone === true
-  );
-}
-
-export function InstallButton({ className = "", variant = "solid" }: { className?: string; variant?: "solid" | "ghost" }) {
-  const [deferred, setDeferred] = useState<BIPEvent | null>(null);
-  const [installed, setInstalled] = useState(false);
-
-  useEffect(() => {
-    setInstalled(isStandalone());
-    const onPrompt = (e: Event) => {
-      e.preventDefault();
-      setDeferred(e as BIPEvent);
-    };
-    const onInstalled = () => { setInstalled(true); setDeferred(null); };
-    window.addEventListener("beforeinstallprompt", onPrompt);
-    window.addEventListener("appinstalled", onInstalled);
-    return () => {
-      window.removeEventListener("beforeinstallprompt", onPrompt);
-      window.removeEventListener("appinstalled", onInstalled);
-    };
-  }, []);
-
-  if (installed || !deferred) return null;
+  if (isInstalled) return null;
 
   async function handleClick() {
-    if (!deferred) return;
-    try {
-      await deferred.prompt();
-      const { outcome } = await deferred.userChoice;
-      if (outcome === "accepted") setInstalled(true);
-      setDeferred(null);
-    } catch {
-      // prompt cancelled or failed — no guidance toast needed
+    if (canInstall) {
+      await install();
+    } else {
+      // For iOS, Safari, or browsers requiring manual steps, trigger the banner/instructions
+      triggerPwaInstall();
     }
   }
 
   const base =
     variant === "solid"
-      ? "inline-flex items-center gap-2 rounded-full bg-gradient-brand px-4 py-2 text-sm font-semibold text-brand-foreground shadow-brand"
-      : "inline-flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-2 text-sm font-medium text-foreground hover:bg-muted";
+      ? "inline-flex items-center gap-2 rounded-full bg-gradient-brand px-4 py-2 text-sm font-semibold text-brand-foreground shadow-brand hover:opacity-95 transition active:scale-95"
+      : variant === "outline"
+        ? "inline-flex items-center gap-2 rounded-full border border-brand/40 bg-brand/5 px-3.5 py-1.5 text-xs font-semibold text-brand hover:bg-brand/10 transition"
+        : "inline-flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-2 text-sm font-medium text-foreground hover:bg-muted transition";
 
   return (
-    <button onClick={handleClick} className={`${base} ${className}`} aria-label="Install INT-HR App">
-      <Download className="h-4 w-4" />
-      Install app
+    <button
+      type="button"
+      onClick={handleClick}
+      className={`${base} ${className}`}
+      aria-label={t("installApp") || "Install INT-HR App"}
+      title={t("installApp") || "Install App"}
+    >
+      <Download className="h-4 w-4 shrink-0" />
+      <span>{t("installApp") || "Install app"}</span>
     </button>
   );
 }

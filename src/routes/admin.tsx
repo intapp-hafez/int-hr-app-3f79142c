@@ -4,6 +4,7 @@ import { LayoutDashboard, Users, MapPin, Clock, CalendarDays, FileBarChart2, Scr
 import { NotificationsBell } from "@/components/admin/NotificationsBell";
 import { AppLogo } from "@/components/AppLogo";
 import { UserMenu } from "@/components/UserMenu";
+import { InstallButton } from "@/components/InstallButton";
 import { LanguageToggle, useI18n } from "@/lib/i18n";
 import { useSession, useAuthReady } from "@/lib/auth";
 import { useExportScheduler } from "@/lib/export-scheduler";
@@ -166,6 +167,7 @@ function AdminLayout() {
             <Link to="/admin/sticky-notes" className="rounded-full p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors" title={t("stickyNotes")}>
               <StickyNote className="h-5 w-5" />
             </Link>
+            <InstallButton variant="outline" className="hidden sm:inline-flex" />
             <LanguageToggle />
             <NotificationsBell />
             <UserMenu />

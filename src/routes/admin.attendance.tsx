@@ -28,6 +28,7 @@ import { listActivityRange } from "@/backend/functions/activity.functions";
 import { EmployeeAvatar } from "@/components/EmployeeAvatar";
 
 import { AttendanceReportView } from "@/components/admin/AttendanceReportView";
+import { AdminTimeManagementView } from "@/components/admin/AdminTimeManagementView";
 
 const LeafletMap = lazy(() => import("@/components/LeafletMap").then((mod) => ({ default: mod.LeafletMap })));
 const EgyptMap = lazy(() => import("@/components/admin/EgyptMap").then((mod) => ({ default: mod.EgyptMap })));
@@ -357,6 +358,19 @@ function AdminAttendance() {
   });
   const rows: AttendanceRow[] = (listQ.data as AttendanceRow[] | undefined) ?? [];
 
+  const [pageSize, setPageSize] = useState(25);
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    setPage(1);
+  }, [dateFilter, empFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const paginatedRows = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return rows.slice(start, start + pageSize);
+  }, [rows, page, pageSize]);
+
   const geosFn = useServerFn(listAllGeofences);
   const geosQ = useQuery({ queryKey: ["admin", "attendance", "geofences"], queryFn: () => geosFn() });
   const fences = (geosQ.data ?? []) as Array<{ id: string; name: string; lat: number; lng: number; radius_m: number; active: boolean }>;
@@ -577,7 +591,7 @@ function AdminAttendance() {
           <TabsTrigger value="records">Records</TabsTrigger>
           <TabsTrigger value="report">Attendance Report</TabsTrigger>
           <TabsTrigger value="map">Live map</TabsTrigger>
-          <TabsTrigger value="tasks">Task activity</TabsTrigger>
+          <TabsTrigger value="tasks">{t("taskTimeAndTimeline") || "Task Time & Timeline"}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-5">
@@ -621,7 +635,7 @@ function AdminAttendance() {
                   <tr><td colSpan={8} className="px-4 py-8 text-center"><Loader2 className="mx-auto h-4 w-4 animate-spin text-muted-foreground" /></td></tr>
                 ) : rows.length === 0 ? (
                   <tr><td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">No records in range.</td></tr>
-                ) : rows.map((row) => {
+                ) : paginatedRows.map((row) => {
                   const checkInPlace = storedPlaceName(row.street, row.district, row.city);
                   const checkOutPlace = storedPlaceName(row.out_street, row.out_district, row.out_city);
                   return (
@@ -681,6 +695,48 @@ function AdminAttendance() {
                 })}
               </tbody>
             </table>
+            {rows.length > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-3 text-xs text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <span>Rows per page:</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value));
+                      setPage(1);
+                    }}
+                    className="rounded-md border border-input bg-card px-2 py-1 text-xs"
+                  >
+                    {[10, 25, 50, 100].map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span>
+                    Page {page} of {totalPages} · {rows.length} total
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page <= 1}
+                    className="rounded-md border border-border bg-card px-2 py-1 text-xs font-medium hover:bg-muted disabled:opacity-40"
+                  >
+                    Prev
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page >= totalPages}
+                    className="rounded-md border border-border bg-card px-2 py-1 text-xs font-medium hover:bg-muted disabled:opacity-40"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </TabsContent>
 
@@ -751,66 +807,7 @@ function AdminAttendance() {
         </TabsContent>
 
         <TabsContent value="tasks" className="space-y-5">
-          <section className="rounded-3xl border border-border bg-card">
-            <header className="border-b border-border px-4 py-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <h2 className="font-display text-lg font-semibold">{t("taskActivityToday")}</h2>
-                  <p className="text-xs text-muted-foreground">{t("taskActivitySubtitle")}</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button onClick={() => exportTaskActivityCsv(taskActivity)} disabled={!taskActivity.length} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold disabled:opacity-50"><FileText className="h-3.5 w-3.5" /> {t("exportCsv")}</button>
-                  <button onClick={() => exportTaskActivityXlsx(taskActivity)} disabled={!taskActivity.length} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold disabled:opacity-50"><FileDown className="h-3.5 w-3.5" /> {t("exportXlsx")}</button>
-                  <button onClick={() => printTaskActivityPdf(taskActivity, t("taskActivityToday"))} disabled={!taskActivity.length} className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-3 py-1.5 text-xs font-semibold text-background disabled:opacity-50"><Printer className="h-3.5 w-3.5" /> {t("exportPdf")}</button>
-                </div>
-              </div>
-            </header>
-            {taskActivity.length === 0 ? (
-              <p className="p-6 text-center text-sm text-muted-foreground">{t("noActivityInRange")}</p>
-            ) : (
-              <table className="w-full text-sm">
-                <thead className="border-b border-border bg-muted/40">
-                  <tr className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                    <th className="px-4 py-3 text-start font-medium">{t("name")}</th>
-                    <th className="px-4 py-3 text-start font-medium">{t("date")} / {t("tripTime")}</th>
-                    <th className="px-4 py-3 text-start font-medium">{t("rowTitle")}</th>
-                    <th className="px-4 py-3 text-start font-medium">{t("taskLocation")}</th>
-                    <th className="px-4 py-3 text-start font-medium">{t("status")}</th>
-                    <th className="px-4 py-3 text-start font-medium">{t("notes")}</th>
-                    <th className="px-4 py-3 text-end font-medium sr-only">Timeline</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {taskActivity.map((row, i) => (
-                    <tr key={i} className="border-b border-border last:border-b-0 hover:bg-muted/40">
-                      <td className="px-4 py-3 font-medium">
-                        <div className="flex items-center gap-2">
-                          <EmployeeAvatar id={row.employeeId} name={row.name} className="h-6 w-6" />
-                          {row.name}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 font-mono tabular-nums">{new Date(row.ts).toLocaleString()}</td>
-                      <td className="px-4 py-3">{row.taskTitle}{row.estimatedHours ? <span className="ms-1 text-[10px] text-muted-foreground">({row.estimatedHours}{t("hoursShort")})</span> : null}</td>
-                      <td className="px-4 py-3"><span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3 text-muted-foreground" />{row.where}</span></td>
-                      <td className="px-4 py-3"><span className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-semibold text-brand">{row.action}</span></td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">{row.note ?? "—"}</td>
-                      <td className="px-4 py-3 text-right">
-                        {row.employeeId && (
-                          <Link
-                            to="/admin/activity-timeline/$id"
-                            params={{ id: row.employeeId }}
-                            className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2 py-1 text-[10px] font-semibold hover:border-brand/60 hover:text-brand"
-                          >
-                            <History className="h-3 w-3" /> Timeline
-                          </Link>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </section>
+          <AdminTimeManagementView />
         </TabsContent>
       </Tabs>
 

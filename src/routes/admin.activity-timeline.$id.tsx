@@ -7,6 +7,7 @@ import { listActivityRange } from "@/backend/functions/activity.functions";
 import { useStore } from "@/lib/store";
 import { DateRangeField } from "@/components/ui/date-input";
 import { formatDateRange, todayISO, toISODate, validateDateRange } from "@/lib/date-format";
+import { MyWorkdayTimeline } from "@/components/employee/MyWorkdayTimeline";
 
 export const Route = createFileRoute("/admin/activity-timeline/$id")({
   component: EmployeeActivityTimeline,
@@ -30,6 +31,7 @@ function EmployeeActivityTimeline() {
   const employees = useStore((s) => s.employees);
   const emp = employees.find((e) => e.id === id);
 
+  const [mode, setMode] = useState<"day" | "range">("day");
   const [from, setFrom] = useState(daysAgoISO(30));
   const [to, setTo] = useState(todayISO());
 
@@ -39,7 +41,7 @@ function EmployeeActivityTimeline() {
   const q = useQuery({
     queryKey: ["employee-activity-timeline", id, from, to],
     queryFn: () => fn({ data: { from, to, employeeIds: [id] } }),
-    enabled: !rangeError,
+    enabled: !rangeError && mode === "range",
   });
 
   const grouped = useMemo(() => {
@@ -72,14 +74,48 @@ function EmployeeActivityTimeline() {
             {emp?.name ?? "Employee"}
           </h1>
           <p className="text-xs text-muted-foreground">
-            Task activity timeline · {total} event{total === 1 ? "" : "s"} between {formatDateRange(from, to)}
+            {mode === "day"
+              ? "Comprehensive daily time breakdown (Attendance, Tasks, Travel, Breaks)"
+              : `Activity log · ${total} event${total === 1 ? "" : "s"} between ${formatDateRange(from, to)}`}
           </p>
         </div>
+
         <div className="flex flex-wrap items-center gap-2">
-          <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-          <DateRangeField className="w-72" from={from} to={to} onFromChange={setFrom} onToChange={setTo} error={rangeError} />
+          {/* Mode switch */}
+          <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1 text-xs shadow-xs">
+            <button
+              type="button"
+              onClick={() => setMode("day")}
+              className={`rounded-full px-3 py-1 font-semibold transition-colors ${
+                mode === "day" ? "bg-gradient-brand text-brand-foreground shadow-brand" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Daily Workday Timeline
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("range")}
+              className={`rounded-full px-3 py-1 font-semibold transition-colors ${
+                mode === "range" ? "bg-gradient-brand text-brand-foreground shadow-brand" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Historical Range Log
+            </button>
+          </div>
+
+          {mode === "range" && (
+            <div className="flex items-center gap-1.5">
+              <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+              <DateRangeField className="w-72" from={from} to={to} onFromChange={setFrom} onToChange={setTo} error={rangeError} />
+            </div>
+          )}
         </div>
       </div>
+
+      {mode === "day" ? (
+        <MyWorkdayTimeline employeeId={id} />
+      ) : (
+        <>
 
       {q.isLoading && (
         <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
@@ -150,6 +186,8 @@ function EmployeeActivityTimeline() {
           </section>
         ))}
       </div>
+        </>
+      )}
     </div>
   );
 }

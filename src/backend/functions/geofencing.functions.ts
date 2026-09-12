@@ -63,6 +63,39 @@ export const createGeofenceAdmin = createServerFn({ method: "POST" })
     return { id: row.id };
   });
 
+export const bulkCreateGeofencesAdmin = createServerFn({ method: "POST" })
+  .middleware([requireAdminAccess])
+  .inputValidator((input) =>
+    z
+      .object({
+        locations: z
+          .array(
+            z.object({
+              name: z.string().trim().min(1).max(80),
+              lat: z.number().min(-90).max(90),
+              lng: z.number().min(-180).max(180),
+              radius_m: z.number().int().min(10).max(5000).default(100),
+              active: z.boolean().default(true),
+            }),
+          )
+          .min(1)
+          .max(500),
+      })
+      .parse(input),
+  )
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context;
+    const payload = data.locations.map((loc) => ({
+      ...loc,
+      created_by: userId,
+    }));
+    const { data: rows, error } = await (supabase.from("geofence_locations") as any)
+      .insert(payload)
+      .select("id");
+    if (error) throw new Error(error.message);
+    return { count: (rows ?? []).length };
+  });
+
 export const updateGeofenceAdmin = createServerFn({ method: "POST" })
   .middleware([requireAdminAccess])
   .inputValidator((input) =>

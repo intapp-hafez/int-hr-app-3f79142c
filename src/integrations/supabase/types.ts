@@ -322,6 +322,42 @@ export type Database = {
         }
         Relationships: []
       }
+      cost_centers: {
+        Row: {
+          code: string
+          created_at: string
+          description_ar: string | null
+          description_en: string | null
+          id: string
+          name_ar: string
+          name_en: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description_ar?: string | null
+          description_en?: string | null
+          id?: string
+          name_ar: string
+          name_en: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description_ar?: string | null
+          description_en?: string | null
+          id?: string
+          name_ar?: string
+          name_en?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       contract_audit_log: {
         Row: {
           action: string
@@ -2536,6 +2572,7 @@ export type Database = {
           contract_end_date: string | null
           contract_start_date: string | null
           contract_type: string | null
+          cost_center_id: string | null
           created_at: string
           custom_field: string | null
           department_id: string | null
@@ -2548,6 +2585,7 @@ export type Database = {
           external_tax_paid: number | null
           extra_email: string | null
           full_name: string | null
+          full_name_ar: string | null
           gender: string | null
           id: string
           id_expiry_date: string | null
@@ -2565,6 +2603,8 @@ export type Database = {
           martyrs_fund_applicable: boolean
           medical_insurance: number | null
           medical_insurance_details: string | null
+          medical_insurance_number: string | null
+          medical_insurance_type: string | null
           military_expire_date: string | null
           national_id: string | null
           other_deductions: number | null
@@ -2596,6 +2636,7 @@ export type Database = {
           contract_end_date?: string | null
           contract_start_date?: string | null
           contract_type?: string | null
+          cost_center_id?: string | null
           created_at?: string
           custom_field?: string | null
           department_id?: string | null
@@ -2608,6 +2649,7 @@ export type Database = {
           external_tax_paid?: number | null
           extra_email?: string | null
           full_name?: string | null
+          full_name_ar?: string | null
           gender?: string | null
           id: string
           id_expiry_date?: string | null
@@ -2625,6 +2667,8 @@ export type Database = {
           martyrs_fund_applicable?: boolean
           medical_insurance?: number | null
           medical_insurance_details?: string | null
+          medical_insurance_number?: string | null
+          medical_insurance_type?: string | null
           military_expire_date?: string | null
           national_id?: string | null
           other_deductions?: number | null
@@ -2656,6 +2700,7 @@ export type Database = {
           contract_end_date?: string | null
           contract_start_date?: string | null
           contract_type?: string | null
+          cost_center_id?: string | null
           created_at?: string
           custom_field?: string | null
           department_id?: string | null
@@ -2668,6 +2713,7 @@ export type Database = {
           external_tax_paid?: number | null
           extra_email?: string | null
           full_name?: string | null
+          full_name_ar?: string | null
           gender?: string | null
           id?: string
           id_expiry_date?: string | null
@@ -2685,6 +2731,8 @@ export type Database = {
           martyrs_fund_applicable?: boolean
           medical_insurance?: number | null
           medical_insurance_details?: string | null
+          medical_insurance_number?: string | null
+          medical_insurance_type?: string | null
           military_expire_date?: string | null
           national_id?: string | null
           other_deductions?: number | null
@@ -3757,6 +3805,17 @@ export type Database = {
           _status?: string
         }
         Returns: string
+      }
+      get_staff_employee_names: {
+        Args: { p_employee_ids?: string[] | null }
+        Returns: {
+          id: string
+          name: string
+          full_name: string | null
+          full_name_ar: string | null
+          email: string | null
+          emp_code: string | null
+        }[]
       }
       is_chat_channel_member: {
         Args: { p_channel_id: string; p_user_id: string }

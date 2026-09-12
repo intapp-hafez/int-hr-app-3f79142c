@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Search, Filter, X, ChevronRight, Upload, FileText, ArrowUp, ArrowDown, ArrowUpDown, Pencil, Trash2, Eye, AlertCircle, AlertTriangle, Ban, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
@@ -53,8 +53,15 @@ function EmployeesPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
-  const searchParams = Route.useSearch();
-  const [q, setQ] = useState(searchParams.q || "");
+  const searchParams = useSearch({ strict: false }) as { q?: string } | undefined;
+  const [q, setQ] = useState(searchParams?.q || "");
+
+  useEffect(() => {
+    if (searchParams?.q !== undefined && searchParams.q !== q) {
+      setQ(searchParams.q);
+      setPage(1);
+    }
+  }, [searchParams?.q]);
   const [deptFilter, setDeptFilter] = useState("");
   const [posFilter, setPosFilter] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
@@ -364,6 +371,7 @@ function EmployeesPage() {
                     <EmployeeAvatar id={e.id} name={e.full_name ?? e.email ?? "?"} url={e.avatar_url} className="h-8 w-8" />
                     <div>
                       <p className="font-medium">{e.full_name ?? "—"}</p>
+                      {e.full_name_ar && <p className="text-xs text-muted-foreground" dir="rtl">{e.full_name_ar}</p>}
                       <p className="text-[11px] text-muted-foreground">{e.email}</p>
                     </div>
                   </div>
@@ -476,7 +484,20 @@ function EmployeesPage() {
         </div>
       </div>
 
-      {open && <AddEmployeeModal departments={departments} positions={positions} cities={cities} districts={districts} managers={geo?.managers ?? []} onClose={() => setOpen(false)} />}
+      {open && (
+        <AddEmployeeModal
+          departments={departments}
+          positions={positions}
+          cities={cities}
+          districts={districts}
+          managers={geo?.managers ?? []}
+          costCenters={geo?.costCenters ?? []}
+          shifts={geo?.shifts ?? []}
+          sections={geo?.sections ?? []}
+          jobGrades={geo?.jobGrades ?? []}
+          onClose={() => setOpen(false)}
+        />
+      )}
       {bulkAssignOpen && (
         <BulkAssignModal
           employeeIds={Array.from(selected).filter((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))}
@@ -488,6 +509,10 @@ function EmployeesPage() {
           row={editing}
           departments={departments}
           positions={positions}
+          costCenters={geo?.costCenters ?? []}
+          shifts={geo?.shifts ?? []}
+          sections={geo?.sections ?? []}
+          jobGrades={geo?.jobGrades ?? []}
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
@@ -515,17 +540,29 @@ function SortableTh({ label, col, sort, dir, onSort }: {
 }
 
 function EditEmployeeDrawer({
-  row, departments, positions, onClose, onSaved,
+  row, departments, positions, costCenters = [], shifts = [], sections = [], jobGrades = [], onClose, onSaved,
 }: {
   row: AdminEmployeeRow;
   departments: { id: string; name: string }[];
   positions: { id: string; name: string }[];
+  costCenters?: { id: string; code: string; name_en: string; name_ar: string; status: string }[];
+  shifts?: { id: string; name: string; start_time: string; end_time: string; is_active: boolean }[];
+  sections?: { id: string; department_id: string; name_en: string }[];
+  jobGrades?: { id: string; name_en: string; name_ar: string; active: boolean }[];
   onClose: () => void;
   onSaved: () => void;
 }) {
   const { t } = useI18n();
+  const [fullName, setFullName] = useState<string>(row.full_name ?? "");
+  const [fullNameAr, setFullNameAr] = useState<string>(row.full_name_ar ?? "");
   const [departmentId, setDepartmentId] = useState<string>(row.department_id ?? "");
+  const [sectionId, setSectionId] = useState<string>(row.section_id ?? "");
   const [positionId, setPositionId] = useState<string>(row.position_id ?? "");
+  const [jobGrade, setJobGrade] = useState<string>(row.job_grade ?? "");
+  const [costCenterId, setCostCenterId] = useState<string>(row.cost_center_id ?? "");
+  const [shiftId, setShiftId] = useState<string>(row.shift_id ?? "");
+  const [medicalInsuranceNumber, setMedicalInsuranceNumber] = useState<string>(row.medical_insurance_number ?? "");
+  const [medicalInsuranceType, setMedicalInsuranceType] = useState<string>(row.medical_insurance_type ?? "");
   const [status, setStatus] = useState<"Active" | "Inactive">(row.status === "Inactive" ? "Inactive" : "Active");
   const [inactiveReason, setInactiveReason] = useState<"" | InactiveReason>(
     (row.inactive_reason as InactiveReason | null) ?? ""
@@ -562,8 +599,16 @@ function EditEmployeeDrawer({
       await updateFn({
         data: {
           id: row.id,
+          full_name: fullName.trim() || null,
+          full_name_ar: fullNameAr.trim() || null,
           department_id: departmentId || null,
+          section_id: sectionId || null,
           position_id: positionId || null,
+          job_grade: jobGrade || null,
+          cost_center_id: costCenterId || null,
+          shift_id: shiftId || null,
+          medical_insurance_number: medicalInsuranceNumber.trim() || null,
+          medical_insurance_type: (medicalInsuranceType || null) as any,
           status,
           inactive_reason: status === "Active" ? null : (inactiveReason || null),
           avatar_url: avatarUrl || null,
@@ -584,13 +629,24 @@ function EditEmployeeDrawer({
           <button onClick={onClose} className="rounded-full p-1.5 hover:bg-muted"><X className="h-4 w-4" /></button>
         </div>
         <div className="mb-4 flex items-center gap-3">
-          <EmployeeAvatar id={row.id} name={row.full_name ?? row.email ?? "?"} url={avatarUrl} className="h-14 w-14" />
+          <EmployeeAvatar id={row.id} name={fullName || row.full_name || row.email || "?"} url={avatarUrl} className="h-14 w-14" />
           <div className="min-w-0">
-            <p className="truncate font-semibold">{row.full_name ?? "—"}</p>
+            <p className="truncate font-semibold">{fullName || row.full_name || "—"}</p>
+            {(fullNameAr || row.full_name_ar) && (
+              <p className="truncate text-xs text-muted-foreground" dir="rtl">{fullNameAr || row.full_name_ar}</p>
+            )}
             <p className="truncate text-xs text-muted-foreground">{row.email}</p>
           </div>
         </div>
         <div className="space-y-3">
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">Full name</span>
+            <input value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full rounded-xl border border-input bg-card px-3 py-2 text-sm" />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">{t("fullNameAr" as any) ?? "Full name (Arabic)"}</span>
+            <input dir="rtl" value={fullNameAr} onChange={(e) => setFullNameAr(e.target.value)} placeholder="الاسم بالكامل بالعربية" className="w-full rounded-xl border border-input bg-card px-3 py-2 text-sm" />
+          </label>
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-muted-foreground">Avatar URL</span>
             <input value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} placeholder="https://… or upload"
@@ -607,10 +663,24 @@ function EditEmployeeDrawer({
           </label>
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-muted-foreground">Department</span>
-            <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}
+            <select value={departmentId} onChange={(e) => { setDepartmentId(e.target.value); setSectionId(""); }}
               className="w-full rounded-xl border border-input bg-card px-3 py-2 text-sm">
               <option value="">—</option>
               {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">Level</span>
+            <select value={sectionId} onChange={(e) => {
+              setSectionId(e.target.value);
+              const sec = sections.find((s) => s.id === e.target.value);
+              if (sec && !departmentId) setDepartmentId(sec.department_id);
+            }}
+              className="w-full rounded-xl border border-input bg-card px-3 py-2 text-sm">
+              <option value="">—</option>
+              {sections.filter((s) => !departmentId || s.department_id === departmentId).map((s) => (
+                <option key={s.id} value={s.id}>{s.name_en}</option>
+              ))}
             </select>
           </label>
           <label className="block">
@@ -620,6 +690,50 @@ function EditEmployeeDrawer({
               <option value="">—</option>
               {positions.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">Job Grade</span>
+            <select value={jobGrade} onChange={(e) => setJobGrade(e.target.value)}
+              className="w-full rounded-xl border border-input bg-card px-3 py-2 text-sm">
+              <option value="">—</option>
+              {jobGrades.filter((g) => g.active !== false || g.name_en === jobGrade).map((g) => (
+                <option key={g.id} value={g.name_en}>{g.name_en} {g.name_ar ? `(${g.name_ar})` : ""}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">{t("costCenter" as any) ?? "Cost Center"}</span>
+            <select value={costCenterId} onChange={(e) => setCostCenterId(e.target.value)}
+              className="w-full rounded-xl border border-input bg-card px-3 py-2 text-sm">
+              <option value="">—</option>
+              {costCenters.filter((c) => c.status === "active" || c.id === costCenterId).map((c) => (
+                <option key={c.id} value={c.id}>#{c.code} - {c.name_en} {c.name_ar ? `(${c.name_ar})` : ""}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">{t("shift" as any) ?? "Shift"}</span>
+            <select value={shiftId} onChange={(e) => setShiftId(e.target.value)}
+              className="w-full rounded-xl border border-input bg-card px-3 py-2 text-sm">
+              <option value="">—</option>
+              {shifts.filter((s) => s.is_active !== false || s.id === shiftId).map((s) => (
+                <option key={s.id} value={s.id}>{s.name} ({s.start_time} - {s.end_time})</option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">{t("medicalInsuranceType")}</span>
+            <select value={medicalInsuranceType} onChange={(e) => setMedicalInsuranceType(e.target.value)}
+              className="w-full rounded-xl border border-input bg-card px-3 py-2 text-sm">
+              <option value="">—</option>
+              <option value="Private">{t("insurancePrivate")}</option>
+              <option value="Governmental">{t("insuranceGovernmental")}</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">{t("medicalInsuranceNumber")}</span>
+            <input value={medicalInsuranceNumber} onChange={(e) => setMedicalInsuranceNumber(e.target.value)} placeholder="e.g. MED-123456"
+              className="w-full rounded-xl border border-input bg-card px-3 py-2 text-sm" />
           </label>
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-muted-foreground">Status</span>
@@ -683,10 +797,25 @@ function DateInput({
   };
 
   const [displayText, setDisplayText] = useState(() => toDisplay(value));
+  const pickerRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setDisplayText(toDisplay(value));
   }, [value]);
+
+  const openPicker = () => {
+    if (pickerRef.current) {
+      try {
+        if (typeof pickerRef.current.showPicker === "function") {
+          pickerRef.current.showPicker();
+        } else {
+          pickerRef.current.focus();
+        }
+      } catch {
+        pickerRef.current.focus();
+      }
+    }
+  };
 
   const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
@@ -709,14 +838,21 @@ function DateInput({
   };
 
   return (
-    <div className="relative flex w-full items-center">
+    <div
+      className="relative flex w-full items-center cursor-pointer"
+      onClick={openPicker}
+    >
       <input
         type="text"
         placeholder="dd/mm/yyyy"
         value={displayText}
         onChange={handleTextChange}
         onBlur={onBlur}
-        className={className + " pe-9"}
+        onClick={(e) => {
+          e.stopPropagation();
+          openPicker();
+        }}
+        className={className + " pe-9 cursor-pointer"}
       />
       <div className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground">
         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -724,19 +860,25 @@ function DateInput({
         </svg>
       </div>
       <input
+        ref={pickerRef}
         type="date"
         value={value || ""}
         onChange={(e) => {
           onChange(e.target.value);
         }}
-        className="absolute inset-0 cursor-pointer opacity-0"
+        onClick={(e) => {
+          try {
+            e.currentTarget.showPicker?.();
+          } catch { }
+        }}
+        className="absolute inset-0 h-full w-full cursor-pointer opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0"
         tabIndex={-1}
       />
     </div>
   );
 }
 
-function AddEmployeeModal({ departments, positions, cities, districts, managers, onClose }: { departments: { id: string; name: string }[]; positions: { id: string; name: string }[]; cities: CityOpt[]; districts: DistrictOpt[]; managers: { id: string; name: string }[]; onClose: () => void }) {
+function AddEmployeeModal({ departments, positions, cities, districts, managers, costCenters = [], shifts = [], sections = [], jobGrades = [], onClose }: { departments: { id: string; name: string }[]; positions: { id: string; name: string }[]; cities: CityOpt[]; districts: DistrictOpt[]; managers: { id: string; name: string }[]; costCenters?: { id: string; code: string; name_en: string; name_ar: string; status: string }[]; shifts?: { id: string; name: string; start_time: string; end_time: string; is_active: boolean }[]; sections?: { id: string; department_id: string; name_en: string }[]; jobGrades?: { id: string; name_en: string; name_ar: string; active: boolean }[]; onClose: () => void }) {
   const { t } = useI18n();
   const qc = useQueryClient();
   const validateBatch = useServerFn(validateEmployeesBatch);
@@ -744,6 +886,11 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
   const setupIncomplete = departments.length === 0 || positions.length === 0;
   const [form, setForm] = useState<Omit<Employee, "id"> & ExtraHr>({
     name: "",
+    nameAr: "",
+    costCenterId: "",
+    shiftId: "",
+    sectionId: "",
+    jobGrade: "",
     email: "",
     phone: "",
     dept: "",
@@ -771,6 +918,8 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
     notes: "",
     extraEmail: "",
     medicalInsuranceDetails: "",
+    medicalInsuranceNumber: "",
+    medicalInsuranceType: "" as "" | "Private" | "Governmental",
     isInsured: false,
     militaryExpireDate: "",
     isFivePercent: false,
@@ -899,11 +1048,16 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
           data: {
             empCode: form.empCode?.trim() || "",
             name: form.name.trim(),
+            nameAr: form.nameAr.trim(),
             email: form.email.trim().toLowerCase(),
             phone: formatEgPhone(form.phone),
             gender: form.gender,
             dept: form.dept,
+            sectionId: form.sectionId || "",
             position: form.position,
+            jobGrade: form.jobGrade || "",
+            costCenterId: form.costCenterId || "",
+            shiftId: form.shiftId || "",
             role: "employee",
             status: form.status === "Inactive" ? "Inactive" : "Active",
             password: form.password,
@@ -926,6 +1080,8 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
             contractCancelled,
             extraEmail: form.extraEmail.trim(),
             medicalInsuranceDetails: form.medicalInsuranceDetails.trim(),
+            medicalInsuranceNumber: form.medicalInsuranceNumber.trim() || undefined,
+            medicalInsuranceType: (form.medicalInsuranceType || undefined) as any,
             isInsured: form.isInsured,
             militaryExpireDate: form.militaryExpireDate,
             isFivePercent: form.isFivePercent,
@@ -1030,6 +1186,9 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
               <input type="text" value={form.password} onChange={(e) => upd("password", e.target.value)} onBlur={() => handleBlur("password")} maxLength={64} placeholder="min 6 chars" className={inputCls + " font-mono"} />
             </Field>
             <Field label="Full name" error={fieldErrors.name}><input value={form.name} onChange={(e) => upd("name", e.target.value)} onBlur={() => handleBlur("name")} maxLength={80} className={inputCls} /></Field>
+            <Field label={t("fullNameAr" as any) ?? "Full name (Arabic)"}>
+              <input dir="rtl" value={form.nameAr} onChange={(e) => upd("nameAr", e.target.value)} maxLength={80} placeholder="الاسم بالكامل بالعربية" className={inputCls} />
+            </Field>
             <Field label="Phone" error={fieldErrors.phone}>
               <input type="tel" dir="ltr" inputMode="tel" value={form.phone} onChange={(e) => upd("phone", formatEgPhone(e.target.value))} onBlur={() => handleBlur("phone")} maxLength={20} placeholder="+20 100 123 4567" className={inputCls + " font-mono"} />
             </Field>
@@ -1079,15 +1238,61 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
               })()}
             </Field>
             <Field label="Department" error={fieldErrors.dept}>
-              <select value={form.dept} onChange={(e) => upd("dept", e.target.value)} disabled={departments.length === 0} className={inputCls + " disabled:opacity-60"}>
+              <select value={form.dept} onChange={(e) => {
+                upd("dept", e.target.value);
+                upd("sectionId", "");
+              }} disabled={departments.length === 0} className={inputCls + " disabled:opacity-60"}>
                 <option value="">—</option>
                 {departments.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
               </select>
+            </Field>
+            <Field label="Level">
+              {(() => {
+                const selectedDeptId = departments.find((d) => d.name === form.dept)?.id;
+                const filteredSections = selectedDeptId ? sections.filter((s) => s.department_id === selectedDeptId) : sections;
+                return (
+                  <select value={form.sectionId} onChange={(e) => {
+                    upd("sectionId", e.target.value);
+                    const sec = sections.find((s) => s.id === e.target.value);
+                    if (sec && !form.dept) {
+                      const d = departments.find((dept) => dept.id === sec.department_id);
+                      if (d) upd("dept", d.name);
+                    }
+                  }} className={inputCls}>
+                    <option value="">—</option>
+                    {filteredSections.map((s) => <option key={s.id} value={s.id}>{s.name_en}</option>)}
+                  </select>
+                );
+              })()}
             </Field>
             <Field label="Position">
               <select value={form.position} onChange={(e) => upd("position", e.target.value)} disabled={positions.length === 0} className={inputCls + " disabled:opacity-60"}>
                 <option value="">—</option>
                 {positions.map((p) => <option key={p.id} value={p.name}>{p.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Job Grade">
+              <select value={form.jobGrade} onChange={(e) => upd("jobGrade", e.target.value)} className={inputCls}>
+                <option value="">—</option>
+                {jobGrades.filter((g) => g.active !== false || g.name_en === form.jobGrade).map((g) => (
+                  <option key={g.id} value={g.name_en}>{g.name_en} {g.name_ar ? `(${g.name_ar})` : ""}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label={t("costCenter" as any) ?? "Cost Center"}>
+              <select value={form.costCenterId} onChange={(e) => upd("costCenterId", e.target.value)} className={inputCls}>
+                <option value="">—</option>
+                {costCenters.filter((c) => c.status === "active" || c.id === form.costCenterId).map((c) => (
+                  <option key={c.id} value={c.id}>#{c.code} - {c.name_en} {c.name_ar ? `(${c.name_ar})` : ""}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label={t("shift" as any) ?? "Shift"}>
+              <select value={form.shiftId} onChange={(e) => upd("shiftId", e.target.value)} className={inputCls}>
+                <option value="">—</option>
+                {shifts.filter((s) => s.is_active !== false || s.id === form.shiftId).map((s) => (
+                  <option key={s.id} value={s.id}>{s.name} ({s.start_time} - {s.end_time})</option>
+                ))}
               </select>
             </Field>
             <Field label={t("gender")}>
@@ -1168,6 +1373,16 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
               Contract cancelled
             </label>
 
+            <Field label={t("medicalInsuranceType")}>
+              <select value={form.medicalInsuranceType} onChange={(e) => upd("medicalInsuranceType", e.target.value as any)} className={inputCls}>
+                <option value="">—</option>
+                <option value="Private">{t("insurancePrivate")}</option>
+                <option value="Governmental">{t("insuranceGovernmental")}</option>
+              </select>
+            </Field>
+            <Field label={t("medicalInsuranceNumber")}>
+              <input value={form.medicalInsuranceNumber} onChange={(e) => upd("medicalInsuranceNumber", e.target.value)} className={inputCls} placeholder="e.g. MED-123456" />
+            </Field>
             <Field label="Medical Insurance Details"><input value={form.medicalInsuranceDetails} onChange={(e) => upd("medicalInsuranceDetails", e.target.value)} className={inputCls} /></Field>
 
             <Field label="Social Insurance Date">
@@ -1189,10 +1404,10 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
                 <label className="block text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Custom Notes / Fields</label>
                 <button type="button" onClick={() => {
                   let arr: any[] = [];
-                  try { 
-                    arr = JSON.parse(form.customField || "[]"); 
-                    if (!Array.isArray(arr)) arr = []; 
-                  } catch { 
+                  try {
+                    arr = JSON.parse(form.customField || "[]");
+                    if (!Array.isArray(arr)) arr = [];
+                  } catch {
                     if (form.customField) {
                       arr = [{ id: 'legacy', title: "Legacy Note", details: "", type: "text", value: form.customField }];
                     } else {
@@ -1208,15 +1423,15 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
               <div className="space-y-3">
                 {(() => {
                   let arr = [];
-                  try { 
-                    arr = JSON.parse(form.customField || "[]"); 
-                    if (!Array.isArray(arr)) arr = []; 
-                  } catch { 
+                  try {
+                    arr = JSON.parse(form.customField || "[]");
+                    if (!Array.isArray(arr)) arr = [];
+                  } catch {
                     if (form.customField) {
                       arr = [{ id: 'legacy', title: "Legacy Note", details: "", type: "text", value: form.customField }];
                     }
                   }
-                  
+
                   if (arr.length === 0) return <p className="text-xs text-muted-foreground italic">No custom fields added.</p>;
 
                   return arr.map((f: any, i: number) => (
@@ -1237,7 +1452,7 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
                         <label className="block">
                           <span className="mb-1 block text-[10px] font-medium uppercase text-muted-foreground">Type</span>
                           <select className={inputCls} value={f.type || "text"} onChange={(e) => {
-                            const newArr = [...arr]; newArr[i].type = e.target.value; 
+                            const newArr = [...arr]; newArr[i].type = e.target.value;
                             if (newArr[i].type === 'number') newArr[i].value = Number(newArr[i].value) || 0;
                             upd("customField", JSON.stringify(newArr));
                           }}>
@@ -1251,8 +1466,8 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
                         <label className="block">
                           <span className="mb-1 block text-[10px] font-medium uppercase text-muted-foreground">Value</span>
                           <input type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : f.type === 'email' ? 'email' : 'text'} className={inputCls} value={f.value || ""} onChange={(e) => {
-                            const newArr = [...arr]; 
-                            newArr[i].value = f.type === 'number' ? Number(e.target.value) : e.target.value; 
+                            const newArr = [...arr];
+                            newArr[i].value = f.type === 'number' ? Number(e.target.value) : e.target.value;
                             upd("customField", JSON.stringify(newArr));
                           }} />
                         </label>
@@ -1466,13 +1681,20 @@ function validateIdExpiry(nationalId: string, exp: string): "ok" | "idExpiryRequ
 }
 
 type ExtraHr = {
+  nameAr: string;
+  costCenterId: string;
+  shiftId: string;
+  sectionId: string;
+  jobGrade: string;
   personalPhone: string; gender: string; country: string; city: string;
   district: string; street: string; building: string; flat: string;
   nationalId: string; isPassport: boolean; nationalIdExpiry: string; position: string;
   contractType: string; notes: string; manager: string;
   salaryMode: "gross" | "net"; salaryGross: number; salaryNet: number;
   empCode: string; idIssueDate: string; idCardAddress: string; avatarUrl: string;
-  extraEmail: string; medicalInsuranceDetails: string; isInsured: boolean;
+  extraEmail: string; medicalInsuranceDetails: string;
+  medicalInsuranceNumber: string; medicalInsuranceType: "" | "Private" | "Governmental";
+  isInsured: boolean;
   militaryExpireDate: string; isFivePercent: boolean; socialInsuranceDate: string;
   customField: string;
 };

@@ -7,6 +7,7 @@ export type AdminEmployeeRow = {
   id: string;
   emp_code: string | null;
   full_name: string | null;
+  full_name_ar: string | null;
   email: string | null;
   phone: string | null;
   department: string | null;
@@ -23,6 +24,12 @@ export type AdminEmployeeRow = {
   contract_start_date: string | null;
   contract_end_date: string | null;
   contract_cancelled: boolean | null;
+  cost_center_id: string | null;
+  shift_id: string | null;
+  section_id: string | null;
+  job_grade: string | null;
+  medical_insurance_number?: string | null;
+  medical_insurance_type?: string | null;
 };
 
 const SORT_COLS = ["full_name", "email", "created_at", "status", "contract_end_date", "contract_remaining"] as const;
@@ -74,10 +81,13 @@ export type ImportEmployeeResult = {
 const CreateEmployeeSchema = z.object({
   empCode: z.string().max(40).optional().default(""),
   name: z.string().trim().min(2).max(120),
+  nameAr: z.string().max(120).optional().default(""),
   email: z.string().trim().email().max(160),
   phone: z.string().max(40).optional().default(""),
   dept: z.string().max(120).optional().default(""),
   position: z.string().max(120).optional().default(""),
+  sectionId: z.string().uuid().optional().or(z.literal("")).default(""),
+  jobGrade: z.string().max(100).optional().or(z.literal("")).default(""),
   gender: z.enum(["male", "female"]).optional().or(z.literal("")),
   role: z.enum(IMPORT_ROLES).optional().default("employee"),
   status: z.enum(["Active", "Inactive"]).optional().default("Active"),
@@ -89,6 +99,8 @@ const CreateEmployeeSchema = z.object({
   idIssueDate: z.string().max(20).optional().default(""),
   nationalIdExpiry: z.string().max(20).optional().default(""),
   managerId: z.string().uuid().optional().or(z.literal("")).default(""),
+  costCenterId: z.string().uuid().optional().or(z.literal("")).default(""),
+  shiftId: z.string().uuid().optional().or(z.literal("")).default(""),
   salaryMode: z.enum(["gross", "net"]).optional().default("gross"),
   salaryGross: z.number().min(0).max(10_000_000).optional().default(0),
   salaryNet: z.number().min(0).max(10_000_000).optional().default(0),
@@ -103,6 +115,8 @@ const CreateEmployeeSchema = z.object({
   contractCancelled: z.boolean().optional().default(false),
   extraEmail: z.string().email().max(255).optional().or(z.literal("")).default(""),
   medicalInsuranceDetails: z.string().max(1000).optional().default(""),
+  medicalInsuranceNumber: z.string().max(100).optional().default(""),
+  medicalInsuranceType: z.enum(["Private", "Governmental"]).optional().or(z.literal("")).default(""),
   isInsured: z.boolean().optional().default(false),
   militaryExpireDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal("")).default(""),
   isFivePercent: z.boolean().optional().default(false),
@@ -181,14 +195,14 @@ export const listEmployeesAdmin = createServerFn({ method: "POST" })
     let q = supabase
       .from("profiles")
       .select(
-        "id, emp_code, full_name, email, phone, department_id, position_id, city, district, status, inactive_reason, avatar_url, created_at, contract_start_date, contract_end_date, contract_cancelled",
+        "id, emp_code, full_name, full_name_ar, cost_center_id, email, phone, department_id, position_id, city, district, status, inactive_reason, avatar_url, created_at, contract_start_date, contract_end_date, contract_cancelled, medical_insurance_number, medical_insurance_type",
         { count: "exact" },
       );
 
     if (data.q) {
       const term = data.q.replace(/[,%]/g, "");
       const phoneSearch = (formatEgPhone(term) || term).replace(/\s+/g, "%");
-      let orStr = `full_name.ilike.%${term}%,email.ilike.%${term}%,phone.ilike.%${term}%,phone.ilike.%${phoneSearch}%`;
+      let orStr = `full_name.ilike.%${term}%,full_name_ar.ilike.%${term}%,email.ilike.%${term}%,phone.ilike.%${term}%,phone.ilike.%${phoneSearch}%`;
       if (/^\d+$/.test(term)) {
         orStr += `,emp_code.eq.${term}`;
       }
@@ -203,15 +217,54 @@ export const listEmployeesAdmin = createServerFn({ method: "POST" })
     const sortCol = data.sort === "contract_remaining" ? "contract_end_date" : data.sort;
     q = q.order(sortCol, { ascending: data.dir === "asc" }).range(from, to);
 
-    const { data: profiles, error: pe, count } = await q;
+    let { data: profiles, error: pe, count } = await q;
+    if (pe && (
+      pe.message?.includes("full_name_ar") || pe.details?.includes("full_name_ar") ||
+      pe.message?.includes("cost_center_id") || pe.details?.includes("cost_center_id") ||
+      pe.message?.includes("medical_insurance_number") || pe.details?.includes("medical_insurance_number") ||
+      pe.message?.includes("medical_insurance_type") || pe.details?.includes("medical_insurance_type")
+    )) {
+      let qFallback = supabase
+        .from("profiles")
+        .select(
+          "id, emp_code, full_name, email, phone, department_id, position_id, city, district, status, inactive_reason, avatar_url, created_at, contract_start_date, contract_end_date, contract_cancelled",
+          { count: "exact" },
+        );
+      if (data.q) {
+        const term = data.q.replace(/[,%]/g, "");
+        const phoneSearch = (formatEgPhone(term) || term).replace(/\s+/g, "%");
+        let orStr = `full_name.ilike.%${term}%,email.ilike.%${term}%,phone.ilike.%${term}%,phone.ilike.%${phoneSearch}%`;
+        if (/^\d+$/.test(term)) {
+          orStr += `,emp_code.eq.${term}`;
+        }
+        qFallback = qFallback.or(orStr);
+      }
+      if (data.departmentId) qFallback = qFallback.eq("department_id", data.departmentId);
+      if (data.positionId) qFallback = qFallback.eq("position_id", data.positionId);
+      if (data.status) qFallback = qFallback.eq("status", data.status);
+      if (data.inactiveReason) qFallback = qFallback.eq("inactive_reason", data.inactiveReason);
+      if (roleUserIds) qFallback = qFallback.in("id", roleUserIds);
+      qFallback = qFallback.order(sortCol, { ascending: data.dir === "asc" }).range(from, to);
+
+      const fallbackRes = await qFallback;
+      profiles = fallbackRes.data as any;
+      pe = fallbackRes.error;
+      count = fallbackRes.count;
+    }
     if (pe) {
       return { rows: [], total: 0, departments: [], positions: [], roles: [], _error: pe } as any;
     }
 
     const ids = (profiles ?? []).map((p: any) => p.id);
-    const { data: rolesRows } = ids.length
-      ? await supabase.from("user_roles").select("user_id, role").in("user_id", ids)
-      : { data: [] as any[] };
+    const [{ data: rolesRows }, { data: shiftsRows }] = await Promise.all([
+      ids.length
+        ? supabase.from("user_roles").select("user_id, role").in("user_id", ids)
+        : Promise.resolve({ data: [] as any[] }),
+      ids.length
+        ? (supabase.from("employee_shifts") as any).select("employee_id, shift_id").in("employee_id", ids)
+        : Promise.resolve({ data: [] as any[] }),
+    ]);
+    const shiftMap = new Map<string, string>((shiftsRows ?? []).map((s: any) => [String(s.employee_id), String(s.shift_id)]));
 
     const dMap = new Map((depts ?? []).map((d: any) => [d.id, d.name_en]));
     const pMap = new Map((poss ?? []).map((p: any) => [p.id, p.name_en]));
@@ -219,6 +272,7 @@ export const listEmployeesAdmin = createServerFn({ method: "POST" })
       id: p.id,
       emp_code: p.emp_code ?? null,
       full_name: p.full_name,
+      full_name_ar: p.full_name_ar ?? null,
       email: p.email,
       phone: p.phone,
       department_id: p.department_id ?? null,
@@ -234,6 +288,12 @@ export const listEmployeesAdmin = createServerFn({ method: "POST" })
       contract_start_date: p.contract_start_date ?? null,
       contract_end_date: p.contract_end_date ?? null,
       contract_cancelled: p.contract_cancelled ?? false,
+      cost_center_id: p.cost_center_id ?? null,
+      shift_id: shiftMap.get(p.id) ?? null,
+      section_id: p.section_id ?? null,
+      job_grade: p.job_grade ?? null,
+      medical_insurance_number: p.medical_insurance_number ?? null,
+      medical_insurance_type: p.medical_insurance_type ?? null,
       roles: (rolesRows ?? []).filter((r: any) => r.user_id === p.id).map((r: any) => String(r.role)),
     }));
 
@@ -253,13 +313,17 @@ export const updateEmployeeAdmin = createServerFn({ method: "POST" })
       .object({
         id: z.string().uuid(),
         full_name: z.string().min(2).max(120).nullable().optional(),
+        full_name_ar: z.string().max(120).nullable().optional().or(z.literal("")),
         gender: z.enum(["male", "female"]).nullable().optional().or(z.literal("")),
         phone: z.string().max(40).nullable().optional(),
         department_id: z.string().uuid().nullable().optional(),
+        section_id: z.string().uuid().nullable().optional().or(z.literal("")),
         position_id: z.string().uuid().nullable().optional(),
         city_id: z.string().uuid().nullable().optional(),
         district_id: z.string().uuid().nullable().optional(),
         manager_id: z.string().uuid().nullable().optional(),
+        cost_center_id: z.string().uuid().nullable().optional().or(z.literal("")),
+        shift_id: z.string().uuid().nullable().optional().or(z.literal("")),
         locale: z.string().max(10).nullable().optional(),
         national_id: z.string().max(40).nullable().optional(),
         id_issue_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
@@ -276,14 +340,16 @@ export const updateEmployeeAdmin = createServerFn({ method: "POST" })
         emergency_fund: z.number().min(0).max(10_000_000).nullable().optional(),
         allowance: z.number().min(0).max(10_000_000).nullable().optional(),
         target_value: z.number().min(0).max(10_000_000).nullable().optional(),
-        target_duration: z.enum(["Daily","Weekly","Monthly","Quarterly","Yearly"]).nullable().optional(),
-        contract_type: z.enum(["FullTime","PartTime","Temporary","Internship","Probation3M"]).nullable().optional(),
+        target_duration: z.enum(["Daily", "Weekly", "Monthly", "Quarterly", "Yearly"]).nullable().optional(),
+        contract_type: z.enum(["FullTime", "PartTime", "Temporary", "Internship", "Probation3M"]).nullable().optional(),
         contract_start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
         contract_end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
         contract_cancelled: z.boolean().optional(),
         job_grade: z.string().max(100).nullable().optional(),
         extra_email: z.string().email().max(255).nullable().optional().or(z.literal("")),
         medical_insurance_details: z.string().max(1000).nullable().optional(),
+        medical_insurance_number: z.string().max(100).nullable().optional().or(z.literal("")),
+        medical_insurance_type: z.enum(["Private", "Governmental"]).nullable().optional().or(z.literal("")),
         is_insured: z.boolean().optional(),
         military_expire_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional().or(z.literal("")),
         is_five_percent: z.boolean().optional(),
@@ -306,13 +372,16 @@ export const updateEmployeeAdmin = createServerFn({ method: "POST" })
     }
     const patch: Record<string, any> = {};
     if (data.full_name !== undefined) patch.full_name = data.full_name;
+    if (data.full_name_ar !== undefined) patch.full_name_ar = data.full_name_ar === "" ? null : data.full_name_ar;
     if (data.gender !== undefined) patch.gender = data.gender === "" ? null : data.gender;
     if (data.phone !== undefined) patch.phone = data.phone;
     if (data.department_id !== undefined) patch.department_id = data.department_id;
+    if (data.section_id !== undefined) patch.section_id = data.section_id === "" ? null : data.section_id;
     if (data.position_id !== undefined) patch.position_id = data.position_id;
     if (data.city_id !== undefined) patch.city_id = data.city_id;
     if (data.district_id !== undefined) patch.district_id = data.district_id;
     if (data.manager_id !== undefined) patch.manager_id = data.manager_id;
+    if (data.cost_center_id !== undefined) patch.cost_center_id = data.cost_center_id === "" ? null : data.cost_center_id;
     if (data.locale !== undefined) patch.locale = data.locale;
     if (data.national_id !== undefined) patch.national_id = data.national_id;
     if (data.id_issue_date !== undefined) patch.id_issue_date = data.id_issue_date;
@@ -353,6 +422,8 @@ export const updateEmployeeAdmin = createServerFn({ method: "POST" })
     if (data.job_grade !== undefined) patch.job_grade = data.job_grade;
     if (data.extra_email !== undefined) patch.extra_email = data.extra_email === "" ? null : data.extra_email;
     if (data.medical_insurance_details !== undefined) patch.medical_insurance_details = data.medical_insurance_details;
+    if (data.medical_insurance_number !== undefined) patch.medical_insurance_number = data.medical_insurance_number === "" ? null : data.medical_insurance_number;
+    if (data.medical_insurance_type !== undefined) patch.medical_insurance_type = data.medical_insurance_type === "" ? null : data.medical_insurance_type;
     if (data.is_insured !== undefined) patch.is_insured = data.is_insured;
     if (data.military_expire_date !== undefined) patch.military_expire_date = data.military_expire_date === "" ? null : data.military_expire_date;
     if (data.is_five_percent !== undefined) patch.is_five_percent = data.is_five_percent;
@@ -379,13 +450,41 @@ export const updateEmployeeAdmin = createServerFn({ method: "POST" })
       previousCustomField = (prev as any)?.custom_field ?? null;
       currentFullName = (prev as any)?.full_name ?? null;
     }
-    const { error } = await (supabase.from("profiles") as any).update(patch).eq("id", data.id);
+    let { error } = await (supabase.from("profiles") as any).update(patch).eq("id", data.id);
+    if (error && (
+      error.message?.includes("full_name_ar") || error.details?.includes("full_name_ar") ||
+      error.message?.includes("cost_center_id") || error.details?.includes("cost_center_id") ||
+      error.message?.includes("medical_insurance_number") || error.details?.includes("medical_insurance_number") ||
+      error.message?.includes("medical_insurance_type") || error.details?.includes("medical_insurance_type")
+    )) {
+      const cleanPatch = { ...patch };
+      if (error.message?.includes("full_name_ar") || error.details?.includes("full_name_ar")) delete cleanPatch.full_name_ar;
+      if (error.message?.includes("cost_center_id") || error.details?.includes("cost_center_id")) delete cleanPatch.cost_center_id;
+      if (error.message?.includes("medical_insurance_number") || error.details?.includes("medical_insurance_number")) delete cleanPatch.medical_insurance_number;
+      if (error.message?.includes("medical_insurance_type") || error.details?.includes("medical_insurance_type")) delete cleanPatch.medical_insurance_type;
+      const fb = await (supabase.from("profiles") as any).update(cleanPatch).eq("id", data.id);
+      error = fb.error;
+    }
     if (error) {
       if ((error as any).code === "23505" && /emp_code/.test(error.message)) {
         throw new Error("That employee code is already used by another employee.");
       }
       throw new Error(error.message);
     }
+    if (data.shift_id !== undefined) {
+      try {
+        await (supabase.from("employee_shifts") as any).delete().eq("employee_id", data.id);
+        if (data.shift_id) {
+          await (supabase.from("employee_shifts") as any).insert({
+            employee_id: data.id,
+            shift_id: data.shift_id,
+          });
+        }
+      } catch (shiftErr) {
+        console.warn("Failed to update employee_shifts:", shiftErr);
+      }
+    }
+
     if (patch.status !== undefined && patch.status !== previousStatus) {
       await (supabase as any).from("employee_status_audit").insert({
         profile_id: data.id,
@@ -784,6 +883,31 @@ export const createEmployeeAdmin = createServerFn({ method: "POST" })
       }
     }
 
+    if (created?.id && data.shiftId) {
+      try {
+        await (supabase.from("employee_shifts") as any).delete().eq("employee_id", created.id);
+        await (supabase.from("employee_shifts") as any).insert({
+          employee_id: created.id,
+          shift_id: data.shiftId,
+        });
+      } catch (shiftErr) {
+        console.warn("Failed to assign shift:", shiftErr);
+      }
+    }
+
+    if (created?.id && (data.sectionId || data.jobGrade || data.medicalInsuranceNumber || data.medicalInsuranceType)) {
+      try {
+        const p: Record<string, any> = {};
+        if (data.sectionId) p.section_id = data.sectionId;
+        if (data.jobGrade) p.job_grade = data.jobGrade;
+        if (data.medicalInsuranceNumber) p.medical_insurance_number = data.medicalInsuranceNumber;
+        if (data.medicalInsuranceType) p.medical_insurance_type = data.medicalInsuranceType;
+        await (supabase.from("profiles") as any).update(p).eq("id", created.id);
+      } catch (err) {
+        console.warn("Failed to set sectionId / jobGrade / medical insurance on profile:", err);
+      }
+    }
+
     return created;
   });
 
@@ -876,6 +1000,15 @@ async function hardDeleteUser(admin: any, id: string) {
 
 export type CityRow = { id: string; name_en: string };
 export type DistrictRow = { id: string; city_id: string; name_en: string };
+export type ShiftOption = {
+  id: string;
+  name: string;
+  start_time: string;
+  end_time: string;
+  grace_minutes: number;
+  is_overnight: boolean;
+  is_active: boolean;
+};
 
 export const listCitiesAndDistricts = createServerFn({ method: "GET" })
   .middleware([requireAdminAccess])
@@ -886,9 +1019,12 @@ export const listCitiesAndDistricts = createServerFn({ method: "GET" })
     sections: { id: string; department_id: string; name_en: string }[];
     positions: { id: string; name_en: string }[];
     managers: { id: string; name: string }[];
+    costCenters: { id: string; code: string; name_en: string; name_ar: string; status: string }[];
+    shifts: ShiftOption[];
+    jobGrades: { id: string; name_en: string; name_ar: string; active: boolean }[];
   }> => {
     const { supabase } = context;
-    const [{ data: cities }, { data: districts }, { data: depts }, { data: secs }, { data: poss }, { data: mgrs }, { data: mgrRoles }] = await Promise.all([
+    const [{ data: cities }, { data: districts }, { data: depts }, { data: secs }, { data: poss }, { data: mgrs }, { data: mgrRoles }, costCentersRes, shiftsRes, jobGradesRes] = await Promise.all([
       supabase.from("cities").select("id, name_en").order("name_en"),
       supabase.from("districts").select("id, city_id, name_en").order("name_en"),
       supabase.from("departments").select("id, name_en").order("name_en"),
@@ -896,6 +1032,9 @@ export const listCitiesAndDistricts = createServerFn({ method: "GET" })
       supabase.from("positions").select("id, name_en").order("name_en"),
       supabase.from("profiles").select("id, full_name, email").eq("status", "Active").order("full_name"),
       supabase.from("user_roles").select("user_id, role").in("role", ["admin", "manager"]),
+      (supabase as any).from("cost_centers").select("id, code, name_en, name_ar, status").order("code").then((r: any) => r.data ?? []).catch(() => []),
+      (supabase as any).from("shifts").select("id, name, start_time, end_time, grace_minutes, is_overnight, is_active").order("name").then((r: any) => r.data ?? []).catch(() => []),
+      (supabase as any).from("job_grades").select("id, name_en, name_ar, active").order("name_en").then((r: any) => r.data ?? []).catch(() => []),
     ]);
     const allowedMgrIds = new Set((mgrRoles ?? []).map((r: any) => r.user_id));
     const filteredMgrs = (mgrs ?? []).filter((m: any) => allowedMgrIds.has(m.id));
@@ -906,6 +1045,28 @@ export const listCitiesAndDistricts = createServerFn({ method: "GET" })
       sections: (secs ?? []).map((s: any) => ({ id: s.id, department_id: s.department_id, name_en: s.name_en })),
       positions: (poss ?? []).map((p: any) => ({ id: p.id, name_en: p.name_en })),
       managers: filteredMgrs.map((m: any) => ({ id: m.id, name: m.full_name ?? m.email ?? "—" })),
+      costCenters: (Array.isArray(costCentersRes) ? costCentersRes : []).map((c: any) => ({
+        id: c.id,
+        code: c.code,
+        name_en: c.name_en,
+        name_ar: c.name_ar,
+        status: c.status,
+      })),
+      shifts: (Array.isArray(shiftsRes) ? shiftsRes : []).map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        start_time: s.start_time,
+        end_time: s.end_time,
+        grace_minutes: s.grace_minutes ?? 0,
+        is_overnight: !!s.is_overnight,
+        is_active: s.is_active !== false,
+      })),
+      jobGrades: (Array.isArray(jobGradesRes) ? jobGradesRes : []).map((g: any) => ({
+        id: g.id,
+        name_en: g.name_en,
+        name_ar: g.name_ar,
+        active: g.active ?? true,
+      })),
     };
   });
 
@@ -980,6 +1141,7 @@ export type EmployeeDetail = {
   id: string;
   emp_code: string | null;
   full_name: string | null;
+  full_name_ar: string | null;
   email: string | null;
   phone: string | null;
   gender: string | null;
@@ -1013,8 +1175,15 @@ export type EmployeeDetail = {
   insurance_salary: number | null;
   emergency_fund: number | null;
   job_grade: string | null;
+  cost_center_id: string | null;
+  cost_center_code: string | null;
+  cost_center_name: string | null;
+  shift_id: string | null;
+  shift_name: string | null;
   extra_email: string | null;
   medical_insurance_details: string | null;
+  medical_insurance_number: string | null;
+  medical_insurance_type: string | null;
   is_insured: boolean;
   military_expire_date: string | null;
   is_five_percent: boolean;
@@ -1031,14 +1200,28 @@ export const getEmployeeDetail = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ context, data }): Promise<EmployeeDetail | null> => {
     const { supabase } = context;
-    const { data: p, error } = await supabase
+    let { data: p, error } = await supabase
       .from("profiles")
-      .select("id, emp_code, full_name, email, phone, gender, department_id, position_id, city_id, district_id, city, district, status, inactive_reason, avatar_url, manager_id, locale, national_id, id_issue_date, id_expiry_date, salary_mode, salary_gross, salary_net, allowance, target_value, target_duration, contract_type, contract_start_date, contract_end_date, contract_cancelled, job_grade, extra_email, medical_insurance_details, is_insured, military_expire_date, is_five_percent, social_insurance_date, custom_field, last_action_date, created_at, updated_at, insurance_salary, emergency_fund")
+      .select("id, emp_code, full_name, full_name_ar, cost_center_id, email, phone, gender, department_id, position_id, city_id, district_id, city, district, status, inactive_reason, avatar_url, manager_id, locale, national_id, id_issue_date, id_expiry_date, salary_mode, salary_gross, salary_net, allowance, target_value, target_duration, contract_type, contract_start_date, contract_end_date, contract_cancelled, job_grade, extra_email, medical_insurance_details, medical_insurance_number, medical_insurance_type, is_insured, military_expire_date, is_five_percent, social_insurance_date, custom_field, last_action_date, created_at, updated_at, insurance_salary, emergency_fund")
       .eq("id", data.id)
       .maybeSingle();
+    if (error && (
+      error.message?.includes("full_name_ar") || error.details?.includes("full_name_ar") ||
+      error.message?.includes("cost_center_id") || error.details?.includes("cost_center_id") ||
+      error.message?.includes("medical_insurance_number") || error.details?.includes("medical_insurance_number") ||
+      error.message?.includes("medical_insurance_type") || error.details?.includes("medical_insurance_type")
+    )) {
+      const fb = await supabase
+        .from("profiles")
+        .select("id, emp_code, full_name, email, phone, gender, department_id, position_id, city_id, district_id, city, district, status, inactive_reason, avatar_url, manager_id, locale, national_id, id_issue_date, id_expiry_date, salary_mode, salary_gross, salary_net, allowance, target_value, target_duration, contract_type, contract_start_date, contract_end_date, contract_cancelled, job_grade, extra_email, medical_insurance_details, is_insured, military_expire_date, is_five_percent, social_insurance_date, custom_field, last_action_date, created_at, updated_at, insurance_salary, emergency_fund")
+        .eq("id", data.id)
+        .maybeSingle();
+      p = fb.data as any;
+      error = fb.error;
+    }
     if (error) throw new Error(error.message);
     if (!p) return null;
-    const [{ data: dept }, { data: pos }, { data: roles }, { data: mgr }, { data: cityRow }, { data: distRow }] = await Promise.all([
+    const [{ data: dept }, { data: pos }, { data: roles }, { data: mgr }, { data: cityRow }, { data: distRow }, ccRow, shiftRow] = await Promise.all([
       (p as any).department_id
         ? supabase.from("departments").select("name_en").eq("id", (p as any).department_id).maybeSingle()
         : Promise.resolve({ data: null }),
@@ -1055,11 +1238,16 @@ export const getEmployeeDetail = createServerFn({ method: "POST" })
       (p as any).district_id
         ? supabase.from("districts").select("name_en").eq("id", (p as any).district_id).maybeSingle()
         : Promise.resolve({ data: null }),
+      (p as any).cost_center_id
+        ? (supabase as any).from("cost_centers").select("id, code, name_en, name_ar").eq("id", (p as any).cost_center_id).maybeSingle().then((r: any) => r.data).catch(() => null)
+        : Promise.resolve(null),
+      (supabase as any).from("employee_shifts").select("shift_id, shifts(id, name, start_time, end_time)").eq("employee_id", data.id).limit(1).maybeSingle().then((r: any) => r.data).catch(() => null),
     ]);
     return {
       id: (p as any).id,
       emp_code: (p as any).emp_code ?? null,
       full_name: (p as any).full_name,
+      full_name_ar: (p as any).full_name_ar ?? null,
       email: (p as any).email,
       phone: (p as any).phone,
       gender: (p as any).gender ?? null,
@@ -1091,8 +1279,15 @@ export const getEmployeeDetail = createServerFn({ method: "POST" })
       contract_end_date: (p as any).contract_end_date ?? null,
       contract_cancelled: !!(p as any).contract_cancelled,
       job_grade: (p as any).job_grade ?? null,
+      cost_center_id: (p as any).cost_center_id ?? null,
+      cost_center_code: (ccRow as any)?.code ?? null,
+      cost_center_name: (ccRow as any)?.name_en ? `${(ccRow as any).name_en} (${(ccRow as any).name_ar || ""})` : null,
+      shift_id: (shiftRow as any)?.shift_id ?? null,
+      shift_name: (shiftRow as any)?.shifts?.name ? `${(shiftRow as any).shifts.name} (${(shiftRow as any).shifts.start_time ?? ""} - ${(shiftRow as any).shifts.end_time ?? ""})` : null,
       extra_email: (p as any).extra_email ?? null,
       medical_insurance_details: (p as any).medical_insurance_details ?? null,
+      medical_insurance_number: (p as any).medical_insurance_number ?? null,
+      medical_insurance_type: (p as any).medical_insurance_type ?? null,
       is_insured: !!(p as any).is_insured,
       military_expire_date: (p as any).military_expire_date ?? null,
       is_five_percent: !!(p as any).is_five_percent,

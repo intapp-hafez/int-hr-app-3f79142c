@@ -22,7 +22,9 @@ import { Route as FinanceIndexRouteImport } from './routes/finance.index'
 import { Route as EmployeeIndexRouteImport } from './routes/employee.index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as StaffProfileRouteImport } from './routes/staff.profile'
+import { Route as StaffNotificationsRouteImport } from './routes/staff.notifications'
 import { Route as StaffLeavesRouteImport } from './routes/staff.leaves'
+import { Route as StaffChatRouteImport } from './routes/staff.chat'
 import { Route as StaffAttendanceRouteImport } from './routes/staff.attendance'
 import { Route as ManagerTripsRouteImport } from './routes/manager.trips'
 import { Route as ManagerTeamRouteImport } from './routes/manager.team'
@@ -149,9 +151,19 @@ const StaffProfileRoute = StaffProfileRouteImport.update({
   path: '/profile',
   getParentRoute: () => StaffRoute,
 } as any)
+const StaffNotificationsRoute = StaffNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => StaffRoute,
+} as any)
 const StaffLeavesRoute = StaffLeavesRouteImport.update({
   id: '/leaves',
   path: '/leaves',
+  getParentRoute: () => StaffRoute,
+} as any)
+const StaffChatRoute = StaffChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
   getParentRoute: () => StaffRoute,
 } as any)
 const StaffAttendanceRoute = StaffAttendanceRouteImport.update({
@@ -519,7 +531,9 @@ export interface FileRoutesByFullPath {
   '/manager/team': typeof ManagerTeamRoute
   '/manager/trips': typeof ManagerTripsRoute
   '/staff/attendance': typeof StaffAttendanceRoute
+  '/staff/chat': typeof StaffChatRoute
   '/staff/leaves': typeof StaffLeavesRoute
+  '/staff/notifications': typeof StaffNotificationsRoute
   '/staff/profile': typeof StaffProfileRoute
   '/admin/': typeof AdminIndexRoute
   '/employee/': typeof EmployeeIndexRoute
@@ -589,7 +603,9 @@ export interface FileRoutesByTo {
   '/manager/team': typeof ManagerTeamRoute
   '/manager/trips': typeof ManagerTripsRoute
   '/staff/attendance': typeof StaffAttendanceRoute
+  '/staff/chat': typeof StaffChatRoute
   '/staff/leaves': typeof StaffLeavesRoute
+  '/staff/notifications': typeof StaffNotificationsRoute
   '/staff/profile': typeof StaffProfileRoute
   '/admin': typeof AdminIndexRoute
   '/employee': typeof EmployeeIndexRoute
@@ -666,7 +682,9 @@ export interface FileRoutesById {
   '/manager/team': typeof ManagerTeamRoute
   '/manager/trips': typeof ManagerTripsRoute
   '/staff/attendance': typeof StaffAttendanceRoute
+  '/staff/chat': typeof StaffChatRoute
   '/staff/leaves': typeof StaffLeavesRoute
+  '/staff/notifications': typeof StaffNotificationsRoute
   '/staff/profile': typeof StaffProfileRoute
   '/admin/': typeof AdminIndexRoute
   '/employee/': typeof EmployeeIndexRoute
@@ -744,7 +762,9 @@ export interface FileRouteTypes {
     | '/manager/team'
     | '/manager/trips'
     | '/staff/attendance'
+    | '/staff/chat'
     | '/staff/leaves'
+    | '/staff/notifications'
     | '/staff/profile'
     | '/admin/'
     | '/employee/'
@@ -814,7 +834,9 @@ export interface FileRouteTypes {
     | '/manager/team'
     | '/manager/trips'
     | '/staff/attendance'
+    | '/staff/chat'
     | '/staff/leaves'
+    | '/staff/notifications'
     | '/staff/profile'
     | '/admin'
     | '/employee'
@@ -890,7 +912,9 @@ export interface FileRouteTypes {
     | '/manager/team'
     | '/manager/trips'
     | '/staff/attendance'
+    | '/staff/chat'
     | '/staff/leaves'
+    | '/staff/notifications'
     | '/staff/profile'
     | '/admin/'
     | '/employee/'
@@ -1010,11 +1034,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StaffProfileRouteImport
       parentRoute: typeof StaffRoute
     }
+    '/staff/notifications': {
+      id: '/staff/notifications'
+      path: '/notifications'
+      fullPath: '/staff/notifications'
+      preLoaderRoute: typeof StaffNotificationsRouteImport
+      parentRoute: typeof StaffRoute
+    }
     '/staff/leaves': {
       id: '/staff/leaves'
       path: '/leaves'
       fullPath: '/staff/leaves'
       preLoaderRoute: typeof StaffLeavesRouteImport
+      parentRoute: typeof StaffRoute
+    }
+    '/staff/chat': {
+      id: '/staff/chat'
+      path: '/chat'
+      fullPath: '/staff/chat'
+      preLoaderRoute: typeof StaffChatRouteImport
       parentRoute: typeof StaffRoute
     }
     '/staff/attendance': {
@@ -1610,14 +1648,18 @@ const ManagerRouteWithChildren =
 
 interface StaffRouteChildren {
   StaffAttendanceRoute: typeof StaffAttendanceRoute
+  StaffChatRoute: typeof StaffChatRoute
   StaffLeavesRoute: typeof StaffLeavesRoute
+  StaffNotificationsRoute: typeof StaffNotificationsRoute
   StaffProfileRoute: typeof StaffProfileRoute
   StaffIndexRoute: typeof StaffIndexRoute
 }
 
 const StaffRouteChildren: StaffRouteChildren = {
   StaffAttendanceRoute: StaffAttendanceRoute,
+  StaffChatRoute: StaffChatRoute,
   StaffLeavesRoute: StaffLeavesRoute,
+  StaffNotificationsRoute: StaffNotificationsRoute,
   StaffProfileRoute: StaffProfileRoute,
   StaffIndexRoute: StaffIndexRoute,
 }

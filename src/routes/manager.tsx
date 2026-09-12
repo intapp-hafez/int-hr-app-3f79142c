@@ -4,6 +4,7 @@ import { AppLogo } from "@/components/AppLogo";
 import { LanguageToggle, useI18n } from "@/lib/i18n";
 import { useSession, useAuthReady, signOut } from "@/lib/auth";
 import { UserMenu } from "@/components/UserMenu";
+import { InstallButton } from "@/components/InstallButton";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getChatUnreadTotal } from "@/backend/functions/chat.functions";
@@ -39,23 +40,23 @@ function ManagerLayout() {
 
   const sidebarItems = [
     { to: "/manager", icon: Home, label: t("dashboard"), exact: true },
-    { to: "/manager/chat", icon: MessageSquare, label: "Messages & Chat" },
-    { to: "/manager/check", icon: LogIn, label: "Check in/out" },
+    { to: "/manager/chat", icon: MessageSquare, label: t("messagesChat") },
+    { to: "/manager/check", icon: LogIn, label: t("checkInOut") },
     { to: "/manager/team", icon: Users, label: t("myTeam") },
-    { to: "/manager/advances", icon: Banknote, label: "Advances" },
+    { to: "/manager/advances", icon: Banknote, label: t("advancesTitle") },
     { to: "/manager/tasks", icon: ListChecks, label: t("tasks") },
     { to: "/manager/trips", icon: RouteIcon, label: t("trips") },
-    { to: "/manager/profile", icon: UserCircle, label: "Profile" },
+    { to: "/manager/profile", icon: UserCircle, label: t("profile") },
   ] as const;
 
   const mobileItems = [
     { to: "/manager", icon: Home, label: t("dashboard"), exact: true },
-    { to: "/manager/chat", icon: MessageSquare, label: "Messages & Chat" },
-    { to: "/manager/check", icon: LogIn, label: "Check in/out" },
+    { to: "/manager/chat", icon: MessageSquare, label: t("messagesChat") },
+    { to: "/manager/check", icon: LogIn, label: t("checkInOut") },
     { to: "/manager/team", icon: Users, label: t("myTeam") },
     { to: "/manager/tasks", icon: ListChecks, label: t("tasks") },
     { to: "/manager/trips", icon: RouteIcon, label: t("trips") },
-    { to: "/manager/profile", icon: UserCircle, label: "Profile" },
+    { to: "/manager/profile", icon: UserCircle, label: t("profile") },
   ] as const;
 
   const isActive = (to: string, exact?: boolean) => (exact ? path === to : path.startsWith(to));
@@ -121,6 +122,7 @@ function ManagerLayout() {
             <span className="hidden text-sm font-semibold lg:inline">{t("managerPanel")}</span>
             <div className="flex items-center gap-2">
               <span className="hidden text-xs text-muted-foreground sm:inline lg:hidden">{session.name}</span>
+              <InstallButton variant="outline" className="hidden sm:inline-flex" />
               <LanguageToggle />
               <UserMenu size="sm" />
             </div>

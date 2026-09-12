@@ -17,6 +17,7 @@ import { DepartmentStructureModal } from "@/components/admin/DepartmentStructure
 import { SectionsManager } from "@/components/admin/SectionsManager";
 import { SmsBroadcastTab } from "@/components/admin/SmsBroadcastTab";
 import { DevicesManager } from "@/components/admin/DevicesManager";
+import { CostCentersManager } from "@/components/admin/CostCentersManager";
 
 const ContractTemplatesManager = lazy(() => import("@/components/ContractTemplatesManager").then((mod) => ({ default: mod.ContractTemplatesManager })));
 const ExperienceCertificate = lazy(() => import("@/components/admin/HrDocuments").then((mod) => ({ default: mod.ExperienceCertificate })));
@@ -24,8 +25,8 @@ const SalaryCertificate = lazy(() => import("@/components/admin/HrDocuments").th
 const AdvancesAcknowledgment = lazy(() => import("@/components/admin/HrDocuments").then((mod) => ({ default: mod.AdvancesAcknowledgment })));
 const CustodyAcknowledgment = lazy(() => import("@/components/admin/HrDocuments").then((mod) => ({ default: mod.CustodyAcknowledgment })));
 
-type Tab = "departments" | "sections" | "positions" | "job_grades" | "cities" | "networks" | "devices" | "contractTemplates" | "sms" | "experienceCertificate" | "salaryDetails" | "advancesAck" | "custodyAck";
-const validTabs: Tab[] = ["departments", "sections", "positions", "job_grades", "cities", "networks", "devices", "contractTemplates", "sms", "experienceCertificate", "salaryDetails", "advancesAck", "custodyAck"];
+type Tab = "departments" | "sections" | "positions" | "job_grades" | "cities" | "cost_centers" | "networks" | "devices" | "contractTemplates" | "sms" | "experienceCertificate" | "salaryDetails" | "advancesAck" | "custodyAck";
+const validTabs: Tab[] = ["departments", "sections", "positions", "job_grades", "cities", "cost_centers", "networks", "devices", "contractTemplates", "sms", "experienceCertificate", "salaryDetails", "advancesAck", "custodyAck"];
 
 export const Route = createFileRoute("/admin/directory")({
   component: DirectoryPage,
@@ -43,6 +44,7 @@ const tabs: { id: Tab; label: string }[] = [
   { id: "positions", label: "Positions" },
   { id: "job_grades", label: "Job Grades" },
   { id: "cities", label: "Cities & Districts" },
+  { id: "cost_centers", label: "Cost Centers" },
   { id: "networks", label: "Networks" },
   { id: "devices", label: "Devices" },
   { id: "contractTemplates", label: "Contract Templates" },
@@ -114,6 +116,7 @@ function DirectoryPage() {
         {tab === "positions" && <NamedSection kind="positions" />}
         {tab === "job_grades" && <NamedSection kind="job_grades" />}
         {tab === "cities" && <CitiesSection />}
+        {tab === "cost_centers" && <CostCentersManager />}
         {tab === "networks" && <NetworksManager />}
         {tab === "devices" && <DevicesManager />}
         {tab === "contractTemplates" && (

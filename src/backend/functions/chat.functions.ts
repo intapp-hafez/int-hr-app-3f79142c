@@ -24,6 +24,7 @@ export type ChatChannelItem = {
     avatar_url?: string | null;
   } | null;
   participant_count?: number;
+  allow_replies?: boolean;
 };
 
 export type ChatMessageItem = {
@@ -181,6 +182,7 @@ export const listMyChannels = createServerFn({ method: "GET" })
         last_message_at: c.last_message_at,
         unread_count: unreadCountMap.get(c.id) ?? 0,
         participant_count: participantCountMap.get(c.id) ?? (c.type === "broadcast" ? undefined : 2),
+        allow_replies: c.allow_replies !== false,
         recipient: otherProfile
           ? {
               id: otherProfile.id,
@@ -280,41 +282,46 @@ export const sendMessage = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const sb = supabase as any;
     const now = new Date().toISOString();
-    // Check if caller is manager-only
+    // Check caller roles
     const { data: userRoles } = await sb.from("user_roles").select("role").eq("user_id", userId);
     const roles = (userRoles ?? []).map((r: any) => r.role);
-    const isManagerOnly = roles.includes("manager") && !roles.some((r: string) => r === "admin" || r === "hr");
+    const isAdminOrHr = roles.some((r: string) => r === "admin" || r === "hr");
+    const isManager = roles.includes("manager");
+    const isManagerOnly = isManager && !isAdminOrHr;
+    const isPrivileged = isAdminOrHr || isManager;
 
-    if (isManagerOnly) {
-      const { data: chan } = await sb
-        .from("chat_channels")
-        .select("id, type")
-        .eq("id", data.channelId)
-        .maybeSingle();
+    const { data: chan } = await sb
+      .from("chat_channels")
+      .select("id, type, allow_replies")
+      .eq("id", data.channelId)
+      .maybeSingle();
 
-      if (chan) {
-        if (chan.type === "broadcast") {
-          throw new Error("Company announcements are read-only");
-        }
-        if (chan.type === "department") {
-          throw new Error("Department channels are read-only for managers");
-        }
-        if (chan.type === "direct") {
-          const { data: parts } = await sb
-            .from("chat_participants")
-            .select("user_id")
-            .eq("channel_id", data.channelId)
-            .neq("user_id", userId);
-          const otherId = parts?.[0]?.user_id;
-          if (otherId) {
-            const { data: targetProfile } = await sb
-              .from("profiles")
-              .select("manager_id")
-              .eq("id", otherId)
-              .maybeSingle();
-            if (targetProfile && targetProfile.manager_id !== userId) {
-              throw new Error("You can only chat with members of your team");
-            }
+    if (chan && chan.allow_replies === false && !isPrivileged) {
+      throw new Error("Replies are disabled in this channel");
+    }
+
+    if (isManagerOnly && chan) {
+      if (chan.type === "broadcast") {
+        throw new Error("Company announcements are read-only");
+      }
+      if (chan.type === "department") {
+        throw new Error("Department channels are read-only for managers");
+      }
+      if (chan.type === "direct") {
+        const { data: parts } = await sb
+          .from("chat_participants")
+          .select("user_id")
+          .eq("channel_id", data.channelId)
+          .neq("user_id", userId);
+        const otherId = parts?.[0]?.user_id;
+        if (otherId) {
+          const { data: targetProfile } = await sb
+            .from("profiles")
+            .select("manager_id")
+            .eq("id", otherId)
+            .maybeSingle();
+          if (targetProfile && targetProfile.manager_id !== userId) {
+            throw new Error("You can only chat with members of your team");
           }
         }
       }
@@ -544,6 +551,21 @@ export const sendGroupOrDirectMessage = createServerFn({ method: "POST" })
 
     if (!targetChannelId) throw new Error("Failed to initialize target channel");
 
+    // Check if channel allows replies for non-privileged users
+    const { data: chanMeta } = await sb
+      .from("chat_channels")
+      .select("allow_replies")
+      .eq("id", targetChannelId)
+      .maybeSingle();
+
+    const isAdminOrHr = roles.some((r: string) => r === "admin" || r === "hr");
+    const isManager = roles.includes("manager");
+    const isPrivileged = isAdminOrHr || isManager;
+
+    if (chanMeta && chanMeta.allow_replies === false && !isPrivileged) {
+      throw new Error("Replies are disabled in this channel");
+    }
+
     // Insert message
     const { data: msg, error: mErr } = await sb
       .from("chat_messages")
@@ -684,3 +706,60 @@ export const getChatUnreadTotal = createServerFn({ method: "GET" })
 
     return { total: unread };
   });
+
+/**
+ * Toggle or set whether replies are allowed in a channel (Admin/Manager only)
+ */
+export const updateChannelRepliesAllowed = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (i) =>
+      z
+        .object({
+          channelId: z.string().uuid(),
+          allowReplies: z.boolean(),
+        })
+        .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const sb = supabase as any;
+    const now = new Date().toISOString();
+
+    // Check caller roles
+    const { data: userRoles } = await sb.from("user_roles").select("role").eq("user_id", userId);
+    const roles = (userRoles ?? []).map((r: any) => r.role);
+    const isAdminOrHr = roles.some((r: string) => r === "admin" || r === "hr");
+    const isManager = roles.includes("manager");
+
+    if (!isAdminOrHr && !isManager) {
+      throw new Error("Unauthorized: Only managers and administrators can change reply settings");
+    }
+
+    // If manager-only, ensure manager participates in the channel
+    if (!isAdminOrHr && isManager) {
+      const { data: part } = await sb
+        .from("chat_participants")
+        .select("id")
+        .eq("channel_id", data.channelId)
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (!part) {
+        throw new Error("Unauthorized: You can only modify settings for channels you participate in");
+      }
+    }
+
+    const { error } = await sb
+      .from("chat_channels")
+      .update({ allow_replies: data.allowReplies, updated_at: now })
+      .eq("id", data.channelId);
+
+    if (error) {
+      console.error("[chat.functions] Failed to update allow_replies:", error);
+      throw new Error(error.message);
+    }
+
+    return { ok: true, channelId: data.channelId, allowReplies: data.allowReplies };
+  });
+

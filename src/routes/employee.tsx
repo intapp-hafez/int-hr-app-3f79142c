@@ -45,9 +45,9 @@ function EmployeeLayout() {
   const items = [
     { to: "/employee", icon: Home, label: t("dashboard") },
     { to: "/employee/attendance", icon: Clock, label: t("attendance") },
-    { to: "/employee/check", icon: LogIn, label: "Check" },
+    { to: "/employee/check", icon: LogIn, label: t("checkInOut") },
     { to: "/employee/tasks", icon: ListChecks, label: t("tasks") },
-    { to: "/employee/settings", icon: MoreHorizontal, label: "More" },
+    { to: "/employee/settings", icon: MoreHorizontal, label: t("more") },
   ] as const;
 
   return (

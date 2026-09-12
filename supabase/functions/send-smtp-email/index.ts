@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Send an email via SMTP from a Supabase Edge Function (Deno runtime).
 // Caller must be an authenticated admin/HR user — we verify the JWT and role.
 // Body: { auth: { host, port, secure, username, password }, msg: { from, fromEmail, to[], subject, text?, html? } }

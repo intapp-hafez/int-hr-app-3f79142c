@@ -30,7 +30,7 @@ function fmtTime(iso?: string | null) {
   catch { return iso; }
 }
 
-function NotificationsPage() {
+export function NotificationsPage() {
   const { t } = useI18n();
   const listFn = useServerFn(listMyDeliveries);
   const { data = [], isLoading } = useQuery({

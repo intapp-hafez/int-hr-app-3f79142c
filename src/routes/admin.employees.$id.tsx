@@ -244,18 +244,20 @@ function EmployeeTransferModal({ detail, close }: { detail: EmployeeDetailRow, c
     note: ""
   });
   const [saving, setSaving] = useState(false);
-  
+
   async function save() {
     setSaving(true);
     try {
-      await transferFn({ data: {
-        employee_id: detail.id,
-        new_department_id: form.new_department_id || null,
-        new_position_id: form.new_position_id || null,
-        new_manager_id: form.new_manager_id || null,
-        effective_date: form.effective_date,
-        note: form.note || undefined
-      }});
+      await transferFn({
+        data: {
+          employee_id: detail.id,
+          new_department_id: form.new_department_id || null,
+          new_position_id: form.new_position_id || null,
+          new_manager_id: form.new_manager_id || null,
+          effective_date: form.effective_date,
+          note: form.note || undefined
+        }
+      });
       toast.success("Employee transferred successfully");
       qc.invalidateQueries({ queryKey: ["admin"] });
       close();
@@ -278,32 +280,32 @@ function EmployeeTransferModal({ detail, close }: { detail: EmployeeDetailRow, c
         <div className="p-5 space-y-4">
           <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             New Department
-            <select className={editInputCls + " mt-1"} value={form.new_department_id} onChange={e => setForm(f => ({...f, new_department_id: e.target.value}))}>
+            <select className={editInputCls + " mt-1"} value={form.new_department_id} onChange={e => setForm(f => ({ ...f, new_department_id: e.target.value }))}>
               <option value="">— Unchanged —</option>
               {(locs?.departments ?? []).map(d => <option key={d.id} value={d.id}>{d.name_en}</option>)}
             </select>
           </label>
           <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             New Position
-            <select className={editInputCls + " mt-1"} value={form.new_position_id} onChange={e => setForm(f => ({...f, new_position_id: e.target.value}))}>
+            <select className={editInputCls + " mt-1"} value={form.new_position_id} onChange={e => setForm(f => ({ ...f, new_position_id: e.target.value }))}>
               <option value="">— Unchanged —</option>
               {(locs?.positions ?? []).map(p => <option key={p.id} value={p.id}>{p.name_en}</option>)}
             </select>
           </label>
           <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             New Manager
-            <select className={editInputCls + " mt-1"} value={form.new_manager_id} onChange={e => setForm(f => ({...f, new_manager_id: e.target.value}))}>
+            <select className={editInputCls + " mt-1"} value={form.new_manager_id} onChange={e => setForm(f => ({ ...f, new_manager_id: e.target.value }))}>
               <option value="">— Unchanged —</option>
               {(locs?.managers ?? []).filter(m => m.id !== detail.id).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
           </label>
           <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Effective Date
-            <input type="date" className={editInputCls + " mt-1 font-mono"} value={form.effective_date} onChange={e => setForm(f => ({...f, effective_date: e.target.value}))} />
+            <input type="date" className={editInputCls + " mt-1 font-mono"} value={form.effective_date} onChange={e => setForm(f => ({ ...f, effective_date: e.target.value }))} />
           </label>
           <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Transfer Note
-            <textarea className={editInputCls + " mt-1 min-h-[80px]"} value={form.note} onChange={e => setForm(f => ({...f, note: e.target.value}))} placeholder="Reason for transfer..." />
+            <textarea className={editInputCls + " mt-1 min-h-[80px]"} value={form.note} onChange={e => setForm(f => ({ ...f, note: e.target.value }))} placeholder="Reason for transfer..." />
           </label>
         </div>
         <div className="flex justify-end gap-2 border-t border-border bg-muted/30 p-4">
@@ -329,6 +331,7 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
   const updateFn = useServerFn(updateEmployeeAdmin);
   const initialForm = useMemo(() => ({
     full_name: detail.full_name ?? "",
+    full_name_ar: detail.full_name_ar ?? "",
     phone: detail.phone ?? "",
     gender: detail.gender ?? "",
     emp_code: detail.emp_code ?? "",
@@ -341,6 +344,8 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
     department_id: detail.department_id ?? "",
     section_id: (detail as any).section_id ?? "",
     position_id: detail.position_id ?? "",
+    cost_center_id: (detail as any).cost_center_id ?? "",
+    shift_id: (detail as any).shift_id ?? "",
     manager_id: detail.manager_id ?? "",
     status: detail.status as "Active" | "Inactive",
     inactive_reason: (detail.inactive_reason ?? "") as "" | (typeof INACTIVE_REASONS)[number],
@@ -360,6 +365,8 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
     job_grade: detail.job_grade ?? "",
     extra_email: (detail as any).extra_email ?? "",
     medical_insurance_details: (detail as any).medical_insurance_details ?? "",
+    medical_insurance_number: (detail as any).medical_insurance_number ?? "",
+    medical_insurance_type: (detail as any).medical_insurance_type ?? "",
     is_insured: !!(detail as any).is_insured,
     military_expire_date: (detail as any).military_expire_date ?? "",
     is_five_percent: !!(detail as any).is_five_percent,
@@ -460,6 +467,7 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
         data: {
           id: detail.id,
           full_name: form.full_name.trim() || null,
+          full_name_ar: form.full_name_ar.trim() || null,
           gender: form.gender || null,
           phone: form.phone.trim() || null,
           emp_code: form.emp_code.trim() || null,
@@ -471,6 +479,8 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
           department_id: form.department_id || null,
           section_id: form.section_id || null,
           position_id: form.position_id || null,
+          cost_center_id: form.cost_center_id || null,
+          shift_id: form.shift_id || null,
           manager_id: form.manager_id || null,
           job_grade: form.job_grade || null,
           status: form.status,
@@ -490,6 +500,8 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
           contract_cancelled: form.contract_cancelled,
           extra_email: form.extra_email.trim() || null,
           medical_insurance_details: form.medical_insurance_details.trim() || null,
+          medical_insurance_number: form.medical_insurance_number.trim() || null,
+          medical_insurance_type: (form.medical_insurance_type || null) as any,
           is_insured: form.is_insured,
           military_expire_date: form.military_expire_date || null,
           is_five_percent: form.is_five_percent,
@@ -524,6 +536,9 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
             />
             <div className="flex-1 min-w-0">
               <h1 className="font-display text-2xl font-semibold truncate">{detail.full_name ?? detail.email ?? "—"}</h1>
+              {detail.full_name_ar && (
+                <p className="text-sm font-medium opacity-90 truncate" dir="rtl">{detail.full_name_ar}</p>
+              )}
               <p className="text-sm opacity-90 truncate">
                 {(detail.roles[0] ?? "employee")} • {detail.department ?? "—"}
               </p>
@@ -580,6 +595,9 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
           )}
           <div className="grid grid-cols-1 gap-3 p-5 text-sm md:grid-cols-3">
             <EditField label="Full name"><input className={editInputCls} value={form.full_name} onChange={(e) => upd("full_name", e.target.value)} /></EditField>
+            <EditField label={t("fullNameAr" as any) ?? "Full name (Arabic)"}>
+              <input dir="rtl" className={editInputCls} value={form.full_name_ar} onChange={(e) => upd("full_name_ar", e.target.value)} placeholder="الاسم بالكامل بالعربية" />
+            </EditField>
             <EditField label="Phone"><input className={editInputCls + " font-mono"} value={form.phone} onChange={(e) => upd("phone", e.target.value)} /></EditField>
             <EditField label={t("gender")}>
               <select className={editInputCls} value={form.gender} onChange={(e) => upd("gender", e.target.value)}>
@@ -649,6 +667,26 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
                 {(locs?.positions ?? []).map((p) => <option key={p.id} value={p.id}>{p.name_en}</option>)}
               </select>
             </EditField>
+            <EditField label={t("costCenter" as any) ?? "Cost Center"}>
+              <select className={editInputCls} value={form.cost_center_id} onChange={(e) => upd("cost_center_id", e.target.value)}>
+                <option value="">—</option>
+                {((locs as any)?.costCenters ?? []).filter((c: any) => c.status === "active" || c.id === form.cost_center_id).map((c: any) => (
+                  <option key={c.id} value={c.id}>
+                    #{c.code} - {c.name_en} {c.name_ar ? `(${c.name_ar})` : ""}
+                  </option>
+                ))}
+              </select>
+            </EditField>
+            <EditField label={t("shift" as any) ?? "Shift"}>
+              <select className={editInputCls} value={form.shift_id} onChange={(e) => upd("shift_id", e.target.value)}>
+                <option value="">—</option>
+                {((locs as any)?.shifts ?? []).filter((s: any) => s.is_active !== false || s.id === form.shift_id).map((s: any) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({s.start_time} - {s.end_time})
+                  </option>
+                ))}
+              </select>
+            </EditField>
             <EditField label="Manager">
               <select className={editInputCls} value={form.manager_id} onChange={(e) => upd("manager_id", e.target.value)}>
                 <option value="">—</option>
@@ -710,6 +748,16 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
               Contract cancelled
             </label>
 
+            <EditField label={t("medicalInsuranceType")}>
+              <select className={editInputCls} value={form.medical_insurance_type} onChange={(e) => upd("medical_insurance_type", e.target.value)}>
+                <option value="">—</option>
+                <option value="Private">{t("insurancePrivate")}</option>
+                <option value="Governmental">{t("insuranceGovernmental")}</option>
+              </select>
+            </EditField>
+            <EditField label={t("medicalInsuranceNumber")}>
+              <input className={editInputCls} value={form.medical_insurance_number} onChange={(e) => upd("medical_insurance_number", e.target.value)} placeholder="e.g. MED-123456" />
+            </EditField>
             <EditField label="Medical Insurance Details"><input className={editInputCls} value={form.medical_insurance_details} onChange={(e) => upd("medical_insurance_details", e.target.value)} /></EditField>
 
             <EditField label="Social Insurance Date">
@@ -723,10 +771,10 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
                 <label className="block text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Custom Notes / Fields</label>
                 <button type="button" onClick={() => {
                   let arr: any[] = [];
-                  try { 
-                    arr = JSON.parse(form.custom_field || "[]"); 
-                    if (!Array.isArray(arr)) arr = []; 
-                  } catch { 
+                  try {
+                    arr = JSON.parse(form.custom_field || "[]");
+                    if (!Array.isArray(arr)) arr = [];
+                  } catch {
                     if (form.custom_field) {
                       arr = [{ id: 'legacy', title: "Legacy Note", details: "", type: "text", value: form.custom_field }];
                     } else {
@@ -742,15 +790,15 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
               <div className="space-y-3">
                 {(() => {
                   let arr = [];
-                  try { 
-                    arr = JSON.parse(form.custom_field || "[]"); 
-                    if (!Array.isArray(arr)) arr = []; 
-                  } catch { 
+                  try {
+                    arr = JSON.parse(form.custom_field || "[]");
+                    if (!Array.isArray(arr)) arr = [];
+                  } catch {
                     if (form.custom_field) {
                       arr = [{ id: 'legacy', title: "Legacy Note", details: "", type: "text", value: form.custom_field }];
                     }
                   }
-                  
+
                   if (arr.length === 0) return <p className="text-xs text-muted-foreground italic">No custom fields added.</p>;
 
                   return arr.map((f: any, i: number) => (
@@ -771,7 +819,7 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
                         <label className="block">
                           <span className="mb-1 block text-[10px] font-medium uppercase text-muted-foreground">Type</span>
                           <select className={editInputCls} value={f.type || "text"} onChange={(e) => {
-                            const newArr = [...arr]; newArr[i].type = e.target.value; 
+                            const newArr = [...arr]; newArr[i].type = e.target.value;
                             if (newArr[i].type === 'number') newArr[i].value = Number(newArr[i].value) || 0;
                             upd("custom_field", JSON.stringify(newArr));
                           }}>
@@ -785,8 +833,8 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
                         <label className="block">
                           <span className="mb-1 block text-[10px] font-medium uppercase text-muted-foreground">Value</span>
                           <input type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : f.type === 'email' ? 'email' : 'text'} className={editInputCls} value={f.value || ""} onChange={(e) => {
-                            const newArr = [...arr]; 
-                            newArr[i].value = f.type === 'number' ? Number(e.target.value) : e.target.value; 
+                            const newArr = [...arr];
+                            newArr[i].value = f.type === 'number' ? Number(e.target.value) : e.target.value;
                             upd("custom_field", JSON.stringify(newArr));
                           }} />
                         </label>
@@ -882,8 +930,8 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
                     key={n.id}
                     onClick={() => setSideTab(n.id)}
                     className={`inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap ${active
-                        ? "bg-gradient-brand text-brand-foreground shadow-brand"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      ? "bg-gradient-brand text-brand-foreground shadow-brand"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
                       }`}
                   >
                     <n.icon className="h-4 w-4" />
@@ -899,9 +947,12 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
               <div className="rounded-3xl border border-border bg-card p-5">
                 <h2 className="mb-4 font-display text-base font-semibold">Overview</h2>
                 <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-3">
+                  <Info icon={UserIcon} label={t("fullNameAr" as any) ?? "Full name (Arabic)"} value={detail.full_name_ar ?? "—"} />
                   <Info icon={Calendar} label="Employee Code" value={detail.emp_code ?? "—"} mono />
                   <Info icon={Building2} label={t("department")} value={detail.department ?? "—"} />
                   <Info icon={Briefcase} label={t("position") ?? "Position"} value={detail.position ?? "—"} />
+                  <Info icon={Building2} label={t("costCenter" as any) ?? "Cost Center"} value={detail.cost_center_code ? `#${detail.cost_center_code} - ${detail.cost_center_name ?? ""}` : "—"} />
+                  <Info icon={Clock} label={t("shift" as any) ?? "Shift"} value={detail.shift_name ?? "—"} />
                   <Info icon={MapPin} label={t("city")} value={detail.city ?? "—"} />
                   <Info icon={MapPin} label="District" value={detail.district ?? "—"} />
                   <Info icon={UserIcon} label="Manager" value={detail.manager_name ?? detail.manager_id ?? "—"} />
@@ -982,6 +1033,9 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
                   <Info icon={Calendar} label="Allowance" value={detail.allowance != null ? `${detail.allowance.toLocaleString()} EGP` : "—"} mono />
                   <Info icon={Plane} label="Job Grade (Trips)" value={detail.job_grade ?? "—"} />
                   <Info icon={Calendar} label="Target" value={detail.target_value != null ? `${detail.target_value} / ${detail.target_duration ?? "—"}` : "—"} />
+                  <Info icon={ShieldCheck} label={t("medicalInsuranceType")} value={detail.medical_insurance_type ? (detail.medical_insurance_type === "Governmental" ? t("insuranceGovernmental") : t("insurancePrivate")) : "—"} />
+                  <Info icon={FileText} label={t("medicalInsuranceNumber")} value={detail.medical_insurance_number ?? "—"} mono />
+                  <Info icon={FileText} label="Medical Insurance Details" value={detail.medical_insurance_details ?? "—"} />
                 </div>
               </div>
             )}
@@ -1725,8 +1779,8 @@ function DevicesTab({ devices }: { devices: Device[] }) {
             </div>
             <div className="flex items-center gap-2">
               <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${d.status === "approved" ? "bg-success/15 text-success" :
-                  d.status === "pending" ? "bg-warning/20 text-warning-foreground" :
-                    "bg-destructive/15 text-destructive"
+                d.status === "pending" ? "bg-warning/20 text-warning-foreground" :
+                  "bg-destructive/15 text-destructive"
                 }`}>
                 {d.status === "approved" ? t("approved") : d.status === "pending" ? t("pending") : t("revoke")}
               </span>
@@ -2229,8 +2283,8 @@ function AttendanceHistoryPanel({ employeeId }: { employeeId: string }) {
                     {r.holiday && <span className="ms-2 text-[11px] font-medium text-violet-600">· {r.holiday.name}</span>}
                     {r.leave && (
                       <span className={`ms-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${r.leave.status === "approved" ? "bg-sky-500/15 text-sky-600"
-                          : r.leave.status === "pending" ? "bg-amber-500/15 text-amber-600"
-                            : "bg-muted text-muted-foreground"
+                        : r.leave.status === "pending" ? "bg-amber-500/15 text-amber-600"
+                          : "bg-muted text-muted-foreground"
                         }`}>
                         {r.leave.status === "pending" ? "Pending" : r.leave.status === "approved" ? "Leave" : r.leave.status}
                         {" · "}{r.leave.type}
@@ -2427,11 +2481,10 @@ function LeavesHistoryPanel({ employeeId }: { employeeId: string }) {
                   key={y}
                   type="button"
                   onClick={() => setSelectedYear(y)}
-                  className={`rounded-lg px-2.5 py-1 font-medium transition ${
-                    selectedYear === y
-                      ? "bg-primary text-primary-foreground shadow-xs"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
+                  className={`rounded-lg px-2.5 py-1 font-medium transition ${selectedYear === y
+                    ? "bg-primary text-primary-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
+                    }`}
                 >
                   {y}
                 </button>
@@ -2494,9 +2547,8 @@ function LeavesHistoryPanel({ employeeId }: { employeeId: string }) {
                       </p>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-                        b.remaining > 0 ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" : "bg-destructive/15 text-destructive"
-                      }`}>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${b.remaining > 0 ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" : "bg-destructive/15 text-destructive"
+                        }`}>
                         {b.remaining}d left
                       </span>
                       <button
@@ -2522,9 +2574,8 @@ function LeavesHistoryPanel({ employeeId }: { employeeId: string }) {
                   <div className="mt-3">
                     <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
                       <div
-                        className={`h-full transition-all duration-300 ${
-                          pct >= 90 ? "bg-destructive" : pct >= 70 ? "bg-amber-500" : "bg-primary"
-                        }`}
+                        className={`h-full transition-all duration-300 ${pct >= 90 ? "bg-destructive" : pct >= 70 ? "bg-amber-500" : "bg-primary"
+                          }`}
                         style={{ width: `${pct}%` }}
                       />
                     </div>
@@ -2777,8 +2828,8 @@ function InfoTab({ employee }: { employee: Employee }) {
               key={k.id}
               onClick={() => setSubTab(k.id)}
               className={`flex-1 min-w-[110px] rounded-xl px-3 py-2 font-semibold transition-colors ${subTab === k.id
-                  ? "bg-gradient-brand text-brand-foreground shadow-brand"
-                  : "text-muted-foreground hover:text-foreground"
+                ? "bg-gradient-brand text-brand-foreground shadow-brand"
+                : "text-muted-foreground hover:text-foreground"
                 }`}
             >
               {t(k.labelKey as any)}
@@ -2896,8 +2947,8 @@ function InfoTab({ employee }: { employee: Employee }) {
                   <label
                     key={m}
                     className={`flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition-colors ${form.salaryMode === m
-                        ? "border-brand bg-gradient-brand text-brand-foreground shadow-brand"
-                        : "border-border bg-card text-muted-foreground hover:text-foreground"
+                      ? "border-brand bg-gradient-brand text-brand-foreground shadow-brand"
+                      : "border-border bg-card text-muted-foreground hover:text-foreground"
                       }`}
                   >
                     <input
@@ -3669,14 +3720,12 @@ function DeviceRequirementToggle({ userId, canManage }: { userId: string; canMan
         disabled={!canManage}
         onClick={toggle}
         aria-pressed={required}
-        className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-50 ${
-          required ? "bg-gradient-brand" : "bg-border"
-        }`}
+        className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-50 ${required ? "bg-gradient-brand" : "bg-border"
+          }`}
       >
         <span
-          className={`absolute top-1 h-5 w-5 rounded-full bg-card shadow transition-all ${
-            required ? "left-6" : "left-1"
-          }`}
+          className={`absolute top-1 h-5 w-5 rounded-full bg-card shadow transition-all ${required ? "left-6" : "left-1"
+            }`}
         />
       </button>
     </div>
@@ -3748,8 +3797,8 @@ function EmployeeDevicesPanel({ userId, canManage }: { userId: string; canManage
               </div>
               <div className="flex items-center gap-2">
                 <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${d.status === "approved" ? "bg-success/15 text-success" :
-                    d.status === "pending" ? "bg-warning/20 text-warning-foreground" :
-                      "bg-destructive/15 text-destructive"
+                  d.status === "pending" ? "bg-warning/20 text-warning-foreground" :
+                    "bg-destructive/15 text-destructive"
                   }`}>{d.status}</span>
                 {canManage && d.status !== "approved" && (
                   <button onClick={() => setStatus(d.id, "approved")} className="inline-flex items-center gap-1 rounded-full bg-gradient-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground shadow-brand">
@@ -4029,7 +4078,7 @@ function AdvancesTab({ employeeId }: { employeeId: string }) {
             </div>
           )}
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="rounded-xl border border-border bg-muted/20 p-4">
             <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">Annual Advance Limit</p>
@@ -4048,7 +4097,7 @@ function AdvancesTab({ employeeId }: { employeeId: string }) {
             )}
             <p className="text-xs text-muted-foreground mt-2">The maximum total amount this employee can request per year.</p>
           </div>
-          
+
           <div className="rounded-xl border border-border bg-muted/20 p-4">
             <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">Used This Year</p>
             <p className="text-2xl font-display font-semibold text-amber-500">
@@ -4061,35 +4110,35 @@ function AdvancesTab({ employeeId }: { employeeId: string }) {
 
       <div className="rounded-3xl border border-border bg-card p-5">
         <h2 className="mb-4 font-display text-base font-semibold">Advances History</h2>
-      {isLoading ? (
-        <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-      ) : data?.advances.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No advances found.</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="border-b bg-muted/40 text-xs font-semibold text-muted-foreground">
-              <tr>
-                <th className="px-3 py-2 text-start">Request #</th>
-                <th className="px-3 py-2 text-start">Date</th>
-                <th className="px-3 py-2 text-start">Amount</th>
-                <th className="px-3 py-2 text-start">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {data?.advances.map(a => (
-                <tr key={a.id}>
-                  <td className="px-3 py-2 font-mono text-xs text-brand">{a.request_number}</td>
-                  <td className="px-3 py-2 whitespace-nowrap">{new Date(a.created_at).toLocaleDateString()}</td>
-                  <td className="px-3 py-2 font-mono font-medium">{a.requested_amount} {a.currency}</td>
-                  <td className="px-3 py-2 capitalize">{a.status.replace(/_/g, " ")}</td>
+        {isLoading ? (
+          <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+        ) : data?.advances.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No advances found.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="border-b bg-muted/40 text-xs font-semibold text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 text-start">Request #</th>
+                  <th className="px-3 py-2 text-start">Date</th>
+                  <th className="px-3 py-2 text-start">Amount</th>
+                  <th className="px-3 py-2 text-start">Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {data?.advances.map(a => (
+                  <tr key={a.id}>
+                    <td className="px-3 py-2 font-mono text-xs text-brand">{a.request_number}</td>
+                    <td className="px-3 py-2 whitespace-nowrap">{new Date(a.created_at).toLocaleDateString()}</td>
+                    <td className="px-3 py-2 font-mono font-medium">{a.requested_amount} {a.currency}</td>
+                    <td className="px-3 py-2 capitalize">{a.status.replace(/_/g, " ")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

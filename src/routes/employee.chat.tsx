@@ -4,6 +4,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   MessageSquare,
+  MessageSquareOff,
+  Lock,
   Send,
   Building2,
   Radio,
@@ -26,7 +28,7 @@ export const Route = createFileRoute("/employee/chat")({
   component: EmployeeChatPage,
 });
 
-function EmployeeChatPage() {
+export function EmployeeChatPage() {
   const { t } = useI18n();
   const session = useSession();
   const qc = useQueryClient();
@@ -63,7 +65,7 @@ function EmployeeChatPage() {
   }, [messages]);
 
   const handleSend = async () => {
-    if (!draft.trim() || !activeChannelId || sending) return;
+    if (!draft.trim() || !activeChannelId || sending || activeChannel?.allow_replies === false) return;
     const text = draft.trim();
     setDraft("");
     setSending(true);
@@ -130,6 +132,13 @@ function EmployeeChatPage() {
               </p>
             </div>
           </div>
+
+          {activeChannel.allow_replies === false && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-600 dark:text-amber-400">
+              <MessageSquareOff className="h-3.5 w-3.5" />
+              <span>{t("chatRepliesDisabled") || "Replies disabled"}</span>
+            </span>
+          )}
         </div>
 
         {/* Message Stream */}
@@ -184,26 +193,41 @@ function EmployeeChatPage() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input Bar */}
-        <div className="border-t border-border bg-card p-2.5">
-          <div className="flex items-end gap-2 rounded-2xl border border-border bg-background p-1.5 focus-within:border-brand">
-            <textarea
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Type a message…"
-              rows={1}
-              className="flex-1 max-h-24 min-h-[34px] resize-none bg-transparent px-2.5 py-1 text-xs outline-none"
-            />
-            <button
-              onClick={handleSend}
-              disabled={!draft.trim() || sending}
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-brand text-brand-foreground transition-transform active:scale-95 disabled:opacity-40"
-            >
-              <Send className="h-3.5 w-3.5" />
-            </button>
+        {/* Input Bar or Replies Disabled Notice */}
+        {activeChannel.allow_replies === false ? (
+          <div className="border-t border-border bg-muted/40 px-4 py-3.5 text-center">
+            <div className="flex flex-col items-center justify-center gap-1 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1.5 font-medium text-foreground">
+                <MessageSquareOff className="h-4 w-4 text-amber-500" />
+                <span>{t("chatRepliesDisabledEmployeeBanner") || "This conversation is not accepting replies"}</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                {t("chatRepliesDisabledEmployeeDesc") ||
+                  "The administrator or manager has turned off replies for this channel."}
+              </p>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="border-t border-border bg-card p-2.5">
+            <div className="flex items-end gap-2 rounded-2xl border border-border bg-background p-1.5 focus-within:border-brand">
+              <textarea
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Type a message…"
+                rows={1}
+                className="flex-1 max-h-24 min-h-[34px] resize-none bg-transparent px-2.5 py-1 text-xs outline-none"
+              />
+              <button
+                onClick={handleSend}
+                disabled={!draft.trim() || sending}
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-brand text-brand-foreground transition-transform active:scale-95 disabled:opacity-40"
+              >
+                <Send className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -284,6 +308,12 @@ function EmployeeChatPage() {
                   {!isDept && !isBroadcast && (
                     <span className="rounded bg-brand/10 px-1.5 py-0.2 text-[9px] font-medium text-brand">
                       Direct Support
+                    </span>
+                  )}
+                  {c.allow_replies === false && (
+                    <span className="inline-flex items-center gap-0.5 rounded bg-amber-500/10 px-1.5 py-0.2 text-[9px] font-medium text-amber-600 dark:text-amber-400">
+                      <MessageSquareOff className="h-2.5 w-2.5" />
+                      {t("chatRepliesOff") || "Replies blocked"}
                     </span>
                   )}
                 </div>

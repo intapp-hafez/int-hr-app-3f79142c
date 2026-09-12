@@ -55,16 +55,16 @@ export function AttendancePage() {
 
   return (
     <div className="space-y-5">
-      <header>
+      <header className="text-center space-y-1">
         <h1 className="font-display text-2xl font-semibold tracking-tight">{t("attendance")}</h1>
-        <p className="text-xs text-muted-foreground">My attendance history with check-in/out, location & network checks, and leave overlaps.</p>
+        <p className="text-xs text-muted-foreground">{t("attendanceSubtitle")}</p>
       </header>
 
       <section className="grid grid-cols-4 gap-2">
         <Stat label={t("present")} value={stats.present} tone="text-success" />
         <Stat label={t("late")} value={stats.late} tone="text-warning-foreground" />
         <Stat label={t("absent")} value={stats.absent} tone="text-destructive" />
-        <Stat label="Total" value={stats.total} tone="text-foreground" />
+        <Stat label={t("total")} value={stats.total} tone="text-foreground" />
       </section>
 
       {(attQ.error || lvQ.error) && (
@@ -75,10 +75,10 @@ export function AttendancePage() {
 
       <section className="space-y-2">
         {attQ.isLoading && (
-          <div className="rounded-2xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground">Loading…</div>
+          <div className="rounded-2xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground">{t("loading")}</div>
         )}
         {!attQ.isLoading && (attQ.data ?? []).length === 0 && (
-          <div className="rounded-2xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground">No attendance records yet</div>
+          <div className="rounded-2xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground">{t("noAttendanceRecordsYet")}</div>
         )}
         {(attQ.data ?? []).map((a: any) => {
           const overlapping = approvedLeaves.filter((l: any) => dateInRange(a.date, l.start_date, l.end_date));
@@ -103,14 +103,14 @@ export function AttendancePage() {
                 <Badge
                   ok={hasGeo}
                   icon={<MapPin className="h-3 w-3" />}
-                  okText={`Location · ${a.branch ?? "—"}`}
-                  failText="Location missing"
+                  okText={`${t("locationBadge")} · ${a.branch ?? "—"}`}
+                  failText={t("locationMissing")}
                 />
                 <Badge
                   ok={a.network_ok === true}
                   icon={a.network_ok === true ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-                  okText="Network OK"
-                  failText="Network failed"
+                  okText={t("networkOk")}
+                  failText={t("networkFailed")}
                 />
                 {hasGeo && (
                   <span className="font-mono text-[10px] text-muted-foreground" dir="ltr">
@@ -126,7 +126,7 @@ export function AttendancePage() {
               {overlapping.length > 0 && (
                 <div className="rounded-lg border border-info/30 bg-info/10 px-2.5 py-1.5 text-[11px] text-info">
                   <p className="inline-flex items-center gap-1 font-semibold">
-                    <CalendarDays className="h-3 w-3" /> Leave overlap
+                    <CalendarDays className="h-3 w-3" /> {t("leaveOverlap")}
                   </p>
                   <ul className="mt-0.5 space-y-0.5">
                     {overlapping.map((l: any) => (

@@ -23,8 +23,9 @@ export const staffListAttendance = createServerFn({ method: "POST" })
     let q = context.supabase
       .from("attendance")
       .select(
-        "id, employee_id, date, in_time, out_time, branch, status, note, city, district, street, profiles:employee_id(full_name, email)",
+        "id, employee_id, date, in_time, out_time, branch, status, note, city, district, street, profiles:employee_id(full_name, full_name_ar, email, emp_code)",
       )
+      .eq("employee_id", context.userId)
       .gte("date", data.from)
       .lte("date", data.to)
       .order("date", { ascending: false })
@@ -32,17 +33,53 @@ export const staffListAttendance = createServerFn({ method: "POST" })
     if (data.employeeIds?.length) q = q.in("employee_id", data.employeeIds);
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
-    return (rows ?? []).map((r: any) => ({
-      id: r.id as string,
-      employee_id: r.employee_id as string,
-      employee_name: (r.profiles?.full_name ?? r.profiles?.email ?? r.employee_id) as string,
-      date: r.date as string,
-      in_time: r.in_time as string | null,
-      out_time: r.out_time as string | null,
-      branch: r.branch as string | null,
-      status: r.status as string,
-      note: r.note as string | null,
-    }));
+
+    const empIds = Array.from(
+      new Set(
+        (rows ?? [])
+          .map((r: any) => r.employee_id)
+          .filter((id): id is string => typeof id === "string" && id.length > 0),
+      ),
+    );
+
+    const nameMap = new Map<string, string>();
+    if (empIds.length > 0) {
+      try {
+        const { data: names } = await (context.supabase as any).rpc("get_staff_employee_names", {
+          p_employee_ids: empIds,
+        });
+        if (names && Array.isArray(names)) {
+          for (const n of names as any[]) {
+            if (n.id && n.name) nameMap.set(n.id, n.name);
+          }
+        }
+      } catch (err) {
+        console.warn("[staffListAttendance] get_staff_employee_names error:", err);
+      }
+    }
+
+    return (rows ?? []).map((r: any) => {
+      const p = r.profiles;
+      const cleanName =
+        nameMap.get(r.employee_id) ||
+        p?.full_name?.trim() ||
+        p?.full_name_ar?.trim() ||
+        p?.email?.trim() ||
+        (p?.emp_code ? `Emp #${p.emp_code}` : null);
+
+      return {
+        id: r.id as string,
+        employee_id: r.employee_id as string,
+        employee_name: (cleanName || (r.employee_id ? `Employee (${r.employee_id.slice(0, 8)})` : "Employee")) as string,
+        employee_email: (p?.email ?? null) as string | null,
+        date: r.date as string,
+        in_time: r.in_time as string | null,
+        out_time: r.out_time as string | null,
+        branch: r.branch as string | null,
+        status: r.status as string,
+        note: r.note as string | null,
+      };
+    });
   });
 
 export const staffUpsertAttendance = createServerFn({ method: "POST" })
@@ -92,17 +129,41 @@ export const staffApproveAttendance = createServerFn({ method: "POST" })
 export const staffListEmployees = createServerFn({ method: "GET" })
   .middleware([requireStaffAccess])
   .handler(async ({ context }) => {
+    try {
+      const { data: names, error } = await (context.supabase as any).rpc("get_staff_employee_names", {
+        p_employee_ids: null,
+      });
+      if (!error && names && Array.isArray(names)) {
+        return (names as any[]).map((r) => ({
+          id: r.id as string,
+          name: (r.name || r.full_name || r.email || (r.id ? `Employee (${r.id.slice(0, 8)})` : "Employee")) as string,
+          email: (r.email ?? null) as string | null,
+          emp_code: (r.emp_code ?? null) as string | null,
+        }));
+      }
+    } catch {
+      // fallback if RPC not installed
+    }
+
     const { data, error } = await context.supabase
       .from("profiles")
-      .select("id, full_name, email")
+      .select("id, full_name, full_name_ar, email, emp_code")
       .order("full_name", { ascending: true })
       .limit(1000);
-    if (error) throw new Error(error.message);
-    return (data ?? []).map((r: any) => ({
-      id: r.id as string,
-      name: (r.full_name ?? r.email ?? r.id) as string,
-      email: (r.email ?? null) as string | null,
-    }));
+    if (error) return [];
+    return (data ?? []).map((r: any) => {
+      const cleanName =
+        r.full_name?.trim() ||
+        r.full_name_ar?.trim() ||
+        r.email?.trim() ||
+        (r.emp_code ? `Emp #${r.emp_code}` : null);
+      return {
+        id: r.id as string,
+        name: (cleanName || (r.id ? `Employee (${r.id.slice(0, 8)})` : "Employee")) as string,
+        email: (r.email ?? null) as string | null,
+        emp_code: (r.emp_code ?? null) as string | null,
+      };
+    });
   });
 
 // ── Leave approvals ──────────────────────────────────────
@@ -112,29 +173,65 @@ export const staffListLeaves = createServerFn({ method: "GET" })
     const { data, error } = await context.supabase
       .from("leaves")
       .select(
-        "id, employee_id, leave_type_id, leave_type_name, start_date, end_date, days, paid, reason, status, proof_url, proof_mime, proof_name, created_at, profiles:employee_id(full_name, email), leave_types:leave_type_id(requires_proof)",
+        "id, employee_id, leave_type_id, leave_type_name, start_date, end_date, days, paid, reason, status, proof_url, proof_mime, proof_name, created_at, profiles:employee_id(full_name, full_name_ar, email, emp_code), leave_types:leave_type_id(requires_proof)",
       )
+      .eq("employee_id", context.userId)
       .order("created_at", { ascending: false })
       .limit(500);
     if (error) throw new Error(error.message);
-    return (data ?? []).map((r: any) => ({
-      id: r.id as string,
-      employee_id: r.employee_id as string,
-      employee_name: (r.profiles?.full_name ?? r.profiles?.email ?? "—") as string,
-      employee_email: (r.profiles?.email ?? null) as string | null,
-      leave_type_id: (r.leave_type_id ?? null) as string | null,
-      leave_type_name: r.leave_type_name as string | null,
-      start_date: r.start_date as string,
-      end_date: r.end_date as string,
-      days: r.days as number | null,
-      paid: r.paid as boolean | null,
-      reason: r.reason as string | null,
-      status: r.status as string,
-      proof_url: (r.proof_url ?? null) as string | null,
-      proof_mime: (r.proof_mime ?? null) as string | null,
-      proof_name: (r.proof_name ?? null) as string | null,
-      requires_proof: !!r.leave_types?.requires_proof,
-    }));
+
+    const empIds = Array.from(
+      new Set(
+        (data ?? [])
+          .map((r: any) => r.employee_id)
+          .filter((id): id is string => typeof id === "string" && id.length > 0),
+      ),
+    );
+
+    const nameMap = new Map<string, string>();
+    if (empIds.length > 0) {
+      try {
+        const { data: names } = await (context.supabase as any).rpc("get_staff_employee_names", {
+          p_employee_ids: empIds,
+        });
+        if (names && Array.isArray(names)) {
+          for (const n of names as any[]) {
+            if (n.id && n.name) nameMap.set(n.id, n.name);
+          }
+        }
+      } catch (err) {
+        console.warn("[staffListLeaves] get_staff_employee_names error:", err);
+      }
+    }
+
+    return (data ?? []).map((r: any) => {
+      const p = r.profiles;
+      const cleanName =
+        nameMap.get(r.employee_id) ||
+        p?.full_name?.trim() ||
+        p?.full_name_ar?.trim() ||
+        p?.email?.trim() ||
+        (p?.emp_code ? `Emp #${p.emp_code}` : null);
+
+      return {
+        id: r.id as string,
+        employee_id: r.employee_id as string,
+        employee_name: (cleanName || (r.employee_id ? `Employee (${r.employee_id.slice(0, 8)})` : "Employee")) as string,
+        employee_email: (p?.email ?? null) as string | null,
+        leave_type_id: (r.leave_type_id ?? null) as string | null,
+        leave_type_name: r.leave_type_name as string | null,
+        start_date: r.start_date as string,
+        end_date: r.end_date as string,
+        days: r.days as number | null,
+        paid: r.paid as boolean | null,
+        reason: r.reason as string | null,
+        status: r.status as string,
+        proof_url: (r.proof_url ?? null) as string | null,
+        proof_mime: (r.proof_mime ?? null) as string | null,
+        proof_name: (r.proof_name ?? null) as string | null,
+        requires_proof: !!r.leave_types?.requires_proof,
+      };
+    });
   });
 
 export const staffDecideLeave = createServerFn({ method: "POST" })

@@ -10,7 +10,7 @@
 •	Add Button which deduct leaves balance from employee annual leaves Balance if employee in probation period and not have balance deduct with Unpaid leave (Bulk Action)
 •	If any employee resigned and have dues what will do after finish all of resign steps? (Payroll) 
 •	Add Social insurance Date in Employee Profile
-•	Adding government funds, such as the Emergency Relief Fund, to each employee's payroll.
+•	Adding Governmental funds, such as the Emergency Relief Fund, to each employee's payroll.
 •	Payroll: We need Gross Salary-Net salary -Basic salary-insurance salary – Allowances
 •	Add: Email (Outlook,Gmail)
 •	Medical insurance

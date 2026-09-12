@@ -92,6 +92,16 @@ export const LeaveTypeRowSchema = z.object({
   active: z.boolean().default(true),
   requires_proof: z.boolean().default(false),
 });
+export const CostCenterRowSchema = z.object({
+  id: z.string().uuid().optional(),
+  code: z.string().trim().min(1, "Code is required").max(50),
+  name_en: z.string().trim().min(1, "English name is required").max(120),
+  name_ar: z.string().trim().min(1, "Arabic name is required").max(120),
+  description_en: z.string().max(1000).nullable().optional(),
+  description_ar: z.string().max(1000).nullable().optional(),
+  status: z.enum(["active", "inactive", "Active", "Inactive"]).default("active"),
+});
+export type CostCenterRowInput = z.infer<typeof CostCenterRowSchema>;
 
 // ── Attendance ─────────────────────────────────────────────
 export const AttendanceCheckSchema = z.object({

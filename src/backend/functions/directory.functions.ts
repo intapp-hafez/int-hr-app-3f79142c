@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireAdminAccess } from "@/integrations/supabase/admin-auth-middleware";
-import { NamedRowSchema, DistrictRowSchema, LeaveTypeRowSchema } from "../schemas";
+import { NamedRowSchema, DistrictRowSchema, LeaveTypeRowSchema, CostCenterRowSchema } from "../schemas";
 
 type DepartmentUpsert = {
   id?: string;
@@ -285,6 +285,68 @@ export const deleteLeaveType = createServerFn({ method: "POST" })
   .inputValidator((i) => z.object({ id: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.from("leave_types").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ── Cost Centers ───────────────────────────────────
+export type CostCenterRow = {
+  id: string;
+  code: string;
+  name_en: string;
+  name_ar: string;
+  description_en: string | null;
+  description_ar: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export const listCostCenters = createServerFn({ method: "GET" })
+  .middleware([requireAdminAccess])
+  .handler(async ({ context }): Promise<CostCenterRow[]> => {
+    try {
+      const { data, error } = await (context.supabase as any)
+        .from("cost_centers")
+        .select("*")
+        .order("code");
+      if (error) {
+        if (error.message?.includes("cost_centers") || error.details?.includes("cost_centers")) {
+          return [];
+        }
+        throw new Error(error.message);
+      }
+      return data ?? [];
+    } catch (err: any) {
+      if (err.message?.includes("cost_centers")) return [];
+      throw err;
+    }
+  });
+
+export const upsertCostCenter = createServerFn({ method: "POST" })
+  .middleware([requireAdminAccess])
+  .inputValidator((i) => CostCenterRowSchema.parse(i))
+  .handler(async ({ data, context }) => {
+    const row = {
+      ...(data.id ? { id: data.id } : {}),
+      code: data.code.trim(),
+      name_en: data.name_en.trim(),
+      name_ar: data.name_ar.trim(),
+      description_en: data.description_en?.trim() || null,
+      description_ar: data.description_ar?.trim() || null,
+      status: data.status.toLowerCase() === "inactive" ? "inactive" : "active",
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = await (context.supabase as any).from("cost_centers").upsert(row);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const deleteCostCenter = createServerFn({ method: "POST" })
+  .middleware([requireAdminAccess])
+  .inputValidator((i) => z.object({ id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { error } = await (context.supabase as any).from("cost_centers").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });

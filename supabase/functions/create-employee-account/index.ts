@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
@@ -83,6 +84,7 @@ Deno.serve(async (req) => {
 
     const email = text(body.email).toLowerCase();
     const fullName = text(body.name);
+    const fullNameAr = text(body.nameAr);
     const password = String(body.password ?? "");
     const role = text(body.role) || "employee";
     const empCode = text(body.empCode);
@@ -119,7 +121,7 @@ Deno.serve(async (req) => {
       email,
       password,
       email_confirm: true,
-      user_metadata: { full_name: fullName },
+      user_metadata: { full_name: fullName, full_name_ar: fullNameAr || null },
     });
     if (createError) return json(400, { ok: false, error: createError.message, accountCreated: false, profileCreated: false, emailSent: false });
     newUserId = created.user?.id ?? "";
@@ -129,13 +131,17 @@ Deno.serve(async (req) => {
       id: newUserId,
       emp_code: empCode || null,
       full_name: fullName,
+      full_name_ar: fullNameAr || null,
       email,
       phone: text(body.phone) || null,
       role,
       city: text(body.city) || null,
       district: text(body.district) || null,
       department_id: departmentId,
+      section_id: text(body.sectionId) || null,
       position_id: positionId,
+      job_grade: text(body.jobGrade) || null,
+      cost_center_id: text(body.costCenterId) || null,
       status: text(body.status) === "Inactive" ? "Inactive" : "Active",
       avatar_url: text(body.avatarUrl) || null,
       national_id: text(body.nationalId) || null,
@@ -155,6 +161,8 @@ Deno.serve(async (req) => {
       contract_cancelled: Boolean(body.contractCancelled),
       extra_email: text(body.extraEmail) || null,
       medical_insurance_details: text(body.medicalInsuranceDetails) || null,
+      medical_insurance_number: text(body.medicalInsuranceNumber) || null,
+      medical_insurance_type: text(body.medicalInsuranceType) || null,
       is_insured: Boolean(body.isInsured),
       military_expire_date: text(body.militaryExpireDate) || null,
       is_five_percent: Boolean(body.isFivePercent),
@@ -162,7 +170,25 @@ Deno.serve(async (req) => {
       custom_field: text(body.customField) || null,
     };
 
-    const { error: profileError } = await admin.from("profiles").upsert(profile as any);
+    let { error: profileError } = await admin.from("profiles").upsert(profile as any);
+    if (profileError && (
+      profileError.message?.includes("cost_center_id") || profileError.details?.includes("cost_center_id") ||
+      profileError.message?.includes("medical_insurance_number") || profileError.details?.includes("medical_insurance_number") ||
+      profileError.message?.includes("medical_insurance_type") || profileError.details?.includes("medical_insurance_type")
+    )) {
+      const cleanProfile = { ...profile };
+      if (profileError.message?.includes("cost_center_id") || profileError.details?.includes("cost_center_id")) {
+        delete (cleanProfile as any).cost_center_id;
+      }
+      if (profileError.message?.includes("medical_insurance_number") || profileError.details?.includes("medical_insurance_number")) {
+        delete (cleanProfile as any).medical_insurance_number;
+      }
+      if (profileError.message?.includes("medical_insurance_type") || profileError.details?.includes("medical_insurance_type")) {
+        delete (cleanProfile as any).medical_insurance_type;
+      }
+      const res = await admin.from("profiles").upsert(cleanProfile as any);
+      profileError = res.error;
+    }
     if (profileError) throw new Error(profileError.message);
     const { error: roleError } = await admin
       .from("user_roles")

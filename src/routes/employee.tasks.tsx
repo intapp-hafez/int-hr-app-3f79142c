@@ -12,6 +12,7 @@ import { listTasks, transitionTask as transitionTaskFn, getProfileNames } from "
 import { mapTaskRow, type TaskRow } from "@/lib/task-mapping";
 import { useMemo } from "react";
 import { reverseGeocodeCoords } from "@/lib/reverse-geocode";
+import { MyWorkdayTimeline } from "@/components/employee/MyWorkdayTimeline";
 
 export const Route = createFileRoute("/employee/tasks")({
   component: EmployeeTasksPage,
@@ -222,6 +223,8 @@ function EmployeeTasksPage() {
 
   return (
     <div className="space-y-5">
+      <MyWorkdayTimeline employeeId={meId} />
+
       <section>
         <div className="mb-2 flex items-center gap-2">
           <ListChecks className="h-4 w-4 text-brand" />

@@ -77,7 +77,7 @@ function fmtDate(s: string | null | undefined) {
 }
 
 function EmployeeAdvancesPage() {
-  const { t } = useI18n();
+  const { t, tf } = useI18n();
   const session = useSession();
   const qc = useQueryClient();
   const listFn = useServerFn(listMyAdvances);
@@ -104,18 +104,12 @@ function EmployeeAdvancesPage() {
     queryFn: () => eligibilityFn(),
   });
 
-  const pendingStatuses = [
-    "pending_manager",
-    "pending_hr",
-    "pending_finance",
-    "approved_for_payment",
-  ];
-  const hasPending = advances.some((a) => pendingStatuses.includes(a.status));
+  const hasPending = advances.some((a) =>
+    ["pending_manager", "pending_hr", "pending_finance"].includes(a.status),
+  );
 
-  // Prefer server-computed values; fall back to client date for first render
-  const today = new Date();
-  const currentDay = today.getDate();
-  const isInWindow = eligibilityData?.isInWindow ?? (currentDay >= 15 && currentDay <= 20);
+  // Eligibility helpers
+  const isInWindow = eligibilityData?.isInWindow ?? false;
   const windowStart = eligibilityData?.windowStart ? new Date(eligibilityData.windowStart) : null;
   const windowEnd = eligibilityData?.windowEnd ? new Date(eligibilityData.windowEnd) : null;
   const nextWindowStart = eligibilityData?.nextWindowStart ? new Date(eligibilityData.nextWindowStart) : null;
@@ -131,29 +125,30 @@ function EmployeeAdvancesPage() {
   // Build a specific, prioritized reason
   let cannotRequestReason: { title: string; detail: string } | null = null;
   if (!isInWindow) {
+    const nextDate = nextWindowStart ? fmtDate(nextWindowStart.toISOString()) : "15";
     cannotRequestReason = {
-      title: "Outside the request window",
-      detail: `Advance requests are only accepted between the 15th and 20th of each month. The next window opens on ${nextWindowStart ? fmtDate(nextWindowStart.toISOString()) : "the 15th of next month"}.`,
+      title: t("advancesOutsideWindow"),
+      detail: tf("advancesOutsideWindowDesc", { date: nextDate }),
     };
   } else if (eligibility.isProbation) {
     cannotRequestReason = {
-      title: "Probation period",
-      detail: "You are not eligible for an advance payment during your probation period (first 3 months of employment).",
+      title: t("advancesProbationTitle"),
+      detail: t("advancesProbationDetail"),
     };
   } else if (eligibility.hasActiveAdvance) {
     cannotRequestReason = {
-      title: "Outstanding advance balance",
-      detail: `You have an outstanding balance of ${fmt(eligibility.outstandingBalance)}. Please settle it before requesting a new advance.`,
+      title: t("advancesOutstandingTitle"),
+      detail: tf("advancesOutstandingDetail", { amount: fmt(eligibility.outstandingBalance) }),
     };
   } else if (eligibility.hasPendingRequest) {
     cannotRequestReason = {
-      title: "Request already in progress",
-      detail: "You already have an active advance request being reviewed. Wait for it to be decided before submitting another.",
+      title: t("advancesPendingTitle"),
+      detail: t("advancesPendingDetail"),
     };
   } else if (eligibility.remainingAnnualLimit <= 0) {
     cannotRequestReason = {
-      title: "Annual limit reached",
-      detail: "You have used your full annual advance limit. A new limit becomes available at the start of next year.",
+      title: t("advancesAnnualLimitTitle"),
+      detail: t("advancesAnnualLimitDetail"),
     };
   }
 
@@ -195,17 +190,17 @@ function EmployeeAdvancesPage() {
         <div>
           <h1 className="font-display text-xl font-semibold flex items-center gap-2">
             <Banknote className="h-5 w-5 text-brand" />
-            My Advances
+            {t("advancesMyTitle")}
           </h1>
           <p className="text-xs text-muted-foreground">{t("advancesMySubtitle")}</p>
         </div>
         <button
           onClick={() => setShowForm(true)}
           disabled={!!cannotRequestReason}
-          title={cannotRequestReason?.detail || "New request"}
+          title={cannotRequestReason?.detail || t("advancesNewReqBtn")}
           className="inline-flex items-center gap-1.5 rounded-full bg-brand px-3 py-2 text-sm font-semibold text-brand-foreground shadow-sm hover:opacity-90 disabled:opacity-50 transition-opacity"
         >
-          <Plus className="h-4 w-4" /> New Request
+          <Plus className="h-4 w-4" /> {t("advancesNewReqBtn")}
         </button>
       </div>
 
@@ -226,13 +221,16 @@ function EmployeeAdvancesPage() {
           <div className="space-y-0.5">
             <p className="font-semibold">
               {isInWindow
-                ? `Request window is open (until ${windowEnd ? fmtDate(windowEnd.toISOString()) : "the 20th"})`
-                : "Request window is closed"}
+                ? tf("advancesWindowOpen", { date: windowEnd ? fmtDate(windowEnd.toISOString()) : "" })
+                : t("advancesWindowClosed")}
             </p>
             <p className="opacity-90">
               {isInWindow
-                ? "You can submit an advance request now, subject to the eligibility rules below."
-                : `Next window: ${windowStart ? fmtDate(windowStart.toISOString()) : "the 15th"} — ${windowEnd ? fmtDate(windowEnd.toISOString()) : "the 20th"}.`}
+                ? t("advancesWindowOpenDesc")
+                : tf("advancesNextWindow", {
+                    start: windowStart ? fmtDate(windowStart.toISOString()) : "",
+                    end: windowEnd ? fmtDate(windowEnd.toISOString()) : "",
+                  })}
             </p>
           </div>
         </div>
@@ -260,10 +258,10 @@ function EmployeeAdvancesPage() {
           <button
             onClick={() => setShowForm(true)}
             disabled={!!cannotRequestReason}
-            title={cannotRequestReason?.detail || "Submit your first request"}
+            title={cannotRequestReason?.detail || t("advancesSubmitFirst")}
             className="mt-3 inline-flex items-center gap-1 rounded-full bg-brand/10 px-3 py-1.5 text-sm font-medium text-brand"
           >
-            <Plus className="h-4 w-4" /> Submit your first request
+            <Plus className="h-4 w-4" /> {t("advancesSubmitFirst")}
           </button>
         </div>
       ) : (
@@ -305,8 +303,8 @@ function EmployeeAdvancesPage() {
             <div className="space-y-3">
               <div>
                 <label className="mb-1 flex justify-between items-center text-xs font-medium text-muted-foreground">
-                  <span>Requested Amount (EGP) <span className="text-red-500">*</span></span>
-                  <span className="text-brand font-semibold">Max: {fmt(eligibility.remainingAnnualLimit)}</span>
+                  <span>{t("advancesRequestedAmount")} (EGP) <span className="text-red-500">*</span></span>
+                  <span className="text-brand font-semibold">{t("max")}: {fmt(eligibility.remainingAnnualLimit)}</span>
                 </label>
                 <input
                   type="number"
@@ -321,19 +319,19 @@ function EmployeeAdvancesPage() {
 
               <div>
                 <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                  Reason <span className="text-red-500">*</span>
+                  {t("advancesReason")} <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   rows={3}
-                  placeholder="Briefly explain the reason for this advance…"
+                  placeholder={t("brieflyExplainAdvance")}
                   className="w-full rounded-xl border border-input bg-muted/30 px-3 py-2.5 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand resize-none"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-muted-foreground">Expected Date (optional)</label>
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">{t("advancesExpectedDate")} ({t("optional")})</label>
                 <input
                   type="date"
                   value={expectedDate}
@@ -348,7 +346,7 @@ function EmployeeAdvancesPage() {
                 onClick={() => setShowForm(false)}
                 className="flex-1 rounded-xl border border-border py-2.5 text-sm font-medium hover:bg-muted transition-colors"
               >
-                Cancel
+                {t("cancel")}
               </button>
               <button
                 disabled={createMutation.isPending || !amount || !reason.trim()}
@@ -356,7 +354,7 @@ function EmployeeAdvancesPage() {
                 className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-brand py-2.5 text-sm font-semibold text-brand-foreground hover:opacity-90 disabled:opacity-50 transition-opacity"
               >
                 {createMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                Submit Request
+                {t("advancesSubmitReq")}
               </button>
             </div>
           </div>
@@ -413,12 +411,12 @@ function EmployeeAdvancesPage() {
 
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div className="rounded-xl border border-border p-2.5">
-                <p className="text-[10px] font-semibold uppercase text-muted-foreground">Submitted</p>
+                <p className="text-[10px] font-semibold uppercase text-muted-foreground">{t("advancesSubmitted")}</p>
                 <p>{fmtDate(selectedAdv.created_at)}</p>
               </div>
               {selectedAdv.expected_date && (
                 <div className="rounded-xl border border-border p-2.5">
-                  <p className="text-[10px] font-semibold uppercase text-muted-foreground">Expected</p>
+                  <p className="text-[10px] font-semibold uppercase text-muted-foreground">{t("advancesExpected")}</p>
                   <p>{fmtDate(selectedAdv.expected_date)}</p>
                 </div>
               )}
@@ -435,11 +433,11 @@ function EmployeeAdvancesPage() {
             {["pending_manager", "draft"].includes(selectedAdv.status) && (
               <button
                 disabled={cancelMutation.isPending}
-                onClick={() => { if (confirm("Cancel this advance request?")) cancelMutation.mutate(selectedAdv.id); }}
+                onClick={() => { if (confirm(t("advancesConfirmCancel"))) cancelMutation.mutate(selectedAdv.id); }}
                 className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-red-50 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 transition-colors"
               >
                 {cancelMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                Cancel Request
+                {t("advancesCancelReq")}
               </button>
             )}
           </div>

@@ -1,6 +1,21 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
-import { MapPin, Plus, Users, X, Trash2, Loader2, Layers, KeyRound } from "lucide-react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import {
+  MapPin,
+  Plus,
+  Users,
+  X,
+  Trash2,
+  Loader2,
+  Layers,
+  KeyRound,
+  FileSpreadsheet,
+  Download,
+  Upload,
+  AlertCircle,
+  CheckCircle2,
+  FileText,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -12,6 +27,7 @@ import { listCitiesWithDistricts } from "@/backend/functions/directory.functions
 import {
   listGeofencesAdmin,
   createGeofenceAdmin,
+  bulkCreateGeofencesAdmin,
   updateGeofenceAdmin,
   deleteGeofenceAdmin,
   listAssignableEmployees,
@@ -44,6 +60,7 @@ function GeoPage() {
     if (selectedId && !locations.find((l) => l.id === selectedId)) setSelectedId(locations[0]?.id ?? null);
   }, [locations, selectedId]);
   const [adding, setAdding] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [assignFor, setAssignFor] = useState<GeofenceLocation | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
   const selected = locations.find((l) => l.id === selectedId) ?? null;
@@ -70,7 +87,7 @@ function GeoPage() {
           <h1 className="font-display text-2xl font-semibold tracking-tight md:text-3xl">{t("geofencing")}</h1>
           <p className="text-sm text-muted-foreground">{t("approvedZones")}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Link
             to="/admin/employee-access"
             className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 text-sm text-foreground hover:bg-muted"
@@ -90,6 +107,12 @@ function GeoPage() {
             className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 text-sm disabled:opacity-50"
           >
             <Users className="h-4 w-4" /> {t("assignEmployees")}
+          </button>
+          <button
+            onClick={() => setImportOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 text-sm font-medium text-foreground hover:bg-muted shadow-sm"
+          >
+            <FileSpreadsheet className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> {t("importExcel")}
           </button>
           <button
             onClick={() => setAdding(true)}
@@ -172,14 +195,38 @@ function GeoPage() {
         </ul>
       </div>
 
-      {adding && <AddLocationModal onClose={() => setAdding(false)} onCreated={invalidate} />}
+      {adding && (
+        <AddLocationModal
+          onClose={() => setAdding(false)}
+          onCreated={invalidate}
+          onOpenImport={() => setImportOpen(true)}
+        />
+      )}
+      {importOpen && (
+        <ImportLocationsModal
+          onClose={() => setImportOpen(false)}
+          onImported={invalidate}
+        />
+      )}
       {assignFor && <AssignEmployeesModal location={assignFor} onClose={() => setAssignFor(null)} onChanged={invalidate} />}
       {bulkOpen && <BulkAssignModal locations={locations} onClose={() => setBulkOpen(false)} onChanged={invalidate} />}
     </div>
   );
 }
 
-function AddLocationModal({ onClose, onCreated, initialLat, initialLng }: { onClose: () => void; onCreated: () => void; initialLat?: number; initialLng?: number }) {
+function AddLocationModal({
+  onClose,
+  onCreated,
+  onOpenImport,
+  initialLat,
+  initialLng,
+}: {
+  onClose: () => void;
+  onCreated: () => void;
+  onOpenImport?: () => void;
+  initialLat?: number;
+  initialLng?: number;
+}) {
   const { t, lang: language } = useI18n();
   const listCitiesFn = useServerFn(listCitiesWithDistricts);
   const { data: dbCities = [] } = useQuery({
@@ -252,7 +299,21 @@ function AddLocationModal({ onClose, onCreated, initialLat, initialLng }: { onCl
     <div className="fixed inset-0 z-[1000] grid place-items-center bg-foreground/40 p-4" onClick={onClose}>
       <form onSubmit={submit} onClick={(e) => e.stopPropagation()} className="max-h-[90vh] w-full max-w-2xl space-y-3 overflow-y-auto rounded-3xl bg-background p-6 shadow-soft">
         <div className="flex items-center justify-between">
-          <h2 className="font-display text-lg font-semibold">{t("addLocation")}</h2>
+          <div>
+            <h2 className="font-display text-lg font-semibold">{t("addLocation")}</h2>
+            {onOpenImport && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenImport();
+                }}
+                className="mt-0.5 inline-flex items-center gap-1 text-xs font-medium text-emerald-600 hover:underline dark:text-emerald-400"
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5" /> {t("importFromExcelTemplate")}
+              </button>
+            )}
+          </div>
           <button type="button" onClick={onClose} className="rounded-full p-1.5 hover:bg-muted"><X className="h-4 w-4" /></button>
         </div>
         <label className="block">
@@ -572,3 +633,487 @@ function BulkAssignModal({
     </div>
   );
 }
+
+type ParsedLocationRow = {
+  rawIndex: number;
+  name: string;
+  lat: number;
+  lng: number;
+  radius_m: number;
+  active: boolean;
+  city?: string;
+  district?: string;
+  isValid: boolean;
+  error?: string;
+};
+
+function ImportLocationsModal({
+  onClose,
+  onImported,
+}: {
+  onClose: () => void;
+  onImported: () => void;
+}) {
+  const { t } = useI18n();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [parsing, setParsing] = useState(false);
+  const [rows, setRows] = useState<ParsedLocationRow[]>([]);
+  const [filter, setFilter] = useState<"all" | "valid" | "invalid">("all");
+  const [isDragging, setIsDragging] = useState(false);
+
+  const bulkFn = useServerFn(bulkCreateGeofencesAdmin);
+
+  const importMut = useMutation({
+    mutationFn: (validList: { name: string; lat: number; lng: number; radius_m: number; active: boolean }[]) =>
+      bulkFn({ data: { locations: validList } }),
+    onSuccess: (res) => {
+      toast.success(`Successfully imported ${res.count} locations!`);
+      onImported();
+      onClose();
+    },
+    onError: (e: any) => {
+      toast.error(e?.message ?? "Failed to import locations");
+    },
+  });
+
+  async function handleDownloadTemplate() {
+    try {
+      const XLSX = await import("xlsx");
+      const headers = ["Name", "Latitude", "Longitude", "Radius_m", "City", "District", "Active"];
+      const sample = [
+        {
+          Name: "Cairo Headquarters",
+          Latitude: 30.044420,
+          Longitude: 31.235712,
+          Radius_m: 100,
+          City: "Cairo",
+          District: "Downtown",
+          Active: "Yes",
+        },
+        {
+          Name: "Alexandria Branch",
+          Latitude: 31.200092,
+          Longitude: 29.918739,
+          Radius_m: 150,
+          City: "Alexandria",
+          District: "Smouha",
+          Active: "Yes",
+        },
+        {
+          Name: "Giza Operations Hub",
+          Latitude: 30.013056,
+          Longitude: 31.208853,
+          Radius_m: 120,
+          City: "Giza",
+          District: "Dokki",
+          Active: "Yes",
+        },
+      ];
+      const ws = XLSX.utils.json_to_sheet(sample, { header: headers });
+      ws["!cols"] = [
+        { wch: 28 }, // Name
+        { wch: 14 }, // Latitude
+        { wch: 14 }, // Longitude
+        { wch: 12 }, // Radius_m
+        { wch: 14 }, // City
+        { wch: 14 }, // District
+        { wch: 10 }, // Active
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Locations");
+      XLSX.writeFile(wb, "locations_template.xlsx");
+      toast.success("Excel template downloaded");
+    } catch (err: any) {
+      toast.error("Failed to generate template: " + (err?.message || ""));
+    }
+  }
+
+  async function processFile(selectedFile: File) {
+    setFile(selectedFile);
+    setParsing(true);
+    try {
+      const XLSX = await import("xlsx");
+      const buf = await selectedFile.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const firstSheetName = wb.SheetNames[0];
+      if (!firstSheetName) {
+        throw new Error("No sheet found in Excel workbook");
+      }
+      const ws = wb.Sheets[firstSheetName];
+      const rawRows = XLSX.utils.sheet_to_json<Record<string, any>>(ws, { defval: "" });
+
+      if (!rawRows || rawRows.length === 0) {
+        toast.error("The selected file is empty");
+        setRows([]);
+        setParsing(false);
+        return;
+      }
+
+      const parsed: ParsedLocationRow[] = rawRows.map((r, idx) => {
+        const getVal = (candidates: string[]) => {
+          for (const key of Object.keys(r)) {
+            const cleanKey = key.trim().toLowerCase();
+            if (candidates.some((c) => c.toLowerCase() === cleanKey)) {
+              return r[key];
+            }
+          }
+          return undefined;
+        };
+
+        const rawName = String(getVal(["name", "location name", "location", "title", "اسم الموقع", "الاسم", "الموقع"]) ?? "").trim();
+        const rawCity = String(getVal(["city", "المدينة"]) ?? "").trim();
+        const rawDistrict = String(getVal(["district", "الحي", "المنطقة"]) ?? "").trim();
+
+        let finalName = rawName;
+        if (!finalName && (rawCity || rawDistrict)) {
+          finalName = [rawCity, rawDistrict].filter(Boolean).join(" - ");
+        }
+
+        const rawLat = getVal(["latitude", "lat", "y", "خط العرض", "خط_العرض"]);
+        const rawLng = getVal(["longitude", "lng", "lon", "long", "x", "خط الطول", "خط_الطول"]);
+        const rawRadius = getVal(["radius_m", "radius", "radius (m)", "radius_meters", "نصف القطر", "نصف_القطر"]);
+        const rawActive = getVal(["active", "status", "نشط", "الحالة"]);
+
+        const latNum = typeof rawLat === "number" ? rawLat : parseFloat(String(rawLat ?? ""));
+        const lngNum = typeof rawLng === "number" ? rawLng : parseFloat(String(rawLng ?? ""));
+
+        let radiusNum = 100;
+        if (rawRadius !== undefined && rawRadius !== null && rawRadius !== "") {
+          const parsedRad = typeof rawRadius === "number" ? rawRadius : parseInt(String(rawRadius), 10);
+          if (!isNaN(parsedRad) && parsedRad >= 10 && parsedRad <= 5000) {
+            radiusNum = parsedRad;
+          }
+        }
+
+        let activeVal = true;
+        if (rawActive !== undefined && rawActive !== null && rawActive !== "") {
+          if (typeof rawActive === "boolean") {
+            activeVal = rawActive;
+          } else {
+            const s = String(rawActive).trim().toLowerCase();
+            if (s === "false" || s === "no" || s === "0" || s === "غير نشط" || s === "معطل" || s === "لا") {
+              activeVal = false;
+            }
+          }
+        }
+
+        let isValid = true;
+        const errors: string[] = [];
+
+        if (!finalName) {
+          isValid = false;
+          errors.push("Missing name");
+        } else if (finalName.length > 80) {
+          finalName = finalName.slice(0, 80);
+        }
+
+        if (isNaN(latNum) || latNum < -90 || latNum > 90) {
+          isValid = false;
+          errors.push("Invalid Lat (-90..90)");
+        }
+
+        if (isNaN(lngNum) || lngNum < -180 || lngNum > 180) {
+          isValid = false;
+          errors.push("Invalid Lng (-180..180)");
+        }
+
+        return {
+          rawIndex: idx + 1,
+          name: finalName,
+          lat: Number(isFinite(latNum) ? latNum.toFixed(6) : 0),
+          lng: Number(isFinite(lngNum) ? lngNum.toFixed(6) : 0),
+          radius_m: radiusNum,
+          active: activeVal,
+          city: rawCity || undefined,
+          district: rawDistrict || undefined,
+          isValid,
+          error: errors.length > 0 ? errors.join(", ") : undefined,
+        };
+      });
+
+      setRows(parsed);
+    } catch (err: any) {
+      toast.error("Failed to parse Excel file: " + (err?.message || ""));
+      setRows([]);
+    } finally {
+      setParsing(false);
+    }
+  }
+
+  const validRows = rows.filter((r) => r.isValid);
+  const invalidRows = rows.filter((r) => !r.isValid);
+
+  const displayedRows =
+    filter === "valid" ? validRows : filter === "invalid" ? invalidRows : rows;
+
+  function handleImport() {
+    if (validRows.length === 0) {
+      toast.error(t("noValidLocationsToImport"));
+      return;
+    }
+    const payload = validRows.map((r) => ({
+      name: r.name,
+      lat: r.lat,
+      lng: r.lng,
+      radius_m: r.radius_m,
+      active: r.active,
+    }));
+    importMut.mutate(payload);
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[1000] grid place-items-center bg-foreground/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-3xl bg-background p-6 shadow-soft"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-border pb-4">
+          <div className="flex items-center gap-3">
+            <div className="grid h-10 w-10 place-items-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <FileSpreadsheet className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="font-display text-lg font-semibold">{t("importFromExcelTemplate")}</h2>
+              <p className="text-xs text-muted-foreground">{t("dragAndDropExcel")}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full p-1.5 hover:bg-muted"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Content Body */}
+        <div className="flex-1 space-y-4 overflow-y-auto py-4">
+          {/* Action Row: Template Download & Upload Helper */}
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border/80 bg-muted/30 p-3.5">
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-brand" />
+              <span className="text-xs font-medium text-foreground">
+                Need the official format?
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleDownloadTemplate}
+              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted shadow-xs transition-colors"
+            >
+              <Download className="h-3.5 w-3.5 text-brand" /> {t("downloadTemplate")} (.xlsx)
+            </button>
+          </div>
+
+          {/* Upload Zone */}
+          {!file && (
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDragging(true);
+              }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDragging(false);
+                const dropped = e.dataTransfer.files?.[0];
+                if (dropped) processFile(dropped);
+              }}
+              onClick={() => fileInputRef.current?.click()}
+              className={`flex cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed p-8 text-center transition-all ${
+                isDragging
+                  ? "border-brand bg-brand/5 scale-[0.99]"
+                  : "border-border hover:border-brand/60 hover:bg-muted/30"
+              }`}
+            >
+              <div className="mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                <Upload className="h-6 w-6" />
+              </div>
+              <p className="text-sm font-semibold text-foreground">
+                {t("dragAndDropExcel")}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Supports .xlsx, .xls, .csv with columns (Name, Latitude, Longitude, Radius_m, Active)
+              </p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) processFile(f);
+                }}
+              />
+            </div>
+          )}
+
+          {/* Parsing State */}
+          {parsing && (
+            <div className="py-12 text-center text-sm text-muted-foreground">
+              <Loader2 className="mx-auto mb-2 h-6 w-6 animate-spin text-brand" />
+              Reading & validating Excel rows…
+            </div>
+          )}
+
+          {/* Results Table & Filter */}
+          {!parsing && file && rows.length > 0 && (
+            <div className="space-y-3">
+              {/* File Info & Stats */}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs font-semibold text-foreground">
+                    {file.name}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFile(null);
+                      setRows([]);
+                      if (fileInputRef.current) fileInputRef.current.value = "";
+                    }}
+                    className="text-xs text-brand hover:underline font-medium"
+                  >
+                    Change file
+                  </button>
+                </div>
+
+                {/* Filter Pills */}
+                <div className="flex items-center gap-1.5 rounded-full border border-border bg-card p-1 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setFilter("all")}
+                    className={`rounded-full px-2.5 py-1 transition-colors ${
+                      filter === "all" ? "bg-accent font-semibold text-accent-foreground" : "text-muted-foreground"
+                    }`}
+                  >
+                    All ({rows.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFilter("valid")}
+                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 transition-colors ${
+                      filter === "valid"
+                        ? "bg-emerald-500/15 font-semibold text-emerald-700 dark:text-emerald-300"
+                        : "text-emerald-600 dark:text-emerald-400"
+                    }`}
+                  >
+                    <CheckCircle2 className="h-3 w-3" /> {validRows.length} {t("validLocations")}
+                  </button>
+                  {invalidRows.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setFilter("invalid")}
+                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 transition-colors ${
+                        filter === "invalid"
+                          ? "bg-destructive/15 font-semibold text-destructive"
+                          : "text-destructive"
+                      }`}
+                    >
+                      <AlertCircle className="h-3 w-3" /> {invalidRows.length} {t("invalidLocations")}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Table Container */}
+              <div className="max-h-[38vh] overflow-auto rounded-2xl border border-border bg-card">
+                <table className="w-full text-left text-xs">
+                  <thead className="sticky top-0 z-10 border-b border-border bg-muted/80 backdrop-blur-xs font-medium text-muted-foreground">
+                    <tr>
+                      <th className="px-3 py-2 w-10">#</th>
+                      <th className="px-3 py-2">Status</th>
+                      <th className="px-3 py-2">Location Name</th>
+                      <th className="px-3 py-2">Coordinates</th>
+                      <th className="px-3 py-2">Radius</th>
+                      <th className="px-3 py-2">Active</th>
+                      <th className="px-3 py-2">Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/60">
+                    {displayedRows.map((r) => (
+                      <tr
+                        key={r.rawIndex}
+                        className={!r.isValid ? "bg-destructive/5" : undefined}
+                      >
+                        <td className="px-3 py-2 font-mono text-muted-foreground">{r.rawIndex}</td>
+                        <td className="px-3 py-2">
+                          {r.isValid ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+                              <CheckCircle2 className="h-3 w-3" /> Valid
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-2 py-0.5 text-[11px] font-medium text-destructive">
+                              <AlertCircle className="h-3 w-3" /> Error
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 font-medium text-foreground">
+                          {r.name || <span className="text-muted-foreground italic">—</span>}
+                        </td>
+                        <td className="px-3 py-2 font-mono text-muted-foreground">
+                          {r.lat.toFixed(4)}, {r.lng.toFixed(4)}
+                        </td>
+                        <td className="px-3 py-2">{r.radius_m}m</td>
+                        <td className="px-3 py-2">
+                          <span
+                            className={`inline-block h-2 w-2 rounded-full ${
+                              r.active ? "bg-emerald-500" : "bg-muted-foreground"
+                            }`}
+                          />
+                        </td>
+                        <td className="px-3 py-2 text-muted-foreground">
+                          {r.error ? (
+                            <span className="text-destructive font-medium">{r.error}</span>
+                          ) : (
+                            "Ready to import"
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer Actions */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-border px-4 py-2 text-xs font-semibold hover:bg-muted"
+          >
+            {t("cancel")}
+          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={validRows.length === 0 || importMut.isPending}
+              onClick={handleImport}
+              className="inline-flex items-center gap-1.5 rounded-full bg-gradient-brand px-5 py-2 text-xs font-semibold text-brand-foreground shadow-brand disabled:opacity-50"
+            >
+              {importMut.isPending ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Importing…
+                </>
+              ) : (
+                <>
+                  <Upload className="h-3.5 w-3.5" />
+                  {t("importLocations")} ({validRows.length})
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+

@@ -9,7 +9,7 @@ import {
   getCurrentDeviceId,
   deviceLabelGuess,
 } from "@/lib/store";
-import { changePassword } from "@/lib/auth";
+import { changePassword, useSession } from "@/lib/auth";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getMe, getMyProfileDetails } from "@/backend/functions/auth.functions";
@@ -30,6 +30,8 @@ import {
 export function SettingsPage() {
   const { t, lang, setLang } = useI18n();
   const { tBranch, tDept } = useTranslators();
+  const session = useSession();
+  const isStaff = session?.roles?.includes("staff") && !session?.roles?.some((r) => ["admin", "hr", "manager", "employee"].includes(r));
   const me = useStore((s) => s.employees.find((e) => e.id === s.currentEmployeeId));
   const meFn = useServerFn(getMe);
   const { data: realMe } = useQuery({ queryKey: ["me", "profile"], queryFn: () => meFn(), staleTime: 30_000 });
@@ -216,10 +218,10 @@ export function SettingsPage() {
         <Link to="/employee/advances" className="block">
           <Row icon={Banknote} label="Advances" right={<ChevronRight className="h-4 w-4 text-muted-foreground rtl-flip" />} />
         </Link>
-        <Link to="/employee/leaves" className="block">
+        <Link to={isStaff ? "/staff/leaves" : "/employee/leaves"} className="block">
           <Row icon={CalendarDays} label={t("leaves")} right={<ChevronRight className="h-4 w-4 text-muted-foreground rtl-flip" />} />
         </Link>
-        <Link to="/employee/messages" className="block">
+        <Link to={isStaff ? "/staff/chat" : "/employee/chat"} className="block">
           <Row icon={MessageSquare} label={t("messages")} right={<ChevronRight className="h-4 w-4 text-muted-foreground rtl-flip" />} />
         </Link>
       </section>
@@ -331,7 +333,7 @@ export function SettingsPage() {
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold">{t("registeredDevice")}</p>
             <p className="font-mono text-[11px] text-muted-foreground truncate" title={deviceId}>
-              Current: {deviceId || "…"}
+              {t("current")}: {deviceId || "…"}
             </p>
           </div>
           <span
@@ -350,7 +352,7 @@ export function SettingsPage() {
               : status === "pending"
                 ? t("pending")
                 : status === "unregistered"
-                  ? "Unregistered"
+                  ? t("unregistered")
                   : t("deviceBlocked")}
           </span>
         </div>
@@ -360,7 +362,7 @@ export function SettingsPage() {
             <span className="inline-flex items-center gap-1.5 font-medium">
               <Check className="h-4 w-4" /> {t("deviceApproved")}
             </span>
-            <span className="ms-auto text-[10px] opacity-80">Contact admin to remove</span>
+            <span className="ms-auto text-[10px] opacity-80">{t("contactAdminToRemove")}</span>
           </div>
         ) : status === "pending" ? (
           <div className="flex items-center justify-between rounded-xl bg-warning/10 p-3 text-xs text-warning-foreground">
@@ -369,28 +371,26 @@ export function SettingsPage() {
               onClick={() => handleRemove(deviceId)}
               className="rounded-lg border border-border px-2.5 py-1 text-xs hover:bg-muted text-foreground"
             >
-              Cancel
+              {t("cancel")}
             </button>
           </div>
         ) : status === "revoked" || status === "rejected" || status === "blocked" ? (
           <div className="space-y-2 rounded-xl bg-destructive/10 p-3 text-xs text-destructive">
-            <p>
-              This device was <strong>{status}</strong> by an administrator. Attendance is blocked from it.
-            </p>
+            <p>{t("deviceBlockedAdmin")}</p>
             <button
               onClick={() => handleRemove(deviceId)}
               className="w-full rounded-xl border border-border bg-card py-2 text-xs font-semibold text-foreground"
             >
-              Remove
+              {t("remove")}
             </button>
           </div>
         ) : (
           <div className="space-y-3">
             {otherDevices.length > 0 && (
               <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
-                <p className="font-semibold">Your account has a device registered on another browser or phone.</p>
+                <p className="font-semibold">{t("deviceRegisteredElsewhereTitle")}</p>
                 <p className="mt-1 opacity-85">
-                  To record attendance from this browser, replace your registered device with this one.
+                  {t("deviceRegisteredElsewhereDesc")}
                 </p>
               </div>
             )}
@@ -398,7 +398,7 @@ export function SettingsPage() {
               onClick={() => handleRegister()}
               className="w-full rounded-xl bg-gradient-brand py-2.5 text-sm font-semibold text-brand-foreground shadow-brand active:scale-[0.98] transition-transform"
             >
-              {otherDevices.length > 0 ? "Replace & Register this device" : t("registerDevice")}
+              {otherDevices.length > 0 ? t("replaceAndRegisterDevice") : t("registerDevice")}
             </button>
           </div>
         )}
@@ -406,7 +406,7 @@ export function SettingsPage() {
         {otherDevices.length > 0 && (
           <div className="mt-4 border-t border-border pt-3 space-y-2">
             <p className="text-xs font-semibold text-muted-foreground">
-              {status === "unregistered" ? "Active device on your account:" : "Other registered devices:"}
+              {status === "unregistered" ? t("activeDeviceOnAccount") : t("otherRegisteredDevices")}
             </p>
             <ul className="space-y-2">
               {otherDevices.map((d: any) => (
@@ -415,7 +415,7 @@ export function SettingsPage() {
                   className="flex items-center justify-between gap-2 rounded-xl border border-border bg-muted/30 p-2.5 text-xs"
                 >
                   <div className="min-w-0">
-                    <p className="truncate font-semibold text-foreground">{d.label || "Device"}</p>
+                    <p className="truncate font-semibold text-foreground">{d.label || t("device")}</p>
                     <p className="font-mono text-[11px] text-muted-foreground truncate">{d.id}</p>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
@@ -428,14 +428,20 @@ export function SettingsPage() {
                             : "bg-destructive/15 text-destructive"
                       }`}
                     >
-                      {d.status}
+                      {d.status === "approved"
+                        ? t("approved")
+                        : d.status === "pending"
+                          ? t("pending")
+                          : d.status === "unregistered"
+                            ? t("unregistered")
+                            : t("rejected")}
                     </span>
                     {d.status !== "approved" && (
                       <button
                         onClick={() => handleRemove(d.id)}
                         className="rounded-lg border border-destructive/30 bg-destructive/10 px-2.5 py-1 text-destructive hover:bg-destructive/20 font-medium"
                       >
-                        Remove
+                        {t("remove")}
                       </button>
                     )}
                   </div>
@@ -450,29 +456,28 @@ export function SettingsPage() {
       <AlertDialog open={confirmReplaceOpen} onOpenChange={setConfirmReplaceOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Replace Registered Device?</AlertDialogTitle>
+            <AlertDialogTitle>{t("replaceRegisteredDeviceTitle")}</AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
               <p>
-                Your account already has registered device{" "}
+                {t("replaceDeviceNotice1")}{" "}
                 <strong className="font-mono text-foreground">{replacingDevice?.id}</strong>{" "}
-                ({replacingDevice?.label || "Device"}).
+                ({replacingDevice?.label || t("device")}).
               </p>
               <p>
-                Each employee can only have one active attendance device. Do you want to remove the old device and register this browser (
-                <strong className="font-mono text-foreground">{deviceId}</strong>) instead?
+                {t("replaceDeviceNotice2")}
               </p>
               <p className="text-xs text-muted-foreground">
-                Note: The new device will require administrator approval before you can record attendance.
+                {t("replaceDeviceApprovalNote")}
               </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Keep Old Device</AlertDialogCancel>
+            <AlertDialogCancel>{t("keepOldDevice")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={executeReplace}
               className="bg-brand text-brand-foreground hover:bg-brand/90"
             >
-              Replace Device
+              {t("replaceDeviceBtn")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

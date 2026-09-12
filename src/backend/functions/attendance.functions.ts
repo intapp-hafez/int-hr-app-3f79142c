@@ -312,6 +312,42 @@ export const checkOut = createServerFn({ method: "POST" })
       }
     }
 
+    // Interlock: check if an active task or travel is in progress
+    const { data: runningTasks } = await supabase
+      .from("tasks")
+      .select("id, title")
+      .contains("assignees", [userId])
+      .eq("status", "in_progress")
+      .limit(1);
+
+    if (runningTasks && runningTasks.length > 0) {
+      return {
+        ok: false as const,
+        blocked: true as const,
+        code: "active_task_in_progress" as const,
+        params: { taskTitle: runningTasks[0].title } as Record<string, any>,
+        reason: `You still have an active task "${runningTasks[0].title}". Please complete or close the task before signing out.`,
+      };
+    }
+
+    const { data: latestAct } = await supabase
+      .from("task_activity")
+      .select("id, kind, task_name")
+      .eq("employee_id", userId)
+      .order("occurred_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (latestAct && latestAct.kind === "start_trip") {
+      return {
+        ok: false as const,
+        blocked: true as const,
+        code: "active_travel_in_progress" as const,
+        params: { travelTitle: latestAct.task_name } as Record<string, any>,
+        reason: `You still have an active travel session "${latestAct.task_name || "Travel"}". Please complete your travel before signing out.`,
+      };
+    }
+
     const dow = isoWeekday(today); // local-noon safe
     const isWeekend = dow === 5 || dow === 6;
     const [{ data: leaveRow }, { data: holidayRow }, { data: profileRow }] = await Promise.all([

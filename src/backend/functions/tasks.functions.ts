@@ -106,7 +106,40 @@ export const transitionTask = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => TransitionSchema.parse(i))
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+
+    if (data.status === "in_progress") {
+      // 1. Check if another task is already in progress for this employee
+      const { data: running } = await supabase
+        .from("tasks")
+        .select("id, title")
+        .contains("assignees", [userId])
+        .eq("status", "in_progress")
+        .neq("id", data.id)
+        .limit(1);
+
+      if (running && running.length > 0) {
+        throw new Error(
+          `Cannot start task because "${running[0].title}" is already in progress. Please complete or pause it first.`
+        );
+      }
+
+      // 2. Check if active travel is in progress
+      const { data: latestAct } = await supabase
+        .from("task_activity")
+        .select("id, kind, task_name")
+        .eq("employee_id", userId)
+        .order("occurred_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (latestAct && latestAct.kind === "start_trip") {
+        throw new Error(
+          `Cannot start task while travel "${latestAct.task_name || "Travel"}" is in progress. Please arrive and complete travel first.`
+        );
+      }
+    }
+
     const now = new Date().toISOString();
     const patch: { status: typeof data.status; started_at?: string; completed_at?: string } = { status: data.status };
     if (data.status === "in_progress") patch.started_at = now;

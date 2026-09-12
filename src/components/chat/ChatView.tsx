@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   MessageSquare,
+  MessageSquareOff,
   Send,
   Plus,
   Search,
@@ -18,12 +19,14 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { Switch } from "@/components/ui/switch";
 import {
   listMyChannels,
   getChannelMessages,
   sendMessage,
   sendGroupOrDirectMessage,
   listChatTargets,
+  updateChannelRepliesAllowed,
   type ChatChannelItem,
   type ChatMessageItem,
 } from "@/backend/functions/chat.functions";
@@ -48,6 +51,7 @@ export function ChatView({ mode = "admin" }: ChatViewProps) {
   const sendMsgFn = useServerFn(sendMessage);
   const sendGroupFn = useServerFn(sendGroupOrDirectMessage);
   const listTargetsFn = useServerFn(listChatTargets);
+  const updateRepliesFn = useServerFn(updateChannelRepliesAllowed);
 
   const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterTab>("all");
@@ -55,6 +59,7 @@ export function ChatView({ mode = "admin" }: ChatViewProps) {
   const [showNewModal, setShowNewModal] = useState(false);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [togglingReplies, setTogglingReplies] = useState(false);
 
   // Channels Query (polls every 5s)
   const { data: channels = [], isLoading: channelsLoading } = useQuery({
@@ -124,6 +129,29 @@ export function ChatView({ mode = "admin" }: ChatViewProps) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
+    }
+  };
+
+  const handleToggleReplies = async (newVal: boolean) => {
+    if (!activeChannelId || togglingReplies) return;
+    setTogglingReplies(true);
+    try {
+      await updateRepliesFn({
+        data: {
+          channelId: activeChannelId,
+          allowReplies: newVal,
+        },
+      });
+      qc.invalidateQueries({ queryKey: ["chat-channels"] });
+      toast.success(
+        newVal
+          ? (t("chatRepliesOn") || "Replies enabled for this channel")
+          : (t("chatRepliesOff") || "Replies disabled for this channel")
+      );
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update reply settings");
+    } finally {
+      setTogglingReplies(false);
     }
   };
 
@@ -273,6 +301,12 @@ export function ChatView({ mode = "admin" }: ChatViewProps) {
                           {c.recipient.department}
                         </span>
                       )}
+                      {c.allow_replies === false && (
+                        <span className="inline-flex items-center gap-0.5 rounded bg-amber-500/10 px-1 py-0.2 text-[9px] font-medium text-amber-600 dark:text-amber-400">
+                          <MessageSquareOff className="h-2.5 w-2.5" />
+                          {t("chatRepliesOff") || "Replies off"}
+                        </span>
+                      )}
                     </div>
 
                     <p className="mt-1 truncate text-xs text-muted-foreground">
@@ -318,7 +352,15 @@ export function ChatView({ mode = "admin" }: ChatViewProps) {
                     )}
                   </div>
                   <div>
-                    <h2 className="font-display text-sm font-bold text-foreground">{activeChannel.name}</h2>
+                    <div className="flex items-center gap-2">
+                      <h2 className="font-display text-sm font-bold text-foreground">{activeChannel.name}</h2>
+                      {activeChannel.allow_replies === false && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                          <MessageSquareOff className="h-3 w-3" />
+                          {t("chatRepliesOff") || "Replies blocked"}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-[11px] text-muted-foreground">
                       {activeChannel.type === "department"
                         ? `Department Channel · ${activeChannel.participant_count ?? 0} members`
@@ -328,7 +370,52 @@ export function ChatView({ mode = "admin" }: ChatViewProps) {
                     </p>
                   </div>
                 </div>
+
+                {/* Accept Replies Option Toggle */}
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2.5 rounded-2xl border border-border bg-background/80 px-3 py-1.5 shadow-xs transition-colors">
+                    <div className="hidden sm:flex flex-col items-end text-end">
+                      <span className="text-xs font-semibold text-foreground">
+                        {t("chatAcceptReplies") || "Accept replies"}
+                      </span>
+                      <span
+                        className={`text-[10px] font-medium ${
+                          activeChannel.allow_replies !== false
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : "text-amber-600 dark:text-amber-400"
+                        }`}
+                      >
+                        {activeChannel.allow_replies !== false
+                          ? (t("chatRepliesOn") || "Employees can reply")
+                          : (t("chatRepliesOff") || "Replies blocked")}
+                      </span>
+                    </div>
+                    <label htmlFor="accept-replies-switch" className="sr-only">
+                      {t("chatAcceptReplies") || "Accept replies"}
+                    </label>
+                    <Switch
+                      id="accept-replies-switch"
+                      checked={activeChannel.allow_replies !== false}
+                      onCheckedChange={(checked) => handleToggleReplies(checked)}
+                      disabled={togglingReplies}
+                      aria-label={t("chatAcceptReplies") || "Accept replies"}
+                    />
+                  </div>
+                </div>
               </div>
+
+              {/* Notice banner when replies are disabled */}
+              {activeChannel.allow_replies === false && (
+                <div className="flex items-center justify-between border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-xs text-amber-800 dark:text-amber-200">
+                  <div className="flex items-center gap-2">
+                    <MessageSquareOff className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <span>
+                      {t("chatChannelRepliesOffNotice") ||
+                        "Replies are currently turned off for this channel. Employees cannot reply."}
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {/* Messages Stream */}
               <div className="flex-1 overflow-y-auto p-4 space-y-3">

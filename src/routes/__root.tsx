@@ -49,6 +49,14 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         <p className="mt-2 text-sm text-muted-foreground">
           Something went wrong on our end. You can try refreshing or head back home.
         </p>
+        {error && (
+          <div className="mt-4 rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-left">
+            <p className="text-xs font-semibold text-destructive">{error.name}: {error.message}</p>
+            {error.stack && (
+              <pre className="mt-2 max-h-32 overflow-auto text-[10px] text-muted-foreground">{error.stack}</pre>
+            )}
+          </div>
+        )}
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => {
@@ -94,6 +102,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       // Windows / Edge
       { name: "msapplication-TileColor", content: "#EA7A2C" },
       { name: "msapplication-TileImage", content: "/android-chrome-192x192.png" },
+      // Security Meta
+      { httpEquiv: "X-Content-Type-Options", content: "nosniff" },
+      { name: "referrer", content: "strict-origin-when-cross-origin" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },

@@ -1,6 +1,6 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { User, Settings as SettingsIcon, LogOut, Camera, Loader2 } from "lucide-react";
+import { User, Settings as SettingsIcon, LogOut, Camera, Loader2, Download } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -14,7 +14,9 @@ import {
 import { EmployeeAvatar } from "@/components/EmployeeAvatar";
 import { useSession, signOut, setSessionAvatar } from "@/lib/auth";
 import { updateEmployeeAdmin } from "@/backend/functions/employees.functions";
-import { useState } from "react";
+import { useI18n } from "@/lib/i18n";
+import { usePwa } from "@/lib/use-pwa";
+import { triggerPwaInstall } from "@/components/PwaInstallBanner";
 
 const ACCEPTED = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
 const MAX_BYTES = 500 * 1024;
@@ -28,6 +30,8 @@ export function UserMenu({
 }) {
   const session = useSession();
   const navigate = useNavigate();
+  const { t } = useI18n();
+  const { isInstalled } = usePwa();
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const updateFn = useServerFn(updateEmployeeAdmin);
@@ -120,6 +124,11 @@ export function UserMenu({
               <SettingsIcon className="mr-2 h-4 w-4" /> Preferences
             </Link>
           </DropdownMenuItem>
+          {!isInstalled && (
+            <DropdownMenuItem onSelect={() => triggerPwaInstall()}>
+              <Download className="mr-2 h-4 w-4" /> {t("installApp") || "Install App"}
+            </DropdownMenuItem>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={doLogout} className="text-destructive focus:text-destructive">
             <LogOut className="mr-2 h-4 w-4" /> Sign out
