@@ -142,9 +142,8 @@ export const checkIn = createServerFn({ method: "POST" })
       };
     }
 
-    const locs = (assigns ?? [])
-      .map((a: any) => a.geofence_locations)
-      .filter((l: any) => l && l.active);
+    const { loadAssignedFences, evaluateFence } = await import("@/backend/server/geofence.server");
+    const locs = (await loadAssignedFences(supabase as any, [userId])).get(userId) ?? [];
 
     const nets = ((netAssigns ?? []) as any[])
       .map((a) => a.networks)
@@ -153,27 +152,18 @@ export const checkIn = createServerFn({ method: "POST" })
     const hasConstraints = locs.length > 0 || nets.length > 0;
     const freeCheck = !hasConstraints;
 
-    let withinGeofence = false;
-    let nearestDistance: number | null = null;
-    let nearestRadius = 0;
-    if (locs.length > 0 && data.lat != null && data.lng != null) {
-      for (const l of locs as any[]) {
-        const d = distMeters(data.lat!, data.lng!, Number(l.lat), Number(l.lng));
-        const r = Number(l.radius_m ?? 100);
-        if (nearestDistance == null || d < nearestDistance) {
-          nearestDistance = d;
-          nearestRadius = r;
-        }
-        if (d <= r) {
-          withinGeofence = true;
-          break;
-        }
-      }
-    }
+    const fenceCheck = evaluateFence(locs, data.lat, data.lng);
+    const withinGeofence = !!fenceCheck?.ok;
+    const nearestDistance = fenceCheck?.distance_m ?? null;
+    const nearestRadius = fenceCheck?.allowed_m ?? 0;
+
     const onAuthorizedNetwork =
       nets.length > 0 && !!data.ssid && nets.some((n: any) => n.ssid === data.ssid);
 
-    if (hasConstraints && !withinGeofence && !onAuthorizedNetwork) {
+    // A work location assignment is a hard gate: being on an authorized network
+    // cannot substitute for standing inside the assigned radius.
+    const blockedByFence = locs.length > 0 && !withinGeofence;
+    if (blockedByFence || (hasConstraints && !withinGeofence && !onAuthorizedNetwork)) {
       const reasonCodes: Array<{ code: string; params?: Record<string, any> }> = [];
       const reasons: string[] = [];
       if (locs.length > 0) {
