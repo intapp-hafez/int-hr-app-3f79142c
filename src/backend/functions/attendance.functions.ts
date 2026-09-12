@@ -402,6 +402,31 @@ export const checkOut = createServerFn({ method: "POST" })
       } catch {}
     }
 
+    // Work-location gate: check-out must also happen inside an assigned radius.
+    {
+      const { loadAssignedFences, evaluateFence } = await import("@/backend/server/geofence.server");
+      const fences = (await loadAssignedFences(supabase as any, [userId])).get(userId) ?? [];
+      if (fences.length > 0) {
+        const fc = evaluateFence(fences, data.lat, data.lng);
+        if (!fc?.ok) {
+          const reasons: Array<{ code: string; params?: Record<string, any> }> =
+            data.lat == null || data.lng == null
+              ? [{ code: "gps_unavailable" }]
+              : [{ code: "gps_outside_fence", params: { dist: fc?.distance_m ?? 0, allowed: fc?.allowed_m ?? 0 } }];
+          return {
+            ok: false as const,
+            blocked: true as const,
+            code: "constraints" as const,
+            params: { action: "check_out", reasons } as Record<string, any>,
+            reason:
+              data.lat == null || data.lng == null
+                ? "Check-out blocked · GPS location not available."
+                : `Check-out blocked · you are ${fc?.distance_m ?? 0} m away from "${fc?.name ?? "your work location"}" (allowed ${fc?.allowed_m ?? 0} m).`,
+          };
+        }
+      }
+    }
+
     const { error } = await supabase
       .from("attendance")
       .update({
