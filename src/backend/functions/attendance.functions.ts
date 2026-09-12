@@ -817,10 +817,10 @@ export const adminAttendanceReport = createServerFn({ method: "POST" })
     // Only count punches made inside an approved work location. Employees with
     // no assigned location (null) are kept, since nothing constrains them.
     return mapped
-      .filter((r) => r.in_location_ok !== false || r.out_location_ok !== false)
       .map((r) => ({
         ...r,
         in_time: r.in_location_ok === false ? null : r.in_time,
         out_time: r.out_location_ok === false ? null : r.out_time,
-      }));
+      }))
+      .filter((r) => r.in_time || r.out_time);
   });
