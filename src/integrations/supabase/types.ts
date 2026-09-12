@@ -165,6 +165,7 @@ export type Database = {
       }
       chat_channels: {
         Row: {
+          allow_replies: boolean
           created_at: string
           created_by: string | null
           department_id: string | null
@@ -176,6 +177,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          allow_replies?: boolean
           created_at?: string
           created_by?: string | null
           department_id?: string | null
@@ -187,6 +189,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          allow_replies?: boolean
           created_at?: string
           created_by?: string | null
           department_id?: string | null
@@ -322,42 +325,6 @@ export type Database = {
         }
         Relationships: []
       }
-      cost_centers: {
-        Row: {
-          code: string
-          created_at: string
-          description_ar: string | null
-          description_en: string | null
-          id: string
-          name_ar: string
-          name_en: string
-          status: string
-          updated_at: string
-        }
-        Insert: {
-          code: string
-          created_at?: string
-          description_ar?: string | null
-          description_en?: string | null
-          id?: string
-          name_ar: string
-          name_en: string
-          status?: string
-          updated_at?: string
-        }
-        Update: {
-          code?: string
-          created_at?: string
-          description_ar?: string | null
-          description_en?: string | null
-          id?: string
-          name_ar?: string
-          name_en?: string
-          status?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       contract_audit_log: {
         Row: {
           action: string
@@ -446,6 +413,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      cost_centers: {
+        Row: {
+          code: string
+          created_at: string | null
+          description_ar: string | null
+          description_en: string | null
+          id: string
+          name_ar: string
+          name_en: string
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          description_ar?: string | null
+          description_en?: string | null
+          id?: string
+          name_ar: string
+          name_en: string
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          description_ar?: string | null
+          description_en?: string | null
+          id?: string
+          name_ar?: string
+          name_en?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       department_positions: {
         Row: {
@@ -2576,6 +2579,7 @@ export type Database = {
           created_at: string
           custom_field: string | null
           department_id: string | null
+          device_check_required: boolean
           district: string | null
           district_id: string | null
           email: string | null
@@ -2640,6 +2644,7 @@ export type Database = {
           created_at?: string
           custom_field?: string | null
           department_id?: string | null
+          device_check_required?: boolean
           district?: string | null
           district_id?: string | null
           email?: string | null
@@ -2704,6 +2709,7 @@ export type Database = {
           created_at?: string
           custom_field?: string | null
           department_id?: string | null
+          device_check_required?: boolean
           district?: string | null
           district_id?: string | null
           email?: string | null
@@ -2758,6 +2764,13 @@ export type Database = {
             columns: ["city_id"]
             isOneToOne: false
             referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_cost_center_id_fkey"
+            columns: ["cost_center_id"]
+            isOneToOne: false
+            referencedRelation: "cost_centers"
             referencedColumns: ["id"]
           },
           {
@@ -3461,35 +3474,35 @@ export type Database = {
         Row: {
           city_id: string
           created_at: string
+          district: string | null
           id: string
           job_grade: string
           nightly_rate: number
-          transport_expense: number
-          district: string | null
-          street: string | null
           radius_m: number
+          street: string | null
+          transport_expense: number
         }
         Insert: {
           city_id: string
           created_at?: string
+          district?: string | null
           id?: string
           job_grade: string
           nightly_rate?: number
-          transport_expense?: number
-          district?: string | null
-          street?: string | null
           radius_m?: number
+          street?: string | null
+          transport_expense?: number
         }
         Update: {
           city_id?: string
           created_at?: string
+          district?: string | null
           id?: string
           job_grade?: string
           nightly_rate?: number
-          transport_expense?: number
-          district?: string | null
-          street?: string | null
           radius_m?: number
+          street?: string | null
+          transport_expense?: number
         }
         Relationships: [
           {
@@ -3780,6 +3793,17 @@ export type Database = {
       }
     }
     Functions: {
+      get_staff_employee_names: {
+        Args: { p_employee_ids?: string[] }
+        Returns: {
+          email: string
+          emp_code: string
+          full_name: string
+          full_name_ar: string
+          id: string
+          name: string
+        }[]
+      }
       has_permission: {
         Args: { _action: string; _page: string; _user_id: string }
         Returns: boolean
@@ -3805,17 +3829,6 @@ export type Database = {
           _status?: string
         }
         Returns: string
-      }
-      get_staff_employee_names: {
-        Args: { p_employee_ids?: string[] | null }
-        Returns: {
-          id: string
-          name: string
-          full_name: string | null
-          full_name_ar: string | null
-          email: string | null
-          emp_code: string | null
-        }[]
       }
       is_chat_channel_member: {
         Args: { p_channel_id: string; p_user_id: string }
