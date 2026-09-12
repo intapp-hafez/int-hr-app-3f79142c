@@ -32,10 +32,12 @@ export function AttendanceReportView() {
   const rangeFrom = from <= to ? from : to;
   const rangeTo = from <= to ? to : from;
 
+  const [onlyApproved, setOnlyApproved] = useState(false);
+
   const reportFn = useServerFn(adminAttendanceReport);
   const { data: rows = [], isLoading, error } = useQuery({
-    queryKey: ["admin", "attendance-report", rangeFrom, rangeTo],
-    queryFn: () => reportFn({ data: { from: rangeFrom, to: rangeTo } }),
+    queryKey: ["admin", "attendance-report", rangeFrom, rangeTo, onlyApproved],
+    queryFn: () => reportFn({ data: { from: rangeFrom, to: rangeTo, onlyApprovedLocations: onlyApproved } }),
   });
 
   const byDept = useMemo(() => {

@@ -142,9 +142,8 @@ export const checkIn = createServerFn({ method: "POST" })
       };
     }
 
-    const locs = (assigns ?? [])
-      .map((a: any) => a.geofence_locations)
-      .filter((l: any) => l && l.active);
+    const { loadAssignedFences, evaluateFence } = await import("@/backend/server/geofence.server");
+    const locs = (await loadAssignedFences(supabase as any, [userId])).get(userId) ?? [];
 
     const nets = ((netAssigns ?? []) as any[])
       .map((a) => a.networks)
@@ -153,27 +152,18 @@ export const checkIn = createServerFn({ method: "POST" })
     const hasConstraints = locs.length > 0 || nets.length > 0;
     const freeCheck = !hasConstraints;
 
-    let withinGeofence = false;
-    let nearestDistance: number | null = null;
-    let nearestRadius = 0;
-    if (locs.length > 0 && data.lat != null && data.lng != null) {
-      for (const l of locs as any[]) {
-        const d = distMeters(data.lat!, data.lng!, Number(l.lat), Number(l.lng));
-        const r = Number(l.radius_m ?? 100);
-        if (nearestDistance == null || d < nearestDistance) {
-          nearestDistance = d;
-          nearestRadius = r;
-        }
-        if (d <= r) {
-          withinGeofence = true;
-          break;
-        }
-      }
-    }
+    const fenceCheck = evaluateFence(locs, data.lat, data.lng);
+    const withinGeofence = !!fenceCheck?.ok;
+    const nearestDistance = fenceCheck?.distance_m ?? null;
+    const nearestRadius = fenceCheck?.allowed_m ?? 0;
+
     const onAuthorizedNetwork =
       nets.length > 0 && !!data.ssid && nets.some((n: any) => n.ssid === data.ssid);
 
-    if (hasConstraints && !withinGeofence && !onAuthorizedNetwork) {
+    // A work location assignment is a hard gate: being on an authorized network
+    // cannot substitute for standing inside the assigned radius.
+    const blockedByFence = locs.length > 0 && !withinGeofence;
+    if (blockedByFence || (hasConstraints && !withinGeofence && !onAuthorizedNetwork)) {
       const reasonCodes: Array<{ code: string; params?: Record<string, any> }> = [];
       const reasons: string[] = [];
       if (locs.length > 0) {
@@ -410,6 +400,31 @@ export const checkOut = createServerFn({ method: "POST" })
         if (!outDistrict && geo.district) outDistrict = geo.district;
         if (!outStreet && geo.street) outStreet = geo.street;
       } catch {}
+    }
+
+    // Work-location gate: check-out must also happen inside an assigned radius.
+    {
+      const { loadAssignedFences, evaluateFence } = await import("@/backend/server/geofence.server");
+      const fences = (await loadAssignedFences(supabase as any, [userId])).get(userId) ?? [];
+      if (fences.length > 0) {
+        const fc = evaluateFence(fences, data.lat, data.lng);
+        if (!fc?.ok) {
+          const reasons: Array<{ code: string; params?: Record<string, any> }> =
+            data.lat == null || data.lng == null
+              ? [{ code: "gps_unavailable" }]
+              : [{ code: "gps_outside_fence", params: { dist: fc?.distance_m ?? 0, allowed: fc?.allowed_m ?? 0 } }];
+          return {
+            ok: false as const,
+            blocked: true as const,
+            code: "constraints" as const,
+            params: { action: "check_out", reasons } as Record<string, any>,
+            reason:
+              data.lat == null || data.lng == null
+                ? "Check-out blocked · GPS location not available."
+                : `Check-out blocked · you are ${fc?.distance_m ?? 0} m away from "${fc?.name ?? "your work location"}" (allowed ${fc?.allowed_m ?? 0} m).`,
+          };
+        }
+      }
     }
 
     const { error } = await supabase
@@ -733,16 +748,24 @@ export type AttendanceReportRow = {
   status: string;
   branch: string | null;
   device_status: string;
+  in_location: string | null;
+  in_location_ok: boolean | null;
+  out_location_ok: boolean | null;
 };
 
 export const adminAttendanceReport = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) => parseInput(dateRangeSchema(), i))
+  .inputValidator((i) =>
+    parseInput(
+      dateRangeSchema().and(z.object({ onlyApprovedLocations: z.boolean().optional() })),
+      i,
+    ),
+  )
   .handler(async ({ data, context }): Promise<AttendanceReportRow[]> => {
     await assertAdminOrHr(context.supabase, context.userId);
     const { data: rows, error } = await context.supabase
       .from("attendance")
-      .select("employee_id, date, in_time, out_time, status, branch")
+      .select("employee_id, date, in_time, out_time, status, branch, lat, lng, out_lat, out_lng")
       .gte("date", data.from).lte("date", data.to)
       .order("date", { ascending: true })
       .limit(5000);
@@ -751,12 +774,14 @@ export const adminAttendanceReport = createServerFn({ method: "POST" })
     const ids = Array.from(new Set(list.map((r) => r.employee_id)));
     if (!ids.length) return [];
 
-    const [{ data: profs }, { data: devices }] = await Promise.all([
+    const { loadAssignedFences, evaluateFence } = await import("@/backend/server/geofence.server");
+    const [{ data: profs }, { data: devices }, fenceMap] = await Promise.all([
       context.supabase
         .from("profiles")
         .select("id, full_name, email, emp_code, departments:department_id(name_en)")
         .in("id", ids),
       context.supabase.from("employee_devices").select("user_id, status").in("user_id", ids),
+      loadAssignedFences(context.supabase as any, ids),
     ]);
 
     const pMap = new Map<string, any>(((profs ?? []) as any[]).map((p) => [p.id, p]));
@@ -766,8 +791,11 @@ export const adminAttendanceReport = createServerFn({ method: "POST" })
       if (!prev || d.status === "approved") dMap.set(d.user_id, d.status);
     }
 
-    return list.map((r) => {
+    const mapped = list.map((r) => {
       const p = pMap.get(r.employee_id);
+      const fences = fenceMap.get(r.employee_id) ?? [];
+      const inFence = r.in_time ? evaluateFence(fences, r.lat, r.lng) : null;
+      const outFence = r.out_time ? evaluateFence(fences, r.out_lat, r.out_lng) : null;
       return {
         employee_id: r.employee_id as string,
         employee_name: (p?.full_name ?? p?.email ?? r.employee_id) as string,
@@ -779,6 +807,20 @@ export const adminAttendanceReport = createServerFn({ method: "POST" })
         status: (r.status ?? "—") as string,
         branch: (r.branch ?? null) as string | null,
         device_status: dMap.get(r.employee_id) ?? "none",
+        in_location: inFence?.name ?? null,
+        in_location_ok: inFence ? inFence.ok : null,
+        out_location_ok: outFence ? outFence.ok : null,
       };
     });
+
+    if (!data.onlyApprovedLocations) return mapped;
+    // Only count punches made inside an approved work location. Employees with
+    // no assigned location (null) are kept, since nothing constrains them.
+    return mapped
+      .map((r) => ({
+        ...r,
+        in_time: r.in_location_ok === false ? null : r.in_time,
+        out_time: r.out_location_ok === false ? null : r.out_time,
+      }))
+      .filter((r) => r.in_time || r.out_time);
   });
