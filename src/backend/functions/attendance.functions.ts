@@ -748,16 +748,24 @@ export type AttendanceReportRow = {
   status: string;
   branch: string | null;
   device_status: string;
+  in_location: string | null;
+  in_location_ok: boolean | null;
+  out_location_ok: boolean | null;
 };
 
 export const adminAttendanceReport = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) => parseInput(dateRangeSchema(), i))
+  .inputValidator((i) =>
+    parseInput(
+      dateRangeSchema().and(z.object({ onlyApprovedLocations: z.boolean().optional() })),
+      i,
+    ),
+  )
   .handler(async ({ data, context }): Promise<AttendanceReportRow[]> => {
     await assertAdminOrHr(context.supabase, context.userId);
     const { data: rows, error } = await context.supabase
       .from("attendance")
-      .select("employee_id, date, in_time, out_time, status, branch")
+      .select("employee_id, date, in_time, out_time, status, branch, lat, lng, out_lat, out_lng")
       .gte("date", data.from).lte("date", data.to)
       .order("date", { ascending: true })
       .limit(5000);
@@ -766,12 +774,14 @@ export const adminAttendanceReport = createServerFn({ method: "POST" })
     const ids = Array.from(new Set(list.map((r) => r.employee_id)));
     if (!ids.length) return [];
 
-    const [{ data: profs }, { data: devices }] = await Promise.all([
+    const { loadAssignedFences, evaluateFence } = await import("@/backend/server/geofence.server");
+    const [{ data: profs }, { data: devices }, fenceMap] = await Promise.all([
       context.supabase
         .from("profiles")
         .select("id, full_name, email, emp_code, departments:department_id(name_en)")
         .in("id", ids),
       context.supabase.from("employee_devices").select("user_id, status").in("user_id", ids),
+      loadAssignedFences(context.supabase as any, ids),
     ]);
 
     const pMap = new Map<string, any>(((profs ?? []) as any[]).map((p) => [p.id, p]));
@@ -781,8 +791,11 @@ export const adminAttendanceReport = createServerFn({ method: "POST" })
       if (!prev || d.status === "approved") dMap.set(d.user_id, d.status);
     }
 
-    return list.map((r) => {
+    const mapped = list.map((r) => {
       const p = pMap.get(r.employee_id);
+      const fences = fenceMap.get(r.employee_id) ?? [];
+      const inFence = r.in_time ? evaluateFence(fences, r.lat, r.lng) : null;
+      const outFence = r.out_time ? evaluateFence(fences, r.out_lat, r.out_lng) : null;
       return {
         employee_id: r.employee_id as string,
         employee_name: (p?.full_name ?? p?.email ?? r.employee_id) as string,
@@ -794,6 +807,20 @@ export const adminAttendanceReport = createServerFn({ method: "POST" })
         status: (r.status ?? "—") as string,
         branch: (r.branch ?? null) as string | null,
         device_status: dMap.get(r.employee_id) ?? "none",
+        in_location: inFence?.name ?? null,
+        in_location_ok: inFence ? inFence.ok : null,
+        out_location_ok: outFence ? outFence.ok : null,
       };
     });
+
+    if (!data.onlyApprovedLocations) return mapped;
+    // Only count punches made inside an approved work location. Employees with
+    // no assigned location (null) are kept, since nothing constrains them.
+    return mapped
+      .filter((r) => r.in_location_ok !== false || r.out_location_ok !== false)
+      .map((r) => ({
+        ...r,
+        in_time: r.in_location_ok === false ? null : r.in_time,
+        out_time: r.out_location_ok === false ? null : r.out_time,
+      }));
   });
