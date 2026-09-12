@@ -268,6 +268,22 @@ export const listLeaveTypes = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase.from("leave_types").select("*").order("name");
     if (error) throw new Error(error.message);
+    if (!data || data.length === 0) {
+      const defaults = [
+        { name: "Annual Leave", annual_days: 21, paid: true, active: true, requires_proof: false },
+        { name: "Sick Leave", annual_days: 14, paid: true, active: true, requires_proof: true },
+        { name: "Casual Leave", annual_days: 7, paid: true, active: true, requires_proof: false },
+        { name: "Unpaid Leave", annual_days: 0, paid: false, active: true, requires_proof: false },
+      ];
+      const { data: seeded, error: seedErr } = await (context.supabase.from("leave_types") as any)
+        .insert(defaults)
+        .select("*");
+      if (!seedErr && seeded && seeded.length > 0) {
+        const { ensureLeaveBalancesSeeded } = await import("@/backend/functions/leave-balances.functions");
+        await ensureLeaveBalancesSeeded(context.supabase);
+        return seeded;
+      }
+    }
     return data ?? [];
   });
 export const upsertLeaveType = createServerFn({ method: "POST" })
@@ -278,12 +294,15 @@ export const upsertLeaveType = createServerFn({ method: "POST" })
       id: data.id, name: data.name, annual_days: data.annual_days, paid: data.paid, active: data.active, requires_proof: data.requires_proof,
     });
     if (error) throw new Error(error.message);
+    const { ensureLeaveBalancesSeeded } = await import("@/backend/functions/leave-balances.functions");
+    await ensureLeaveBalancesSeeded(context.supabase);
     return { ok: true };
   });
 export const deleteLeaveType = createServerFn({ method: "POST" })
   .middleware([requireAdminAccess])
   .inputValidator((i) => z.object({ id: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
+    await context.supabase.from("leave_balances").delete().eq("leave_type_id", data.id);
     const { error } = await context.supabase.from("leave_types").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };

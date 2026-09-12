@@ -15,6 +15,9 @@ import {
   AlertCircle,
   CheckCircle2,
   FileText,
+  Search,
+  Globe,
+  Pencil,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
@@ -32,9 +35,11 @@ import {
   deleteGeofenceAdmin,
   listAssignableEmployees,
   toggleGeofenceAssignment,
+  updateGeofenceAssignmentRadius,
   bulkAssignGeofences,
   listAllAssignableEmployees,
   type GeofenceLocation,
+  type AssignableEmployee,
 } from "@/backend/functions/geofencing.functions";
 
 const EgyptMap = lazy(() => import("@/components/admin/EgyptMap").then((mod) => ({ default: mod.EgyptMap })));
@@ -59,16 +64,25 @@ function GeoPage() {
     if (!selectedId && locations[0]) setSelectedId(locations[0].id);
     if (selectedId && !locations.find((l) => l.id === selectedId)) setSelectedId(locations[0]?.id ?? null);
   }, [locations, selectedId]);
+
   const [adding, setAdding] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [assignFor, setAssignFor] = useState<GeofenceLocation | null>(null);
+  const [editFor, setEditFor] = useState<GeofenceLocation | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [showEgyptOverview, setShowEgyptOverview] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive">("all");
+
   const selected = locations.find((l) => l.id === selectedId) ?? null;
 
   const updateMut = useMutation({
     mutationFn: (vars: { id: string; name?: string; lat?: number; lng?: number; radius_m?: number; active?: boolean }) =>
       updateFn({ data: vars }),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      toast.success("Updated");
+      invalidate();
+    },
     onError: (e: any) => toast.error(e?.message ?? "Failed"),
   });
   const deleteMut = useMutation({
@@ -77,17 +91,53 @@ function GeoPage() {
     onError: (e: any) => toast.error(e?.message ?? "Failed"),
   });
 
+  const mapMarkers = useMemo(() => {
+    return locations.map((l) => ({
+      id: l.id,
+      name: l.name,
+      lat: l.lat,
+      lng: l.lng,
+      radius: l.radius_m,
+      active: l.active,
+    }));
+  }, [locations]);
+
+  const filteredLocations = useMemo(() => {
+    let list = locations;
+    if (filterStatus === "active") list = list.filter((l) => l.active);
+    if (filterStatus === "inactive") list = list.filter((l) => !l.active);
+    const s = searchQuery.trim().toLowerCase();
+    if (!s) return list;
+    return list.filter(
+      (l) =>
+        l.name.toLowerCase().includes(s) ||
+        String(l.lat).includes(s) ||
+        String(l.lng).includes(s),
+    );
+  }, [locations, filterStatus, searchQuery]);
+
   return (
     <div className="space-y-5">
-      <Suspense fallback={<div className="h-[420px] rounded-3xl border border-border bg-card" />}>
-        <EgyptMap />
-      </Suspense>
+      {/* Top Header */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-display text-2xl font-semibold tracking-tight md:text-3xl">{t("geofencing")}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="font-display text-2xl font-semibold tracking-tight md:text-3xl">{t("geofencing")}</h1>
+            <span className="rounded-full bg-brand/10 text-brand px-2.5 py-0.5 text-xs font-semibold">
+              {locations.length} {locations.length === 1 ? "zone" : "zones"}
+            </span>
+          </div>
           <p className="text-sm text-muted-foreground">{t("approvedZones")}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setShowEgyptOverview((prev) => !prev)}
+            className={`inline-flex items-center gap-1.5 rounded-full border border-border px-3.5 py-2 text-sm transition-colors ${
+              showEgyptOverview ? "bg-muted text-foreground font-medium" : "bg-card text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            <Globe className="h-4 w-4" /> {showEgyptOverview ? "Hide Egypt overview" : "Egypt overview"}
+          </button>
           <Link
             to="/admin/employee-access"
             className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 text-sm text-foreground hover:bg-muted"
@@ -123,76 +173,306 @@ function GeoPage() {
         </div>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-5">
-        <ul className="space-y-2 lg:col-span-5">
-          {isLoading && (
-            <li className="rounded-2xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
-              <Loader2 className="mx-auto mb-2 h-4 w-4 animate-spin" /> Loading…
-            </li>
-          )}
-          {!isLoading && locations.length === 0 && (
-            <li className="rounded-2xl border border-dashed border-border bg-card p-6 text-center text-sm text-muted-foreground">
-              No locations yet. Add one to get started.
-            </li>
-          )}
-          {locations.map((l) => {
-            const assigned = l.assigned_count;
-            const isActive = l.id === selectedId;
-            return (
-              <li
-                key={l.id}
-                onClick={() => setSelectedId(l.id)}
-                className={`cursor-pointer rounded-2xl border bg-card p-4 transition-colors ${isActive ? "border-brand shadow-brand" : "border-border hover:bg-muted/50"}`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-3">
-                    <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent text-accent-foreground"><MapPin className="h-4 w-4" /></span>
-                    <div>
-                      <p className="font-semibold">{l.name}</p>
-                      <p className="font-mono text-[11px] text-muted-foreground">{l.lat.toFixed(4)}, {l.lng.toFixed(4)}</p>
-                      <p className="mt-0.5 text-[11px] text-muted-foreground">{assigned} · {t("employees")}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1">
+      {/* Optional macro Egypt overview */}
+      {showEgyptOverview && (
+        <Suspense fallback={<div className="h-[420px] rounded-3xl border border-border bg-card" />}>
+          <EgyptMap />
+        </Suspense>
+      )}
+
+      {/* Main split view: Map on the left, Locations on the right */}
+      <div className="grid gap-5 lg:grid-cols-12 items-start">
+        {/* Left column: Interactive Map */}
+        <div className="lg:col-span-7 xl:col-span-7 space-y-2 lg:sticky lg:top-4">
+          <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm flex flex-col">
+            {/* Map bar */}
+            <div className="flex items-center justify-between border-b border-border px-4 py-3 bg-muted/30">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-accent text-accent-foreground">
+                  <MapPin className="h-4 w-4" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold truncate">
+                    {selected ? selected.name : "Geofence Zones Map"}
+                  </p>
+                  <p className="font-mono text-[11px] text-muted-foreground truncate">
+                    {selected
+                      ? `${selected.lat.toFixed(4)}, ${selected.lng.toFixed(4)} · ${selected.radius_m}m radius`
+                      : "Click any zone on map or list to focus"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-background px-2.5 py-1 text-[11px] font-medium text-muted-foreground border border-border">
+                  <span className="h-2 w-2 rounded-full bg-success" />
+                  {locations.filter((l) => l.active).length} Active
+                </span>
+                {selected && (
+                  <div className="flex items-center gap-1.5">
                     <button
-                      onClick={(e) => { e.stopPropagation(); updateMut.mutate({ id: l.id, active: !l.active }); }}
-                      className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase ${l.active ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}
+                      onClick={() => setEditFor(selected)}
+                      className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium text-foreground hover:bg-muted transition-colors"
+                      title="Edit location details"
                     >
-                      {l.active ? t("active") : t("off")}
+                      <Pencil className="h-3 w-3 text-muted-foreground" /> Edit
                     </button>
                     <button
-                      onClick={(e) => { e.stopPropagation(); if (confirm(`Delete ${l.name}?`)) deleteMut.mutate(l.id); }}
-                      className="rounded-full p-1.5 text-destructive hover:bg-destructive/10"
-                      title="Delete"
+                      onClick={() => setAssignFor(selected)}
+                      className="inline-flex items-center gap-1 rounded-full bg-gradient-brand px-2.5 py-1 text-[11px] font-semibold text-brand-foreground shadow-brand"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Users className="h-3 w-3" /> {t("assignEmployees")}
                     </button>
                   </div>
-                </div>
-                <div className="mt-3 flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">{t("radius")}</span>
-                  <span className="font-semibold tabular-nums">{l.radius_m} m</span>
-                </div>
-                <input
-                  type="range"
-                  min={20}
-                  max={500}
-                  step={10}
-                  value={l.radius_m}
-                  onChange={(e) => updateMut.mutate({ id: l.id, radius_m: Number(e.target.value) })}
-                  onClick={(e) => e.stopPropagation()}
-                  className="mt-2 w-full accent-brand"
-                />
+                )}
+              </div>
+            </div>
+
+            {/* Map Container */}
+            <div className="h-[540px] xl:h-[620px] w-full relative">
+              <LeafletMap
+                height="100%"
+                markers={mapMarkers}
+                selectedId={selectedId ?? undefined}
+                editableId={selectedId ?? undefined}
+                onSelect={(id) => setSelectedId(String(id))}
+                onRadiusChange={(id, r) => updateMut.mutate({ id: String(id), radius_m: r })}
+              />
+            </div>
+
+            {/* Map bottom helper */}
+            <div className="border-t border-border bg-muted/20 px-4 py-2 flex items-center justify-between text-[11px] text-muted-foreground">
+              <span>Drag the orange handle on selected zone to resize radius</span>
+              {selected && (
+                <span className="font-medium text-foreground">
+                  {selected.assigned_count} {t("employees")} assigned
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Right column: Locations List */}
+        <div className="lg:col-span-5 xl:col-span-5 space-y-3">
+          {/* Search & Filter Card */}
+          <div className="rounded-2xl border border-border bg-card p-3 space-y-2.5 shadow-sm">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <h2 className="font-display text-sm font-semibold">Locations</h2>
+                <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
+                  {filteredLocations.length}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
                 <button
-                  onClick={(e) => { e.stopPropagation(); setSelectedId(l.id); setAssignFor(l); }}
-                  className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-gradient-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground shadow-brand"
+                  onClick={() => setFilterStatus("all")}
+                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors ${
+                    filterStatus === "all" ? "bg-brand text-brand-foreground" : "bg-muted hover:bg-muted/80 text-muted-foreground"
+                  }`}
                 >
-                  <Users className="h-3 w-3" /> {t("assignEmployees")}
+                  All
+                </button>
+                <button
+                  onClick={() => setFilterStatus("active")}
+                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors ${
+                    filterStatus === "active" ? "bg-brand text-brand-foreground" : "bg-muted hover:bg-muted/80 text-muted-foreground"
+                  }`}
+                >
+                  Active
+                </button>
+                <button
+                  onClick={() => setFilterStatus("inactive")}
+                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors ${
+                    filterStatus === "inactive" ? "bg-brand text-brand-foreground" : "bg-muted hover:bg-muted/80 text-muted-foreground"
+                  }`}
+                >
+                  Off
+                </button>
+              </div>
+            </div>
+
+            <div className="relative">
+              <Search className="pointer-events-none absolute start-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search locations by name…"
+                className="w-full rounded-xl border border-input bg-background py-1.5 ps-8 pe-7 text-xs"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute end-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* List items */}
+          <ul className="space-y-2 max-h-[calc(100vh-280px)] min-h-[460px] overflow-y-auto pr-1">
+            {isLoading && (
+              <li className="rounded-2xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
+                <Loader2 className="mx-auto mb-2 h-4 w-4 animate-spin" /> Loading…
+              </li>
+            )}
+            {!isLoading && filteredLocations.length === 0 && (
+              <li className="rounded-2xl border border-dashed border-border bg-card p-6 text-center text-sm text-muted-foreground space-y-2">
+                <p>No locations match your search.</p>
+                <button
+                  onClick={() => setAdding(true)}
+                  className="inline-flex items-center gap-1 rounded-full bg-gradient-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground shadow-brand"
+                >
+                  <Plus className="h-3.5 w-3.5" /> {t("addLocation")}
                 </button>
               </li>
-            );
-          })}
-        </ul>
+            )}
+            {filteredLocations.map((l) => {
+              const assigned = l.assigned_count;
+              const isActive = l.id === selectedId;
+              return (
+                <li
+                  key={l.id}
+                  onClick={() => setSelectedId(l.id)}
+                  className={`cursor-pointer rounded-2xl border bg-card p-3.5 transition-all ${
+                    isActive
+                      ? "border-brand shadow-sm ring-1 ring-brand bg-brand/5 dark:bg-brand/10"
+                      : "border-border hover:bg-muted/50"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-2.5 min-w-0">
+                      <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl ${
+                        isActive ? "bg-brand text-brand-foreground" : "bg-accent text-accent-foreground"
+                      }`}>
+                        <MapPin className="h-4 w-4" />
+                      </span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-semibold text-sm truncate">{l.name}</p>
+                          {isActive && (
+                            <span className="rounded-full bg-brand/15 text-brand px-1.5 py-0.2 text-[9px] font-bold uppercase tracking-wider">
+                              Selected
+                            </span>
+                          )}
+                        </div>
+                        <p className="font-mono text-[11px] text-muted-foreground">
+                          {l.lat.toFixed(4)}, {l.lng.toFixed(4)}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                          {assigned} · {t("employees")}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {/* ON/OFF Switch Button */}
+                      <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={l.active}
+                          title={l.active ? "Turn Off" : "Turn On"}
+                          onClick={() => updateMut.mutate({ id: l.id, active: !l.active })}
+                          disabled={updateMut.isPending}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 ${
+                            l.active ? "bg-success" : "bg-muted-foreground/30"
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-md transition duration-200 ease-in-out ${
+                              l.active ? "translate-x-4" : "translate-x-0.5"
+                            }`}
+                          />
+                        </button>
+                        <span className={`text-[10px] font-semibold uppercase ${l.active ? "text-success" : "text-muted-foreground"}`}>
+                          {l.active ? t("active") : t("off")}
+                        </span>
+                      </div>
+
+                      {/* Edit Button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditFor(l);
+                        }}
+                        className="rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                        title="Edit location"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+
+                      {/* Delete Button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`Delete ${l.name}?`)) deleteMut.mutate(l.id);
+                        }}
+                        className="rounded-full p-1.5 text-destructive hover:bg-destructive/10 transition-colors"
+                        title="Delete"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Radius slider & number input */}
+                  <div className="mt-2.5 pt-2 border-t border-border/50">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground text-[11px]">{t("radius")}</span>
+                      <span className="font-mono font-semibold tabular-nums text-xs">{l.radius_m} m</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={20}
+                      max={500}
+                      step={10}
+                      value={l.radius_m}
+                      onChange={(e) => updateMut.mutate({ id: l.id, radius_m: Number(e.target.value) })}
+                      onClick={(e) => e.stopPropagation()}
+                      className="mt-1.5 w-full accent-brand cursor-pointer"
+                    />
+                  </div>
+
+                  <div className="mt-2.5 flex items-center justify-between gap-2 pt-2 border-t border-border/50">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedId(l.id);
+                        setAssignFor(l);
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-gradient-brand px-3 py-1 text-xs font-semibold text-brand-foreground shadow-brand"
+                    >
+                      <Users className="h-3 w-3" /> {t("assignEmployees")}
+                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditFor(l);
+                        }}
+                        className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium border border-border text-foreground hover:bg-muted transition-colors"
+                      >
+                        <Pencil className="h-3 w-3 text-muted-foreground" /> Edit
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedId(l.id);
+                        }}
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium border transition-colors ${
+                          isActive ? "border-brand/40 text-brand bg-brand/10" : "border-border text-muted-foreground hover:bg-muted"
+                        }`}
+                      >
+                        <MapPin className="h-3 w-3" /> Focus
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       </div>
 
       {adding && (
@@ -200,6 +480,13 @@ function GeoPage() {
           onClose={() => setAdding(false)}
           onCreated={invalidate}
           onOpenImport={() => setImportOpen(true)}
+        />
+      )}
+      {editFor && (
+        <EditLocationModal
+          location={editFor}
+          onClose={() => setEditFor(null)}
+          onUpdated={invalidate}
         />
       )}
       {importOpen && (
@@ -210,6 +497,182 @@ function GeoPage() {
       )}
       {assignFor && <AssignEmployeesModal location={assignFor} onClose={() => setAssignFor(null)} onChanged={invalidate} />}
       {bulkOpen && <BulkAssignModal locations={locations} onClose={() => setBulkOpen(false)} onChanged={invalidate} />}
+    </div>
+  );
+}
+
+function EditLocationModal({
+  location,
+  onClose,
+  onUpdated,
+}: {
+  location: GeofenceLocation;
+  onClose: () => void;
+  onUpdated: () => void;
+}) {
+  const { t } = useI18n();
+  const updateFn = useServerFn(updateGeofenceAdmin);
+
+  const [name, setName] = useState(location.name);
+  const [lat, setLat] = useState(location.lat.toFixed(6));
+  const [lng, setLng] = useState(location.lng.toFixed(6));
+  const [radius, setRadius] = useState(location.radius_m);
+  const [active, setActive] = useState(location.active);
+
+  const latNum = parseFloat(lat);
+  const lngNum = parseFloat(lng);
+  const validCoords = isFinite(latNum) && isFinite(lngNum);
+
+  const mut = useMutation({
+    mutationFn: (vars: { name: string; lat: number; lng: number; radius_m: number; active: boolean }) =>
+      updateFn({ data: { id: location.id, ...vars } }),
+    onSuccess: () => {
+      toast.success("Location updated successfully");
+      onUpdated();
+      onClose();
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Failed to update location"),
+  });
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim()) return toast.error("Name required");
+    if (!validCoords) return toast.error("Valid coordinates required");
+    mut.mutate({
+      name: name.trim().slice(0, 80),
+      lat: latNum,
+      lng: lngNum,
+      radius_m: radius,
+      active,
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-[1000] grid place-items-center bg-foreground/40 p-4" onClick={onClose}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-lg space-y-4 rounded-3xl bg-background p-6 shadow-soft max-h-[90vh] overflow-y-auto"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="grid h-8 w-8 place-items-center rounded-xl bg-brand/10 text-brand">
+              <Pencil className="h-4 w-4" />
+            </span>
+            <h2 className="font-display text-lg font-semibold">Edit Location</h2>
+          </div>
+          <button onClick={onClose} className="rounded-full p-1.5 hover:bg-muted">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <form onSubmit={submit} className="space-y-4">
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">{t("locationName")}</span>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm"
+              placeholder="e.g. Cairo Headquarters"
+            />
+          </label>
+
+          {/* Active status switch */}
+          <div className="flex items-center justify-between rounded-xl border border-border bg-card p-3">
+            <div>
+              <p className="text-sm font-medium">Active status</p>
+              <p className="text-xs text-muted-foreground">When off, employees cannot check in or out at this zone</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={active}
+              onClick={() => setActive(!active)}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 ease-in-out ${
+                active ? "bg-success" : "bg-muted-foreground/30"
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition duration-200 ease-in-out ${
+                  active ? "translate-x-6" : "translate-x-1"
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Interactive Map */}
+          {validCoords && (
+            <div className="overflow-hidden rounded-2xl border border-border">
+              <LeafletMap
+                height={260}
+                markers={[{ id: "preview", name: name || "Zone", lat: latNum, lng: lngNum, radius, active }]}
+                selectedId="preview"
+                editableId="preview"
+                onMapClick={(la, lo) => {
+                  setLat(la.toFixed(6));
+                  setLng(lo.toFixed(6));
+                }}
+                onRadiusChange={(_id, r) => setRadius(r)}
+              />
+              <p className="border-t border-border bg-muted/30 px-3 py-1.5 text-[11px] text-muted-foreground">
+                Click map to move pin · drag the orange handle to resize radius
+              </p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-muted-foreground">Lat</span>
+              <input
+                value={lat}
+                onChange={(e) => setLat(e.target.value)}
+                className="w-full rounded-xl border border-input bg-background px-3 py-2 font-mono text-xs"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-muted-foreground">Lng</span>
+              <input
+                value={lng}
+                onChange={(e) => setLng(e.target.value)}
+                className="w-full rounded-xl border border-input bg-background px-3 py-2 font-mono text-xs"
+              />
+            </label>
+          </div>
+
+          <label className="block">
+            <span className="mb-1 flex items-center justify-between text-xs font-medium text-muted-foreground">
+              {t("radius")}{" "}
+              <span className="font-semibold text-foreground tabular-nums">{radius} m</span>
+            </span>
+            <input
+              type="range"
+              min={20}
+              max={1000}
+              step={10}
+              value={radius}
+              onChange={(e) => setRadius(Number(e.target.value))}
+              className="w-full accent-brand cursor-pointer"
+            />
+          </label>
+
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-border px-4 py-2 text-sm font-medium hover:bg-muted"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={mut.isPending}
+              className="rounded-xl bg-gradient-brand px-5 py-2 text-sm font-semibold text-brand-foreground shadow-brand disabled:opacity-50"
+            >
+              {mut.isPending ? "Saving…" : "Save Changes"}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
@@ -397,16 +860,99 @@ function AddLocationModal({
   );
 }
 
+function AssigneeRow({
+  e,
+  location,
+  onToggle,
+  onRadiusChange,
+  isPending,
+}: {
+  e: AssignableEmployee;
+  location: GeofenceLocation;
+  onToggle: (assign: boolean) => void;
+  onRadiusChange: (radius: number | null) => void;
+  isPending: boolean;
+}) {
+  const { t } = useI18n();
+  const [radiusVal, setRadiusVal] = useState<string>(e.radius_m != null ? String(e.radius_m) : "");
+
+  useEffect(() => {
+    setRadiusVal(e.radius_m != null ? String(e.radius_m) : "");
+  }, [e.radius_m]);
+
+  return (
+    <li className="space-y-2 rounded-xl border border-border bg-card p-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium">{e.full_name}</p>
+          <p className="text-[11px] text-muted-foreground">
+            {e.emp_code ?? "—"}
+            {e.department ? ` · ${e.department}` : ""}
+          </p>
+        </div>
+        <button
+          disabled={isPending}
+          onClick={() => onToggle(!e.assigned)}
+          className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+            e.assigned ? "bg-destructive/10 text-destructive hover:bg-destructive/20" : "bg-gradient-brand text-brand-foreground"
+          }`}
+        >
+          {e.assigned ? (
+            <span className="inline-flex items-center gap-1">
+              <Trash2 className="h-3 w-3" /> {t("remove")}
+            </span>
+          ) : (
+            t("add")
+          )}
+        </button>
+      </div>
+
+      {e.assigned && (
+        <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/60 text-xs">
+          <span className="text-muted-foreground text-[11px]">Radius override:</span>
+          <div className="flex items-center gap-1.5">
+            <input
+              type="number"
+              min={10}
+              max={10000}
+              step={10}
+              placeholder={`${location.radius_m}m default`}
+              value={radiusVal}
+              onChange={(evt) => setRadiusVal(evt.target.value)}
+              onBlur={() => {
+                const trimmed = radiusVal.trim();
+                const num = trimmed ? parseInt(trimmed, 10) : null;
+                if (num !== (e.radius_m ?? null)) {
+                  onRadiusChange(num && !isNaN(num) && num > 0 ? num : null);
+                }
+              }}
+              onKeyDown={(evt) => {
+                if (evt.key === "Enter") {
+                  evt.currentTarget.blur();
+                }
+              }}
+              className="w-28 rounded-lg border border-input bg-background px-2 py-1 text-xs font-mono text-end placeholder:text-muted-foreground/60"
+            />
+            <span className="text-[11px] text-muted-foreground">m</span>
+          </div>
+        </div>
+      )}
+    </li>
+  );
+}
+
 function AssignEmployeesModal({ location, onClose, onChanged }: { location: GeofenceLocation; onClose: () => void; onChanged: () => void }) {
   const { t } = useI18n();
   const qc = useQueryClient();
   const listFn = useServerFn(listAssignableEmployees);
   const toggleFn = useServerFn(toggleGeofenceAssignment);
+  const updateRadiusFn = useServerFn(updateGeofenceAssignmentRadius);
   const queryKey = ["admin", "geofences", "assignable", location.id] as const;
   const { data: employees = [], isLoading } = useQuery({
     queryKey,
     queryFn: () => listFn({ data: { locationId: location.id } }),
   });
+
   const mut = useMutation({
     mutationFn: (vars: { profileId: string; assign: boolean }) =>
       toggleFn({ data: { locationId: location.id, ...vars } }),
@@ -417,6 +963,18 @@ function AssignEmployeesModal({ location, onClose, onChanged }: { location: Geof
     },
     onError: (e: any) => toast.error(e?.message ?? "Failed"),
   });
+
+  const radiusMut = useMutation({
+    mutationFn: (vars: { profileId: string; radius_m: number | null }) =>
+      updateRadiusFn({ data: { locationId: location.id, profileId: vars.profileId, radius_m: vars.radius_m } }),
+    onSuccess: () => {
+      toast.success("Radius updated");
+      qc.invalidateQueries({ queryKey });
+      onChanged();
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Failed to update radius"),
+  });
+
   const [q, setQ] = useState("");
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -428,6 +986,7 @@ function AssignEmployeesModal({ location, onClose, onChanged }: { location: Geof
         (e.department ?? "").toLowerCase().includes(s),
     );
   }, [employees, q]);
+
   return (
     <div className="fixed inset-0 z-[1000] grid place-items-center bg-foreground/40 p-4" onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-3xl bg-background p-6 shadow-soft">
@@ -435,6 +994,9 @@ function AssignEmployeesModal({ location, onClose, onChanged }: { location: Geof
           <h2 className="font-display text-lg font-semibold">{t("assignEmployees")} — {location.name}</h2>
           <button onClick={onClose} className="rounded-full p-1.5 hover:bg-muted"><X className="h-4 w-4" /></button>
         </div>
+        <p className="text-xs text-muted-foreground mb-3">
+          Assign employees and customize their individual allowed check-in radius if different from the location default ({location.radius_m}m).
+        </p>
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -442,25 +1004,17 @@ function AssignEmployeesModal({ location, onClose, onChanged }: { location: Geof
           className="mb-3 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
         />
         {isLoading && <p className="py-6 text-center text-sm text-muted-foreground"><Loader2 className="mx-auto h-4 w-4 animate-spin" /></p>}
-        <ul className="max-h-[60vh] space-y-1 overflow-y-auto">
-          {filtered.map((e) => {
-            const assigned = e.assigned;
-            return (
-              <li key={e.id} className="flex items-center justify-between rounded-xl border border-border bg-card p-3">
-                <div>
-                  <p className="text-sm font-medium">{e.full_name}</p>
-                  <p className="text-[11px] text-muted-foreground">{e.emp_code ?? "—"}{e.department ? ` · ${e.department}` : ""}</p>
-                </div>
-                <button
-                  disabled={mut.isPending}
-                  onClick={() => mut.mutate({ profileId: e.id, assign: !assigned })}
-                  className={`rounded-full px-3 py-1.5 text-xs font-semibold ${assigned ? "bg-destructive/10 text-destructive" : "bg-gradient-brand text-brand-foreground"}`}
-                >
-                  {assigned ? <span className="inline-flex items-center gap-1"><Trash2 className="h-3 w-3" /> {t("remove")}</span> : t("add")}
-                </button>
-              </li>
-            );
-          })}
+        <ul className="max-h-[60vh] space-y-2 overflow-y-auto">
+          {filtered.map((e) => (
+            <AssigneeRow
+              key={e.id}
+              e={e}
+              location={location}
+              isPending={mut.isPending || radiusMut.isPending}
+              onToggle={(assign) => mut.mutate({ profileId: e.id, assign })}
+              onRadiusChange={(radius_m) => radiusMut.mutate({ profileId: e.id, radius_m })}
+            />
+          ))}
           {!isLoading && filtered.length === 0 && (
             <li className="py-6 text-center text-xs text-muted-foreground">No employees</li>
           )}

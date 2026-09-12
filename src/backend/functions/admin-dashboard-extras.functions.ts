@@ -77,6 +77,7 @@ export type AlertKind =
   | "military_expiry"
   | "probation_end"
   | "pending_leave"
+  | "leave_decision"
   | "advance_payment"
   | "late"
   | "absent"
@@ -102,12 +103,19 @@ export const getAdminAlerts = createServerFn({ method: "GET" })
     const past30Iso = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
 
     const { supabase } = context;
-    const [pend, att, totalEmp, expiringProfiles, pendingAdvances] = await Promise.all([
+    const [pend, decidedLeaves, att, totalEmp, expiringProfiles, pendingAdvances] = await Promise.all([
       supabase
         .from("leaves")
         .select("id, leave_type_name, start_date, end_date, created_at, profiles:employee_id(full_name)")
         .eq("status", "pending")
         .order("created_at", { ascending: false })
+        .limit(20),
+      supabase
+        .from("leaves")
+        .select("id, leave_type_name, start_date, end_date, status, decided_at, profiles:employee_id(full_name)")
+        .in("status", ["approved", "rejected", "cancelled"])
+        .not("decided_at", "is", null)
+        .order("decided_at", { ascending: false })
         .limit(20),
       supabase
         .from("attendance")
@@ -144,6 +152,25 @@ export const getAdminAlerts = createServerFn({ method: "GET" })
         description: `${r.start_date} → ${r.end_date}`,
         ts: r.created_at,
         link: "/admin/leaves-requests",
+      });
+    }
+
+    // 1b. Recently Decided Leaves
+    for (const r of (decidedLeaves?.data ?? []) as any[]) {
+      const verb =
+        r.status === "approved"
+          ? "approved"
+          : r.status === "rejected"
+          ? "rejected"
+          : "cancelled";
+      alerts.push({
+        id: `leave-decided-${r.id}`,
+        kind: "leave_decision",
+        severity: r.status === "approved" ? "info" : r.status === "rejected" ? "danger" : "warning",
+        title: `${r.profiles?.full_name ?? "Employee"} ${r.leave_type_name ?? "leave"} ${verb}`,
+        description: `${r.start_date} → ${r.end_date} · Status: ${r.status}`,
+        ts: r.decided_at ?? new Date().toISOString(),
+        link: "/admin/leaves",
       });
     }
 

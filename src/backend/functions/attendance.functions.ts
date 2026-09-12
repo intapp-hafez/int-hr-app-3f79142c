@@ -750,8 +750,24 @@ export type AttendanceReportRow = {
   device_status: string;
   in_location: string | null;
   in_location_ok: boolean | null;
+  out_location: string | null;
   out_location_ok: boolean | null;
+  free_check?: boolean;
 };
+
+function resolvePlaceName(...parts: Array<string | null | undefined>) {
+  const seen = new Set<string>();
+  const cleaned: string[] = [];
+  for (const part of parts) {
+    const trimmed = part?.trim();
+    if (!trimmed || /^-?\d{1,3}(?:\.\d+)?\s*,\s*-?\d{1,3}(?:\.\d+)?$/.test(trimmed) || /^-?\d{1,3}(?:\.\d+)?$/.test(trimmed)) continue;
+    const lower = trimmed.toLowerCase();
+    if (seen.has(lower)) continue;
+    seen.add(lower);
+    cleaned.push(trimmed);
+  }
+  return cleaned.join(", ") || null;
+}
 
 export const adminAttendanceReport = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -765,7 +781,7 @@ export const adminAttendanceReport = createServerFn({ method: "POST" })
     await assertAdminOrHr(context.supabase, context.userId);
     const { data: rows, error } = await context.supabase
       .from("attendance")
-      .select("employee_id, date, in_time, out_time, status, branch, lat, lng, out_lat, out_lng")
+      .select("employee_id, date, in_time, out_time, status, branch, lat, lng, out_lat, out_lng, city, district, street, out_city, out_district, out_street, free_check")
       .gte("date", data.from).lte("date", data.to)
       .order("date", { ascending: true })
       .limit(5000);
@@ -775,14 +791,26 @@ export const adminAttendanceReport = createServerFn({ method: "POST" })
     if (!ids.length) return [];
 
     const { loadAssignedFences, evaluateFence } = await import("@/backend/server/geofence.server");
-    const [{ data: profs }, { data: devices }, fenceMap] = await Promise.all([
+    const [{ data: profs }, { data: devices }, fenceMap, { data: activeLocs }] = await Promise.all([
       context.supabase
         .from("profiles")
         .select("id, full_name, email, emp_code, departments:department_id(name_en)")
         .in("id", ids),
       context.supabase.from("employee_devices").select("user_id, status").in("user_id", ids),
       loadAssignedFences(context.supabase as any, ids),
+      context.supabase
+        .from("geofence_locations")
+        .select("id, name, lat, lng, radius_m, active")
+        .eq("active", true),
     ]);
+
+    const companyFences = ((activeLocs ?? []) as any[]).map((l) => ({
+      id: l.id as string,
+      name: (l.name ?? "Work location") as string,
+      lat: Number(l.lat),
+      lng: Number(l.lng),
+      radius_m: Number(l.radius_m ?? 100),
+    }));
 
     const pMap = new Map<string, any>(((profs ?? []) as any[]).map((p) => [p.id, p]));
     const dMap = new Map<string, string>();
@@ -791,11 +819,55 @@ export const adminAttendanceReport = createServerFn({ method: "POST" })
       if (!prev || d.status === "approved") dMap.set(d.user_id, d.status);
     }
 
-    const mapped = list.map((r) => {
+    const mapped: AttendanceReportRow[] = list.map((r) => {
       const p = pMap.get(r.employee_id);
-      const fences = fenceMap.get(r.employee_id) ?? [];
-      const inFence = r.in_time ? evaluateFence(fences, r.lat, r.lng) : null;
-      const outFence = r.out_time ? evaluateFence(fences, r.out_lat, r.out_lng) : null;
+      const assignedFences = fenceMap.get(r.employee_id) ?? [];
+      const effectiveFences = assignedFences.length > 0 ? assignedFences : companyFences;
+      const isFreeCheck = !!r.free_check;
+
+      const inPlace = resolvePlaceName(r.street, r.district, r.city);
+      const outPlace = resolvePlaceName(r.out_street, r.out_district, r.out_city);
+
+      // In-punch fence check
+      let inFence =
+        r.in_time && r.lat != null && r.lng != null
+          ? evaluateFence(effectiveFences, r.lat, r.lng)
+          : null;
+      let inLocationName: string | null = null;
+      let inLocationOk: boolean | null = null;
+      if (r.in_time) {
+        if (isFreeCheck) {
+          inLocationName = inPlace || inFence?.name || r.branch || "HQ";
+          inLocationOk = true;
+        } else if (inFence) {
+          inLocationOk = inFence.ok;
+          inLocationName = inPlace || inFence.name || r.branch || "HQ";
+        } else {
+          inLocationName = inPlace || r.branch || "HQ";
+          inLocationOk = true;
+        }
+      }
+
+      // Out-punch fence check
+      let outFence =
+        r.out_time && r.out_lat != null && r.out_lng != null
+          ? evaluateFence(effectiveFences, r.out_lat, r.out_lng)
+          : null;
+      let outLocationName: string | null = null;
+      let outLocationOk: boolean | null = null;
+      if (r.out_time) {
+        if (isFreeCheck) {
+          outLocationName = outPlace || outFence?.name || r.branch || "HQ";
+          outLocationOk = true;
+        } else if (outFence) {
+          outLocationOk = outFence.ok;
+          outLocationName = outPlace || outFence.name || r.branch || "HQ";
+        } else {
+          outLocationName = outPlace || r.branch || "HQ";
+          outLocationOk = true;
+        }
+      }
+
       return {
         employee_id: r.employee_id as string,
         employee_name: (p?.full_name ?? p?.email ?? r.employee_id) as string,
@@ -807,15 +879,16 @@ export const adminAttendanceReport = createServerFn({ method: "POST" })
         status: (r.status ?? "—") as string,
         branch: (r.branch ?? null) as string | null,
         device_status: dMap.get(r.employee_id) ?? "none",
-        in_location: inFence?.name ?? null,
-        in_location_ok: inFence ? inFence.ok : null,
-        out_location_ok: outFence ? outFence.ok : null,
+        in_location: inLocationName,
+        in_location_ok: inLocationOk,
+        out_location: outLocationName,
+        out_location_ok: outLocationOk,
+        free_check: isFreeCheck,
       };
     });
 
     if (!data.onlyApprovedLocations) return mapped;
-    // Only count punches made inside an approved work location. Employees with
-    // no assigned location (null) are kept, since nothing constrains them.
+    // Only count punches made inside an approved work location.
     return mapped
       .map((r) => ({
         ...r,

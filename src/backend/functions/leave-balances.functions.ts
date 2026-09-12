@@ -28,10 +28,58 @@ export type ListBalancesResult = {
   pageSize: number;
 };
 
+export async function ensureLeaveBalancesSeeded(supabase: any, year?: number) {
+  try {
+    const currentYear = year ?? new Date().getFullYear();
+    const [{ data: activeEmployees, error: e1 }, { data: activeTypes, error: e2 }] = await Promise.all([
+      supabase.from("profiles").select("id").eq("status", "Active"),
+      supabase.from("leave_types").select("id, name, annual_days").eq("active", true),
+    ]);
+    if (e1 || e2 || !activeEmployees?.length || !activeTypes?.length) return;
+
+    // Fetch existing balances for this year
+    const { data: existing, error: e3 } = await supabase
+      .from("leave_balances")
+      .select("employee_id, leave_type_id")
+      .eq("year", currentYear);
+    if (e3) return;
+
+    const existingSet = new Set(
+      (existing ?? []).map((e: any) => `${e.employee_id}::${e.leave_type_id}`)
+    );
+
+    const toInsert: any[] = [];
+    for (const emp of activeEmployees) {
+      for (const lt of activeTypes) {
+        const key = `${emp.id}::${lt.id}`;
+        if (!existingSet.has(key)) {
+          toInsert.push({
+            employee_id: emp.id,
+            leave_type_id: lt.id,
+            year: currentYear,
+            total_days: Number(lt.annual_days) || 0,
+            used_days: 0,
+          });
+        }
+      }
+    }
+
+    if (toInsert.length > 0) {
+      for (let i = 0; i < toInsert.length; i += 100) {
+        const chunk = toInsert.slice(i, i + 100);
+        await (supabase.from("leave_balances") as any).insert(chunk);
+      }
+    }
+  } catch (err) {
+    console.error("Failed to auto-seed leave balances:", err);
+  }
+}
+
 export const listLeaveBalancesAdmin = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => ListBalancesSchema.parse(i))
   .handler(async ({ data, context }): Promise<ListBalancesResult> => {
+    await ensureLeaveBalancesSeeded(context.supabase);
     const page = data.page;
     const pageSize = data.pageSize;
     const from = (page - 1) * pageSize;

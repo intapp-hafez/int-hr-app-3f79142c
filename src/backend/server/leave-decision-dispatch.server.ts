@@ -181,7 +181,10 @@ export async function dispatchLeaveDecisionToStaff(
       .maybeSingle();
 
     const recipients = new Set<string>();
+    const staffUserIds = new Set<string>();
+
     if ((employee as any)?.manager_id) {
+      staffUserIds.add((employee as any).manager_id);
       const { data: mgr } = await supabaseAdmin
         .from("profiles")
         .select("email")
@@ -194,12 +197,15 @@ export async function dispatchLeaveDecisionToStaff(
       .select("user_id, role")
       .in("role", ["admin", "hr"]);
     const ids = ((staff ?? []) as any[]).map((r) => r.user_id);
+    for (const uid of ids) {
+      staffUserIds.add(uid);
+    }
     if (ids.length) {
       const { data: rows } = await supabaseAdmin.from("profiles").select("email").in("id", ids);
       for (const r of (rows ?? []) as any[]) if (r.email) recipients.add(r.email);
     }
     if ((employee as any)?.email) recipients.delete((employee as any).email);
-    if (recipients.size === 0) return { ok: false, reason: "no-recipients" };
+    staffUserIds.delete(input.employeeId);
 
     const who = (employee as any)?.full_name ?? (employee as any)?.email ?? input.employeeId;
     const base = render(input, who);
@@ -212,8 +218,39 @@ export async function dispatchLeaveDecisionToStaff(
       <p style="margin:0 0 8px">${esc(text)}</p>
     </div>`;
 
+    // 1. Deliver in-app notification to manager and HR/admins
+    if (staffUserIds.size > 0) {
+      try {
+        const inAppRows = Array.from(staffUserIds).map((uid) => ({
+          user_id: uid,
+          channel: "inapp",
+          status: "delivered",
+          subject,
+          payload: {
+            kind: "leave_decision",
+            decision: input.kind,
+            employee_id: input.employeeId,
+            employee_name: who,
+            leave_id: input.leaveId,
+            leave_type_name: input.leaveTypeName,
+            start_date: input.startDate,
+            end_date: input.endDate,
+            days: input.days ?? null,
+            paid: input.paid ?? null,
+            decided_by_name: input.decidedByName ?? null,
+          },
+        }));
+        await supabaseAdmin.from("notif_deliveries").insert(inAppRows);
+      } catch (inAppErr) {
+        console.error("[dispatchLeaveDecisionToStaff] in-app insert error:", inAppErr);
+      }
+    }
+
+    // 2. Deliver email via SMTP
+    if (recipients.size === 0) return { ok: true, inAppOnly: true };
+
     const smtp = await loadSmtpConfig();
-    if (!smtp || !smtp.host || !smtp.password) return { ok: false, reason: "smtp-not-configured" };
+    if (!smtp || !smtp.host || !smtp.password) return { ok: true, inAppOnly: true, reason: "smtp-not-configured" };
     const res = await sendEmail(
       { host: smtp.host, port: smtp.port, secure: smtp.secure, username: smtp.username, password: smtp.password },
       {

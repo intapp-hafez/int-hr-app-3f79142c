@@ -31,3 +31,4 @@ supabase/.temp/cli-latest
 *.njsproj
 *.sln
 *.sw?
+*.zip

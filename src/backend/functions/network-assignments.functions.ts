@@ -55,12 +55,25 @@ export const listGeofenceAssignmentsForEmployee = createServerFn({ method: "POST
   .inputValidator((i) => z.object({ profileId: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
     await assertAdminOrHr(context.supabase, context.userId);
-    const { data: rows, error } = await context.supabase
+    const resWithRadius = await context.supabase
       .from("geofence_assignments")
-      .select("location_id, geofence_locations(id, name, lat, lng, radius_m, active)")
+      .select("location_id, radius_m, geofence_locations(id, name, lat, lng, radius_m, active)")
       .eq("profile_id", data.profileId);
-    if (error) throw new Error(error.message);
-    return (rows ?? []).map((r: any) => r.geofence_locations).filter(Boolean);
+    let rows: any[] | null = resWithRadius.data;
+    if (resWithRadius.error) {
+      const fallback = await context.supabase
+        .from("geofence_assignments")
+        .select("location_id, geofence_locations(id, name, lat, lng, radius_m, active)")
+        .eq("profile_id", data.profileId);
+      if (fallback.error) throw new Error(fallback.error.message);
+      rows = fallback.data;
+    }
+    return (rows ?? [])
+      .map((r: any) => ({
+        ...(r.geofence_locations ?? {}),
+        override_radius_m: r.radius_m != null ? Number(r.radius_m) : null,
+      }))
+      .filter((x: any) => !!x.id);
   });
 
 export const setEmployeeGeofenceAssignment = createServerFn({ method: "POST" })
@@ -70,17 +83,32 @@ export const setEmployeeGeofenceAssignment = createServerFn({ method: "POST" })
       profileId: z.string().uuid(),
       locationId: z.string().uuid(),
       assign: z.boolean(),
+      radius_m: z.number().int().min(10).max(10000).nullable().optional(),
     }).parse(i),
   )
   .handler(async ({ data, context }) => {
     await assertAdminOrHr(context.supabase, context.userId);
     if (data.assign) {
+      const payload: any = {
+        profile_id: data.profileId,
+        location_id: data.locationId,
+        assigned_by: context.userId,
+      };
+      if (data.radius_m !== undefined) {
+        payload.radius_m = data.radius_m;
+      }
       const { error } = await (context.supabase.from("geofence_assignments") as any)
-        .upsert(
-          { profile_id: data.profileId, location_id: data.locationId, assigned_by: context.userId },
-          { onConflict: "location_id,profile_id", ignoreDuplicates: true },
-        );
-      if (error) throw new Error(error.message);
+        .upsert(payload, { onConflict: "location_id,profile_id" });
+      if (error) {
+        if (`${error.message}`.toLowerCase().includes("radius_m")) {
+          delete payload.radius_m;
+          const retry = await (context.supabase.from("geofence_assignments") as any)
+            .upsert(payload, { onConflict: "location_id,profile_id", ignoreDuplicates: true });
+          if (retry.error) throw new Error(retry.error.message);
+        } else {
+          throw new Error(error.message);
+        }
+      }
     } else {
       const { error } = await context.supabase
         .from("geofence_assignments")

@@ -1,5 +1,7 @@
 # ==============================================================================
 # INT-HR App — Apache / LiteSpeed / cPanel / hPanel Configuration
+# NOTE: If your server does not see .htaccess (hidden file), rename this file
+# from htaccess.txt to .htaccess in your cPanel/hPanel File Manager!
 # ==============================================================================
 
 # Disable MultiViews so Apache doesn't misinterpret client routes (e.g. /admin, /reports)
@@ -58,7 +60,7 @@ ErrorDocument 404 /index.html
 
   # 6. Permissions-Policy: Enable GPS Geolocation & Camera for employee attendance & selfie check-in
   Header set Permissions-Policy "geolocation=(self), camera=(self), microphone=(), payment=(), usb=()"
-  Header always set Permissions-Policy "geolocation=(self), camera=(self), microphone=(), payment=(), usb=()"
+  Header always set Permissions-Policy "geolocation=(self), camera=(self), microphone=(), payment=()"
 
   # 7. Content-Security-Policy (CSP)
   Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://*.supabase.co https://*.tile.openstreetmap.org https://tile.openstreetmap.org; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://nominatim.openstreetmap.org https://fonts.googleapis.com https://fonts.gstatic.com; worker-src 'self' blob:; frame-ancestors 'self';"

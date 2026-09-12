@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { MapPin, Wifi, Search, Check, AlertTriangle, Users, Loader2 } from "lucide-react";
+import { MapPin, Wifi, Search, Check, AlertTriangle, Users, Loader2, Smartphone } from "lucide-react";
 import {
   listEmployeesForAccess,
   listAllNetworks,
@@ -13,6 +13,10 @@ import {
   listGeofenceAssignmentsForEmployee,
   setEmployeeGeofenceAssignment,
 } from "@/backend/functions/network-assignments.functions";
+import {
+  getDeviceRequirement,
+  setDeviceRequirement,
+} from "@/backend/functions/devices.functions";
 
 export const Route = createFileRoute("/admin/employee-access")({ component: Page });
 
@@ -25,6 +29,8 @@ function Page() {
   const empListGeos = useServerFn(listGeofenceAssignmentsForEmployee);
   const toggleNet = useServerFn(setEmployeeNetworkAssignment);
   const toggleGeo = useServerFn(setEmployeeGeofenceAssignment);
+  const devGetFn = useServerFn(getDeviceRequirement);
+  const devSetFn = useServerFn(setDeviceRequirement);
 
   const empQ = useQuery({ queryKey: ["access", "employees"], queryFn: () => empFn() });
   const netsQ = useQuery({ queryKey: ["access", "networks"], queryFn: () => netsFn() });
@@ -54,8 +60,26 @@ function Page() {
     enabled: !!selectedId,
   });
 
+  const devReqQ = useQuery({
+    queryKey: ["employee-device-requirement", selectedId],
+    queryFn: () => devGetFn({ data: { user_id: selectedId! } }),
+    enabled: !!selectedId,
+  });
+
+  const devMut = useMutation({
+    mutationFn: (required: boolean) => devSetFn({ data: { user_id: selectedId!, required } }),
+    onSuccess: (_d, req) => {
+      toast.success(req ? "Approved device required for check-in" : "Any device allowed for check-in");
+      qc.invalidateQueries({ queryKey: ["employee-device-requirement", selectedId] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Failed"),
+  });
+
   const netSet = new Set((assignedNetsQ.data ?? []).map((n: any) => n.id));
   const geoSet = new Set((assignedGeosQ.data ?? []).map((g: any) => g.id));
+  const assignedGeoMap = new Map<string, number | null>(
+    (assignedGeosQ.data ?? []).map((g: any) => [g.id, g.override_radius_m ?? null])
+  );
 
   const netMut = useMutation({
     mutationFn: (v: { networkId: string; assign: boolean }) =>
@@ -66,7 +90,7 @@ function Page() {
     onError: (e: any) => toast.error(e?.message ?? "Failed"),
   });
   const geoMut = useMutation({
-    mutationFn: (v: { locationId: string; assign: boolean }) =>
+    mutationFn: (v: { locationId: string; assign: boolean; radius_m?: number | null }) =>
       toggleGeo({ data: { profileId: selectedId!, ...v } }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["access", "emp-geos", selectedId] });
@@ -156,6 +180,31 @@ function Page() {
                     <Check className="h-3 w-3" /> Restricted to assigned locations or networks
                   </p>
                 )}
+
+                {/* Device check gate switch */}
+                <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
+                  <div className="flex items-center gap-2">
+                    <Smartphone className="h-4 w-4 text-brand" />
+                    <div>
+                      <p className="text-xs font-semibold">Approved device requirement</p>
+                      <p className="text-[11px] text-muted-foreground">Require an approved device to check in</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={devMut.isPending || devReqQ.isLoading}
+                    onClick={() => devMut.mutate(!devReqQ.data?.required)}
+                    className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50 ${
+                      devReqQ.data?.required ? "bg-gradient-brand" : "bg-border"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 h-5 w-5 rounded-full bg-card shadow transition-all ${
+                        devReqQ.data?.required ? "left-5" : "left-0.5"
+                      }`}
+                    />
+                  </button>
+                </div>
               </div>
 
               {/* Geofences */}
@@ -176,9 +225,10 @@ function Page() {
                   )}
                   {geos.map((g: any) => {
                     const checked = geoSet.has(g.id);
+                    const overrideRadius = assignedGeoMap.get(g.id);
                     return (
                       <li key={g.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                        <div>
+                        <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium">
                             {g.name}{" "}
                             {!g.active && (
@@ -186,13 +236,43 @@ function Page() {
                             )}
                           </p>
                           <p className="font-mono text-[11px] text-muted-foreground">
-                            {g.lat.toFixed(4)}, {g.lng.toFixed(4)} · {g.radius_m} m
+                            {g.lat.toFixed(4)}, {g.lng.toFixed(4)} · {g.radius_m} m default
                           </p>
+                          {checked && (
+                            <div className="flex items-center gap-1.5 mt-1.5">
+                              <span className="text-[11px] text-muted-foreground">Custom radius:</span>
+                              <input
+                                type="number"
+                                min={10}
+                                max={10000}
+                                step={10}
+                                placeholder={`${g.radius_m}m default`}
+                                defaultValue={overrideRadius != null ? String(overrideRadius) : ""}
+                                key={`${selectedId}-${g.id}-${overrideRadius}`}
+                                onBlur={(e) => {
+                                  const v = e.target.value.trim();
+                                  const num = v ? parseInt(v, 10) : null;
+                                  if (num !== overrideRadius) {
+                                    geoMut.mutate({
+                                      locationId: g.id,
+                                      assign: true,
+                                      radius_m: num && !isNaN(num) && num > 0 ? num : null,
+                                    });
+                                  }
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") e.currentTarget.blur();
+                                }}
+                                className="w-24 rounded-lg border border-input bg-background px-2 py-0.5 text-xs font-mono text-end placeholder:text-muted-foreground/60"
+                              />
+                              <span className="text-[11px] text-muted-foreground">m</span>
+                            </div>
+                          )}
                         </div>
                         <button
                           disabled={geoMut.isPending || !g.active}
                           onClick={() => geoMut.mutate({ locationId: g.id, assign: !checked })}
-                          className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+                          className={`rounded-full px-3 py-1.5 text-xs font-semibold shrink-0 ${
                             checked ? "bg-destructive/10 text-destructive" : "bg-gradient-brand text-brand-foreground"
                           } disabled:opacity-50`}
                         >

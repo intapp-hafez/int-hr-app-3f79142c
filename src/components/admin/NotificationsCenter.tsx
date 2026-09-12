@@ -17,6 +17,7 @@ import {
   Award,
   Timer,
   DollarSign,
+  CheckCheck,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getAdminAlerts, type AdminAlert } from "@/backend/functions/admin-dashboard-extras.functions";
@@ -28,7 +29,8 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: "all", label: "All" },
   { id: "id_expiry", label: "National ID" },
   { id: "contract_expiry", label: "Contracts" },
-  { id: "pending_leave", label: "Leaves" },
+  { id: "pending_leave", label: "Leave Requests" },
+  { id: "leave_decision", label: "Leave Decisions" },
   { id: "advance_payment", label: "Advances" },
   { id: "late", label: "Late" },
   { id: "absent", label: "Absent" },
@@ -38,6 +40,7 @@ const FILTERS: { id: Filter; label: string }[] = [
 
 const ICONS: Record<AdminAlert["kind"], typeof Bell> = {
   pending_leave: CalendarClock,
+  leave_decision: CheckCheck,
   late: Clock,
   absent: UserX,
   checkin: LogIn,

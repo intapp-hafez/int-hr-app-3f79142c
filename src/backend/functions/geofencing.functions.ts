@@ -18,6 +18,7 @@ export type AssignableEmployee = {
   emp_code: string | null;
   department: string | null;
   assigned: boolean;
+  radius_m?: number | null;
 };
 
 export const listGeofencesAdmin = createServerFn({ method: "GET" })
@@ -133,25 +134,49 @@ export const listAssignableEmployees = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({ locationId: z.string().uuid() }).parse(input))
   .handler(async ({ context, data }): Promise<AssignableEmployee[]> => {
     const { supabase } = context;
-    const [{ data: emps, error: e1 }, { data: assigned, error: e2 }] = await Promise.all([
+    const [{ data: emps, error: e1 }, assignedRes] = await Promise.all([
       supabase
         .from("profiles")
         .select("id, full_name, emp_code, departments:department_id(name_en)")
         .eq("status", "Active")
         .order("full_name", { ascending: true })
         .limit(500),
-      supabase.from("geofence_assignments").select("profile_id").eq("location_id", data.locationId),
+      supabase
+        .from("geofence_assignments")
+        .select("profile_id, radius_m")
+        .eq("location_id", data.locationId),
     ]);
     if (e1) throw new Error(e1.message);
-    if (e2) throw new Error(e2.message);
-    const set = new Set((assigned ?? []).map((a: any) => a.profile_id));
-    return (emps ?? []).map((p: any) => ({
-      id: p.id,
-      full_name: p.full_name ?? "—",
-      emp_code: p.emp_code ?? null,
-      department: p.departments?.name_en ?? null,
-      assigned: set.has(p.id),
-    }));
+
+    let assignedRows: any[] = [];
+    if (assignedRes.error) {
+      // Fallback if radius_m column is not yet present
+      const fallback = await supabase
+        .from("geofence_assignments")
+        .select("profile_id")
+        .eq("location_id", data.locationId);
+      if (fallback.error) throw new Error(fallback.error.message);
+      assignedRows = fallback.data ?? [];
+    } else {
+      assignedRows = assignedRes.data ?? [];
+    }
+
+    const assignMap = new Map<string, { radius_m: number | null }>();
+    for (const a of assignedRows) {
+      assignMap.set(a.profile_id, { radius_m: a.radius_m != null ? Number(a.radius_m) : null });
+    }
+
+    return (emps ?? []).map((p: any) => {
+      const info = assignMap.get(p.id);
+      return {
+        id: p.id,
+        full_name: p.full_name ?? "—",
+        emp_code: p.emp_code ?? null,
+        department: p.departments?.name_en ?? null,
+        assigned: !!info,
+        radius_m: info ? info.radius_m : null,
+      };
+    });
   });
 
 export const toggleGeofenceAssignment = createServerFn({ method: "POST" })
@@ -162,18 +187,34 @@ export const toggleGeofenceAssignment = createServerFn({ method: "POST" })
         locationId: z.string().uuid(),
         profileId: z.string().uuid(),
         assign: z.boolean(),
+        radius_m: z.number().int().min(10).max(10000).nullable().optional(),
       })
       .parse(input),
   )
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
     if (data.assign) {
-      const { error } = await (supabase.from("geofence_assignments") as any).insert({
+      const payload: any = {
         location_id: data.locationId,
         profile_id: data.profileId,
         assigned_by: userId,
-      });
-      if (error && !`${error.message}`.toLowerCase().includes("duplicate")) throw new Error(error.message);
+      };
+      if (data.radius_m !== undefined) {
+        payload.radius_m = data.radius_m;
+      }
+      const { error } = await (supabase.from("geofence_assignments") as any).insert(payload);
+      if (error && !`${error.message}`.toLowerCase().includes("duplicate")) {
+        // Fallback without radius_m if column does not exist yet
+        if (`${error.message}`.toLowerCase().includes("radius_m")) {
+          delete payload.radius_m;
+          const retry = await (supabase.from("geofence_assignments") as any).insert(payload);
+          if (retry.error && !`${retry.error.message}`.toLowerCase().includes("duplicate")) {
+            throw new Error(retry.error.message);
+          }
+        } else {
+          throw new Error(error.message);
+        }
+      }
     } else {
       const { error } = await supabase
         .from("geofence_assignments")
@@ -182,6 +223,27 @@ export const toggleGeofenceAssignment = createServerFn({ method: "POST" })
         .eq("profile_id", data.profileId);
       if (error) throw new Error(error.message);
     }
+    return { ok: true };
+  });
+
+export const updateGeofenceAssignmentRadius = createServerFn({ method: "POST" })
+  .middleware([requireAdminAccess])
+  .inputValidator((input) =>
+    z
+      .object({
+        locationId: z.string().uuid(),
+        profileId: z.string().uuid(),
+        radius_m: z.number().int().min(10).max(10000).nullable(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ context, data }) => {
+    const { supabase } = context;
+    const { error } = await (supabase.from("geofence_assignments") as any)
+      .update({ radius_m: data.radius_m })
+      .eq("location_id", data.locationId)
+      .eq("profile_id", data.profileId);
+    if (error) throw new Error(error.message);
     return { ok: true };
   });
 

@@ -70,6 +70,15 @@ export function AttendanceReportView() {
             To
             <DateInput value={to} onChange={setTo} className="mt-1 w-40" />
           </label>
+          <label className="flex items-center gap-2 self-end h-9 rounded-xl border border-input bg-card px-3 text-xs font-medium cursor-pointer hover:bg-muted/40 transition-colors">
+            <input
+              type="checkbox"
+              checked={onlyApproved}
+              onChange={(e) => setOnlyApproved(e.target.checked)}
+              className="h-4 w-4 rounded border-border text-brand focus:ring-brand accent-brand cursor-pointer"
+            />
+            <span>Only approved locations</span>
+          </label>
           <button
             onClick={() => window.print()}
             className="inline-flex h-9 items-center gap-2 rounded-xl bg-gradient-brand px-4 text-sm font-semibold text-brand-foreground shadow-brand cursor-pointer"
@@ -112,7 +121,9 @@ export function AttendanceReportView() {
                     <th className="py-1.5">Employee</th>
                     <th className="py-1.5">Date</th>
                     <th className="py-1.5">Check-in</th>
+                    <th className="py-1.5">In Location</th>
                     <th className="py-1.5">Check-out</th>
+                    <th className="py-1.5">Out Location</th>
                     <th className="py-1.5">Status</th>
                     <th className="py-1.5">Branch</th>
                     <th className="py-1.5">Device</th>
@@ -125,7 +136,61 @@ export function AttendanceReportView() {
                       <td className="py-1.5 font-medium">{r.employee_name}</td>
                       <td className="py-1.5 font-mono">{formatDate(r.date)}</td>
                       <td className="py-1.5 font-mono">{time(r.in_time)}</td>
-                      <td className="py-1.5 font-mono">{time(r.out_time)}</td>
+                      <td className="py-1.5 align-top">
+                        {r.in_time ? (
+                          <div className="flex flex-col gap-0.5 max-w-[220px]">
+                            <span className="text-foreground leading-tight truncate" title={r.in_location || r.branch || ""}>
+                              {r.in_location || r.branch || "HQ"}
+                            </span>
+                            {r.free_check ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-warning-foreground">
+                                <span className="h-1.5 w-1.5 rounded-full bg-warning inline-block shrink-0" />
+                                Free check-in
+                              </span>
+                            ) : r.in_location_ok === true ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-success">
+                                <span className="h-1.5 w-1.5 rounded-full bg-success inline-block shrink-0" />
+                                Inside
+                              </span>
+                            ) : r.in_location_ok === false ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-destructive">
+                                <span className="h-1.5 w-1.5 rounded-full bg-destructive inline-block shrink-0" />
+                                Outside
+                              </span>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="py-1.5 font-mono align-top">{time(r.out_time)}</td>
+                      <td className="py-1.5 align-top">
+                        {r.out_time ? (
+                          <div className="flex flex-col gap-0.5 max-w-[220px]">
+                            <span className="text-foreground leading-tight truncate" title={r.out_location || r.branch || ""}>
+                              {r.out_location || r.branch || "HQ"}
+                            </span>
+                            {r.free_check ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-warning-foreground">
+                                <span className="h-1.5 w-1.5 rounded-full bg-warning inline-block shrink-0" />
+                                Free check-out
+                              </span>
+                            ) : r.out_location_ok === true ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-success">
+                                <span className="h-1.5 w-1.5 rounded-full bg-success inline-block shrink-0" />
+                                Inside
+                              </span>
+                            ) : r.out_location_ok === false ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-destructive">
+                                <span className="h-1.5 w-1.5 rounded-full bg-destructive inline-block shrink-0" />
+                                Outside
+                              </span>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
                       <td className="py-1.5 capitalize">{r.status}</td>
                       <td className="py-1.5">{r.branch ?? "—"}</td>
                       <td className={`py-1.5 font-semibold capitalize ${deviceClass(r.device_status)}`}>

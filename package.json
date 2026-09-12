@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "package": "node scripts/package-deploy.mjs"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",

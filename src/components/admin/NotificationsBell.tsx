@@ -26,6 +26,7 @@ import { useNotificationPrefs } from "@/lib/notification-prefs";
 
 const ICONS: Record<AdminAlert["kind"], typeof Bell> = {
   pending_leave: CalendarClock,
+  leave_decision: CheckCheck,
   late: Clock,
   absent: UserX,
   checkin: LogIn,

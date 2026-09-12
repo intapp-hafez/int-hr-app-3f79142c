@@ -8,6 +8,7 @@ export type AlertCategory =
   | "military_expiry"
   | "probation_end"
   | "pending_leave"
+  | "leave_decision"
   | "advance_payment"
   | "late"
   | "absent"
@@ -84,6 +85,12 @@ export const CATEGORY_META: {
     group: "requests",
   },
   {
+    id: "leave_decision",
+    label: "Leave decisions (Team)",
+    description: "Approved, rejected, and cancelled leave updates for team members",
+    group: "requests",
+  },
+  {
     id: "advance_payment",
     label: "Advance payment requests",
     description: "Salary advance & loan requests awaiting review",
@@ -130,6 +137,7 @@ const DEFAULT: CategoryPrefs = {
   military_expiry: { inapp: true, email: false, push: false },
   probation_end:   { inapp: true, email: true,  push: false },
   pending_leave:   { inapp: true, email: true,  push: false },
+  leave_decision:  { inapp: true, email: true,  push: false },
   advance_payment: { inapp: true, email: true,  push: false },
   late:            { inapp: true, email: true,  push: true  },
   absent:          { inapp: true, email: true,  push: false },
