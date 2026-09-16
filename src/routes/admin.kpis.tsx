@@ -595,7 +595,7 @@ function Page() {
                   <tr key={idx} className={row.isValid ? "hover:bg-muted/40" : "bg-destructive/5"}>
                     <td className="px-3 py-2">
                       {row.isValid ? (
-                        <CheckCircle2 className="h-4 w-4 text-success" title="Ready to import" />
+                        <span title="Ready to import"><CheckCircle2 className="h-4 w-4 text-success" /></span>
                       ) : (
                         <span className="inline-flex items-center gap-1 text-destructive" title={row.error}>
                           <AlertCircle className="h-4 w-4" />
