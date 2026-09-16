@@ -15,6 +15,7 @@ import { decideLeave } from "@/backend/functions/leaves.functions";
 import { NotificationsCenter } from "@/components/admin/NotificationsCenter";
 import { AttendanceTrendChart } from "@/components/admin/AttendanceTrendChart";
 import { formatDate } from "@/lib/date-format";
+import { usePermissions } from "@/lib/permissions";
 
 export const Route = createFileRoute("/admin/")({
   component: AdminDashboard,
@@ -23,6 +24,7 @@ export const Route = createFileRoute("/admin/")({
 function AdminDashboard() {
   const { t } = useI18n();
   const qc = useQueryClient();
+  const { can, isAdmin } = usePermissions();
   const notifications = useStore((s) => s.notifications).filter((n) => n.audience === "hr");
   const unread = notifications.filter((n) => !n.read).length;
   const fn = useServerFn(getAdminStats);
@@ -234,22 +236,34 @@ function AdminDashboard() {
       </div>
 
       {/* Manage modules */}
-      <section className="rounded-3xl border border-border bg-card p-5">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-display text-base font-semibold">Manage</h2>
-          <span className="text-[11px] text-muted-foreground">Jump into any module</span>
-        </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-          <ModuleTile to="/admin/employees" icon={Users} label="Employees" tone="indigo" />
-          <ModuleTile to="/admin/attendance" icon={Clock} label="Attendance" tone="emerald" />
-          <ModuleTile to="/admin/leaves" icon={CalendarDays} label="Leaves" tone="sky" />
-          <ModuleTile to="/admin/payroll" icon={Wallet} label="Payroll" tone="violet" />
-          <ModuleTile to="/admin/contracts" icon={FileText} label="Contracts" tone="amber" />
-          <ModuleTile to="/admin/networks" icon={Building2} label="Branches" tone="orange" />
-          <ModuleTile to="/admin/settings/roles" icon={Shield} label="Roles" tone="rose" />
-          <ModuleTile to="/admin/reports" icon={BarChart3} label="Reports" tone="brand" />
-        </div>
-      </section>
+      {(() => {
+        const modules = [
+          { to: "/admin/employees", icon: Users, label: "Employees", tone: "indigo" as const, page: "employees" },
+          { to: "/admin/attendance", icon: Clock, label: "Attendance", tone: "emerald" as const, page: "attendance" },
+          { to: "/admin/leaves", icon: CalendarDays, label: "Leaves", tone: "sky" as const, page: "leaves" },
+          { to: "/admin/payroll", icon: Wallet, label: "Payroll", tone: "violet" as const, page: "payroll" },
+          { to: "/admin/contracts", icon: FileText, label: "Contracts", tone: "amber" as const, page: "contracts" },
+          { to: "/admin/networks", icon: Building2, label: "Branches", tone: "orange" as const, page: "networks" },
+          { to: "/admin/settings/roles", icon: Shield, label: "Roles", tone: "rose" as const, page: "roles" },
+          { to: "/admin/reports", icon: BarChart3, label: "Reports", tone: "brand" as const, page: "reports" },
+        ].filter((m) => isAdmin || can(m.page, "view"));
+
+        if (modules.length === 0) return null;
+
+        return (
+          <section className="rounded-3xl border border-border bg-card p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-display text-base font-semibold">Manage</h2>
+              <span className="text-[11px] text-muted-foreground">Jump into allowed modules</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+              {modules.map((m) => (
+                <ModuleTile key={m.to} to={m.to} icon={m.icon} label={m.label} tone={m.tone} />
+              ))}
+            </div>
+          </section>
+        );
+      })()}
 
       <section className="rounded-3xl border border-border bg-card p-5">
         <div className="mb-3 flex items-center justify-between">

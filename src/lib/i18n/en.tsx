@@ -936,6 +936,11 @@ export const ui = {
   addToHomeScreen: "Add to Home Screen",
   tapShareButton: "Tap the Share button",
   installSuccess: "App installed successfully",
+  allowedPages: "Allowed Pages",
+  allowedPagesDesc: "Manage accessible pages for users and roles dynamically",
+  accessRestrictedTitle: "Page Access Restricted",
+  accessRestrictedDesc: "You do not have permission from your administrator to view this page. This page has not been added to your allowed pages.",
+  backToDashboard: "Back to Dashboard",
 } as const;
 
 // Identity maps — English is the source of truth, so translators

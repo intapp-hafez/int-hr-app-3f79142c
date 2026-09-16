@@ -927,6 +927,11 @@ export const ui: Record<UiKey, string> = {
   addToHomeScreen: "إضافة إلى الشاشة الرئيسية",
   tapShareButton: "اضغط على زر المشاركة",
   installSuccess: "تم تثبيت التطبيق بنجاح",
+  allowedPages: "الصفحات المسموحة",
+  allowedPagesDesc: "إدارة الصفحات المصرح بها للمستخدمين والأدوار ديناميكياً",
+  accessRestrictedTitle: "تم تقييد الوصول إلى هذه الصفحة",
+  accessRestrictedDesc: "ليس لديك إذن من المشرف لعرض هذه الصفحة. لم تتم إضافة هذه الصفحة إلى صفحاتك المسموحة.",
+  backToDashboard: "العودة إلى لوحة التحكم",
 };
 
 // Mock-data dictionaries (Arabic translations of seeded data).

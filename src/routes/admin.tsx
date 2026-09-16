@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, Link, useRouterState, Navigate, useNavigate } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
-import { LayoutDashboard, Users, MapPin, Clock, CalendarDays, FileBarChart2, ScrollText, Menu, X, Bell, Search, Wallet, Settings, FileSignature, Shield, Building2, KeyRound, Calculator, UserCog, Network, StickyNote, Banknote, Plane, BarChart3, MessageSquare , Smartphone, Printer } from "lucide-react";
+import { LayoutDashboard, Users, MapPin, Clock, CalendarDays, FileBarChart2, ScrollText, Menu, X, Bell, Search, Wallet, Settings, FileSignature, Shield, Building2, KeyRound, Calculator, UserCog, Network, StickyNote, Banknote, Plane, BarChart3, MessageSquare , Smartphone, Printer, ShieldAlert, ArrowLeft } from "lucide-react";
 import { NotificationsBell } from "@/components/admin/NotificationsBell";
 import { AppLogo } from "@/components/AppLogo";
 import { UserMenu } from "@/components/UserMenu";
@@ -74,6 +74,9 @@ function AdminLayout() {
   const nav = isAdmin || permsLoading
     ? navAll
     : navAll.filter((n) => n.page === null || can(n.page, "view"));
+
+  const currentRequiredPage = getPageSlugForPath(path);
+  const isPageAllowed = isAdmin || permsLoading || !currentRequiredPage || can(currentRequiredPage, "view");
 
   const isActive = (to: string, exact?: boolean) => (exact ? path === to : path.startsWith(to));
 
@@ -175,8 +178,73 @@ function AdminLayout() {
         </header>
 
         <main className="p-4 lg:p-8">
-          <Outlet />
+          {!isPageAllowed ? (
+            <AccessRestrictedView pageSlug={currentRequiredPage!} path={path} />
+          ) : (
+            <Outlet />
+          )}
         </main>
+      </div>
+    </div>
+  );
+}
+
+function getPageSlugForPath(path: string): string | null {
+  if (path === "/admin" || path === "/admin/") return null;
+  if (path.startsWith("/admin/chat") || path.startsWith("/admin/sticky-notes")) return null;
+  if (path.startsWith("/admin/employees") || path.startsWith("/admin/org-chart") || path.startsWith("/admin/activity-timeline") || path.startsWith("/admin/manpower") || path.startsWith("/admin/reassign-managers")) return "employees";
+  if (path.startsWith("/admin/contracts")) return "contracts";
+  if (path.startsWith("/admin/attendance")) return "attendance";
+  if (path.startsWith("/admin/leaves-requests")) return "leaves-requests";
+  if (path.startsWith("/admin/leaves")) return "leaves";
+  if (path.startsWith("/admin/payroll")) return "payroll";
+  if (path.startsWith("/admin/advances")) return "advances";
+  if (path.startsWith("/admin/geofencing") || path.startsWith("/admin/work-locations")) return "geofencing";
+  if (path.startsWith("/admin/networks") || path.startsWith("/admin/devices")) return "networks";
+  if (path.startsWith("/admin/shifts")) return "shifts";
+  if (path.startsWith("/admin/holiday-types")) return "holiday-types";
+  if (path.startsWith("/admin/holidays")) return "holidays";
+  if (path.startsWith("/admin/kpis")) return "kpis";
+  if (path.startsWith("/admin/allowances")) return "allowances";
+  if (path.startsWith("/admin/late-penalties")) return "late-penalties";
+  if (path.startsWith("/admin/targets-overtime")) return "targets-overtime";
+  if (path.startsWith("/admin/directory")) return "directory";
+  if (path.startsWith("/admin/employee-access")) return "employee-access";
+  if (path.startsWith("/admin/audit")) return "audit";
+  if (path.startsWith("/admin/reports")) return "reports";
+  if (path.startsWith("/admin/settings/roles")) return "roles";
+  if (path.startsWith("/admin/settings")) return "settings";
+  return null;
+}
+
+function AccessRestrictedView({ pageSlug, path }: { pageSlug: string; path: string }) {
+  const { t } = useI18n();
+  return (
+    <div className="flex min-h-[60vh] items-center justify-center p-4">
+      <div className="max-w-md w-full rounded-3xl border border-destructive/20 bg-card p-8 text-center shadow-lg space-y-5">
+        <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-destructive/10 text-destructive">
+          <ShieldAlert className="h-8 w-8" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="font-display text-xl font-bold tracking-tight text-foreground">
+            {t("accessRestrictedTitle") || "Page Access Restricted"}
+          </h2>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            {t("accessRestrictedDesc") || "You do not have permission from your administrator to view this page. This page has not been added to your allowed pages."}
+          </p>
+          <div className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-muted/50 px-3 py-1 text-[11px] font-mono text-muted-foreground">
+            <span>Route:</span> <strong className="text-foreground">{path}</strong>
+          </div>
+        </div>
+        <div className="pt-2">
+          <Link
+            to="/admin"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-brand text-brand-foreground px-5 py-2.5 text-sm font-semibold shadow-brand hover:opacity-95 transition-all"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            {t("backToDashboard") || "Back to Dashboard"}
+          </Link>
+        </div>
       </div>
     </div>
   );

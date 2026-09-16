@@ -1,9 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Shield, X, Lock, Search, ChevronLeft, UserPlus, UserMinus, History, CheckCircle2, AlertCircle } from "lucide-react";
+import {
+  Shield, X, Lock, Search, ChevronLeft, UserPlus, UserMinus, History, CheckCircle2, AlertCircle,
+  Users, Building2, KeyRound, Clock, CalendarDays, Wallet, Banknote, Calculator,
+  AlertTriangle, TrendingUp, BarChart3, MapPin, Network, FileBarChart2, ScrollText, Settings,
+  RotateCcw, CheckCheck, Ban, Sparkles, Filter, FileSignature, Check, ShieldCheck, ShieldAlert
+} from "lucide-react";
 import {
   listUsersWithRoles,
   assignRole,
@@ -17,11 +22,17 @@ import {
   setRolePermission,
   getUserOverrides,
   setUserOverride,
+  getUserAllowedPages,
+  setUserAllowedPage,
+  bulkSetUserAllowedPages,
+  setRoleAllowedPage,
   PERMISSION_PAGES,
   PERMISSION_ACTIONS,
   type PermissionAction,
+  type UserAllowedPageStatus,
 } from "@/backend/functions/permissions.functions";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,7 +44,18 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-export const Route = createFileRoute("/admin/settings_/roles")({ component: RolesPage });
+type RolesSearch = {
+  tab?: string;
+  userId?: string;
+};
+
+export const Route = createFileRoute("/admin/settings_/roles")({
+  validateSearch: (search: Record<string, unknown>): RolesSearch => ({
+    tab: typeof search.tab === "string" ? search.tab : undefined,
+    userId: typeof search.userId === "string" ? search.userId : undefined,
+  }),
+  component: RolesPage,
+});
 
 const ALL_ROLES = ["admin", "hr", "finance", "manager", "employee", "staff", "user"] as const;
 type Role = (typeof ALL_ROLES)[number];
@@ -61,6 +83,14 @@ const ROLE_DESC: Record<Role, string> = {
 };
 
 function RolesPage() {
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const activeTab = search.tab || "users";
+
+  const handleTabChange = (val: string) => {
+    navigate({ search: (prev: Record<string, unknown>) => ({ ...prev, tab: val }) });
+  };
+
   return (
     <div className="space-y-5">
       <header className="space-y-2">
@@ -72,16 +102,18 @@ function RolesPage() {
         </Link>
         <div>
           <h1 className="font-display text-2xl font-semibold tracking-tight md:text-3xl">Roles & Permissions</h1>
-          <p className="text-sm text-muted-foreground">Assign roles and fine-tune what each role or user can do. Add and remove actions require confirmation.</p>
+          <p className="text-sm text-muted-foreground">Assign roles, manage allowed pages per user/role, and fine-tune permissions. All changes persist directly to the database.</p>
         </div>
       </header>
-      <Tabs defaultValue="users" className="space-y-5">
-        <TabsList>
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-5">
+        <TabsList className="grid grid-cols-2 sm:flex sm:w-auto">
           <TabsTrigger value="users">Users & Roles</TabsTrigger>
+          <TabsTrigger value="allowed-pages">Allowed Pages</TabsTrigger>
           <TabsTrigger value="role-perms">Role Permissions</TabsTrigger>
           <TabsTrigger value="user-perms">User Overrides</TabsTrigger>
         </TabsList>
         <TabsContent value="users"><UsersAndRoles /></TabsContent>
+        <TabsContent value="allowed-pages"><AllowedPagesTab defaultUserId={search.userId} /></TabsContent>
         <TabsContent value="role-perms"><RolePermissionsTab /></TabsContent>
         <TabsContent value="user-perms"><UserOverridesTab /></TabsContent>
       </Tabs>
@@ -760,6 +792,550 @@ function UserOverridesTab() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+const PAGE_ICON_MAP: Record<string, any> = {
+  Users,
+  FileSignature,
+  Building2,
+  KeyRound,
+  Clock,
+  CalendarDays,
+  Wallet,
+  Banknote,
+  Calculator,
+  AlertTriangle,
+  TrendingUp,
+  BarChart3,
+  MapPin,
+  Network,
+  FileBarChart2,
+  ScrollText,
+  Settings,
+  Shield,
+};
+
+const CATEGORIES_CONFIG: Record<string, { label: string; tone: string }> = {
+  core_hr: { label: "Core HR & Staffing", tone: "bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800/40" },
+  attendance: { label: "Time & Attendance", tone: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/40" },
+  finance: { label: "Payroll & Finance", tone: "bg-teal-500/10 text-teal-700 dark:text-teal-400 border-teal-200 dark:border-teal-800/40" },
+  operations: { label: "Workplace & Operations", tone: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/40" },
+  settings: { label: "System & Administration", tone: "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800/40" },
+};
+
+function AllowedPagesTab({ defaultUserId }: { defaultUserId?: string }) {
+  const qc = useQueryClient();
+  const [configMode, setConfigMode] = useState<"user" | "role">("user");
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(defaultUserId ?? null);
+  const [selectedRole, setSelectedRole] = useState<ManagedRole>("hr");
+  const [userSearch, setUserSearch] = useState("");
+  const [pageSearch, setPageSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+
+  const listUsers = useServerFn(listUsersWithRoles);
+  const fetchUserAllowed = useServerFn(getUserAllowedPages);
+  const setPageMut = useServerFn(setUserAllowedPage);
+  const bulkMut = useServerFn(bulkSetUserAllowedPages);
+  const setRolePageMut = useServerFn(setRoleAllowedPage);
+  const fetchRoleMatrix = useServerFn(getRoleMatrix);
+
+  // Load all users
+  const usersQuery = useQuery({
+    queryKey: ["users-with-roles"],
+    queryFn: () => listUsers(),
+  });
+
+  // Filter users by search
+  const filteredUsers = useMemo(() => {
+    const s = userSearch.trim().toLowerCase();
+    const all = (usersQuery.data ?? []) as any[];
+    if (!s) return all;
+    return all.filter((u) =>
+      (u.full_name ?? "").toLowerCase().includes(s) ||
+      (u.email ?? "").toLowerCase().includes(s)
+    );
+  }, [usersQuery.data, userSearch]);
+
+  // If no user selected, select first managed user
+  useEffect(() => {
+    if (!selectedUserId && filteredUsers.length > 0) {
+      const firstManaged = filteredUsers.find((u: any) =>
+        (u.roles ?? []).some((r: string) => (MANAGED_ROLES as readonly string[]).includes(r as any))
+      ) || filteredUsers[0];
+      if (firstManaged) setSelectedUserId(firstManaged.id);
+    }
+  }, [selectedUserId, filteredUsers]);
+
+  // Load user allowed pages from DB
+  const userPagesQuery = useQuery({
+    queryKey: ["user-allowed-pages", selectedUserId],
+    queryFn: () => fetchUserAllowed({ data: { userId: selectedUserId! } }),
+    enabled: !!selectedUserId && configMode === "user",
+  });
+
+  // Load role matrix for role mode
+  const roleMatrixQuery = useQuery({
+    queryKey: ["role-matrix"],
+    queryFn: () => fetchRoleMatrix(),
+    enabled: configMode === "role",
+  });
+
+  const roleViewMap = useMemo(() => {
+    const m = new Map<string, boolean>();
+    for (const r of roleMatrixQuery.data ?? []) {
+      if ((r as any).role === selectedRole) {
+        m.set((r as any).page, Boolean((r as any).can_view));
+      }
+    }
+    return m;
+  }, [roleMatrixQuery.data, selectedRole]);
+
+  // Toggle single user page permission
+  const toggleUserPage = useMutation({
+    mutationFn: (v: { userId: string; page: string; allowed: boolean | null }) =>
+      setPageMut({ data: v }),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["user-allowed-pages", vars.userId] });
+      qc.invalidateQueries({ queryKey: ["my-permissions"] });
+      toast.success("Page access saved to database");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  // Bulk user page toggle
+  const bulkUserToggle = useMutation({
+    mutationFn: (v: { userId: string; action: "allow_all" | "block_all" | "reset_all" }) =>
+      bulkMut({ data: v }),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["user-allowed-pages", vars.userId] });
+      qc.invalidateQueries({ queryKey: ["my-permissions"] });
+      toast.success(
+        vars.action === "allow_all"
+          ? "All pages allowed for user"
+          : vars.action === "block_all"
+          ? "All pages blocked for user"
+          : "Reset all pages to role default"
+      );
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  // Role page toggle
+  const toggleRolePage = useMutation({
+    mutationFn: (v: { role: ManagedRole; page: string; allowed: boolean }) =>
+      setRolePageMut({ data: v }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["role-matrix"] });
+      qc.invalidateQueries({ queryKey: ["user-allowed-pages"] });
+      qc.invalidateQueries({ queryKey: ["my-permissions"] });
+      toast.success("Role page permission saved to database");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const selectedUser = useMemo(() => {
+    return (usersQuery.data ?? []).find((u: any) => u.id === selectedUserId);
+  }, [usersQuery.data, selectedUserId]);
+
+  const rawPages: UserAllowedPageStatus[] = useMemo(() => {
+    if (configMode === "user" && userPagesQuery.data?.pages) {
+      return userPagesQuery.data.pages;
+    }
+    return PERMISSION_PAGES.map((p) => {
+      const allowed = Boolean(roleViewMap.get(p.slug));
+      return {
+        slug: p.slug,
+        label: p.label,
+        path: p.path,
+        category: p.category,
+        icon: p.icon,
+        isAllowed: allowed,
+        source: "role" as const,
+        overrideValue: null,
+        roleValue: allowed,
+      };
+    });
+  }, [configMode, userPagesQuery.data, roleViewMap]);
+
+  const filteredPages = useMemo(() => {
+    const s = pageSearch.trim().toLowerCase();
+    return rawPages.filter((p) => {
+      const matchCat = selectedCategory === "all" || p.category === selectedCategory;
+      const matchSearch = !s || p.label.toLowerCase().includes(s) || p.path.toLowerCase().includes(s);
+      return matchCat && matchSearch;
+    });
+  }, [rawPages, pageSearch, selectedCategory]);
+
+  const groupedPages = useMemo(() => {
+    const groups: Record<string, UserAllowedPageStatus[]> = {};
+    for (const p of filteredPages) {
+      const cat = p.category || "other";
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(p);
+    }
+    return groups;
+  }, [filteredPages]);
+
+  const isUserAdmin = userPagesQuery.data?.isAdmin;
+
+  return (
+    <div className="space-y-6">
+      {/* Top Banner & Mode Selector */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-3xl border border-border bg-card p-4">
+        <div>
+          <h2 className="text-base font-semibold flex items-center gap-2">
+            <ShieldCheck className="h-5 w-5 text-brand" />
+            Allowed Pages Management
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            Configure dynamic page-level access stored directly in the database. Users can only visit pages authorized by an admin.
+          </p>
+        </div>
+        <div className="flex items-center gap-1 rounded-xl bg-muted p-1 text-xs">
+          <button
+            type="button"
+            onClick={() => setConfigMode("user")}
+            className={`rounded-lg px-3 py-1.5 font-medium transition-all ${
+              configMode === "user"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Configure by User
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfigMode("role")}
+            className={`rounded-lg px-3 py-1.5 font-medium transition-all ${
+              configMode === "role"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Configure by Role
+          </button>
+        </div>
+      </div>
+
+      {configMode === "role" ? (
+        /* Role Mode View */
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            {MANAGED_ROLES.map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setSelectedRole(r)}
+                className={`rounded-full px-4 py-1.5 text-xs font-semibold capitalize transition-all ${
+                  selectedRole === r
+                    ? "bg-brand text-brand-foreground shadow-brand"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                }`}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+
+          <div className="rounded-2xl border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
+            Editing baseline allowed pages for all users with the <strong className="capitalize text-foreground">{selectedRole}</strong> role. Changes take effect across all matching users immediately.
+          </div>
+
+          <div className="space-y-6">
+            {Object.entries(groupedPages).map(([catKey, pages]) => {
+              const catCfg = CATEGORIES_CONFIG[catKey] ?? { label: catKey, tone: "bg-muted text-muted-foreground border-border" };
+              return (
+                <div key={catKey} className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${catCfg.tone}`}>
+                      {catCfg.label}
+                    </span>
+                    <span className="text-xs text-muted-foreground">({pages.length} pages)</span>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {pages.map((p) => {
+                      const IconComp = PAGE_ICON_MAP[p.icon || ""] || Shield;
+                      const isAllowed = Boolean(roleViewMap.get(p.slug));
+                      return (
+                        <div
+                          key={p.slug}
+                          className={`flex items-center justify-between gap-3 rounded-2xl border p-3.5 transition-all ${
+                            isAllowed
+                              ? "border-brand/30 bg-card shadow-sm hover:border-brand/50"
+                              : "border-border bg-muted/20 opacity-75 hover:opacity-100"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${isAllowed ? "bg-brand/10 text-brand" : "bg-muted text-muted-foreground"}`}>
+                              <IconComp className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold">{p.label}</p>
+                              <code className="text-[10px] text-muted-foreground font-mono">{p.path}</code>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              checked={isAllowed}
+                              disabled={toggleRolePage.isPending}
+                              onCheckedChange={(checked) =>
+                                toggleRolePage.mutate({ role: selectedRole, page: p.slug, allowed: checked })
+                              }
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        /* User Mode View */
+        <div className="grid gap-5 lg:grid-cols-[300px_1fr]">
+          {/* Left User Selector Column */}
+          <div className="space-y-3 rounded-3xl border border-border bg-card p-3">
+            <div className="relative">
+              <Search className="pointer-events-none absolute start-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={userSearch}
+                onChange={(e) => setUserSearch(e.target.value)}
+                placeholder="Search employees…"
+                className="w-full rounded-xl border border-input bg-background py-1.5 ps-8 pe-3 text-xs outline-none focus:border-ring"
+              />
+            </div>
+
+            <div className="max-h-[600px] space-y-1 overflow-y-auto pe-1">
+              {filteredUsers.length === 0 && (
+                <p className="py-6 text-center text-xs text-muted-foreground">No users found</p>
+              )}
+              {filteredUsers.map((u: any) => {
+                const isSelected = selectedUserId === u.id;
+                const roles = (u.roles ?? []) as Role[];
+                const primaryRole = roles[0] || "user";
+                return (
+                  <button
+                    key={u.id}
+                    type="button"
+                    onClick={() => setSelectedUserId(u.id)}
+                    className={`w-full rounded-2xl p-2.5 text-start transition-all ${
+                      isSelected
+                        ? "bg-brand/10 border border-brand/40 text-foreground shadow-sm"
+                        : "hover:bg-muted/60 border border-transparent"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <p className="truncate text-xs font-semibold">{u.full_name || "Unnamed User"}</p>
+                      <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase ${roleColor[primaryRole] || roleColor.user}`}>
+                        {primaryRole}
+                      </span>
+                    </div>
+                    <p className="truncate text-[11px] text-muted-foreground">{u.email}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Right Pages Matrix Column */}
+          <div className="space-y-4 rounded-3xl border border-border bg-card p-5">
+            {!selectedUser ? (
+              <div className="p-12 text-center text-sm text-muted-foreground">
+                Select a user to view and manage their allowed pages.
+              </div>
+            ) : (
+              <div className="space-y-5">
+                {/* Header for Selected User */}
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-border pb-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base font-bold tracking-tight">{selectedUser.full_name || selectedUser.email}</h3>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${roleColor[selectedUser.roles?.[0] as Role] || roleColor.user}`}>
+                        {selectedUser.roles?.[0] || "user"}
+                      </span>
+                      {isUserAdmin && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900 px-2 py-0.5 text-[10px] font-bold">
+                          <Lock className="h-3 w-3" /> Full Administrator
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">{selectedUser.email}</p>
+                    {userPagesQuery.data && (
+                      <p className="text-xs font-medium text-foreground/80">
+                        <strong className="text-brand">{userPagesQuery.data.allowedCount}</strong> of {userPagesQuery.data.totalCount} pages allowed
+                      </p>
+                    )}
+                  </div>
+
+                  {!isUserAdmin && (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <button
+                        type="button"
+                        disabled={bulkUserToggle.isPending}
+                        onClick={() => bulkUserToggle.mutate({ userId: selectedUser.id, action: "allow_all" })}
+                        className="inline-flex items-center gap-1 rounded-xl bg-brand/10 hover:bg-brand/20 text-brand px-2.5 py-1.5 text-xs font-semibold transition-colors"
+                      >
+                        <CheckCheck className="h-3.5 w-3.5" /> Allow All
+                      </button>
+                      <button
+                        type="button"
+                        disabled={bulkUserToggle.isPending}
+                        onClick={() => bulkUserToggle.mutate({ userId: selectedUser.id, action: "block_all" })}
+                        className="inline-flex items-center gap-1 rounded-xl bg-destructive/10 hover:bg-destructive/20 text-destructive px-2.5 py-1.5 text-xs font-semibold transition-colors"
+                      >
+                        <Ban className="h-3.5 w-3.5" /> Block All
+                      </button>
+                      <button
+                        type="button"
+                        disabled={bulkUserToggle.isPending}
+                        onClick={() => bulkUserToggle.mutate({ userId: selectedUser.id, action: "reset_all" })}
+                        className="inline-flex items-center gap-1 rounded-xl bg-muted hover:bg-muted/80 text-muted-foreground px-2.5 py-1.5 text-xs font-medium transition-colors"
+                        title="Reset all pages to inherit from user role"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" /> Reset Default
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {isUserAdmin && (
+                  <div className="rounded-2xl border border-border bg-muted/40 p-3 text-xs text-muted-foreground flex items-center gap-2">
+                    <Lock className="h-4 w-4 text-brand shrink-0" />
+                    <p>Admins inherently have unrestricted access to all pages and API endpoints. User overrides do not apply to Admins.</p>
+                  </div>
+                )}
+
+                {/* Filters Row */}
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  {/* Category Pills */}
+                  <div className="flex flex-wrap items-center gap-1 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCategory("all")}
+                      className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                        selectedCategory === "all" ? "bg-brand text-brand-foreground shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/80"
+                      }`}
+                    >
+                      All Pages
+                    </button>
+                    {Object.entries(CATEGORIES_CONFIG).map(([key, cfg]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setSelectedCategory(key)}
+                        className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                          selectedCategory === key ? "bg-brand text-brand-foreground shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/80"
+                        }`}
+                      >
+                        {cfg.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Search within pages */}
+                  <div className="relative sm:w-56">
+                    <Search className="pointer-events-none absolute start-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      value={pageSearch}
+                      onChange={(e) => setPageSearch(e.target.value)}
+                      placeholder="Filter pages…"
+                      className="w-full rounded-xl border border-input bg-background py-1 ps-8 pe-2.5 text-xs outline-none focus:border-ring"
+                    />
+                  </div>
+                </div>
+
+                {/* Grouped Pages Grid */}
+                <div className="space-y-6">
+                  {Object.entries(groupedPages).map(([catKey, pages]) => {
+                    const catCfg = CATEGORIES_CONFIG[catKey] ?? { label: catKey, tone: "bg-muted text-muted-foreground border-border" };
+                    return (
+                      <div key={catKey} className="space-y-2.5">
+                        <div className="flex items-center gap-2">
+                          <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${catCfg.tone}`}>
+                            {catCfg.label}
+                          </span>
+                        </div>
+
+                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                          {pages.map((p) => {
+                            const IconComp = PAGE_ICON_MAP[p.icon || ""] || Shield;
+                            const isCustom = p.source === "override" && p.overrideValue !== null;
+                            return (
+                              <div
+                                key={p.slug}
+                                className={`flex items-center justify-between gap-3 rounded-2xl border p-3.5 transition-all ${
+                                  p.isAllowed
+                                    ? "border-border bg-card hover:border-brand/40 shadow-sm"
+                                    : "border-border/60 bg-muted/20 opacity-80 hover:opacity-100"
+                                }`}
+                              >
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${
+                                    p.isAllowed
+                                      ? "bg-brand/10 text-brand"
+                                      : "bg-muted text-muted-foreground"
+                                  }`}>
+                                    <IconComp className="h-4 w-4" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="truncate text-xs font-semibold">{p.label}</p>
+                                    <code className="text-[10px] text-muted-foreground font-mono">{p.path}</code>
+                                    <div className="mt-0.5 flex items-center gap-1.5">
+                                      {p.isAllowed ? (
+                                        <span className="inline-flex items-center gap-0.5 text-[9px] font-medium text-emerald-600 dark:text-emerald-400">
+                                          <Check className="h-2.5 w-2.5" /> {isCustom ? "Custom Allowed" : "Role Allowed"}
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-0.5 text-[9px] font-medium text-destructive">
+                                          <Ban className="h-2.5 w-2.5" /> {isCustom ? "Custom Blocked" : "Role Blocked"}
+                                        </span>
+                                      )}
+                                      {isCustom && !isUserAdmin && (
+                                        <button
+                                          type="button"
+                                          disabled={toggleUserPage.isPending}
+                                          onClick={() => toggleUserPage.mutate({ userId: selectedUser.id, page: p.slug, allowed: null })}
+                                          className="text-[9px] text-muted-foreground hover:text-brand underline inline-flex items-center gap-0.5"
+                                          title="Revert to role default"
+                                        >
+                                          <RotateCcw className="h-2 w-2" /> Reset
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  <Switch
+                                    checked={p.isAllowed}
+                                    disabled={isUserAdmin || toggleUserPage.isPending}
+                                    onCheckedChange={(checked) =>
+                                      toggleUserPage.mutate({
+                                        userId: selectedUser.id,
+                                        page: p.slug,
+                                        allowed: checked,
+                                      })
+                                    }
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

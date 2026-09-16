@@ -88,6 +88,7 @@ import { Route as AdminEmployeesIdRouteImport } from './routes/admin.employees.$
 import { Route as AdminContractsNotificationsRouteImport } from './routes/admin.contracts.notifications'
 import { Route as AdminActivityTimelineIdRouteImport } from './routes/admin.activity-timeline.$id'
 import { Route as ApiPublicCronRunSchedulesRouteImport } from './routes/api/public/cron/run-schedules'
+import { Route as AdminSettingsRolesAllowedPagesRouteImport } from './routes/admin.settings_.roles.allowed-pages'
 
 const StaffRoute = StaffRouteImport.update({
   id: '/staff',
@@ -487,6 +488,12 @@ const ApiPublicCronRunSchedulesRoute =
     path: '/api/public/cron/run-schedules',
     getParentRoute: () => rootRouteImport,
   } as any)
+const AdminSettingsRolesAllowedPagesRoute =
+  AdminSettingsRolesAllowedPagesRouteImport.update({
+    id: '/allowed-pages',
+    path: '/allowed-pages',
+    getParentRoute: () => AdminSettingsRolesRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -563,10 +570,11 @@ export interface FileRoutesByFullPath {
   '/admin/activity-timeline/$id': typeof AdminActivityTimelineIdRoute
   '/admin/contracts/notifications': typeof AdminContractsNotificationsRoute
   '/admin/employees/$id': typeof AdminEmployeesIdRoute
-  '/admin/settings/roles': typeof AdminSettingsRolesRoute
+  '/admin/settings/roles': typeof AdminSettingsRolesRouteWithChildren
   '/api/public/employees': typeof ApiPublicEmployeesRoute
   '/admin/contracts/': typeof AdminContractsIndexRoute
   '/admin/employees/': typeof AdminEmployeesIndexRoute
+  '/admin/settings/roles/allowed-pages': typeof AdminSettingsRolesAllowedPagesRoute
   '/api/public/cron/run-schedules': typeof ApiPublicCronRunSchedulesRoute
 }
 export interface FileRoutesByTo {
@@ -637,10 +645,11 @@ export interface FileRoutesByTo {
   '/admin/activity-timeline/$id': typeof AdminActivityTimelineIdRoute
   '/admin/contracts/notifications': typeof AdminContractsNotificationsRoute
   '/admin/employees/$id': typeof AdminEmployeesIdRoute
-  '/admin/settings/roles': typeof AdminSettingsRolesRoute
+  '/admin/settings/roles': typeof AdminSettingsRolesRouteWithChildren
   '/api/public/employees': typeof ApiPublicEmployeesRoute
   '/admin/contracts': typeof AdminContractsIndexRoute
   '/admin/employees': typeof AdminEmployeesIndexRoute
+  '/admin/settings/roles/allowed-pages': typeof AdminSettingsRolesAllowedPagesRoute
   '/api/public/cron/run-schedules': typeof ApiPublicCronRunSchedulesRoute
 }
 export interface FileRoutesById {
@@ -719,10 +728,11 @@ export interface FileRoutesById {
   '/admin/activity-timeline/$id': typeof AdminActivityTimelineIdRoute
   '/admin/contracts/notifications': typeof AdminContractsNotificationsRoute
   '/admin/employees/$id': typeof AdminEmployeesIdRoute
-  '/admin/settings_/roles': typeof AdminSettingsRolesRoute
+  '/admin/settings_/roles': typeof AdminSettingsRolesRouteWithChildren
   '/api/public/employees': typeof ApiPublicEmployeesRoute
   '/admin/contracts/': typeof AdminContractsIndexRoute
   '/admin/employees/': typeof AdminEmployeesIndexRoute
+  '/admin/settings_/roles/allowed-pages': typeof AdminSettingsRolesAllowedPagesRoute
   '/api/public/cron/run-schedules': typeof ApiPublicCronRunSchedulesRoute
 }
 export interface FileRouteTypes {
@@ -806,6 +816,7 @@ export interface FileRouteTypes {
     | '/api/public/employees'
     | '/admin/contracts/'
     | '/admin/employees/'
+    | '/admin/settings/roles/allowed-pages'
     | '/api/public/cron/run-schedules'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -880,6 +891,7 @@ export interface FileRouteTypes {
     | '/api/public/employees'
     | '/admin/contracts'
     | '/admin/employees'
+    | '/admin/settings/roles/allowed-pages'
     | '/api/public/cron/run-schedules'
   id:
     | '__root__'
@@ -961,6 +973,7 @@ export interface FileRouteTypes {
     | '/api/public/employees'
     | '/admin/contracts/'
     | '/admin/employees/'
+    | '/admin/settings_/roles/allowed-pages'
     | '/api/public/cron/run-schedules'
   fileRoutesById: FileRoutesById
 }
@@ -1531,6 +1544,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCronRunSchedulesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/settings_/roles/allowed-pages': {
+      id: '/admin/settings_/roles/allowed-pages'
+      path: '/allowed-pages'
+      fullPath: '/admin/settings/roles/allowed-pages'
+      preLoaderRoute: typeof AdminSettingsRolesAllowedPagesRouteImport
+      parentRoute: typeof AdminSettingsRolesRoute
+    }
   }
 }
 
@@ -1561,6 +1581,17 @@ const AdminEmployeesRouteChildren: AdminEmployeesRouteChildren = {
 const AdminEmployeesRouteWithChildren = AdminEmployeesRoute._addFileChildren(
   AdminEmployeesRouteChildren,
 )
+
+interface AdminSettingsRolesRouteChildren {
+  AdminSettingsRolesAllowedPagesRoute: typeof AdminSettingsRolesAllowedPagesRoute
+}
+
+const AdminSettingsRolesRouteChildren: AdminSettingsRolesRouteChildren = {
+  AdminSettingsRolesAllowedPagesRoute: AdminSettingsRolesAllowedPagesRoute,
+}
+
+const AdminSettingsRolesRouteWithChildren =
+  AdminSettingsRolesRoute._addFileChildren(AdminSettingsRolesRouteChildren)
 
 interface AdminRouteChildren {
   AdminAdvancesRoute: typeof AdminAdvancesRoute
@@ -1596,7 +1627,7 @@ interface AdminRouteChildren {
   AdminWorkLocationsRoute: typeof AdminWorkLocationsRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminActivityTimelineIdRoute: typeof AdminActivityTimelineIdRoute
-  AdminSettingsRolesRoute: typeof AdminSettingsRolesRoute
+  AdminSettingsRolesRoute: typeof AdminSettingsRolesRouteWithChildren
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
@@ -1633,7 +1664,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminWorkLocationsRoute: AdminWorkLocationsRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminActivityTimelineIdRoute: AdminActivityTimelineIdRoute,
-  AdminSettingsRolesRoute: AdminSettingsRolesRoute,
+  AdminSettingsRolesRoute: AdminSettingsRolesRouteWithChildren,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
