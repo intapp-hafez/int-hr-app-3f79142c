@@ -432,7 +432,7 @@ export const ui: Record<UiKey, string> = {
   next15Days: "خلال 15 يومًا",
   next30Days: "خلال 30 يومًا",
   next45Days: "خلال 45 يومًا",
-  next60Days: "خلال 60 يومًا",
+  next65Days: "خلال 65 يومًا",
   next90Days: "خلال 90 يومًا",
   cancelled: "ملغي",
   renew: "تجديد",
@@ -883,6 +883,8 @@ export const ui: Record<UiKey, string> = {
   "cat.Walkie-Talkie": "جهاز لاسلكي",
   "cat.Petty Cash Box": "صندوق عهدة نقدية",
   "cat.Credit Card": "بطاقة ائتمان",
+  "cat.Private Insurance Card": "بطاقة تأمين خاص",
+  "cat.Governmental Insurance Card": "بطاقة تأمين حكومي",
   "cat.Other": "أخرى",
 
   medicalInsuranceNumber: "رقم التأمين الطبي",

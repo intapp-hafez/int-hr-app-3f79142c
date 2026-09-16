@@ -58,6 +58,9 @@ export const CUSTODY_CATEGORIES = [
   // Financial
   "Petty Cash Box",
   "Credit Card",
+  // Insurance
+  "Private Insurance Card",
+  "Governmental Insurance Card",
   // Other
   "Other",
 ] as const;

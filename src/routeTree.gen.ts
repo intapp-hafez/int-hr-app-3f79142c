@@ -81,9 +81,11 @@ import { Route as AdminAttendanceRouteImport } from './routes/admin.attendance'
 import { Route as AdminAllowancesRouteImport } from './routes/admin.allowances'
 import { Route as AdminAdvancesRouteImport } from './routes/admin.advances'
 import { Route as AdminEmployeesIndexRouteImport } from './routes/admin.employees.index'
+import { Route as AdminContractsIndexRouteImport } from './routes/admin.contracts.index'
 import { Route as ApiPublicEmployeesRouteImport } from './routes/api/public/employees'
 import { Route as AdminSettingsRolesRouteImport } from './routes/admin.settings_.roles'
 import { Route as AdminEmployeesIdRouteImport } from './routes/admin.employees.$id'
+import { Route as AdminContractsNotificationsRouteImport } from './routes/admin.contracts.notifications'
 import { Route as AdminActivityTimelineIdRouteImport } from './routes/admin.activity-timeline.$id'
 import { Route as ApiPublicCronRunSchedulesRouteImport } from './routes/api/public/cron/run-schedules'
 
@@ -448,6 +450,11 @@ const AdminEmployeesIndexRoute = AdminEmployeesIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AdminEmployeesRoute,
 } as any)
+const AdminContractsIndexRoute = AdminContractsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminContractsRoute,
+} as any)
 const ApiPublicEmployeesRoute = ApiPublicEmployeesRouteImport.update({
   id: '/api/public/employees',
   path: '/api/public/employees',
@@ -463,6 +470,12 @@ const AdminEmployeesIdRoute = AdminEmployeesIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AdminEmployeesRoute,
 } as any)
+const AdminContractsNotificationsRoute =
+  AdminContractsNotificationsRouteImport.update({
+    id: '/notifications',
+    path: '/notifications',
+    getParentRoute: () => AdminContractsRoute,
+  } as any)
 const AdminActivityTimelineIdRoute = AdminActivityTimelineIdRouteImport.update({
   id: '/activity-timeline/$id',
   path: '/activity-timeline/$id',
@@ -489,7 +502,7 @@ export interface FileRoutesByFullPath {
   '/admin/attendance-report': typeof AdminAttendanceReportRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/chat': typeof AdminChatRoute
-  '/admin/contracts': typeof AdminContractsRoute
+  '/admin/contracts': typeof AdminContractsRouteWithChildren
   '/admin/devices': typeof AdminDevicesRoute
   '/admin/directory': typeof AdminDirectoryRoute
   '/admin/employee-access': typeof AdminEmployeeAccessRoute
@@ -548,9 +561,11 @@ export interface FileRoutesByFullPath {
   '/manager/': typeof ManagerIndexRoute
   '/staff/': typeof StaffIndexRoute
   '/admin/activity-timeline/$id': typeof AdminActivityTimelineIdRoute
+  '/admin/contracts/notifications': typeof AdminContractsNotificationsRoute
   '/admin/employees/$id': typeof AdminEmployeesIdRoute
   '/admin/settings/roles': typeof AdminSettingsRolesRoute
   '/api/public/employees': typeof ApiPublicEmployeesRoute
+  '/admin/contracts/': typeof AdminContractsIndexRoute
   '/admin/employees/': typeof AdminEmployeesIndexRoute
   '/api/public/cron/run-schedules': typeof ApiPublicCronRunSchedulesRoute
 }
@@ -563,7 +578,6 @@ export interface FileRoutesByTo {
   '/admin/attendance-report': typeof AdminAttendanceReportRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/chat': typeof AdminChatRoute
-  '/admin/contracts': typeof AdminContractsRoute
   '/admin/devices': typeof AdminDevicesRoute
   '/admin/directory': typeof AdminDirectoryRoute
   '/admin/employee-access': typeof AdminEmployeeAccessRoute
@@ -621,9 +635,11 @@ export interface FileRoutesByTo {
   '/manager': typeof ManagerIndexRoute
   '/staff': typeof StaffIndexRoute
   '/admin/activity-timeline/$id': typeof AdminActivityTimelineIdRoute
+  '/admin/contracts/notifications': typeof AdminContractsNotificationsRoute
   '/admin/employees/$id': typeof AdminEmployeesIdRoute
   '/admin/settings/roles': typeof AdminSettingsRolesRoute
   '/api/public/employees': typeof ApiPublicEmployeesRoute
+  '/admin/contracts': typeof AdminContractsIndexRoute
   '/admin/employees': typeof AdminEmployeesIndexRoute
   '/api/public/cron/run-schedules': typeof ApiPublicCronRunSchedulesRoute
 }
@@ -642,7 +658,7 @@ export interface FileRoutesById {
   '/admin/attendance-report': typeof AdminAttendanceReportRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/chat': typeof AdminChatRoute
-  '/admin/contracts': typeof AdminContractsRoute
+  '/admin/contracts': typeof AdminContractsRouteWithChildren
   '/admin/devices': typeof AdminDevicesRoute
   '/admin/directory': typeof AdminDirectoryRoute
   '/admin/employee-access': typeof AdminEmployeeAccessRoute
@@ -701,9 +717,11 @@ export interface FileRoutesById {
   '/manager/': typeof ManagerIndexRoute
   '/staff/': typeof StaffIndexRoute
   '/admin/activity-timeline/$id': typeof AdminActivityTimelineIdRoute
+  '/admin/contracts/notifications': typeof AdminContractsNotificationsRoute
   '/admin/employees/$id': typeof AdminEmployeesIdRoute
   '/admin/settings_/roles': typeof AdminSettingsRolesRoute
   '/api/public/employees': typeof ApiPublicEmployeesRoute
+  '/admin/contracts/': typeof AdminContractsIndexRoute
   '/admin/employees/': typeof AdminEmployeesIndexRoute
   '/api/public/cron/run-schedules': typeof ApiPublicCronRunSchedulesRoute
 }
@@ -782,9 +800,11 @@ export interface FileRouteTypes {
     | '/manager/'
     | '/staff/'
     | '/admin/activity-timeline/$id'
+    | '/admin/contracts/notifications'
     | '/admin/employees/$id'
     | '/admin/settings/roles'
     | '/api/public/employees'
+    | '/admin/contracts/'
     | '/admin/employees/'
     | '/api/public/cron/run-schedules'
   fileRoutesByTo: FileRoutesByTo
@@ -797,7 +817,6 @@ export interface FileRouteTypes {
     | '/admin/attendance-report'
     | '/admin/audit'
     | '/admin/chat'
-    | '/admin/contracts'
     | '/admin/devices'
     | '/admin/directory'
     | '/admin/employee-access'
@@ -855,9 +874,11 @@ export interface FileRouteTypes {
     | '/manager'
     | '/staff'
     | '/admin/activity-timeline/$id'
+    | '/admin/contracts/notifications'
     | '/admin/employees/$id'
     | '/admin/settings/roles'
     | '/api/public/employees'
+    | '/admin/contracts'
     | '/admin/employees'
     | '/api/public/cron/run-schedules'
   id:
@@ -934,9 +955,11 @@ export interface FileRouteTypes {
     | '/manager/'
     | '/staff/'
     | '/admin/activity-timeline/$id'
+    | '/admin/contracts/notifications'
     | '/admin/employees/$id'
     | '/admin/settings_/roles'
     | '/api/public/employees'
+    | '/admin/contracts/'
     | '/admin/employees/'
     | '/api/public/cron/run-schedules'
   fileRoutesById: FileRoutesById
@@ -1459,6 +1482,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminEmployeesIndexRouteImport
       parentRoute: typeof AdminEmployeesRoute
     }
+    '/admin/contracts/': {
+      id: '/admin/contracts/'
+      path: '/'
+      fullPath: '/admin/contracts/'
+      preLoaderRoute: typeof AdminContractsIndexRouteImport
+      parentRoute: typeof AdminContractsRoute
+    }
     '/api/public/employees': {
       id: '/api/public/employees'
       path: '/api/public/employees'
@@ -1480,6 +1510,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminEmployeesIdRouteImport
       parentRoute: typeof AdminEmployeesRoute
     }
+    '/admin/contracts/notifications': {
+      id: '/admin/contracts/notifications'
+      path: '/notifications'
+      fullPath: '/admin/contracts/notifications'
+      preLoaderRoute: typeof AdminContractsNotificationsRouteImport
+      parentRoute: typeof AdminContractsRoute
+    }
     '/admin/activity-timeline/$id': {
       id: '/admin/activity-timeline/$id'
       path: '/activity-timeline/$id'
@@ -1496,6 +1533,20 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface AdminContractsRouteChildren {
+  AdminContractsNotificationsRoute: typeof AdminContractsNotificationsRoute
+  AdminContractsIndexRoute: typeof AdminContractsIndexRoute
+}
+
+const AdminContractsRouteChildren: AdminContractsRouteChildren = {
+  AdminContractsNotificationsRoute: AdminContractsNotificationsRoute,
+  AdminContractsIndexRoute: AdminContractsIndexRoute,
+}
+
+const AdminContractsRouteWithChildren = AdminContractsRoute._addFileChildren(
+  AdminContractsRouteChildren,
+)
 
 interface AdminEmployeesRouteChildren {
   AdminEmployeesIdRoute: typeof AdminEmployeesIdRoute
@@ -1518,7 +1569,7 @@ interface AdminRouteChildren {
   AdminAttendanceReportRoute: typeof AdminAttendanceReportRoute
   AdminAuditRoute: typeof AdminAuditRoute
   AdminChatRoute: typeof AdminChatRoute
-  AdminContractsRoute: typeof AdminContractsRoute
+  AdminContractsRoute: typeof AdminContractsRouteWithChildren
   AdminDevicesRoute: typeof AdminDevicesRoute
   AdminDirectoryRoute: typeof AdminDirectoryRoute
   AdminEmployeeAccessRoute: typeof AdminEmployeeAccessRoute
@@ -1555,7 +1606,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminAttendanceReportRoute: AdminAttendanceReportRoute,
   AdminAuditRoute: AdminAuditRoute,
   AdminChatRoute: AdminChatRoute,
-  AdminContractsRoute: AdminContractsRoute,
+  AdminContractsRoute: AdminContractsRouteWithChildren,
   AdminDevicesRoute: AdminDevicesRoute,
   AdminDirectoryRoute: AdminDirectoryRoute,
   AdminEmployeeAccessRoute: AdminEmployeeAccessRoute,

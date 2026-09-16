@@ -65,7 +65,7 @@ export const getFaceDescriptorForLogin = createServerFn({ method: "POST" })
     const { data: profile } = await supabaseAdmin
       .from("profiles")
       .select("id")
-      .eq("email", data.email.toLowerCase().trim())
+      .ilike("email", data.email.trim())
       .maybeSingle();
     if (!profile) return { enrolled: false, descriptor: null as number[] | null };
     const { data: row } = await supabaseAdmin
@@ -89,7 +89,7 @@ export const faceLogin = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const email = data.email.toLowerCase().trim();
     const { data: profile } = await supabaseAdmin
-      .from("profiles").select("id").eq("email", email).maybeSingle();
+      .from("profiles").select("id").ilike("email", email).maybeSingle();
     if (!profile) throw new Error("No account for this email");
     const { data: row } = await supabaseAdmin
       .from("face_descriptors").select("descriptor").eq("user_id", profile.id).maybeSingle();
@@ -195,7 +195,7 @@ export const webauthnAuthOptions = createServerFn({ method: "POST" })
     const { rpID } = getOrigin();
     const email = data.email.toLowerCase().trim();
     const { data: profile } = await supabaseAdmin
-      .from("profiles").select("id").eq("email", email).maybeSingle();
+      .from("profiles").select("id").ilike("email", email).maybeSingle();
     if (!profile) throw new Error("No account for this email");
     const { data: creds } = await supabaseAdmin
       .from("webauthn_credentials").select("credential_id, transports").eq("user_id", profile.id);
@@ -227,7 +227,7 @@ export const webauthnAuthVerify = createServerFn({ method: "POST" })
     const { origin, rpID } = getOrigin();
     const email = data.email.toLowerCase().trim();
     const { data: profile } = await supabaseAdmin
-      .from("profiles").select("id").eq("email", email).maybeSingle();
+      .from("profiles").select("id").ilike("email", email).maybeSingle();
     if (!profile) throw new Error("No account for this email");
     const credId: string = data.response.id;
     const { data: cred } = await supabaseAdmin

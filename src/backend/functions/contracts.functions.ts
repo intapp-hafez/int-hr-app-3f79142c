@@ -24,7 +24,7 @@ export const listContractsAdmin = createServerFn({ method: "POST" })
         pageSize: z.number().int().min(1).max(200).default(25),
         q: z.string().max(120).optional().default(""),
         filter: z
-          .enum(["all", "15", "30", "45", "60", "90", "expired", "cancelled"])
+          .enum(["all", "15", "30", "45", "65", "90", "expired", "cancelled"])
           .optional()
           .default("all"),
       })

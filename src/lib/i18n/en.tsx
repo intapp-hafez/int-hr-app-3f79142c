@@ -435,7 +435,7 @@ export const ui = {
   next15Days: "Next 15 days",
   next30Days: "Next 30 days",
   next45Days: "Next 45 days",
-  next60Days: "Next 60 days",
+  next65Days: "Next 65 days",
   next90Days: "Next 90 days",
   cancelled: "Cancelled",
   renew: "Renew",
@@ -892,6 +892,8 @@ export const ui = {
   "cat.Walkie-Talkie": "Walkie-Talkie",
   "cat.Petty Cash Box": "Petty Cash Box",
   "cat.Credit Card": "Credit Card",
+  "cat.Private Insurance Card": "Private Insurance Card",
+  "cat.Governmental Insurance Card": "Governmental Insurance Card",
   "cat.Other": "Other",
 
   medicalInsuranceNumber: "Medical Insurance Number",

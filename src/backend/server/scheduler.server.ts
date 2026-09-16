@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { processContractNotifications } from "@/backend/functions/contract-notifications.functions";
 import { loadSmtpConfig } from "./smtp-config.server";
 import { sendEmail } from "./smtp-client.server";
 import { rowsToCsv, rowsToXlsx, tableToCsv, tableToXlsx, type ActivityRow } from "./csv-xlsx.server";
@@ -159,6 +160,9 @@ async function fetchActivityRows(
  * to prevent duplicate runs across overlapping cron invocations.
  */
 export async function runDueSchedules(now: Date = new Date()): Promise<RunSummary[]> {
+  // Check contract expirations (idempotent, skips if already processed)
+  await processContractNotifications().catch(e => console.error("Error in processContractNotifications:", e));
+
   const { data: schedules, error } = await supabaseAdmin
     .from("export_schedules")
     .select("*")
