@@ -373,6 +373,68 @@ export type Database = {
           },
         ]
       }
+      contract_notifications: {
+        Row: {
+          closed_at: string | null
+          closed_by: string | null
+          confirmed_at: string | null
+          confirmed_by: string | null
+          contract_end_date: string
+          created_at: string
+          id: string
+          notes: string | null
+          notification_channel: string | null
+          notified_at: string | null
+          notified_by: string | null
+          profile_id: string
+          status: Database["public"]["Enums"]["notification_status_enum"]
+          type: Database["public"]["Enums"]["notification_type_enum"]
+          updated_at: string
+        }
+        Insert: {
+          closed_at?: string | null
+          closed_by?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          contract_end_date: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          notification_channel?: string | null
+          notified_at?: string | null
+          notified_by?: string | null
+          profile_id: string
+          status?: Database["public"]["Enums"]["notification_status_enum"]
+          type: Database["public"]["Enums"]["notification_type_enum"]
+          updated_at?: string
+        }
+        Update: {
+          closed_at?: string | null
+          closed_by?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          contract_end_date?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          notification_channel?: string | null
+          notified_at?: string | null
+          notified_by?: string | null
+          profile_id?: string
+          status?: Database["public"]["Enums"]["notification_status_enum"]
+          type?: Database["public"]["Enums"]["notification_type_enum"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_notifications_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contract_templates: {
         Row: {
           active: boolean
@@ -1528,18 +1590,21 @@ export type Database = {
           assigned_by: string | null
           location_id: string
           profile_id: string
+          radius_m: number | null
         }
         Insert: {
           assigned_at?: string
           assigned_by?: string | null
           location_id: string
           profile_id: string
+          radius_m?: number | null
         }
         Update: {
           assigned_at?: string
           assigned_by?: string | null
           location_id?: string
           profile_id?: string
+          radius_m?: number | null
         }
         Relationships: [
           {
@@ -3862,6 +3927,8 @@ export type Database = {
         | "staff"
         | "user"
         | "finance"
+      notification_status_enum: "pending" | "notified" | "confirmed" | "closed"
+      notification_type_enum: "renew" | "resign"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3998,6 +4065,8 @@ export const Constants = {
         "user",
         "finance",
       ],
+      notification_status_enum: ["pending", "notified", "confirmed", "closed"],
+      notification_type_enum: ["renew", "resign"],
     },
   },
 } as const
