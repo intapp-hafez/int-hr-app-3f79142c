@@ -298,3 +298,157 @@ export const listAllAssignableEmployees = createServerFn({ method: "GET" })
       assigned: false,
     }));
   });
+// ── Work Locations (employee-centric assignment) ─────────────
+
+export type EmployeeWorkLocation = {
+  location_id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  location_radius_m: number;
+  radius_m: number | null;
+  is_default: boolean;
+};
+
+export type EmployeeWorkLocations = {
+  id: string;
+  full_name: string;
+  emp_code: string | null;
+  department: string | null;
+  assignments: EmployeeWorkLocation[];
+};
+
+export const listEmployeeWorkLocations = createServerFn({ method: "GET" })
+  .middleware([requireAdminAccess])
+  .handler(async ({ context }): Promise<{ locations: GeofenceLocation[]; employees: EmployeeWorkLocations[] }> => {
+    const supabase: any = context.supabase;
+    const [locRes, empRes] = await Promise.all([
+      supabase.from("geofence_locations").select("id, name, lat, lng, radius_m, active").order("name"),
+      supabase
+        .from("profiles")
+        .select("id, full_name, emp_code, departments:department_id(name_en)")
+        .eq("status", "Active")
+        .order("full_name", { ascending: true })
+        .limit(1000),
+    ]);
+    if (locRes.error) throw new Error(locRes.error.message);
+    if (empRes.error) throw new Error(empRes.error.message);
+
+    let assignRows: any[] = [];
+    const full = await supabase
+      .from("geofence_assignments")
+      .select("profile_id, location_id, radius_m, is_default");
+    if (full.error) {
+      const partial = await supabase.from("geofence_assignments").select("profile_id, location_id");
+      assignRows = partial.data ?? [];
+    } else {
+      assignRows = full.data ?? [];
+    }
+
+    const locations: GeofenceLocation[] = ((locRes.data ?? []) as any[]).map((r) => ({
+      id: r.id,
+      name: r.name,
+      lat: Number(r.lat),
+      lng: Number(r.lng),
+      radius_m: Number(r.radius_m ?? 100),
+      active: !!r.active,
+      assigned_count: assignRows.filter((a) => a.location_id === r.id).length,
+    }));
+    const locMap = new Map(locations.map((l) => [l.id, l]));
+
+    const employees: EmployeeWorkLocations[] = ((empRes.data ?? []) as any[]).map((p) => ({
+      id: p.id,
+      full_name: p.full_name ?? "—",
+      emp_code: p.emp_code ?? null,
+      department: p.departments?.name_en ?? null,
+      assignments: assignRows
+        .filter((a) => a.profile_id === p.id && locMap.has(a.location_id))
+        .map((a) => {
+          const l = locMap.get(a.location_id)!;
+          return {
+            location_id: l.id,
+            name: l.name,
+            lat: l.lat,
+            lng: l.lng,
+            location_radius_m: l.radius_m,
+            radius_m: a.radius_m == null ? null : Number(a.radius_m),
+            is_default: !!a.is_default,
+          };
+        }),
+    }));
+
+    return { locations, employees };
+  });
+
+export const saveEmployeeWorkLocation = createServerFn({ method: "POST" })
+  .middleware([requireAdminAccess])
+  .inputValidator((input) =>
+    z
+      .object({
+        profileId: z.string().uuid(),
+        locationId: z.string().uuid(),
+        radius_m: z.number().int().min(10).max(10000).nullable().optional(),
+        makeDefault: z.boolean().optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ context, data }) => {
+    const supabase: any = context.supabase;
+    const userId = context.userId;
+
+    const { data: existing } = await supabase
+      .from("geofence_assignments")
+      .select("id")
+      .eq("profile_id", data.profileId)
+      .eq("location_id", data.locationId)
+      .maybeSingle();
+
+    const patch: Record<string, unknown> = {};
+    if (data.radius_m !== undefined) patch.radius_m = data.radius_m;
+    if (data.makeDefault) patch.is_default = true;
+
+    if (existing) {
+      if (Object.keys(patch).length) {
+        const res = await supabase.from("geofence_assignments").update(patch).eq("id", existing.id);
+        if (res.error && !`${res.error.message}`.includes("is_default") && !`${res.error.message}`.includes("radius_m")) {
+          throw new Error(res.error.message);
+        }
+      }
+    } else {
+      const payload: any = { profile_id: data.profileId, location_id: data.locationId, assigned_by: userId, ...patch };
+      const res = await supabase.from("geofence_assignments").insert(payload);
+      if (res.error) {
+        const retry = await supabase
+          .from("geofence_assignments")
+          .insert({ profile_id: data.profileId, location_id: data.locationId, assigned_by: userId });
+        if (retry.error && !`${retry.error.message}`.toLowerCase().includes("duplicate")) {
+          throw new Error(retry.error.message);
+        }
+      }
+    }
+
+    if (data.makeDefault) {
+      // Only one default per employee.
+      await supabase
+        .from("geofence_assignments")
+        .update({ is_default: false })
+        .eq("profile_id", data.profileId)
+        .neq("location_id", data.locationId);
+    }
+    return { ok: true };
+  });
+
+export const removeEmployeeWorkLocation = createServerFn({ method: "POST" })
+  .middleware([requireAdminAccess])
+  .inputValidator((input) =>
+    z.object({ profileId: z.string().uuid(), locationId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ context, data }) => {
+    const { error } = await context.supabase
+      .from("geofence_assignments")
+      .delete()
+      .eq("profile_id", data.profileId)
+      .eq("location_id", data.locationId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
