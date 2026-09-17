@@ -11,6 +11,7 @@ import {
   type LeaveQueueRow,
 } from "@/backend/functions/leaves.functions";
 import { formatDate } from "@/lib/date-format";
+import { LeaveDecisionsPanel } from "@/components/admin/LeaveDecisionsPanel";
 
 export const Route = createFileRoute("/admin/leaves-requests")({ component: LeaveApprovalQueue });
 
@@ -134,6 +135,7 @@ function LeaveApprovalQueue() {
           </span>
         </div>
       </header>
+      <LeaveDecisionsPanel />
 
       <div className="flex flex-wrap items-center gap-2">
         {FILTERS.map((f) => (

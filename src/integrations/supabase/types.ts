@@ -50,6 +50,48 @@ export type Database = {
         }
         Relationships: []
       }
+      app_pages: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          display_order: number
+          icon: string | null
+          is_system: boolean
+          label: string
+          label_ar: string | null
+          path: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          icon?: string | null
+          is_system?: boolean
+          label: string
+          label_ar?: string | null
+          path: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          icon?: string | null
+          is_system?: boolean
+          label?: string
+          label_ar?: string | null
+          path?: string
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       attendance: {
         Row: {
           branch: string | null
