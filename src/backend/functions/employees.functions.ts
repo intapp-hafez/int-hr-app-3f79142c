@@ -486,14 +486,17 @@ export const updateEmployeeAdmin = createServerFn({ method: "POST" })
     }
 
     if (patch.status !== undefined && patch.status !== previousStatus) {
-      await (supabase as any).from("employee_status_audit").insert({
-        profile_id: data.id,
-        previous_status: previousStatus,
-        new_status: patch.status,
-        inactive_reason: patch.status === "Inactive" ? (patch.inactive_reason ?? null) : null,
-        source: "update",
-        changed_by: userId,
-      });
+      const { logStatusChanges } = await import("@/backend/server/status-audit.server");
+      await logStatusChanges(supabase, [
+        {
+          profile_id: data.id,
+          previous_status: previousStatus,
+          new_status: patch.status,
+          inactive_reason: patch.inactive_reason ?? null,
+          source: "update",
+          changed_by: userId,
+        },
+      ]);
     }
 
     if (patch.custom_field !== undefined && patch.custom_field !== previousCustomField) {
@@ -552,19 +555,18 @@ export const bulkSetEmployeeStatus = createServerFn({ method: "POST" })
     patch.inactive_reason = data.status === "Inactive" ? (data.inactive_reason ?? null) : null;
     const { error } = await (supabase.from("profiles") as any).update(patch).in("id", data.ids);
     if (error) throw new Error(error.message);
-    const auditRows = (prevRows ?? [])
-      .filter((r: any) => (r.status ?? null) !== data.status)
-      .map((r: any) => ({
+    const { logStatusChanges } = await import("@/backend/server/status-audit.server");
+    await logStatusChanges(
+      supabase,
+      (prevRows ?? []).map((r: any) => ({
         profile_id: r.id,
         previous_status: r.status ?? null,
         new_status: data.status,
-        inactive_reason: data.status === "Inactive" ? (data.inactive_reason ?? null) : null,
+        inactive_reason: data.inactive_reason ?? null,
         source: "bulk",
         changed_by: userId,
-      }));
-    if (auditRows.length > 0) {
-      await (supabase as any).from("employee_status_audit").insert(auditRows);
-    }
+      })),
+    );
     return { ok: true, count: data.ids.length };
   });
 
