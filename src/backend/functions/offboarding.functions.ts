@@ -160,9 +160,24 @@ export const saveFinalSettlement = createServerFn({ method: "POST" })
     }
 
     // Also mark employee as inactive -> Resigned if not already
+    const { data: prevProfile } = await (supabase.from("profiles") as any)
+      .select("status")
+      .eq("id", data.employee_id)
+      .maybeSingle();
     await (supabase.from("profiles") as any)
       .update({ status: "Inactive", inactive_reason: "Resigned" })
       .eq("id", data.employee_id);
+    const { logStatusChanges } = await import("@/backend/server/status-audit.server");
+    await logStatusChanges(supabase, [
+      {
+        profile_id: data.employee_id,
+        previous_status: (prevProfile as any)?.status ?? null,
+        new_status: "Inactive",
+        inactive_reason: "Resigned",
+        source: "final_settlement",
+        changed_by: userId,
+      },
+    ]);
 
     return { ok: true };
   });
