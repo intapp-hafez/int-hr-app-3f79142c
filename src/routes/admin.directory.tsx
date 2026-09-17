@@ -24,9 +24,10 @@ const ExperienceCertificate = lazy(() => import("@/components/admin/HrDocuments"
 const SalaryCertificate = lazy(() => import("@/components/admin/HrDocuments").then((mod) => ({ default: mod.SalaryCertificate })));
 const AdvancesAcknowledgment = lazy(() => import("@/components/admin/HrDocuments").then((mod) => ({ default: mod.AdvancesAcknowledgment })));
 const CustodyAcknowledgment = lazy(() => import("@/components/admin/HrDocuments").then((mod) => ({ default: mod.CustodyAcknowledgment })));
+const SalaryInsights = lazy(() => import("@/components/admin/SalaryInsights").then((mod) => ({ default: mod.SalaryInsights })));
 
-type Tab = "departments" | "sections" | "positions" | "job_grades" | "cities" | "cost_centers" | "networks" | "devices" | "contractTemplates" | "sms" | "experienceCertificate" | "salaryDetails" | "advancesAck" | "custodyAck";
-const validTabs: Tab[] = ["departments", "sections", "positions", "job_grades", "cities", "cost_centers", "networks", "devices", "contractTemplates", "sms", "experienceCertificate", "salaryDetails", "advancesAck", "custodyAck"];
+type Tab = "departments" | "sections" | "positions" | "job_grades" | "cities" | "cost_centers" | "networks" | "devices" | "contractTemplates" | "sms" | "experienceCertificate" | "salaryDetails" | "advancesAck" | "custodyAck" | "salaryInsights";
+const validTabs: Tab[] = ["departments", "sections", "positions", "job_grades", "cities", "cost_centers", "networks", "devices", "contractTemplates", "sms", "experienceCertificate", "salaryDetails", "advancesAck", "custodyAck", "salaryInsights"];
 
 export const Route = createFileRoute("/admin/directory")({
   component: DirectoryPage,
@@ -53,6 +54,7 @@ const tabs: { id: Tab; label: string }[] = [
   { id: "salaryDetails", label: "Salary Certificate" },
   { id: "advancesAck", label: "Advances Acknowledgment" },
   { id: "custodyAck", label: "Custody Acknowledgment" },
+  { id: "salaryInsights", label: "Salary Insights" },
 ];
 
 const PAGE_SIZE = 10;
@@ -143,6 +145,11 @@ function DirectoryPage() {
         {tab === "custodyAck" && (
           <Suspense fallback={<div className="h-40 rounded-2xl bg-muted/30" />}>
             <CustodyAcknowledgment />
+          </Suspense>
+        )}
+        {tab === "salaryInsights" && (
+          <Suspense fallback={<div className="h-40 rounded-2xl bg-muted/30" />}>
+            <SalaryInsights />
           </Suspense>
         )}
       </div>
