@@ -18,6 +18,7 @@ if (typeof process !== "undefined" && process.env?.NODE_ENV !== "production") {
 
 type Ctx = {
   lang: Lang;
+  isAr: boolean;
   setLang: (l: Lang) => void;
   t: (key: UiKey | string) => string;
   tf: (key: UiKey | string, params?: Record<string, string | number>) => string;
@@ -47,6 +48,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     if (typeof window !== "undefined") localStorage.setItem("int-lang", l);
   };
 
+  const isAr = lang === "ar";
   const t = (key: UiKey | string) => bundles[lang].ui[key as UiKey] ?? en.ui[key as UiKey] ?? String(key);
   const tf = (key: UiKey | string, params?: Record<string, string | number>) => {
     const tmpl = t(key);
@@ -94,7 +96,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <LangContext.Provider value={{ lang, setLang, t, tf, formatBlocked, dir: lang === "ar" ? "rtl" : "ltr" }}>
+    <LangContext.Provider value={{ lang, isAr, setLang, t, tf, formatBlocked, dir: lang === "ar" ? "rtl" : "ltr" }}>
       {children}
     </LangContext.Provider>
   );

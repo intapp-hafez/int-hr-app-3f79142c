@@ -23,6 +23,9 @@ export const ensureOnboarded = createServerFn({ method: "POST" })
     }
 
     const { data: profile } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
+    if ((profile as any)?.status === "Inactive") {
+      throw new Error("This account has been deactivated. Please contact your administrator.");
+    }
     const { data: roleRows } = await supabase.from("user_roles").select("role").eq("user_id", userId);
     return { profile, roles: (roleRows ?? []).map((r: { role: string }) => r.role) };
   });

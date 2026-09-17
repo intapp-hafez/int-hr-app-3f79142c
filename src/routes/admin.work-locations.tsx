@@ -5,6 +5,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { MapPin, Star, Trash2, Search, Loader2 } from "lucide-react";
 import { LeafletMap } from "@/components/LeafletMap";
+import { SubTabs } from "@/components/SubTabs";
+import { useI18n } from "@/lib/i18n";
 import {
   listEmployeeWorkLocations,
   saveEmployeeWorkLocation,
@@ -26,6 +28,7 @@ export const Route = createFileRoute("/admin/work-locations")({
 });
 
 function WorkLocationsPage() {
+  const { t } = useI18n();
   const qc = useQueryClient();
   const listFn = useServerFn(listEmployeeWorkLocations);
   const saveFn = useServerFn(saveEmployeeWorkLocation);
@@ -86,8 +89,15 @@ function WorkLocationsPage() {
 
   return (
     <div className="space-y-6">
+      <SubTabs
+        items={[
+          { to: "/admin/geofencing", label: t("geofencing") },
+          { to: "/admin/work-locations", label: t("workLocations") },
+        ]}
+      />
+
       <header>
-        <h1 className="text-2xl font-bold tracking-tight">Work Locations</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{t("workLocations")}</h1>
         <p className="text-sm text-muted-foreground">
           Assign each employee their approved work locations, a default location, and the allowed check-in radius.
         </p>

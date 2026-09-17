@@ -37,12 +37,62 @@ export const listTasks = createServerFn({ method: "GET" })
         }
       }
 
+      // Collect unique profile IDs from assignees, creators, and activities
+      const allProfileIds = new Set<string>();
+      for (const t of tasks) {
+        if (Array.isArray(t.assignees)) {
+          for (const aid of t.assignees) {
+            if (typeof aid === "string" && aid) allProfileIds.add(aid);
+          }
+        }
+        if (t.created_by && typeof t.created_by === "string") {
+          allProfileIds.add(t.created_by);
+        }
+      }
+      for (const a of acts ?? []) {
+        if (a.employee_id) allProfileIds.add(a.employee_id);
+      }
+
+      let profRows: any[] = [];
+      let deptRows: any[] = [];
+      const pIds = Array.from(allProfileIds);
+      if (pIds.length > 0) {
+        const [{ data: profs }, { data: depts }] = await Promise.all([
+          context.supabase
+            .from("profiles")
+            .select("id, full_name, emp_code, department_id, avatar_url")
+            .in("id", pIds),
+          context.supabase
+            .from("departments")
+            .select("id, name_en, name_ar"),
+        ]);
+        profRows = profs ?? [];
+        deptRows = depts ?? [];
+      }
+
+      const deptMap = new Map((deptRows ?? []).map((d: any) => [d.id, d.name_en || d.name_ar]));
+      const profMap = new Map<string, any>();
+      for (const p of profRows) {
+        profMap.set(p.id, {
+          id: p.id,
+          full_name: p.full_name || p.id,
+          emp_code: p.emp_code || null,
+          department: p.department_id ? deptMap.get(p.department_id) : null,
+          avatar_url: p.avatar_url || null,
+        });
+      }
+
       if (acts && acts.length > 0) {
         const byTask = new Map<string, any[]>();
         for (const a of acts) {
           if (!a.task_id) continue;
+          const p = profMap.get(a.employee_id);
+          const enriched = {
+            ...a,
+            employee_name: p?.full_name || a.employee_id,
+          };
           const arr = byTask.get(a.task_id) ?? [];
-          arr.push(a);
+          arr.push(enriched);
           byTask.set(a.task_id, arr);
         }
         for (const t of tasks) {
@@ -51,6 +101,20 @@ export const listTasks = createServerFn({ method: "GET" })
       }
 
       for (const t of tasks) {
+        // Attach rich assignee profiles
+        const assignedList: any[] = [];
+        if (Array.isArray(t.assignees)) {
+          for (const aid of t.assignees) {
+            const p = profMap.get(aid);
+            if (p) assignedList.push(p);
+            else assignedList.push({ id: aid, full_name: aid });
+          }
+        }
+        (t as any).assignee_profiles = assignedList;
+        if (t.created_by && profMap.has(t.created_by)) {
+          (t as any).creator_name = profMap.get(t.created_by)?.full_name;
+        }
+
         if (!t.city && t.district) {
           const match = distToCity.get(t.district.toLowerCase()) || distToCity.get(t.district);
           if (match) {

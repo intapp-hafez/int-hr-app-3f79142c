@@ -30,6 +30,7 @@ import { Route as ManagerTripsRouteImport } from './routes/manager.trips'
 import { Route as ManagerTeamRouteImport } from './routes/manager.team'
 import { Route as ManagerTasksRouteImport } from './routes/manager.tasks'
 import { Route as ManagerProfileRouteImport } from './routes/manager.profile'
+import { Route as ManagerLeavesRouteImport } from './routes/manager.leaves'
 import { Route as ManagerCheckRouteImport } from './routes/manager.check'
 import { Route as ManagerChatRouteImport } from './routes/manager.chat'
 import { Route as ManagerAdvancesRouteImport } from './routes/manager.advances'
@@ -193,6 +194,11 @@ const ManagerTasksRoute = ManagerTasksRouteImport.update({
 const ManagerProfileRoute = ManagerProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => ManagerRoute,
+} as any)
+const ManagerLeavesRoute = ManagerLeavesRouteImport.update({
+  id: '/leaves',
+  path: '/leaves',
   getParentRoute: () => ManagerRoute,
 } as any)
 const ManagerCheckRoute = ManagerCheckRouteImport.update({
@@ -553,6 +559,7 @@ export interface FileRoutesByFullPath {
   '/manager/advances': typeof ManagerAdvancesRoute
   '/manager/chat': typeof ManagerChatRoute
   '/manager/check': typeof ManagerCheckRoute
+  '/manager/leaves': typeof ManagerLeavesRoute
   '/manager/profile': typeof ManagerProfileRoute
   '/manager/tasks': typeof ManagerTasksRoute
   '/manager/team': typeof ManagerTeamRoute
@@ -628,6 +635,7 @@ export interface FileRoutesByTo {
   '/manager/advances': typeof ManagerAdvancesRoute
   '/manager/chat': typeof ManagerChatRoute
   '/manager/check': typeof ManagerCheckRoute
+  '/manager/leaves': typeof ManagerLeavesRoute
   '/manager/profile': typeof ManagerProfileRoute
   '/manager/tasks': typeof ManagerTasksRoute
   '/manager/team': typeof ManagerTeamRoute
@@ -711,6 +719,7 @@ export interface FileRoutesById {
   '/manager/advances': typeof ManagerAdvancesRoute
   '/manager/chat': typeof ManagerChatRoute
   '/manager/check': typeof ManagerCheckRoute
+  '/manager/leaves': typeof ManagerLeavesRoute
   '/manager/profile': typeof ManagerProfileRoute
   '/manager/tasks': typeof ManagerTasksRoute
   '/manager/team': typeof ManagerTeamRoute
@@ -795,6 +804,7 @@ export interface FileRouteTypes {
     | '/manager/advances'
     | '/manager/chat'
     | '/manager/check'
+    | '/manager/leaves'
     | '/manager/profile'
     | '/manager/tasks'
     | '/manager/team'
@@ -870,6 +880,7 @@ export interface FileRouteTypes {
     | '/manager/advances'
     | '/manager/chat'
     | '/manager/check'
+    | '/manager/leaves'
     | '/manager/profile'
     | '/manager/tasks'
     | '/manager/team'
@@ -952,6 +963,7 @@ export interface FileRouteTypes {
     | '/manager/advances'
     | '/manager/chat'
     | '/manager/check'
+    | '/manager/leaves'
     | '/manager/profile'
     | '/manager/tasks'
     | '/manager/team'
@@ -1136,6 +1148,13 @@ declare module '@tanstack/react-router' {
       path: '/profile'
       fullPath: '/manager/profile'
       preLoaderRoute: typeof ManagerProfileRouteImport
+      parentRoute: typeof ManagerRoute
+    }
+    '/manager/leaves': {
+      id: '/manager/leaves'
+      path: '/leaves'
+      fullPath: '/manager/leaves'
+      preLoaderRoute: typeof ManagerLeavesRouteImport
       parentRoute: typeof ManagerRoute
     }
     '/manager/check': {
@@ -1728,6 +1747,7 @@ interface ManagerRouteChildren {
   ManagerAdvancesRoute: typeof ManagerAdvancesRoute
   ManagerChatRoute: typeof ManagerChatRoute
   ManagerCheckRoute: typeof ManagerCheckRoute
+  ManagerLeavesRoute: typeof ManagerLeavesRoute
   ManagerProfileRoute: typeof ManagerProfileRoute
   ManagerTasksRoute: typeof ManagerTasksRoute
   ManagerTeamRoute: typeof ManagerTeamRoute
@@ -1739,6 +1759,7 @@ const ManagerRouteChildren: ManagerRouteChildren = {
   ManagerAdvancesRoute: ManagerAdvancesRoute,
   ManagerChatRoute: ManagerChatRoute,
   ManagerCheckRoute: ManagerCheckRoute,
+  ManagerLeavesRoute: ManagerLeavesRoute,
   ManagerProfileRoute: ManagerProfileRoute,
   ManagerTasksRoute: ManagerTasksRoute,
   ManagerTeamRoute: ManagerTeamRoute,

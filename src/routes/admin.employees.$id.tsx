@@ -4,6 +4,7 @@ import { EmployeeAvatar } from "@/components/EmployeeAvatar";
 import { formatDate, parseISODate } from "@/lib/date-format";
 import { EmployeeTripsPanel } from "@/components/employee/EmployeeTripsPanel";
 import { EmployeeCustodyPanel } from "@/components/admin/EmployeeCustodyPanel";
+import { EmployeePenaltiesPanel } from "@/components/admin/EmployeePenaltiesPanel";
 import { AvatarUploader } from "@/components/AvatarUploader";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -104,7 +105,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Trash2, Pencil, Save } from "lucide-react";
 import { EmployeeAssignmentsPicker } from "@/components/EmployeeAssignmentsPicker";
 import { Target } from "lucide-react";
-import { Package } from "lucide-react";
+import { Package, Gavel } from "lucide-react";
 import { safeRandomUUID } from "@/lib/utils";
 
 
@@ -112,7 +113,7 @@ export const Route = createFileRoute("/admin/employees/$id")({
   component: EmployeeDetail,
 });
 
-type Tab = "info" | "attendance" | "leaves" | "devices" | "trips" | "custody";
+type Tab = "info" | "attendance" | "leaves" | "devices" | "trips" | "custody" | "penalties";
 
 function EmployeeDetail() {
   const { id } = Route.useParams();
@@ -205,14 +206,14 @@ function EmployeeDetail() {
       />
 
       <div className="flex gap-1 rounded-full border border-border bg-card p-1 text-sm overflow-x-auto whitespace-nowrap">
-        {(["info", "attendance", "leaves", "devices", "trips", "custody"] as Tab[]).map((k) => (
+        {(["info", "attendance", "leaves", "devices", "trips", "custody", "penalties"] as Tab[]).map((k) => (
           <button
             key={k}
             onClick={() => setTab(k)}
             className={`px-4 py-2 rounded-full font-medium capitalize transition-colors ${tab === k ? "bg-gradient-brand text-brand-foreground shadow-brand" : "text-muted-foreground hover:text-foreground"
               }`}
           >
-            {k === "trips" ? (t("tripAllowance") ?? "Trip Allowance") : k === "custody" ? "Custody" : t(k)}
+            {k === "trips" ? (t("tripAllowance") ?? "Trip Allowance") : k === "custody" ? "Custody" : k === "penalties" ? (t("penalties") || "Penalties") : t(k)}
           </button>
         ))}
       </div>
@@ -223,6 +224,7 @@ function EmployeeDetail() {
       {tab === "devices" && <DevicesTab devices={devices} />}
       {tab === "trips" && <EmployeeTripsPanel employeeId={employee.id} />}
       {tab === "custody" && <EmployeeCustodyPanel employeeId={employee.id} />}
+      {tab === "penalties" && <EmployeePenaltiesPanel employeeId={employee.id} canManage={isAdmin} />}
     </div>
   );
 }
@@ -410,7 +412,7 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
   const upd = <K extends keyof typeof form>(k: K, v: typeof form[K]) => setForm((f) => ({ ...f, [k]: v }));
   const districtsForCity = (locs?.districts ?? []).filter((d) => !form.city_id || d.city_id === form.city_id);
   const sectionsForDept = (locs?.sections ?? []).filter((s: any) => !form.department_id || s.department_id === form.department_id);
-  type SideTab = "overview" | "employment" | "assignments" | "attendance" | "leaves" | "documents" | "devices" | "notes" | "advances" | "status" | "offboarding" | "trips" | "custody";
+  type SideTab = "overview" | "employment" | "assignments" | "attendance" | "leaves" | "documents" | "devices" | "notes" | "advances" | "penalties" | "status" | "offboarding" | "trips" | "custody";
   const [sideTab, setSideTab] = useState<SideTab>("overview");
   const sideNav: { id: SideTab; label: string; icon: any }[] = [
     { id: "overview", label: "Overview", icon: UserIcon },
@@ -422,6 +424,7 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
     { id: "devices", label: "Allowed devices", icon: Smartphone },
     { id: "notes", label: "Notes", icon: StickyNoteIcon },
     { id: "advances", label: "Advances", icon: Banknote },
+    { id: "penalties", label: t("penalties") || "Penalties", icon: Gavel },
     { id: "status", label: "Status history", icon: Clock },
     { id: "trips", label: t("tripAllowance" as any) ?? "Trip Allowance", icon: MapPin },
     { id: "custody", label: "Custody", icon: Package },
@@ -1007,12 +1010,12 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
 
             {sideTab === "employment" && (
               <div className="rounded-3xl border border-border bg-card p-5">
-                <h2 className="mb-4 font-display text-base font-semibold">Employment & Compensation</h2>
+                <h2 className="mb-4 font-display text-base font-semibold">{t("employment_compensation") || "Employment & Compensation"}</h2>
                 <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-3">
-                  <Info icon={Calendar} label="Contract Type" value={detail.contract_type ?? "—"} />
-                  <Info icon={Calendar} label="Contract Start" value={detail.contract_start_date ?? "—"} />
+                  <Info icon={Calendar} label={t("contractType") || "Contract Type"} value={detail.contract_type ?? "—"} />
+                  <Info icon={Calendar} label={t("contract_start") || "Contract Start"} value={detail.contract_start_date ?? "—"} />
                   <div className="flex flex-col gap-1">
-                    <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Contract End</span>
+                    <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{t("contract_end") || "Contract End"}</span>
                     <div className="flex items-center gap-2 text-sm text-foreground">
                       <Calendar className="h-4 w-4 text-muted-foreground" />
                       {detail.contract_end_date ? (
@@ -1025,17 +1028,17 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
                       )}
                     </div>
                   </div>
-                  <Info icon={Calendar} label="Salary Basis" value={detail.salary_mode ? (detail.salary_mode === "gross" ? "Gross" : "Net") : "—"} />
-                  <Info icon={Calendar} label="Salary (Gross)" value={detail.salary_gross != null ? `${detail.salary_gross.toLocaleString()} EGP` : "—"} mono />
-                  <Info icon={Calendar} label="Salary (Net)" value={detail.salary_net != null ? `${detail.salary_net.toLocaleString()} EGP` : "—"} mono />
-                  <Info icon={Calendar} label="Insurance Salary" value={(detail as any).insurance_salary != null ? `${(detail as any).insurance_salary.toLocaleString()} EGP` : "—"} mono />
-                  <Info icon={Calendar} label="Emergency Relief Fund" value={(detail as any).emergency_fund != null ? `${(detail as any).emergency_fund.toLocaleString()} EGP` : "—"} mono />
-                  <Info icon={Calendar} label="Allowance" value={detail.allowance != null ? `${detail.allowance.toLocaleString()} EGP` : "—"} mono />
-                  <Info icon={Plane} label="Job Grade (Trips)" value={detail.job_grade ?? "—"} />
-                  <Info icon={Calendar} label="Target" value={detail.target_value != null ? `${detail.target_value} / ${detail.target_duration ?? "—"}` : "—"} />
+                  <Info icon={Calendar} label={t("salaryBasis") || "Salary Basis"} value={detail.salary_mode ? (detail.salary_mode === "gross" ? (t("salaryGross") || "Gross") : (t("salaryNet") || "Net")) : "—"} />
+                  <Info icon={Calendar} label={t("salaryGross") || "Salary (Gross)"} value={detail.salary_gross != null ? `${detail.salary_gross.toLocaleString()} EGP` : "—"} mono />
+                  <Info icon={Calendar} label={t("salaryNet") || "Salary (Net)"} value={detail.salary_net != null ? `${detail.salary_net.toLocaleString()} EGP` : "—"} mono />
+                  <Info icon={Calendar} label={t("insuranceSalary") || "Insurance Salary"} value={(detail as any).insurance_salary != null ? `${(detail as any).insurance_salary.toLocaleString()} EGP` : "—"} mono />
+                  <Info icon={Calendar} label={t("emergencyFund") || "Emergency Relief Fund"} value={(detail as any).emergency_fund != null ? `${(detail as any).emergency_fund.toLocaleString()} EGP` : "—"} mono />
+                  <Info icon={Calendar} label={t("allowance") || "Allowance"} value={detail.allowance != null ? `${detail.allowance.toLocaleString()} EGP` : "—"} mono />
+                  <Info icon={Plane} label={t("job_grade") || "Job Grade (Trips)"} value={detail.job_grade ?? "—"} />
+                  <Info icon={Calendar} label={t("targetValue") || "Target"} value={detail.target_value != null ? `${detail.target_value} / ${detail.target_duration ?? "—"}` : "—"} />
                   <Info icon={ShieldCheck} label={t("medicalInsuranceType")} value={detail.medical_insurance_type ? (detail.medical_insurance_type === "Governmental" ? t("insuranceGovernmental") : t("insurancePrivate")) : "—"} />
                   <Info icon={FileText} label={t("medicalInsuranceNumber")} value={detail.medical_insurance_number ?? "—"} mono />
-                  <Info icon={FileText} label="Medical Insurance Details" value={detail.medical_insurance_details ?? "—"} />
+                  <Info icon={FileText} label={t("medicalInsuranceDetails") || "Medical Insurance Details"} value={detail.medical_insurance_details ?? "—"} />
                 </div>
               </div>
             )}
@@ -1044,9 +1047,9 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
 
             {sideTab === "assignments" && (
               <div className="rounded-3xl border border-border bg-card p-5">
-                <h2 className="mb-4 font-display text-base font-semibold">Assignments</h2>
+                <h2 className="mb-4 font-display text-base font-semibold">{t("assignments") || "Assignments"}</h2>
                 <p className="mb-4 text-xs text-muted-foreground">
-                  Select KPIs, Allowances, Targets &amp; Overtime, and Shifts to apply to this employee.
+                  {t("selectAssignmentsNotice") || "Select KPIs, Allowances, Targets & Overtime, and Shifts to apply to this employee."}
                 </p>
                 <EmployeeAssignmentsPicker employeeId={detail.id} />
               </div>
@@ -1074,6 +1077,10 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
 
             {sideTab === "advances" && (
               <AdvancesTab employeeId={detail.id} />
+            )}
+
+            {sideTab === "penalties" && (
+              <EmployeePenaltiesPanel employeeId={detail.id} canManage={canEdit} />
             )}
 
             {sideTab === "status" && (
@@ -1133,6 +1140,8 @@ function AdminOffboarding({
   resignationDate: string;
   onNavigateTab?: (tab: any) => void;
 }) {
+  const { t, lang } = useI18n();
+  const isAr = lang === "ar";
   const qc = useQueryClient();
   const [date, setDate] = useState(resignationDate);
   const [confirmCustodyOpen, setConfirmCustodyOpen] = useState(false);
@@ -1165,7 +1174,7 @@ function AdminOffboarding({
           other_deductions: 0,
         },
       });
-      toast.success("Final settlement approved and saved!");
+      toast.success(t("settlementApprovedSuccess") || "Final settlement approved and saved!");
       qc.invalidateQueries({ queryKey: ["admin"] });
     } catch (e: any) {
       toast.error(e.message);
@@ -1191,267 +1200,297 @@ function AdminOffboarding({
   return (
     <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-5">
       <div className="flex flex-col gap-1">
-        <h3 className="text-lg font-semibold">Final Settlement & Offboarding</h3>
+        <h3 className="text-lg font-semibold">{t("offboardingTitle") || "Final Settlement & Offboarding"}</h3>
         <p className="text-sm text-muted-foreground">
-          Calculate end of service dues, verify company asset returns, and resolve outstanding loan balances.
+          {t("offboardingDesc") || "Calculate end of service dues, verify company asset returns, and resolve outstanding loan balances."}
         </p>
       </div>
 
-      <div className="max-w-2xl rounded-2xl border border-border bg-card p-6 space-y-6">
-        <label className="block text-sm font-semibold">
-          Resignation Date
-          <input
-            type="date"
-            className="input mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
-        </label>
+      <div className="w-full rounded-2xl border border-border bg-card p-6 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-muted/30 border border-border/60">
+          <div>
+            <label htmlFor="resignation-date" className="block text-sm font-semibold text-foreground">
+              {t("resignationDateLabel") || "Resignation / End of Service Date"}
+            </label>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {t("resignationDateDesc") || "Select the official last working day to calculate accrued dues, custody return status, and deductions."}
+            </p>
+          </div>
+          <div className="w-full sm:w-64">
+            <input
+              id="resignation-date"
+              type="date"
+              className="input w-full rounded-xl border border-input bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-brand"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </div>
+        </div>
 
         {isLoading ? (
-          <div className="p-8 text-center text-sm text-muted-foreground">
+          <div className="p-12 text-center text-sm text-muted-foreground">
             <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-brand" />
-            Calculating settlement dues, custody, and advances...
+            {t("calculatingSettlement") || "Calculating settlement dues, custody, and advances..."}
           </div>
         ) : settlement ? (
           <div className="space-y-6">
             {/* Dues Calculation Grid */}
-            <div className="grid grid-cols-2 gap-4 rounded-xl bg-muted/30 p-4 text-sm">
-              <div>
-                <p className="text-xs text-muted-foreground">Daily Rate</p>
-                <p className="font-mono font-medium">{settlement.daily_rate} EGP</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Worked Days (Current Month)</p>
-                <p className="font-mono font-medium">{settlement.worked_days}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Unpaid Salary</p>
-                <p className="font-mono font-medium text-emerald-600 dark:text-emerald-400">
-                  +{settlement.unpaid_salary} EGP
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 rounded-xl bg-muted/30 p-4 text-sm border border-border/60">
+              <div className="rounded-lg bg-card/70 border border-border/50 p-3">
+                <p className="text-xs text-muted-foreground font-medium">{t("dailyRate") || "Daily Rate"}</p>
+                <p className="font-mono font-semibold text-base text-foreground mt-1">
+                  {settlement.daily_rate?.toLocaleString()} {isAr ? "جنيه" : "EGP"}
                 </p>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground">
-                  Remaining Leaves ({settlement.remaining_leave_days})
-                </p>
-                <p className="font-mono font-medium text-emerald-600 dark:text-emerald-400">
-                  +{settlement.leave_cash_out} EGP
+              <div className="rounded-lg bg-card/70 border border-border/50 p-3">
+                <p className="text-xs text-muted-foreground font-medium">{t("workedDaysMonth") || "Worked Days (Month)"}</p>
+                <p className="font-mono font-semibold text-base text-foreground mt-1">
+                  {settlement.worked_days} {isAr ? "يوم" : "days"}
                 </p>
               </div>
-              <div className="col-span-2 flex items-center justify-between border-t border-border/50 pt-2">
-                <div>
-                  <p className="text-xs text-muted-foreground">Outstanding Advances/Loans</p>
-                  <p className={`font-mono font-medium ${settlement.outstanding_advances > 0 ? "text-destructive" : "text-muted-foreground"}`}>
-                    -{settlement.outstanding_advances} EGP
-                  </p>
+              <div className="rounded-lg bg-card/70 border border-border/50 p-3">
+                <p className="text-xs text-muted-foreground font-medium">{t("unpaidSalary") || "Unpaid Salary"}</p>
+                <p className="font-mono font-semibold text-base text-emerald-600 dark:text-emerald-400 mt-1">
+                  +{settlement.unpaid_salary?.toLocaleString()} {isAr ? "جنيه" : "EGP"}
+                </p>
+              </div>
+              <div className="rounded-lg bg-card/70 border border-border/50 p-3">
+                <p className="text-xs text-muted-foreground font-medium">
+                  {isAr ? `رصيد الإجازات (${settlement.remaining_leave_days} يوم)` : `Remaining Leaves (${settlement.remaining_leave_days}d)`}
+                </p>
+                <p className="font-mono font-semibold text-base text-emerald-600 dark:text-emerald-400 mt-1">
+                  +{settlement.leave_cash_out?.toLocaleString()} {isAr ? "جنيه" : "EGP"}
+                </p>
+              </div>
+              <div className="col-span-2 sm:col-span-1 rounded-lg bg-card/70 border border-border/50 p-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground font-medium">{t("advancesAndLoans") || "Advances / Loans"}</p>
+                  {settlement.outstanding_advances > 0 && (
+                    <span className="rounded-full bg-destructive/10 px-1.5 py-0.5 text-[10px] font-semibold text-destructive">
+                      {advancesList.length} {t("activeLoansCount") || "Active"}
+                    </span>
+                  )}
                 </div>
-                {settlement.outstanding_advances > 0 && (
-                  <span className="rounded-full bg-destructive/10 px-2.5 py-0.5 text-xs font-semibold text-destructive">
-                    {advancesList.length} Active Loan(s)
-                  </span>
-                )}
+                <p className={`font-mono font-semibold text-base mt-1 ${settlement.outstanding_advances > 0 ? "text-destructive" : "text-muted-foreground"}`}>
+                  -{settlement.outstanding_advances?.toLocaleString()} {isAr ? "جنيه" : "EGP"}
+                </p>
               </div>
             </div>
 
-            {/* 1. Custody Clearance Section */}
-            <div className="rounded-xl border border-border bg-background p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand/10 text-brand">
-                    <Package className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-semibold text-foreground">Company Custody & Equipment</h4>
-                    <p className="text-xs text-muted-foreground">Clearance of company property and equipment</p>
-                  </div>
-                </div>
+            {/* Clearances Responsive Grid: Custody & Loans */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
+              {/* 1. Custody Clearance Section */}
+              <div className="rounded-xl border border-border bg-background p-4 space-y-3 flex flex-col justify-between">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand/10 text-brand">
+                        <Package className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-semibold text-foreground">{t("companyCustodySection") || "Company Custody & Equipment"}</h4>
+                        <p className="text-xs text-muted-foreground">{t("companyCustodyDesc") || "Clearance of company property and equipment"}</p>
+                      </div>
+                    </div>
 
-                {unreturnedCustodyCount > 0 ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                    <AlertTriangle className="h-3 w-3" />
-                    {unreturnedCustodyCount} Unreturned
-                  </span>
-                ) : totalCustodyCount > 0 ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                    <CheckCircle2 className="h-3 w-3" />
-                    All {totalCustodyCount} Returned
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-                    <CheckCircle2 className="h-3 w-3" />
-                    No Custody Assigned
-                  </span>
-                )}
-              </div>
-
-              {unreturnedCustodyCount > 0 ? (
-                <div className="space-y-3 pt-1">
-                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-800 dark:text-amber-300">
-                    <p className="font-semibold flex items-center gap-1.5">
-                      <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                      Employee still holds {unreturnedCustodyCount} company asset(s) that must be returned:
-                    </p>
+                    {unreturnedCustodyCount > 0 ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-600 dark:text-amber-400 border border-amber-500/20 shrink-0">
+                        <AlertTriangle className="h-3 w-3" />
+                        {unreturnedCustodyCount} {t("unreturnedBadge") || "Unreturned"}
+                      </span>
+                    ) : totalCustodyCount > 0 ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+                        <CheckCircle2 className="h-3 w-3" />
+                        {isAr ? `تم استرداد جميع الـ ${totalCustodyCount}` : `All ${totalCustodyCount} Returned`}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground shrink-0">
+                        <CheckCircle2 className="h-3 w-3" />
+                        {t("noCustodyAssignedBadge") || "No Custody Assigned"}
+                      </span>
+                    )}
                   </div>
 
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {unreturnedCustodyItems.map((item: any) => (
-                      <div
-                        key={item.id}
-                        className="flex flex-col justify-between rounded-xl border border-amber-500/20 bg-amber-500/5 p-3"
-                      >
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between gap-1">
-                            <span className="font-semibold text-sm text-foreground truncate">{item.name}</span>
-                            <span className="rounded bg-background px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground border border-border">
-                              {item.category}
-                            </span>
-                          </div>
-                          {(item.model || item.serial_number) && (
-                            <p className="text-xs text-muted-foreground truncate">
-                              {item.model ? `Model: ${item.model}` : ""}
-                              {item.model && item.serial_number ? " • " : ""}
-                              {item.serial_number ? `S/N: ${item.serial_number}` : ""}
-                            </p>
-                          )}
-                        </div>
-                        <p className="text-[11px] text-muted-foreground mt-2">
-                          Handed over: <span className="font-medium text-foreground">{formatDate(item.custody_date)}</span>
+                  {unreturnedCustodyCount > 0 ? (
+                    <div className="space-y-3 pt-1">
+                      <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-800 dark:text-amber-300">
+                        <p className="font-semibold flex items-center gap-1.5">
+                          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                          {isAr
+                            ? `لا يزال بحوزة الموظف ${unreturnedCustodyCount} عهدة يجب استلامها قبل إتمام إخلاء الطرف:`
+                            : `Employee still holds ${unreturnedCustodyCount} company asset(s) that must be returned:`}
                         </p>
                       </div>
-                    ))}
-                  </div>
 
-                  {onNavigateTab && (
-                    <div className="flex justify-end pt-1">
-                      <button
-                        type="button"
-                        onClick={() => onNavigateTab("custody")}
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand hover:underline"
-                      >
-                        Open Custody Tab to process returns
-                        <ArrowRight className="h-3.5 w-3.5" />
-                      </button>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {unreturnedCustodyItems.map((item: any) => (
+                          <div
+                            key={item.id}
+                            className="flex flex-col justify-between rounded-xl border border-amber-500/20 bg-amber-500/5 p-3"
+                          >
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="font-semibold text-sm text-foreground truncate">{item.name}</span>
+                                <span className="rounded bg-background px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground border border-border">
+                                  {item.category}
+                                </span>
+                              </div>
+                              {(item.model || item.serial_number) && (
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {item.model ? `${isAr ? "موديل" : "Model"}: ${item.model}` : ""}
+                                  {item.model && item.serial_number ? " • " : ""}
+                                  {item.serial_number ? `S/N: ${item.serial_number}` : ""}
+                                </p>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-muted-foreground mt-2">
+                              {isAr ? "تاريخ الاستلام:" : "Handed over:"}{" "}
+                              <span className="font-medium text-foreground">{formatDate(item.custody_date)}</span>
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 rounded-lg bg-emerald-500/5 border border-emerald-500/20 p-3 text-xs text-emerald-700 dark:text-emerald-300">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <span>
+                        {totalCustodyCount > 0
+                          ? (isAr
+                              ? `تم التحقق واسترداد جميع الـ ${totalCustodyCount} عهدة المسندة للموظف.`
+                              : `All ${totalCustodyCount} assigned custody item(s) have been verified and returned.`)
+                          : (t("noCustodyItemsAssigned") || "No active custody items or equipment currently assigned to this employee.")}
+                      </span>
                     </div>
                   )}
                 </div>
-              ) : (
-                <div className="flex items-center gap-2 rounded-lg bg-emerald-500/5 border border-emerald-500/20 p-3 text-xs text-emerald-700 dark:text-emerald-300">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                  <span>
-                    {totalCustodyCount > 0
-                      ? `All ${totalCustodyCount} assigned custody item(s) have been verified and returned.`
-                      : "No active custody items or equipment currently assigned to this employee."}
-                  </span>
-                </div>
-              )}
-            </div>
 
-            {/* 2. Advances & Loans Clearance Section */}
-            <div className="rounded-xl border border-border bg-background p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                    <Banknote className="h-4 w-4" />
+                {unreturnedCustodyCount > 0 && onNavigateTab && (
+                  <div className="flex justify-end pt-2 border-t border-border/40">
+                    <button
+                      type="button"
+                      onClick={() => onNavigateTab("custody")}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand hover:underline"
+                    >
+                      {t("openCustodyTabLink") || "Open Custody Tab to process returns"}
+                      <ArrowRight className="h-3.5 w-3.5 rtl:rotate-180" />
+                    </button>
                   </div>
-                  <div>
-                    <h4 className="text-sm font-semibold text-foreground">Advance Payments & Loans</h4>
-                    <p className="text-xs text-muted-foreground">Unsettled salary advance balances</p>
-                  </div>
-                </div>
-
-                {settlement.outstanding_advances > 0 ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2.5 py-0.5 text-xs font-semibold text-destructive border border-destructive/20">
-                    -{settlement.outstanding_advances.toLocaleString()} EGP Total
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                    <CheckCircle2 className="h-3 w-3" />
-                    0 EGP Outstanding
-                  </span>
                 )}
               </div>
 
-              {advancesList.length > 0 ? (
-                <div className="space-y-3 pt-1">
-                  <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs text-destructive">
-                    <p className="font-semibold flex items-center gap-1.5">
-                      <AlertCircle className="h-4 w-4 shrink-0" />
-                      The following {advancesList.length} advance balance(s) will be deducted from the settlement:
-                    </p>
-                  </div>
-
-                  <div className="divide-y divide-border/60 rounded-xl border border-border bg-card">
-                    {advancesList.map((adv: any) => (
-                      <div key={adv.id} className="flex items-center justify-between p-3 text-xs">
-                        <div className="space-y-0.5">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-semibold text-foreground">{adv.request_number}</span>
-                            <span className="rounded bg-muted px-1.5 py-0.2 text-[10px] uppercase font-medium text-muted-foreground">
-                              {adv.status}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-muted-foreground">
-                            Approved: {adv.approved_amount?.toLocaleString()} EGP
-                            {adv.installment_amount ? ` • ${adv.installment_amount} EGP / installment` : ""}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-[11px] text-muted-foreground">Remaining</p>
-                          <p className="font-mono font-semibold text-destructive">
-                            -{adv.remaining_balance?.toLocaleString()} EGP
-                          </p>
-                        </div>
+              {/* 2. Advances & Loans Clearance Section */}
+              <div className="rounded-xl border border-border bg-background p-4 space-y-3 flex flex-col justify-between">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                        <Banknote className="h-4 w-4" />
                       </div>
-                    ))}
+                      <div>
+                        <h4 className="text-sm font-semibold text-foreground">{t("advancePaymentsSection") || "Advance Payments & Loans"}</h4>
+                        <p className="text-xs text-muted-foreground">{t("advancePaymentsDesc") || "Unsettled salary advance balances"}</p>
+                      </div>
+                    </div>
+
+                    {settlement.outstanding_advances > 0 ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2.5 py-0.5 text-xs font-semibold text-destructive border border-destructive/20 shrink-0">
+                        -{settlement.outstanding_advances.toLocaleString()} {isAr ? "جنيه إجمالي" : "EGP Total"}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+                        <CheckCircle2 className="h-3 w-3" />
+                        0 {isAr ? "جنيه متبقي" : "EGP Outstanding"}
+                      </span>
+                    )}
                   </div>
 
-                  {onNavigateTab && (
-                    <div className="flex justify-end pt-1">
-                      <button
-                        type="button"
-                        onClick={() => onNavigateTab("advances")}
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand hover:underline"
-                      >
-                        Open Advances Tab to review history
-                        <ArrowRight className="h-3.5 w-3.5" />
-                      </button>
+                  {advancesList.length > 0 ? (
+                    <div className="space-y-3 pt-1">
+                      <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs text-destructive">
+                        <p className="font-semibold flex items-center gap-1.5">
+                          <AlertCircle className="h-4 w-4 shrink-0" />
+                          {isAr
+                            ? `سيتم خصم أرصدة السلف التالية (${advancesList.length} سلفة) من المستحقات النهائية:`
+                            : `The following ${advancesList.length} advance balance(s) will be deducted from the settlement:`}
+                        </p>
+                      </div>
+
+                      <div className="divide-y divide-border/60 rounded-xl border border-border bg-card">
+                        {advancesList.map((adv: any) => (
+                          <div key={adv.id} className="flex items-center justify-between p-3 text-xs">
+                            <div className="space-y-0.5">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono font-semibold text-foreground">{adv.request_number}</span>
+                                <span className="rounded bg-muted px-1.5 py-0.2 text-[10px] uppercase font-medium text-muted-foreground">
+                                  {adv.status}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground">
+                                {isAr ? "المعتمد:" : "Approved:"} {adv.approved_amount?.toLocaleString()} {isAr ? "جنيه" : "EGP"}
+                                {adv.installment_amount ? ` • ${adv.installment_amount} ${isAr ? "جنيه / قسط" : "EGP / installment"}` : ""}
+                              </p>
+                            </div>
+                            <div className="text-right rtl:text-left">
+                              <p className="text-[11px] text-muted-foreground">{isAr ? "المتبقي" : "Remaining"}</p>
+                              <p className="font-mono font-semibold text-destructive">
+                                -{adv.remaining_balance?.toLocaleString()} {isAr ? "جنيه" : "EGP"}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 rounded-lg bg-emerald-500/5 border border-emerald-500/20 p-3 text-xs text-emerald-700 dark:text-emerald-300">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <span>{t("noActiveAdvancesFound") || "No active salary advances or unpaid loans found for this employee."}</span>
                     </div>
                   )}
                 </div>
-              ) : (
-                <div className="flex items-center gap-2 rounded-lg bg-emerald-500/5 border border-emerald-500/20 p-3 text-xs text-emerald-700 dark:text-emerald-300">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                  <span>No active salary advances or unpaid loans found for this employee.</span>
-                </div>
-              )}
+
+                {advancesList.length > 0 && onNavigateTab && (
+                  <div className="flex justify-end pt-2 border-t border-border/40">
+                    <button
+                      type="button"
+                      onClick={() => onNavigateTab("advances")}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand hover:underline"
+                    >
+                      {t("openAdvancesTabLink") || "Open Advances Tab to review history"}
+                      <ArrowRight className="h-3.5 w-3.5 rtl:rotate-180" />
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Net Settlement Banner */}
-            <div className="rounded-xl bg-gradient-brand/10 p-5 border border-brand/20 space-y-1">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="font-semibold text-brand text-base block">Net Settlement Amount</span>
-                  <span className="text-xs text-muted-foreground">
-                    (Unpaid Salary + Leave Cash-Out) - Outstanding Advances
-                  </span>
-                </div>
-                <span className="font-mono text-2xl font-bold text-brand">
-                  {settlement.net_settlement.toLocaleString()} EGP
+            <div className="rounded-2xl bg-gradient-to-r from-brand/10 via-brand/5 to-transparent p-6 border border-brand/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <span className="text-xs font-semibold uppercase tracking-wider text-brand">{t("summaryCalculationLabel") || "Summary Calculation"}</span>
+                <h3 className="text-lg font-bold text-foreground">{t("netSettlementTitle") || "Total Net Settlement Dues"}</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {t("netSettlementFormula") || "Formula: (Unpaid Worked Days Salary + Remaining Leaves Cash-Out) − Outstanding Loans & Advances"}
+                </p>
+              </div>
+              <div className="text-left sm:text-right rtl:text-right rtl:sm:text-left">
+                <span className="text-xs text-muted-foreground font-medium block">{t("totalPayableLabel") || "Total Payable to Employee"}</span>
+                <span className="font-mono text-3xl font-extrabold text-brand">
+                  {settlement.net_settlement?.toLocaleString()} <span className="text-base font-bold">{isAr ? "جنيه" : "EGP"}</span>
                 </span>
               </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border/50">
               {unreturnedCustodyCount > 0 ? (
                 <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1.5 font-medium">
                   <AlertTriangle className="h-4 w-4 shrink-0" />
-                  {unreturnedCustodyCount} custody item(s) pending return
+                  {unreturnedCustodyCount} {t("custodyPendingWarningText") || "custody item(s) pending return before clearance"}
                 </p>
               ) : (
                 <span className="text-xs text-muted-foreground">
-                  Ready to approve end-of-service clearance
+                  {t("readyToApproveText") || "Ready to approve end-of-service clearance and update status"}
                 </span>
               )}
 
@@ -1460,7 +1499,7 @@ function AdminOffboarding({
                 onClick={handleApproveClick}
                 className="w-full sm:w-auto rounded-xl bg-gradient-brand px-6 py-2.5 text-sm font-semibold text-brand-foreground shadow-brand disabled:opacity-60 transition-transform active:scale-95"
               >
-                {saving ? "Saving..." : "Approve & Mark Resigned"}
+                {saving ? (t("approvingSettlement") || "Saving...") : (t("approveAndMarkResigned") || "Approve & Mark Resigned")}
               </button>
             </div>
           </div>
@@ -1473,13 +1512,18 @@ function AdminOffboarding({
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-amber-600">
               <AlertTriangle className="h-5 w-5" />
-              Unreturned Custody Warning
+              {t("confirmCustodyHoldTitle") || "Unreturned Custody Warning"}
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
               <p>
-                This employee still has <strong>{unreturnedCustodyCount} unreturned company asset(s)</strong>:
+                {isAr
+                  ? `لا يزال بحوزة هذا الموظف `
+                  : `This employee still has `}
+                <strong>
+                  {unreturnedCustodyCount} {isAr ? `عهدة غير مستردة` : `unreturned company asset(s)`}
+                </strong>:
               </p>
-              <ul className="list-disc pl-5 text-sm font-medium text-foreground">
+              <ul className="list-disc pl-5 rtl:pr-5 rtl:pl-0 text-sm font-medium text-foreground">
                 {unreturnedCustodyItems.map((c: any) => (
                   <li key={c.id}>
                     {c.name} ({c.category}){c.serial_number ? ` - S/N: ${c.serial_number}` : ""}
@@ -1487,18 +1531,19 @@ function AdminOffboarding({
                 ))}
               </ul>
               <p className="pt-2 text-xs text-muted-foreground">
-                It is strongly recommended to collect and confirm return of all assets before approving the final settlement.
-                Are you sure you want to proceed and mark the employee as Resigned now?
+                {isAr
+                  ? `يُوصى بشدة باستلام والتحقق من كافة العهد قبل اعتماد المستحقات النهائية. هل أنت متأكد من المتابعة وتسجيل حالة الموظف كـ "مستقيل" الآن؟`
+                  : `It is strongly recommended to collect and confirm return of all assets before approving the final settlement. Are you sure you want to proceed and mark the employee as Resigned now?`}
               </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Go Back & Collect Assets</AlertDialogCancel>
+            <AlertDialogCancel>{isAr ? "الرجوع لاستلام العهد" : "Go Back & Collect Assets"}</AlertDialogCancel>
             <AlertDialogAction
               onClick={executeApprove}
               className="bg-amber-600 hover:bg-amber-700 text-white"
             >
-              Approve Anyway
+              {isAr ? "اعتماد على أي حال" : "Approve Anyway"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -3687,6 +3732,7 @@ function attTone(s: string) {
 }
 
 function DeviceRequirementToggle({ userId, canManage }: { userId: string; canManage: boolean }) {
+  const { t } = useI18n();
   const getFn = useServerFn(getDeviceRequirement);
   const setFn = useServerFn(setDeviceRequirement);
   const qc = useQueryClient();
@@ -3699,7 +3745,7 @@ function DeviceRequirementToggle({ userId, canManage }: { userId: string; canMan
   async function toggle() {
     try {
       await setFn({ data: { user_id: userId, required: !required } });
-      toast.success(!required ? "Device approval is now required" : "Device approval is no longer required");
+      toast.success(!required ? (t("deviceApprovalRequiredToast") || "Device approval is now required") : (t("deviceApprovalNotRequiredToast") || "Device approval is no longer required"));
       qc.invalidateQueries({ queryKey: ["employee-device-requirement", userId] });
     } catch (e: any) {
       toast.error(e?.message ?? "Failed");
@@ -3709,10 +3755,9 @@ function DeviceRequirementToggle({ userId, canManage }: { userId: string; canMan
   return (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-muted/40 p-3">
       <div className="min-w-0">
-        <p className="text-sm font-semibold">Require an approved device to check in</p>
+        <p className="text-sm font-semibold">{t("requireApprovedDeviceTitle") || "Require an approved device to check in"}</p>
         <p className="text-xs text-muted-foreground">
-          Off by default — the employee can check in from any device. Turn it on to allow attendance only from
-          an approved device.
+          {t("requireApprovedDeviceDesc") || "Off by default — the employee can check in from any device. Turn it on to allow attendance only from an approved device."}
         </p>
       </div>
       <button
@@ -3724,7 +3769,7 @@ function DeviceRequirementToggle({ userId, canManage }: { userId: string; canMan
           }`}
       >
         <span
-          className={`absolute top-1 h-5 w-5 rounded-full bg-card shadow transition-all ${required ? "left-6" : "left-1"
+          className={`absolute top-1 h-5 w-5 rounded-full bg-card shadow transition-all ${required ? "left-6 rtl:right-6 rtl:left-auto" : "left-1 rtl:right-1 rtl:left-auto"
             }`}
         />
       </button>
@@ -3733,6 +3778,7 @@ function DeviceRequirementToggle({ userId, canManage }: { userId: string; canMan
 }
 
 function EmployeeDevicesPanel({ userId, canManage }: { userId: string; canManage: boolean }) {
+  const { t, lang } = useI18n();
   const listFn = useServerFn(listEmployeeDevices);
   const setStatusFn = useServerFn(setEmployeeDeviceStatus);
   const deleteFn = useServerFn(deleteEmployeeDevice);
@@ -3745,7 +3791,7 @@ function EmployeeDevicesPanel({ userId, canManage }: { userId: string; canManage
   async function setStatus(device_id: string, status: "approved" | "revoked" | "pending") {
     try {
       await setStatusFn({ data: { device_id, status } });
-      toast.success(`Device ${status}`);
+      toast.success(status === "approved" ? (t("deviceApproved") || "Device approved") : status === "revoked" ? (t("deviceStatusRevoked") || "Device revoked") : (t("deviceStatusPending") || "Device pending"));
       qc.invalidateQueries({ queryKey: ["employee-devices", userId] });
     } catch (e: any) {
       toast.error(e?.message ?? "Failed");
@@ -3754,7 +3800,7 @@ function EmployeeDevicesPanel({ userId, canManage }: { userId: string; canManage
   async function remove(device_id: string) {
     try {
       await deleteFn({ data: { device_id } });
-      toast.success("Device removed");
+      toast.success(t("deviceRemovedToast") || "Device removed");
       qc.invalidateQueries({ queryKey: ["employee-devices", userId] });
     } catch (e: any) {
       toast.error(e?.message ?? "Failed");
@@ -3764,16 +3810,16 @@ function EmployeeDevicesPanel({ userId, canManage }: { userId: string; canManage
   return (
     <div className="rounded-3xl border border-border bg-card p-5">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="font-display text-base font-semibold">Devices</h2>
-        <span className="text-xs text-muted-foreground">{rows.length} registered</span>
+        <h2 className="font-display text-base font-semibold">{t("devices") || "Devices"}</h2>
+        <span className="text-xs text-muted-foreground">{rows.length} {t("registeredDevicesCount") || "registered"}</span>
       </div>
 
       <DeviceRequirementToggle userId={userId} canManage={canManage} />
       {isLoading ? (
-        <p className="text-center text-sm text-muted-foreground">Loading…</p>
+        <p className="text-center text-sm text-muted-foreground">{t("loading") || "Loading…"}</p>
       ) : rows.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-          No devices registered for this employee.
+          {t("noDevicesRegistered") || "No devices registered for this employee."}
         </p>
       ) : (
         <ul className="space-y-2">
@@ -3787,8 +3833,8 @@ function EmployeeDevicesPanel({ userId, canManage }: { userId: string; canManage
                   <p className="text-sm font-semibold">{d.label}</p>
                   <p className="font-mono text-[11px] text-muted-foreground truncate">{d.id}</p>
                   <p className="text-[11px] text-muted-foreground">
-                    Registered {new Date(d.created_at).toLocaleString()}
-                    {d.last_seen_at ? ` · Last seen ${new Date(d.last_seen_at).toLocaleString()}` : ""}
+                    {t("registeredAtLabel") || "Registered"} {new Date(d.created_at).toLocaleDateString(lang === "ar" ? "ar-EG" : undefined)}
+                    {d.last_seen_at ? ` · ${t("lastSeenAtLabel") || "Last seen"} ${new Date(d.last_seen_at).toLocaleDateString(lang === "ar" ? "ar-EG" : undefined)}` : ""}
                   </p>
                   {d.user_agent && (
                     <p className="mt-0.5 truncate text-[10px] text-muted-foreground">{d.user_agent}</p>
@@ -3799,19 +3845,19 @@ function EmployeeDevicesPanel({ userId, canManage }: { userId: string; canManage
                 <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${d.status === "approved" ? "bg-success/15 text-success" :
                   d.status === "pending" ? "bg-warning/20 text-warning-foreground" :
                     "bg-destructive/15 text-destructive"
-                  }`}>{d.status}</span>
+                  }`}>{d.status === "approved" ? (t("deviceStatusApproved") || "Approved") : d.status === "pending" ? (t("deviceStatusPending") || "Pending") : (t("deviceStatusRevoked") || "Revoked")}</span>
                 {canManage && d.status !== "approved" && (
                   <button onClick={() => setStatus(d.id, "approved")} className="inline-flex items-center gap-1 rounded-full bg-gradient-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground shadow-brand">
-                    <Check className="h-3 w-3" /> Approve
+                    <Check className="h-3 w-3" /> {t("approveDeviceBtn") || "Approve"}
                   </button>
                 )}
                 {canManage && d.status === "approved" && (
                   <button onClick={() => setStatus(d.id, "revoked")} className="rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold">
-                    Revoke
+                    {t("revokeDeviceBtn") || "Revoke"}
                   </button>
                 )}
                 {canManage && (
-                  <button onClick={() => remove(d.id)} className="rounded-full border border-destructive/40 bg-destructive/5 px-2 py-1.5 text-destructive">
+                  <button onClick={() => remove(d.id)} title={t("delete") || "Delete"} className="rounded-full border border-destructive/40 bg-destructive/5 px-2 py-1.5 text-destructive">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 )}
@@ -4013,6 +4059,8 @@ function StatusHistoryPanel({ profileId }: { profileId: string }) {
 import { getAdvanceEligibility, updateAnnualAdvanceLimit } from "@/backend/functions/advances.functions";
 
 function AdvancesTab({ employeeId }: { employeeId: string }) {
+  const { t, lang } = useI18n();
+  const isAr = lang === "ar";
   const [page, setPage] = useState(1);
   const [editingLimit, setEditingLimit] = useState(false);
   const [annualLimit, setAnnualLimit] = useState("");
@@ -4040,7 +4088,7 @@ function AdvancesTab({ employeeId }: { employeeId: string }) {
   const saveLimit = async () => {
     try {
       await updateLimitFn({ data: { employee_id: employeeId, limit: Number(annualLimit) } });
-      toast.success("Annual limit updated successfully");
+      toast.success(isAr ? "تم تحديث الحد السنوي بنجاح" : "Annual limit updated successfully");
       setEditingLimit(false);
       refetchEligibility();
     } catch (e: any) {
@@ -4053,13 +4101,13 @@ function AdvancesTab({ employeeId }: { employeeId: string }) {
       {/* Annual Limit Settings */}
       <div className="rounded-3xl border border-border bg-card p-5">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="font-display text-base font-semibold">Advance Eligibility</h2>
+          <h2 className="font-display text-base font-semibold">{t("advanceEligibility") || "Advance Eligibility"}</h2>
           {!editingLimit ? (
             <button
               onClick={() => setEditingLimit(true)}
               className="rounded-full bg-brand/10 px-3 py-1 text-xs font-semibold text-brand"
             >
-              Edit Limit
+              {isAr ? "تعديل الحد" : "Edit Limit"}
             </button>
           ) : (
             <div className="flex gap-2">
@@ -4067,13 +4115,13 @@ function AdvancesTab({ employeeId }: { employeeId: string }) {
                 onClick={() => setEditingLimit(false)}
                 className="rounded-full bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground"
               >
-                Cancel
+                {t("cancel") || "Cancel"}
               </button>
               <button
                 onClick={saveLimit}
                 className="rounded-full bg-brand px-3 py-1 text-xs font-semibold text-brand-foreground"
               >
-                Save
+                {t("save") || "Save"}
               </button>
             </div>
           )}
@@ -4081,56 +4129,56 @@ function AdvancesTab({ employeeId }: { employeeId: string }) {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="rounded-xl border border-border bg-muted/20 p-4">
-            <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">Annual Advance Limit</p>
+            <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">{t("annualAdvanceLimit") || "Annual Advance Limit"}</p>
             {editingLimit ? (
               <div className="flex items-center gap-2 mt-2">
                 <input
                   type="number"
                   value={annualLimit}
                   onChange={(e) => setAnnualLimit(e.target.value)}
-                  className="w-full rounded-xl border border-input bg-background px-3 py-1.5 text-sm focus:border-brand focus:outline-none"
+                  className="w-full rounded-xl border border-input bg-background px-3 py-1.5 text-sm focus:border-brand focus:outline-none font-mono"
                 />
-                <span className="text-sm font-medium text-muted-foreground">EGP</span>
+                <span className="text-sm font-medium text-muted-foreground">{isAr ? "جنيه" : "EGP"}</span>
               </div>
             ) : (
-              <p className="text-2xl font-display font-semibold text-brand">{Number(annualLimit).toLocaleString()} EGP</p>
+              <p className="text-2xl font-display font-semibold text-brand">{Number(annualLimit).toLocaleString()} {isAr ? "جنيه" : "EGP"}</p>
             )}
-            <p className="text-xs text-muted-foreground mt-2">The maximum total amount this employee can request per year.</p>
+            <p className="text-xs text-muted-foreground mt-2">{t("annualAdvanceLimitDesc") || "The maximum total amount this employee can request per year."}</p>
           </div>
 
           <div className="rounded-xl border border-border bg-muted/20 p-4">
-            <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">Used This Year</p>
+            <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">{t("usedThisYear") || "Used This Year"}</p>
             <p className="text-2xl font-display font-semibold text-amber-500">
-              {eligibility?.usedThisYear?.toLocaleString() ?? 0} EGP
+              {eligibility?.usedThisYear?.toLocaleString() ?? 0} {isAr ? "جنيه" : "EGP"}
             </p>
-            <p className="text-xs text-muted-foreground mt-2">Total advances approved in the current calendar year.</p>
+            <p className="text-xs text-muted-foreground mt-2">{t("usedThisYearDesc") || "Total advances approved in the current calendar year."}</p>
           </div>
         </div>
       </div>
 
       <div className="rounded-3xl border border-border bg-card p-5">
-        <h2 className="mb-4 font-display text-base font-semibold">Advances History</h2>
+        <h2 className="mb-4 font-display text-base font-semibold">{t("advancesHistory") || "Advances History"}</h2>
         {isLoading ? (
           <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
         ) : data?.advances.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No advances found.</p>
+          <p className="text-sm text-muted-foreground">{t("noAdvancesFound") || "No advances found."}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="border-b bg-muted/40 text-xs font-semibold text-muted-foreground">
                 <tr>
-                  <th className="px-3 py-2 text-start">Request #</th>
-                  <th className="px-3 py-2 text-start">Date</th>
-                  <th className="px-3 py-2 text-start">Amount</th>
-                  <th className="px-3 py-2 text-start">Status</th>
+                  <th className="px-3 py-2 text-start">{isAr ? "رقم الطلب" : "Request #"}</th>
+                  <th className="px-3 py-2 text-start">{t("date") || "Date"}</th>
+                  <th className="px-3 py-2 text-start">{t("amount") || "Amount"}</th>
+                  <th className="px-3 py-2 text-start">{t("status") || "Status"}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {data?.advances.map(a => (
                   <tr key={a.id}>
                     <td className="px-3 py-2 font-mono text-xs text-brand">{a.request_number}</td>
-                    <td className="px-3 py-2 whitespace-nowrap">{new Date(a.created_at).toLocaleDateString()}</td>
-                    <td className="px-3 py-2 font-mono font-medium">{a.requested_amount} {a.currency}</td>
+                    <td className="px-3 py-2 whitespace-nowrap">{new Date(a.created_at).toLocaleDateString(isAr ? "ar-EG" : undefined)}</td>
+                    <td className="px-3 py-2 font-mono font-medium">{a.requested_amount?.toLocaleString()} {a.currency === "EGP" && isAr ? "جنيه" : a.currency}</td>
                     <td className="px-3 py-2 capitalize">{a.status.replace(/_/g, " ")}</td>
                   </tr>
                 ))}

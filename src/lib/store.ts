@@ -98,6 +98,14 @@ export type ManagerTask = {
   startedAt?: number;
   completedAt?: number;
   history?: TaskHistoryEntry[];
+  assigneeProfiles?: Array<{
+    id: string;
+    name: string;
+    empCode?: string;
+    department?: string;
+    avatarUrl?: string;
+  }>;
+  creatorName?: string;
 };
 export type ManagerTrip = {
   id: string;

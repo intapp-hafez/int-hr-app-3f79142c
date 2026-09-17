@@ -32,6 +32,14 @@ function MapEvents({ onChange }: { onChange: (lat: number, lng: number) => void 
 
 function MapController({ cityName, districtName, hasPosition }: { cityName?: string; districtName?: string; hasPosition: boolean }) {
   const map = useMap();
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [map]);
+
   useEffect(() => {
     if (hasPosition) return;
     
@@ -80,7 +88,11 @@ export function TaskLocationPicker({ lat, lng, radius_m = 500, cityName, distric
   );
 
   useEffect(() => {
-    if (lat != null && lng != null) setPosition(new L.LatLng(lat, lng));
+    if (lat != null && lng != null) {
+      setPosition(new L.LatLng(lat, lng));
+    } else {
+      setPosition(null);
+    }
   }, [lat, lng]);
 
   const handleMapClick = (newLat: number, newLng: number) => {

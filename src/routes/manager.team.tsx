@@ -228,7 +228,16 @@ function TeamPage() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-muted/30 p-8 text-center text-sm text-muted-foreground">
-          {team.length === 0 ? t("noTeamMembers") : "No team members match the current filters."}
+          {team.length === 0 ? (
+            <div className="space-y-2">
+              <p className="font-semibold text-foreground">{t("noTeamMembers") || "No team members found"}</p>
+              <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                No employees are currently assigned to you or your department. Direct reports can be assigned by administrators in the Employees directory or Manager Assignment page.
+              </p>
+            </div>
+          ) : (
+            "No team members match the current filters."
+          )}
         </div>
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2">

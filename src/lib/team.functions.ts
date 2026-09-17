@@ -17,6 +17,58 @@ export type TeamMember = {
 
 export type GetMyTeamResult = { rows: TeamMember[]; total: number };
 
+export async function resolveTeamMemberScope(supabase: any, userId: string) {
+  const { data: userRoles } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId);
+  const roles = (userRoles ?? []).map((r: any) => String(r.role).toLowerCase());
+  const isAdmin = roles.includes("admin") || roles.includes("hr");
+
+  if (isAdmin) {
+    return { isAdmin: true, filterConditions: null as string[] | null };
+  }
+
+  const [{ data: myProfile }, { data: managedDepts }] = await Promise.all([
+    supabase.from("profiles").select("id, department_id").eq("id", userId).maybeSingle(),
+    supabase.from("departments").select("id").eq("responsible_person_id", userId),
+  ]);
+
+  const managedDeptIds = (managedDepts ?? []).map((d: any) => d.id as string).filter(Boolean);
+  const conditions: string[] = [`manager_id.eq.${userId}`];
+
+  if (managedDeptIds.length > 0) {
+    conditions.push(`department_id.in.(${managedDeptIds.join(",")})`);
+  }
+  if (myProfile?.department_id) {
+    conditions.push(`department_id.eq.${myProfile.department_id}`);
+  }
+
+  return {
+    isAdmin: false,
+    filterConditions: conditions,
+    myProfile,
+    managedDeptIds,
+  };
+}
+
+export async function getTeamMemberIds(supabase: any, userId: string): Promise<{ isAdmin: boolean; ids: string[] }> {
+  const scope = await resolveTeamMemberScope(supabase, userId);
+  if (scope.isAdmin) {
+    return { isAdmin: true, ids: [] };
+  }
+  let q = supabase
+    .from("profiles")
+    .select("id")
+    .neq("id", userId);
+  if (scope.filterConditions && scope.filterConditions.length > 0) {
+    q = q.or(scope.filterConditions.join(","));
+  }
+  const { data } = await q;
+  const ids = (data ?? []).map((r: any) => r.id as string).filter(Boolean);
+  return { isAdmin: false, ids };
+}
+
 export const getMyTeam = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
@@ -30,22 +82,31 @@ export const getMyTeam = createServerFn({ method: "POST" })
   )
   .handler(async ({ context, data }): Promise<GetMyTeamResult> => {
     const { supabase, userId } = context;
+    const scope = await resolveTeamMemberScope(supabase, userId);
     const from = (data.page - 1) * data.pageSize;
     const to = from + data.pageSize - 1;
+
     let q = supabase
       .from("profiles")
       .select(
         "id, full_name, email, phone, status, avatar_url, department_id, position_id, city",
         { count: "exact" },
       )
-      .eq("manager_id", userId)
-      .order("full_name", { ascending: true })
-      .range(from, to);
+      .neq("id", userId)
+      .order("full_name", { ascending: true });
+
+    if (!scope.isAdmin && scope.filterConditions && scope.filterConditions.length > 0) {
+      q = q.or(scope.filterConditions.join(","));
+    }
+
     const term = data.q.trim();
     if (term) {
       const esc = term.replace(/[%,]/g, " ");
       q = q.or(`full_name.ilike.%${esc}%,email.ilike.%${esc}%`);
     }
+
+    q = q.range(from, to);
+
     const { data: rows, count, error } = await q;
     if (error) throw new Error(error.message);
     const reports = rows ?? [];
@@ -101,17 +162,28 @@ export const checkEmployeeAssignment = createServerFn({ method: "POST" })
     const email = data.email.trim().toLowerCase();
     const { data: row, error } = await supabase
       .from("profiles")
-      .select("id, manager_id")
+      .select("id, manager_id, department_id")
       .ilike("email", email)
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!row) return { ok: false, reason: "not-found", myId: userId, email };
     const managerId = (row as any).manager_id as string | null;
-    if (!managerId) return { ok: false, reason: "no-manager", myId: userId, email };
-    if (managerId !== userId) {
-      return { ok: false, reason: "different-manager", managerId, myId: userId, email };
+    if (managerId === userId) {
+      return { ok: true, employeeId: (row as any).id, managerId: userId, managerIsMe: true };
     }
-    return { ok: true, employeeId: (row as any).id, managerId, managerIsMe: true };
+    const [{ data: myProfile }, { data: managedDepts }] = await Promise.all([
+      supabase.from("profiles").select("department_id").eq("id", userId).maybeSingle(),
+      supabase.from("departments").select("id").eq("responsible_person_id", userId),
+    ]);
+    const managedDeptIds = (managedDepts ?? []).map((d: any) => d.id);
+    if (
+      (row as any).department_id &&
+      (managedDeptIds.includes((row as any).department_id) || (myProfile?.department_id && myProfile.department_id === (row as any).department_id))
+    ) {
+      return { ok: true, employeeId: (row as any).id, managerId: userId, managerIsMe: true };
+    }
+    if (!managerId) return { ok: false, reason: "no-manager", myId: userId, email };
+    return { ok: false, reason: "different-manager", managerId, myId: userId, email };
   });
 
 export type TeamPresence = { presentIds: string[]; from: string; to: string };
@@ -128,10 +200,12 @@ export const getTeamPresence = createServerFn({ method: "POST" })
   )
   .handler(async ({ context, data }): Promise<TeamPresence> => {
     const { supabase, userId } = context;
-    const { data: team, error: te } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("manager_id", userId);
+    const scope = await resolveTeamMemberScope(supabase, userId);
+    let q = supabase.from("profiles").select("id").neq("id", userId);
+    if (!scope.isAdmin && scope.filterConditions && scope.filterConditions.length > 0) {
+      q = q.or(scope.filterConditions.join(","));
+    }
+    const { data: team, error: te } = await q;
     if (te) throw new Error(te.message);
     const ids = (team ?? []).map((r: any) => r.id as string);
     if (ids.length === 0) return { presentIds: [], from: data.from, to: data.to };

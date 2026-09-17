@@ -61,7 +61,6 @@ function AdminLayout() {
     { to: "/admin/employees", icon: Users, label: t("employees"), page: "employees" },
     { to: "/admin/contracts", icon: FileSignature, label: t("contracts"), page: "contracts" },
     { to: "/admin/geofencing", icon: MapPin, label: t("geofencing"), page: "geofencing" },
-    { to: "/admin/work-locations", icon: Navigation, label: "Work Locations", page: "geofencing" },
     { to: "/admin/attendance", icon: Clock, label: t("attendance"), page: "attendance" },
     { to: "/admin/leaves", icon: CalendarDays, label: t("leaves"), page: "leaves" },
     { to: "/admin/payroll", icon: Wallet, label: t("payroll"), page: "payroll" },
@@ -79,7 +78,10 @@ function AdminLayout() {
   const currentRequiredPage = getPageSlugForPath(path);
   const isPageAllowed = isAdmin || permsLoading || !currentRequiredPage || can(currentRequiredPage, "view");
 
-  const isActive = (to: string, exact?: boolean) => (exact ? path === to : path.startsWith(to));
+  const isActive = (to: string, exact?: boolean) => {
+    if (to === "/admin/geofencing" && path.startsWith("/admin/work-locations")) return true;
+    return exact ? path === to : path.startsWith(to);
+  };
 
   return (
     <div dir={dir} className="min-h-screen bg-muted/40">

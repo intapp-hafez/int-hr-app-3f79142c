@@ -201,7 +201,7 @@ export const listLeaveQueue = createServerFn({ method: "GET" })
     const { data, error } = await context.supabase
       .from("leaves")
       .select(
-        "id, employee_id, leave_type_name, start_date, end_date, days, paid, reason, status, created_at, proof_url, proof_mime, proof_name, profiles:employee_id(full_name, email, departments:department_id(name))",
+        "id, employee_id, leave_type_name, start_date, end_date, days, paid, reason, status, created_at, proof_url, proof_mime, proof_name, profiles:employee_id(full_name, email, departments:department_id(name_en, name_ar))",
       )
       .order("created_at", { ascending: false })
       .limit(500);
@@ -211,7 +211,54 @@ export const listLeaveQueue = createServerFn({ method: "GET" })
       employee_id: r.employee_id,
       employee_name: r.profiles?.full_name ?? "—",
       employee_email: r.profiles?.email ?? null,
-      department: r.profiles?.departments?.name ?? null,
+      department: r.profiles?.departments?.name_en ?? r.profiles?.departments?.name_ar ?? null,
+      leave_type_name: r.leave_type_name,
+      start_date: r.start_date,
+      end_date: r.end_date,
+      days: r.days,
+      paid: r.paid,
+      reason: r.reason,
+      status: r.status,
+      created_at: r.created_at ?? null,
+      proof_url: r.proof_url ?? null,
+      proof_mime: r.proof_mime ?? null,
+      proof_name: r.proof_name ?? null,
+    }));
+    return rows.sort((a, b) => {
+      const ap = a.status === "pending" ? 0 : 1;
+      const bp = b.status === "pending" ? 0 : 1;
+      if (ap !== bp) return ap - bp;
+      return (b.created_at ?? "").localeCompare(a.created_at ?? "");
+    });
+  });
+
+export const listManagerTeamLeaves = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<LeaveQueueRow[]> => {
+    const { supabase, userId } = context;
+    const { getTeamMemberIds } = await import("@/lib/team.functions");
+    const { isAdmin, ids } = await getTeamMemberIds(supabase, userId);
+
+    let q = supabase
+      .from("leaves")
+      .select(
+        "id, employee_id, leave_type_name, start_date, end_date, days, paid, reason, status, created_at, proof_url, proof_mime, proof_name, profiles:employee_id(full_name, email, departments:department_id(name_en, name_ar))",
+      )
+      .order("created_at", { ascending: false })
+      .limit(500);
+
+    if (!isAdmin && ids.length > 0) {
+      q = q.in("employee_id", ids);
+    }
+
+    const { data, error } = await q;
+    if (error) throw new Error(error.message);
+    const rows: LeaveQueueRow[] = (data ?? []).map((r: any) => ({
+      id: r.id,
+      employee_id: r.employee_id,
+      employee_name: r.profiles?.full_name ?? "—",
+      employee_email: r.profiles?.email ?? null,
+      department: r.profiles?.departments?.name_en ?? r.profiles?.departments?.name_ar ?? null,
       leave_type_name: r.leave_type_name,
       start_date: r.start_date,
       end_date: r.end_date,

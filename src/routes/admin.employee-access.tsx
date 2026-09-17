@@ -17,10 +17,12 @@ import {
   getDeviceRequirement,
   setDeviceRequirement,
 } from "@/backend/functions/devices.functions";
+import { useI18n } from "@/lib/i18n";
 
 export const Route = createFileRoute("/admin/employee-access")({ component: Page });
 
 function Page() {
+  const { t } = useI18n();
   const qc = useQueryClient();
   const empFn = useServerFn(listEmployeesForAccess);
   const netsFn = useServerFn(listAllNetworks);
@@ -186,8 +188,8 @@ function Page() {
                   <div className="flex items-center gap-2">
                     <Smartphone className="h-4 w-4 text-brand" />
                     <div>
-                      <p className="text-xs font-semibold">Approved device requirement</p>
-                      <p className="text-[11px] text-muted-foreground">Require an approved device to check in</p>
+                      <p className="text-xs font-semibold">{t("approvedDeviceRequirement") || "Approved device requirement"}</p>
+                      <p className="text-[11px] text-muted-foreground">{t("requireApprovedDeviceTitle") || "Require an approved device to check in"}</p>
                     </div>
                   </div>
                   <button
@@ -200,7 +202,7 @@ function Page() {
                   >
                     <span
                       className={`absolute top-0.5 h-5 w-5 rounded-full bg-card shadow transition-all ${
-                        devReqQ.data?.required ? "left-5" : "left-0.5"
+                        devReqQ.data?.required ? "left-5 rtl:right-5 rtl:left-auto" : "left-0.5 rtl:right-0.5 rtl:left-auto"
                       }`}
                     />
                   </button>

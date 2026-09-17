@@ -591,7 +591,7 @@ function AdminAttendance() {
           <TabsTrigger value="records">Records</TabsTrigger>
           <TabsTrigger value="report">Attendance Report</TabsTrigger>
           <TabsTrigger value="map">Live map</TabsTrigger>
-          <TabsTrigger value="tasks">{t("taskTimeAndTimeline") || "Task Time & Timeline"}</TabsTrigger>
+          <TabsTrigger value="tasks">{t("tasks") || "Tasks"}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-5">

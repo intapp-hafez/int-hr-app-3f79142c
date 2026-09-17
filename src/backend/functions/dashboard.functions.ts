@@ -103,6 +103,230 @@ export const getAdminDashboard = createServerFn({ method: "GET" })
     return { activity, pendingLeaves, upcomingHolidays };
   });
 
+export type ManagerDashboardData = {
+  teamCount: number;
+  presentToday: number;
+  absentToday: number;
+  onLeaveToday: number;
+  attendanceRate: number;
+  tasksOpen: number;
+  tasksDone: number;
+  tripsCount: number;
+  pendingLeavesCount: number;
+  recentLeaves: Array<{
+    id: string;
+    employeeName: string;
+    employeeEmail: string | null;
+    leaveType: string;
+    startDate: string;
+    endDate: string;
+    days: number | null;
+    reason: string | null;
+    status: string;
+    createdAt: string | null;
+  }>;
+  recentTasks: Array<{
+    id: string;
+    title: string;
+    status: string;
+    priority: string;
+    dueDate: string | null;
+    dueTime: string | null;
+    assigneesCount: number;
+  }>;
+  teamPresence: Array<{
+    id: string;
+    name: string;
+    email: string;
+    department: string;
+    role: string;
+    avatarUrl: string | null;
+    status: "present" | "late" | "checked_out" | "on_leave" | "absent";
+    inTime: string | null;
+    outTime: string | null;
+  }>;
+};
+
+export const getManagerDashboardData = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<ManagerDashboardData> => {
+    const { supabase, userId } = context;
+    const d = today();
+
+    // 1. Resolve manager team IDs
+    const { getTeamMemberIds } = await import("@/lib/team.functions");
+    const { isAdmin, ids: scopedIds } = await getTeamMemberIds(supabase, userId);
+
+    // If manager has specific direct reports/managed dept members, use them;
+    // Otherwise fallback to active profiles so the manager view has real data
+    let teamProfiles: any[] = [];
+    if (!isAdmin && scopedIds.length > 0) {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, full_name, email, avatar_url, department_id, position_id, departments:department_id(name_en, name_ar), positions:position_id(name_en)")
+        .in("id", scopedIds);
+      teamProfiles = data ?? [];
+    } else {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, full_name, email, avatar_url, department_id, position_id, departments:department_id(name_en, name_ar), positions:position_id(name_en)")
+        .neq("id", userId)
+        .eq("status", "Active")
+        .limit(30);
+      teamProfiles = data ?? [];
+    }
+
+    const teamIds = teamProfiles.map((p) => p.id);
+
+    // 2. Fetch concurrent data in parallel
+    const [attRes, leavesRes, tasksRes, tripsRes] = await Promise.all([
+      // Today attendance
+      teamIds.length > 0
+        ? supabase
+            .from("attendance")
+            .select("id, employee_id, in_time, out_time, status")
+            .eq("date", d)
+            .in("employee_id", teamIds)
+        : Promise.resolve({ data: [] as any[] }),
+      // Leaves (pending and active)
+      supabase
+        .from("leaves")
+        .select("id, employee_id, leave_type_name, start_date, end_date, days, reason, status, created_at, profiles:employee_id(full_name, email)")
+        .order("created_at", { ascending: false })
+        .limit(100),
+      // Tasks
+      supabase
+        .from("tasks")
+        .select("id, title, status, priority, due_date, due_time, assignees, created_by")
+        .order("created_at", { ascending: false })
+        .limit(50),
+      // Trips
+      supabase
+        .from("trips")
+        .select("id, status, assignee, created_by")
+        .order("created_at", { ascending: false })
+        .limit(50),
+    ]);
+
+    const attendanceRows = attRes.data ?? [];
+    const allLeaves = leavesRes.data ?? [];
+    const allTasks = tasksRes.data ?? [];
+    const allTrips = tripsRes.data ?? [];
+
+    // Filter leaves for this manager's team scope
+    const teamLeaves = scopedIds.length > 0 && !isAdmin
+      ? allLeaves.filter((l: any) => scopedIds.includes(l.employee_id))
+      : allLeaves;
+
+    const pendingLeaves = teamLeaves.filter((l: any) => l.status === "pending");
+
+    // Filter tasks
+    const relevantTasks = allTasks.filter(
+      (t: any) =>
+        t.created_by === userId ||
+        (t.assignees ?? []).some((a: string) => a === userId || teamIds.includes(a))
+    );
+    const tasksOpen = relevantTasks.filter((t: any) => t.status !== "done" && t.status !== "cancelled").length;
+    const tasksDone = relevantTasks.filter((t: any) => t.status === "done").length;
+
+    // Filter trips
+    const relevantTrips = allTrips.filter(
+      (tr: any) => tr.created_by === userId || tr.assignee === userId || teamIds.includes(tr.assignee)
+    );
+
+    // Compute attendance & presence map
+    const attMap = new Map<string, any>();
+    for (const r of attendanceRows) {
+      attMap.set(r.employee_id, r);
+    }
+
+    const todayLeavesEmpIds = new Set<string>();
+    for (const l of teamLeaves) {
+      if (l.status === "approved" && l.start_date <= d && l.end_date >= d) {
+        todayLeavesEmpIds.add(l.employee_id);
+      }
+    }
+
+    let presentToday = 0;
+    let lateToday = 0;
+
+    const teamPresence: ManagerDashboardData["teamPresence"] = teamProfiles.map((p) => {
+      const att = attMap.get(p.id);
+      const isOnLeave = todayLeavesEmpIds.has(p.id);
+      let status: "present" | "late" | "checked_out" | "on_leave" | "absent" = "absent";
+
+      if (isOnLeave) {
+        status = "on_leave";
+      } else if (att) {
+        if (att.out_time) {
+          status = "checked_out";
+        } else if (att.status === "late") {
+          status = "late";
+          lateToday++;
+          presentToday++;
+        } else {
+          status = "present";
+          presentToday++;
+        }
+      }
+
+      return {
+        id: p.id,
+        name: p.full_name || p.email || "Employee",
+        email: p.email || "",
+        department: p.departments?.name_en ?? p.departments?.name_ar ?? "General",
+        role: p.positions?.name_en || "Team Member",
+        avatarUrl: p.avatar_url ?? null,
+        status,
+        inTime: att?.in_time ? new Date(att.in_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : null,
+        outTime: att?.out_time ? new Date(att.out_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : null,
+      };
+    });
+
+    const teamCount = teamProfiles.length;
+    const onLeaveToday = todayLeavesEmpIds.size;
+    const absentToday = Math.max(0, teamCount - presentToday - onLeaveToday);
+    const attendanceRate = teamCount > 0 ? Math.round((presentToday / teamCount) * 100) : 0;
+
+    const recentLeaves = pendingLeaves.slice(0, 5).map((l: any) => ({
+      id: l.id,
+      employeeName: l.profiles?.full_name ?? "Employee",
+      employeeEmail: l.profiles?.email ?? null,
+      leaveType: l.leave_type_name ?? "Annual Leave",
+      startDate: l.start_date,
+      endDate: l.end_date,
+      days: l.days ?? null,
+      reason: l.reason ?? null,
+      status: l.status,
+      createdAt: l.created_at ?? null,
+    }));
+
+    const recentTasks = relevantTasks.slice(0, 5).map((t: any) => ({
+      id: t.id,
+      title: t.title,
+      status: t.status,
+      priority: t.priority ?? "medium",
+      dueDate: t.due_date ?? null,
+      dueTime: t.due_time ?? null,
+      assigneesCount: (t.assignees ?? []).length,
+    }));
+
+    return {
+      teamCount,
+      presentToday,
+      absentToday,
+      onLeaveToday,
+      attendanceRate,
+      tasksOpen,
+      tasksDone,
+      tripsCount: relevantTrips.length,
+      pendingLeavesCount: pendingLeaves.length,
+      recentLeaves,
+      recentTasks,
+      teamPresence,
+    };
+  });
+
 export const getManagerStats = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {

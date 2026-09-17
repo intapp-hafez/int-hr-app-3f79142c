@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export type Role = "admin" | "manager" | "staff" | "employee" | "finance";
-export type Session = { username: string; role: Role; name: string; employeeId?: string; roles: string[]; avatarUrl?: string | null };
+export type Session = { username: string; email?: string; role: Role; name: string; employeeId?: string; roles: string[]; avatarUrl?: string | null };
 
 function pickRole(roles: string[]): Role {
   if (roles.includes("admin") || roles.includes("hr")) return "admin";
@@ -33,14 +33,21 @@ async function hydrate(userId?: string, email?: string, metaName?: string) {
     return;
   }
   const [{ data: profile }, { data: roleRows }] = await Promise.all([
-    supabase.from("profiles").select("full_name, email, avatar_url").eq("id", userId).maybeSingle(),
+    supabase.from("profiles").select("full_name, email, avatar_url, status").eq("id", userId).maybeSingle(),
     supabase.from("user_roles").select("role").eq("user_id", userId),
   ]);
+  if ((profile as any)?.status === "Inactive") {
+    await supabase.auth.signOut();
+    _state = { loaded: true, session: null };
+    emit();
+    return;
+  }
   const roles = (roleRows ?? []).map((r: { role: string }) => r.role);
   _state = {
     loaded: true,
     session: {
       username: profile?.email ?? email ?? "",
+      email: profile?.email ?? email ?? "",
       name: profile?.full_name ?? metaName ?? email ?? "",
       role: pickRole(roles),
       employeeId: userId,

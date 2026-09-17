@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, Play, Check, X, MapPin, Search, History, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 import { useStore, addTrip, transitionTrip, removeTrip, type TaskStatus, type ManagerTrip } from "@/lib/store";
@@ -10,6 +10,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { getMyTeam } from "@/lib/team.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { TaskLocationPicker } from "@/components/admin/TaskLocationPicker";
+import { reverseGeocodeCoords } from "@/lib/reverse-geocode";
 
 export const Route = createFileRoute("/manager/trips")({
   component: ManagerTripsPage,
@@ -74,8 +75,7 @@ function ManagerTripsPage() {
         </div>
         <button
           onClick={() => setOpen(true)}
-          disabled={team.length === 0}
-          className="inline-flex items-center gap-1.5 rounded-full bg-gradient-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground shadow-brand disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-full bg-gradient-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground shadow-brand hover:opacity-90 transition-opacity"
         >
           <Plus className="h-3.5 w-3.5" /> {t("addTrip")}
         </button>
@@ -200,6 +200,23 @@ function AddTripModal({ me, team, onClose }: { me: string; team: Array<{ id: str
   const cities = cityData?.cities ?? [];
   const districts = cityData?.districts ?? [];
 
+  const { data: fallbackEmployees = [] } = useQuery({
+    queryKey: ["active-employees-assignees"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, full_name, email")
+        .eq("status", "Active")
+        .order("full_name");
+      return (data ?? []).map((p: any) => ({
+        id: p.id,
+        name: p.full_name || p.email || "Employee",
+      }));
+    },
+    enabled: team.length === 0,
+  });
+  const assigneesList = team.length > 0 ? team : fallbackEmployees;
+
   const [destination, setDestination] = useState("");
   const [address, setAddress] = useState("");
   const [cityId, setCityId] = useState("");
@@ -208,7 +225,14 @@ function AddTripModal({ me, team, onClose }: { me: string; team: Array<{ id: str
   const [time, setTime] = useState("");
   const [purpose, setPurpose] = useState("");
   const [notes, setNotes] = useState("");
-  const [assignee, setAssignee] = useState(team[0]?.id ?? "");
+  const [assignee, setAssignee] = useState(assigneesList[0]?.id ?? "");
+
+  useEffect(() => {
+    if (!assignee && assigneesList[0]?.id) {
+      setAssignee(assigneesList[0].id);
+    }
+  }, [assigneesList, assignee]);
+
   const [lat, setLat] = useState<number>();
   const [lng, setLng] = useState<number>();
   const [radius_m, setRadiusM] = useState<number>(500);
@@ -270,7 +294,20 @@ function AddTripModal({ me, team, onClose }: { me: string; team: Array<{ id: str
                 radius_m={radius_m}
                 cityName={cityName}
                 districtName={district}
-                onChange={(l, g, r) => { setLat(l); setLng(g); setRadiusM(r ?? 500); }}
+                onChange={async (l, g, r) => {
+                  setLat(l);
+                  setLng(g);
+                  setRadiusM(r ?? 500);
+                  if (l != null && g != null) {
+                    try {
+                      const geo = await reverseGeocodeCoords(l, g);
+                      const autoAddress = geo.detailedAddress || geo.street || geo.formatted;
+                      if (autoAddress) setAddress(autoAddress);
+                    } catch {
+                      // ignore
+                    }
+                  }
+                }}
               />
             </div>
           )}
@@ -278,7 +315,7 @@ function AddTripModal({ me, team, onClose }: { me: string; team: Array<{ id: str
             <Field label={t("tripPurpose")}><input value={purpose} onChange={(e) => setPurpose(e.target.value)} className="input" /></Field>
             <Field label={t("assignedTo")}>
               <select value={assignee} onChange={(e) => setAssignee(e.target.value)} className="input">
-                {team.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+                {assigneesList.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
               </select>
             </Field>
           </div>

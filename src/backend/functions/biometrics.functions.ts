@@ -89,8 +89,11 @@ export const faceLogin = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const email = data.email.toLowerCase().trim();
     const { data: profile } = await supabaseAdmin
-      .from("profiles").select("id").ilike("email", email).maybeSingle();
+      .from("profiles").select("id, status").ilike("email", email).maybeSingle();
     if (!profile) throw new Error("No account for this email");
+    if ((profile as any)?.status === "Inactive") {
+      throw new Error("This account is inactive. Please contact your administrator.");
+    }
     const { data: row } = await supabaseAdmin
       .from("face_descriptors").select("descriptor").eq("user_id", profile.id).maybeSingle();
     if (!row) throw new Error("Face not enrolled for this account");
@@ -195,8 +198,11 @@ export const webauthnAuthOptions = createServerFn({ method: "POST" })
     const { rpID } = getOrigin();
     const email = data.email.toLowerCase().trim();
     const { data: profile } = await supabaseAdmin
-      .from("profiles").select("id").ilike("email", email).maybeSingle();
+      .from("profiles").select("id, status").ilike("email", email).maybeSingle();
     if (!profile) throw new Error("No account for this email");
+    if ((profile as any)?.status === "Inactive") {
+      throw new Error("This account is inactive. Please contact your administrator.");
+    }
     const { data: creds } = await supabaseAdmin
       .from("webauthn_credentials").select("credential_id, transports").eq("user_id", profile.id);
     if (!creds?.length) throw new Error("No fingerprint registered for this account");
@@ -227,8 +233,11 @@ export const webauthnAuthVerify = createServerFn({ method: "POST" })
     const { origin, rpID } = getOrigin();
     const email = data.email.toLowerCase().trim();
     const { data: profile } = await supabaseAdmin
-      .from("profiles").select("id").ilike("email", email).maybeSingle();
+      .from("profiles").select("id, status").ilike("email", email).maybeSingle();
     if (!profile) throw new Error("No account for this email");
+    if ((profile as any)?.status === "Inactive") {
+      throw new Error("This account is inactive. Please contact your administrator.");
+    }
     const credId: string = data.response.id;
     const { data: cred } = await supabaseAdmin
       .from("webauthn_credentials")
@@ -364,6 +373,14 @@ export const deleteWebauthnCredential = createServerFn({ method: "POST" })
 // ── Session minting (admin) ──────────────────────────────
 async function mintSession(email: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("status")
+    .ilike("email", email)
+    .maybeSingle();
+  if ((profile as any)?.status === "Inactive") {
+    throw new Error("This account is inactive. Please contact your administrator.");
+  }
   // Generate a magic link, extract the OTP, then verify it server-side to get
   // an access_token / refresh_token pair we can hand to the client.
   const { data, error } = await supabaseAdmin.auth.admin.generateLink({

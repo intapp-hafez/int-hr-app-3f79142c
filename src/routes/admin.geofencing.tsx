@@ -24,6 +24,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useI18n } from "@/lib/i18n";
 import { LeafletMap } from "@/components/LeafletMap";
+import { SubTabs } from "@/components/SubTabs";
 import { lookupCity } from "@/lib/egypt-cities";
 
 import { listCitiesWithDistricts } from "@/backend/functions/directory.functions";
@@ -118,6 +119,13 @@ function GeoPage() {
 
   return (
     <div className="space-y-5">
+      <SubTabs
+        items={[
+          { to: "/admin/geofencing", label: t("geofencing") },
+          { to: "/admin/work-locations", label: t("workLocations") },
+        ]}
+      />
+
       {/* Top Header */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>

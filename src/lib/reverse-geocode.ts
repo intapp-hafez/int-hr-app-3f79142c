@@ -3,6 +3,7 @@ export type GeocodeResult = {
   district?: string;
   street?: string;
   formatted?: string;
+  detailedAddress?: string;
 };
 
 function cleanText(val?: string | null): string {
@@ -79,6 +80,7 @@ function parseBDC(j: any): GeocodeResult {
     city: city || undefined,
     district: district || undefined,
     street: street || undefined,
+    detailedAddress: street || undefined,
   };
 }
 
@@ -98,57 +100,70 @@ function parseNominatim(j: any): GeocodeResult {
   ];
 
   const district = districtCandidates.find((d) => isDistinct(d, city));
-  const street = [cleanText(addr.house_number), cleanText(addr.road)].filter(Boolean).join(" ") || cleanText(addr.road);
+
+  const landmark = cleanText(addr.amenity || addr.building || addr.shop || addr.office || addr.tourism || addr.leisure || "");
+  const streetWithNumber = [cleanText(addr.house_number), cleanText(addr.road)].filter(Boolean).join(" ") || cleanText(addr.road);
+  const area = cleanText(addr.neighbourhood || addr.suburb || addr.quarter || "");
+
+  const detailedParts = [landmark, streetWithNumber, area].filter(Boolean);
+  const detailedAddress = detailedParts.join(", ") || streetWithNumber || cleanText(j.display_name);
 
   return {
     city: city || undefined,
     district: cleanText(district) || undefined,
-    street: street || undefined,
+    street: detailedAddress || streetWithNumber || undefined,
+    detailedAddress: detailedAddress || undefined,
   };
 }
 
 /**
- * Reverse geocodes coordinates into city, district, and street.
- * Queries BigDataCloud and falls back to / enriches with Nominatim OpenStreetMap.
+ * Reverse geocodes coordinates into city, district, street, and detailed address.
+ * Supports language localization ("ar" or "en").
+ * Queries Nominatim OpenStreetMap enriched with BigDataCloud.
  */
-export async function reverseGeocodeCoords(lat: number, lng: number): Promise<GeocodeResult> {
+export async function reverseGeocodeCoords(lat: number, lng: number, lang: string = "en"): Promise<GeocodeResult> {
   let bdc: GeocodeResult = {};
   let nom: GeocodeResult = {};
+  const isAr = lang.startsWith("ar");
+  const nomLang = isAr ? "ar,en" : "en";
+  const bdcLang = isAr ? "ar" : "en";
 
+  // 1. Query Nominatim for detailed street, house number, landmark & neighbourhood
   try {
     const r = await fetch(
-      `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`,
-      { signal: typeof AbortSignal !== "undefined" && "timeout" in AbortSignal ? AbortSignal.timeout(4000) : undefined },
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&accept-language=${nomLang}&addressdetails=1`,
+      {
+        headers: { "User-Agent": "HR-App reverse geocoding" },
+        signal: typeof AbortSignal !== "undefined" && "timeout" in AbortSignal ? AbortSignal.timeout(5000) : undefined,
+      },
     );
     if (r.ok) {
-      bdc = parseBDC(await r.json());
+      nom = parseNominatim(await r.json());
     }
   } catch {
-    // ignore and continue to Nominatim
+    // ignore and continue
   }
 
-  // If district or street or city is missing, query Nominatim
-  if (!bdc.district || !bdc.street || !bdc.city) {
+  // 2. Query BigDataCloud as fallback / supplement if city or district is missing
+  if (!nom.city || !nom.district || !nom.detailedAddress) {
     try {
       const r = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&accept-language=en&addressdetails=1`,
-        {
-          headers: { "User-Agent": "HR-App reverse geocoding" },
-          signal: typeof AbortSignal !== "undefined" && "timeout" in AbortSignal ? AbortSignal.timeout(4000) : undefined,
-        },
+        `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=${bdcLang}`,
+        { signal: typeof AbortSignal !== "undefined" && "timeout" in AbortSignal ? AbortSignal.timeout(4000) : undefined },
       );
       if (r.ok) {
-        nom = parseNominatim(await r.json());
+        bdc = parseBDC(await r.json());
       }
     } catch {
       // ignore
     }
   }
 
-  const city = bdc.city || nom.city;
-  const rawDistrict = bdc.district || nom.district;
+  const city = nom.city || bdc.city;
+  const rawDistrict = nom.district || bdc.district;
   const district = isDistinct(rawDistrict, city) ? rawDistrict : undefined;
-  const street = nom.street || bdc.street;
+  const detailedAddress = nom.detailedAddress || bdc.detailedAddress || nom.street || bdc.street;
+  const street = detailedAddress || nom.street || bdc.street;
 
   const formatted = formatLocationParts(street, district, city);
 
@@ -156,6 +171,7 @@ export async function reverseGeocodeCoords(lat: number, lng: number): Promise<Ge
     city,
     district,
     street,
+    detailedAddress,
     formatted: formatted || undefined,
   };
 }

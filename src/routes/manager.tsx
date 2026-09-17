@@ -1,5 +1,6 @@
 import { createFileRoute, Outlet, Link, useRouterState, Navigate } from "@tanstack/react-router";
-import { Home, Users, ListChecks, Route as RouteIcon, LogOut, LogIn, UserCircle, Banknote, MessageSquare } from "lucide-react";
+import { useMemo } from "react";
+import { Home, Users, ListChecks, Route as RouteIcon, LogOut, LogIn, UserCircle, Banknote, MessageSquare, CalendarCheck } from "lucide-react";
 import { AppLogo } from "@/components/AppLogo";
 import { LanguageToggle, useI18n } from "@/lib/i18n";
 import { useSession, useAuthReady, signOut } from "@/lib/auth";
@@ -8,6 +9,7 @@ import { InstallButton } from "@/components/InstallButton";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getChatUnreadTotal } from "@/backend/functions/chat.functions";
+import { listManagerTeamLeaves } from "@/backend/functions/leaves.functions";
 
 export const Route = createFileRoute("/manager")({
   component: ManagerLayout,
@@ -18,7 +20,6 @@ function ManagerLayout() {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const session = useSession();
   const ready = useAuthReady();
-  // navigate handled inside UserMenu / inline logout
 
   const unreadFn = useServerFn(getChatUnreadTotal);
   const { data: unreadData } = useQuery({
@@ -28,6 +29,18 @@ function ManagerLayout() {
     enabled: !!session,
   });
   const unreadMessagesCount = unreadData?.total ?? 0;
+
+  const leavesFn = useServerFn(listManagerTeamLeaves);
+  const { data: leavesData } = useQuery({
+    queryKey: ["manager-team-leaves-badge"],
+    queryFn: () => leavesFn(),
+    refetchInterval: 30000,
+    enabled: !!session,
+  });
+  const pendingLeavesCount = useMemo(
+    () => (leavesData ?? []).filter((l) => l.status === "pending").length,
+    [leavesData]
+  );
 
   if (typeof window === "undefined") return null;
   if (!ready) return null;
@@ -43,6 +56,7 @@ function ManagerLayout() {
     { to: "/manager/chat", icon: MessageSquare, label: t("messagesChat") },
     { to: "/manager/check", icon: LogIn, label: t("checkInOut") },
     { to: "/manager/team", icon: Users, label: t("myTeam") },
+    { to: "/manager/leaves", icon: CalendarCheck, label: t("teamLeaves") ?? "Team Leaves" },
     { to: "/manager/advances", icon: Banknote, label: t("advancesTitle") },
     { to: "/manager/tasks", icon: ListChecks, label: t("tasks") },
     { to: "/manager/trips", icon: RouteIcon, label: t("trips") },
@@ -54,6 +68,7 @@ function ManagerLayout() {
     { to: "/manager/chat", icon: MessageSquare, label: t("messagesChat") },
     { to: "/manager/check", icon: LogIn, label: t("checkInOut") },
     { to: "/manager/team", icon: Users, label: t("myTeam") },
+    { to: "/manager/leaves", icon: CalendarCheck, label: t("teamLeaves") ?? "Team Leaves" },
     { to: "/manager/tasks", icon: ListChecks, label: t("tasks") },
     { to: "/manager/trips", icon: RouteIcon, label: t("trips") },
     { to: "/manager/profile", icon: UserCircle, label: t("profile") },
@@ -69,9 +84,12 @@ function ManagerLayout() {
           <div className="flex items-center gap-2 border-b border-sidebar-border px-4 py-4">
             <Link to="/"><AppLogo size={28} tone="light" /></Link>
           </div>
-          <nav className="flex-1 space-y-1 p-3">
+          <nav className="flex-1 space-y-1 p-3 overflow-y-auto">
             {sidebarItems.map((it) => {
               const active = isActive(it.to, "exact" in it ? it.exact : false);
+              const isChat = it.to === "/manager/chat";
+              const isLeaves = it.to === "/manager/leaves";
+
               return (
                 <Link
                   key={it.to}
@@ -86,7 +104,7 @@ function ManagerLayout() {
                     <it.icon className="h-4 w-4 shrink-0" />
                     <span>{it.label}</span>
                   </div>
-                  {it.to === "/manager/chat" && unreadMessagesCount > 0 && (
+                  {isChat && unreadMessagesCount > 0 && (
                     <span
                       className={`grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[10px] font-bold shadow-sm ${
                         active
@@ -95,6 +113,17 @@ function ManagerLayout() {
                       }`}
                     >
                       {unreadMessagesCount}
+                    </span>
+                  )}
+                  {isLeaves && pendingLeavesCount > 0 && (
+                    <span
+                      className={`grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[10px] font-bold shadow-sm ${
+                        active
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                          : "bg-amber-500 text-white"
+                      }`}
+                    >
+                      {pendingLeavesCount}
                     </span>
                   )}
                 </Link>
@@ -137,6 +166,9 @@ function ManagerLayout() {
             <ul className="flex items-center justify-between">
               {mobileItems.map((it) => {
                 const active = isActive(it.to, "exact" in it ? it.exact : false);
+                const isChat = it.to === "/manager/chat";
+                const isLeaves = it.to === "/manager/leaves";
+
                 return (
                   <li key={it.to} className="flex-1">
                     <Link
@@ -147,13 +179,18 @@ function ManagerLayout() {
                     >
                       <div className="relative">
                         <it.icon className={`h-5 w-5 ${active ? "stroke-[2.5]" : ""}`} />
-                        {it.to === "/manager/chat" && unreadMessagesCount > 0 && (
+                        {isChat && unreadMessagesCount > 0 && (
                           <span className="absolute -end-2 -top-1 grid h-3.5 min-w-3.5 place-items-center rounded-full bg-brand px-1 text-[9px] font-bold text-brand-foreground shadow-sm">
                             {unreadMessagesCount}
                           </span>
                         )}
+                        {isLeaves && pendingLeavesCount > 0 && (
+                          <span className="absolute -end-2 -top-1 grid h-3.5 min-w-3.5 place-items-center rounded-full bg-amber-500 px-1 text-[9px] font-bold text-white shadow-sm">
+                            {pendingLeavesCount}
+                          </span>
+                        )}
                       </div>
-                      <span>{it.label}</span>
+                      <span className="truncate max-w-[50px]">{it.label}</span>
                     </Link>
                   </li>
                 );

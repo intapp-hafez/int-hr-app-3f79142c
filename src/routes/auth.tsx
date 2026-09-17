@@ -10,6 +10,7 @@ import {
   faceLogin,
 } from "@/backend/functions/biometrics.functions";
 import { useServerFn } from "@tanstack/react-start";
+import { useI18n } from "@/lib/i18n";
 import { FaceCapture } from "@/components/biometrics/FaceCapture";
 
 export const Route = createFileRoute("/auth")({
@@ -18,6 +19,7 @@ export const Route = createFileRoute("/auth")({
 });
 
 function AuthPage() {
+  const { t } = useI18n();
   const navigate = useNavigate();
   const redirectTo = (() => {
     if (typeof window === "undefined") return null;
@@ -42,6 +44,21 @@ function AuthPage() {
     let cancelled = false;
     async function redirectIfSignedIn(userId?: string) {
       if (!userId || cancelled) return;
+
+      // Verify active account status
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("status, inactive_reason")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if ((prof as any)?.status === "Inactive") {
+        await supabase.auth.signOut();
+        const reason = (prof as any)?.inactive_reason ? ` (${(prof as any).inactive_reason})` : "";
+        toast.error(`${t("accountInactive")}${reason}`);
+        return;
+      }
+
       // Ensure profile + default role exist before routing into the app.
       let roles: string[] = [];
       try {
@@ -72,18 +89,60 @@ function AuthPage() {
       redirectIfSignedIn(s?.user.id);
     });
     return () => { cancelled = true; sub.subscription.unsubscribe(); };
-  }, [navigate]);
+  }, [navigate, t]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
+      const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        throw error;
+      }
+
+      // Defense-in-depth: check profile status immediately
+      if (authData?.user?.id) {
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("status, inactive_reason")
+          .eq("id", authData.user.id)
+          .maybeSingle();
+
+        if ((prof as any)?.status === "Inactive") {
+          await supabase.auth.signOut();
+          const reason = (prof as any)?.inactive_reason ? ` (${(prof as any).inactive_reason})` : "";
+          toast.error(`${t("accountInactive")}${reason}`);
+          return;
+        }
+      }
+
       toast.success("Signed in");
       // onAuthStateChange will redirect by role
     } catch (err: any) {
-      toast.error(err?.message ?? "Authentication failed");
+      const rawMsg = typeof err?.message === "string" ? err.message : "";
+      const msg = rawMsg.toLowerCase();
+      const code = typeof err?.code === "string" ? err.code.toLowerCase() : "";
+
+      if (
+        msg.includes("banned") ||
+        msg.includes("inactive") ||
+        msg.includes("disabled") ||
+        code === "user_banned"
+      ) {
+        toast.error(t("accountInactive"));
+      } else if (
+        msg.includes("invalid login credentials") ||
+        msg.includes("invalid_credentials") ||
+        code === "invalid_credentials"
+      ) {
+        toast.error(t("invalidCredentials"));
+      } else if (msg.includes("email not confirmed")) {
+        toast.error("Please verify your email address before signing in.");
+      } else if (!rawMsg || rawMsg === "{}" || rawMsg === "[object Object]") {
+        toast.error(t("authFailed"));
+      } else {
+        toast.error(rawMsg);
+      }
     } finally {
       setBusy(false);
     }
@@ -104,7 +163,12 @@ function AuthPage() {
       if (error) throw error;
       toast.success("Signed in with fingerprint");
     } catch (e: any) {
-      toast.error(e?.message ?? "Fingerprint sign-in failed");
+      const msg = e?.message?.toLowerCase() || "";
+      if (msg.includes("inactive") || msg.includes("banned")) {
+        toast.error(t("accountInactive"));
+      } else {
+        toast.error(e?.message ?? "Fingerprint sign-in failed");
+      }
     } finally {
       setBusy(false);
     }
@@ -122,7 +186,12 @@ function AuthPage() {
       toast.success("Signed in with face");
       setShowFace(false);
     } catch (e: any) {
-      toast.error(e?.message ?? "Face sign-in failed");
+      const msg = e?.message?.toLowerCase() || "";
+      if (msg.includes("inactive") || msg.includes("banned")) {
+        toast.error(t("accountInactive"));
+      } else {
+        toast.error(e?.message ?? "Face sign-in failed");
+      }
     } finally {
       setBusy(false);
     }
