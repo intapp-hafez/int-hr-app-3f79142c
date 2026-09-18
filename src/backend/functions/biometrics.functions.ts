@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { logBiometricEvent } from "@/backend/server/biometric-audit.server";
 
 // ── Face descriptors ─────────────────────────────────────
 const DescriptorSchema = z.object({
@@ -26,6 +27,10 @@ export const enrollFace = createServerFn({ method: "POST" })
     const { error } = await context.supabase
       .from("face_descriptors")
       .upsert({ user_id: context.userId, descriptor: data.descriptor as any });
+    await logBiometricEvent({
+      userId: context.userId, method: "face", event: "enroll",
+      success: !error, reason: error?.message ?? null,
+    });
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -37,6 +42,10 @@ export const deleteFace = createServerFn({ method: "POST" })
       .from("face_descriptors")
       .delete()
       .eq("user_id", context.userId);
+    await logBiometricEvent({
+      userId: context.userId, method: "face", event: "unenroll",
+      success: !error, reason: error?.message ?? null,
+    });
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -51,10 +60,22 @@ export const verifyFace = createServerFn({ method: "POST" })
       .eq("user_id", context.userId)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    if (!row) return { match: false, enrolled: false, distance: null as number | null };
+    if (!row) {
+      await logBiometricEvent({
+        userId: context.userId, method: "face", event: "verify",
+        success: false, reason: "Face not enrolled",
+      });
+      return { match: false, enrolled: false, distance: null as number | null };
+    }
     const stored = row.descriptor as unknown as number[];
     const d = distance(stored, data.descriptor);
-    return { match: d <= FACE_THRESHOLD, enrolled: true, distance: d };
+    const match = d <= FACE_THRESHOLD;
+    await logBiometricEvent({
+      userId: context.userId, method: "face", event: "verify",
+      success: match, distance: d,
+      reason: match ? null : `Distance ${d.toFixed(3)} above threshold ${FACE_THRESHOLD}`,
+    });
+    return { match, enrolled: true, distance: d };
   });
 
 // Used during login: scope the lookup by an email the user types
@@ -90,16 +111,27 @@ export const faceLogin = createServerFn({ method: "POST" })
     const email = data.email.toLowerCase().trim();
     const { data: profile } = await supabaseAdmin
       .from("profiles").select("id, status").ilike("email", email).maybeSingle();
-    if (!profile) throw new Error("No account for this email");
+    const fail = async (reason: string, dist?: number) => {
+      await logBiometricEvent({
+        userId: (profile as any)?.id ?? null, email, method: "face", event: "login",
+        success: false, reason, distance: dist ?? null,
+      });
+      throw new Error(reason);
+    };
+    if (!profile) await fail("No account for this email");
     if ((profile as any)?.status === "Inactive") {
-      throw new Error("This account is inactive. Please contact your administrator.");
+      await fail("This account is inactive. Please contact your administrator.");
     }
     const { data: row } = await supabaseAdmin
-      .from("face_descriptors").select("descriptor").eq("user_id", profile.id).maybeSingle();
-    if (!row) throw new Error("Face not enrolled for this account");
-    const d = distance(row.descriptor as unknown as number[], data.descriptor);
-    if (d > FACE_THRESHOLD) throw new Error(`Face did not match (distance ${d.toFixed(3)})`);
-    return await mintSession(email);
+      .from("face_descriptors").select("descriptor").eq("user_id", profile!.id).maybeSingle();
+    if (!row) await fail("Face not enrolled for this account");
+    const d = distance(row!.descriptor as unknown as number[], data.descriptor);
+    if (d > FACE_THRESHOLD) await fail(`Face did not match (distance ${d.toFixed(3)})`, d);
+    const session = await mintSession(email);
+    await logBiometricEvent({
+      userId: profile!.id, email, method: "face", event: "login", success: true, distance: d,
+    });
+    return session;
   });
 
 // ── WebAuthn (fingerprint / platform authenticator) ──────
