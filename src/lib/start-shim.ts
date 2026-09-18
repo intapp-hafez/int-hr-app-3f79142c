@@ -13,17 +13,37 @@ import { supabase } from "@/integrations/supabase/client";
 // Returns a fluent builder. The final .handler(fn) call returns a callable
 // that invokes fn({ data, context }) directly in the browser with active auth.
 export function createServerFn(_opts?: { method?: string }) {
+  let validatorFn: ((input: any) => any) | null = null;
   const builder: any = {
     middleware: (_mw: any[]) => builder,
-    validator: (_v: any) => builder,
-    inputValidator: (_v: any) => builder,
+    validator: (v: any) => {
+      validatorFn = v;
+      return builder;
+    },
+    inputValidator: (v: any) => {
+      validatorFn = v;
+      return builder;
+    },
     outputValidator: (_v: any) => builder,
     handler: (fn: (...args: any[]) => any) => {
       const caller = async (input?: any) => {
         // TanStack Start callers pass either { data: X } or just X.
-        const data = input != null && typeof input === "object" && "data" in input
+        let data = input != null && typeof input === "object" && "data" in input
           ? input.data
           : input;
+
+        if (validatorFn) {
+          try {
+            data = typeof validatorFn === "function"
+              ? validatorFn(data)
+              : typeof (validatorFn as any).parse === "function"
+                ? (validatorFn as any).parse(data)
+                : data;
+          } catch (valErr) {
+            console.error("[start-shim] validator error:", valErr);
+            throw valErr;
+          }
+        }
 
         // Resolve context dynamically on the client using the browser's auth session
         const { data: sessionData } = await supabase.auth.getSession();

@@ -76,6 +76,7 @@ import { Route as AdminDirectoryRouteImport } from './routes/admin.directory'
 import { Route as AdminDevicesRouteImport } from './routes/admin.devices'
 import { Route as AdminContractsRouteImport } from './routes/admin.contracts'
 import { Route as AdminChatRouteImport } from './routes/admin.chat'
+import { Route as AdminBiometricsHealthRouteImport } from './routes/admin.biometrics-health'
 import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 import { Route as AdminAttendanceReportRouteImport } from './routes/admin.attendance-report'
 import { Route as AdminAttendanceRouteImport } from './routes/admin.attendance'
@@ -427,6 +428,11 @@ const AdminChatRoute = AdminChatRouteImport.update({
   path: '/chat',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminBiometricsHealthRoute = AdminBiometricsHealthRouteImport.update({
+  id: '/biometrics-health',
+  path: '/biometrics-health',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminAuditRoute = AdminAuditRouteImport.update({
   id: '/audit',
   path: '/audit',
@@ -514,6 +520,7 @@ export interface FileRoutesByFullPath {
   '/admin/attendance': typeof AdminAttendanceRoute
   '/admin/attendance-report': typeof AdminAttendanceReportRoute
   '/admin/audit': typeof AdminAuditRoute
+  '/admin/biometrics-health': typeof AdminBiometricsHealthRoute
   '/admin/chat': typeof AdminChatRoute
   '/admin/contracts': typeof AdminContractsRouteWithChildren
   '/admin/devices': typeof AdminDevicesRoute
@@ -592,6 +599,7 @@ export interface FileRoutesByTo {
   '/admin/attendance': typeof AdminAttendanceRoute
   '/admin/attendance-report': typeof AdminAttendanceReportRoute
   '/admin/audit': typeof AdminAuditRoute
+  '/admin/biometrics-health': typeof AdminBiometricsHealthRoute
   '/admin/chat': typeof AdminChatRoute
   '/admin/devices': typeof AdminDevicesRoute
   '/admin/directory': typeof AdminDirectoryRoute
@@ -674,6 +682,7 @@ export interface FileRoutesById {
   '/admin/attendance': typeof AdminAttendanceRoute
   '/admin/attendance-report': typeof AdminAttendanceReportRoute
   '/admin/audit': typeof AdminAuditRoute
+  '/admin/biometrics-health': typeof AdminBiometricsHealthRoute
   '/admin/chat': typeof AdminChatRoute
   '/admin/contracts': typeof AdminContractsRouteWithChildren
   '/admin/devices': typeof AdminDevicesRoute
@@ -759,6 +768,7 @@ export interface FileRouteTypes {
     | '/admin/attendance'
     | '/admin/attendance-report'
     | '/admin/audit'
+    | '/admin/biometrics-health'
     | '/admin/chat'
     | '/admin/contracts'
     | '/admin/devices'
@@ -837,6 +847,7 @@ export interface FileRouteTypes {
     | '/admin/attendance'
     | '/admin/attendance-report'
     | '/admin/audit'
+    | '/admin/biometrics-health'
     | '/admin/chat'
     | '/admin/devices'
     | '/admin/directory'
@@ -918,6 +929,7 @@ export interface FileRouteTypes {
     | '/admin/attendance'
     | '/admin/attendance-report'
     | '/admin/audit'
+    | '/admin/biometrics-health'
     | '/admin/chat'
     | '/admin/contracts'
     | '/admin/devices'
@@ -1472,6 +1484,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminChatRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/biometrics-health': {
+      id: '/admin/biometrics-health'
+      path: '/biometrics-health'
+      fullPath: '/admin/biometrics-health'
+      preLoaderRoute: typeof AdminBiometricsHealthRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/audit': {
       id: '/admin/audit'
       path: '/audit'
@@ -1618,6 +1637,7 @@ interface AdminRouteChildren {
   AdminAttendanceRoute: typeof AdminAttendanceRoute
   AdminAttendanceReportRoute: typeof AdminAttendanceReportRoute
   AdminAuditRoute: typeof AdminAuditRoute
+  AdminBiometricsHealthRoute: typeof AdminBiometricsHealthRoute
   AdminChatRoute: typeof AdminChatRoute
   AdminContractsRoute: typeof AdminContractsRouteWithChildren
   AdminDevicesRoute: typeof AdminDevicesRoute
@@ -1655,6 +1675,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminAttendanceRoute: AdminAttendanceRoute,
   AdminAttendanceReportRoute: AdminAttendanceReportRoute,
   AdminAuditRoute: AdminAuditRoute,
+  AdminBiometricsHealthRoute: AdminBiometricsHealthRoute,
   AdminChatRoute: AdminChatRoute,
   AdminContractsRoute: AdminContractsRouteWithChildren,
   AdminDevicesRoute: AdminDevicesRoute,

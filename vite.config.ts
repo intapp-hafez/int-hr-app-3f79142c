@@ -28,8 +28,11 @@ function stubServerModules(): Plugin {
   };
 }
 
+import { biometricsDevPlugin } from "./src/lib/biometrics-dev-api";
+
 export default defineConfig({
   plugins: [
+    biometricsDevPlugin(),
     stubServerModules(),
     tsConfigPaths({ projects: ["./tsconfig.json"] }),
     tailwindcss(),

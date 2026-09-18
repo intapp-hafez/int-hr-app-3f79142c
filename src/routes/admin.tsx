@@ -57,7 +57,7 @@ function AdminLayout() {
 
   const navAll = [
     { to: "/admin", icon: LayoutDashboard, label: t("dashboard"), exact: true, page: null },
-    { to: "/admin/chat", icon: MessageSquare, label: "Messages & Chat", page: null },
+    { to: "/admin/chat", icon: MessageSquare, label: t("messagesAndChat"), page: null },
     { to: "/admin/employees", icon: Users, label: t("employees"), page: "employees" },
     { to: "/admin/contracts", icon: FileSignature, label: t("contracts"), page: "contracts" },
     { to: "/admin/geofencing", icon: MapPin, label: t("geofencing"), page: "geofencing" },
@@ -87,24 +87,24 @@ function AdminLayout() {
     <div dir={dir} className="min-h-screen bg-muted/40">
       {/* Sidebar (desktop) */}
       <aside className="fixed inset-y-0 start-0 z-30 hidden w-64 flex-col bg-sidebar text-sidebar-foreground lg:flex">
-        <div className="px-5 py-5">
-          <Link to="/"><AppLogo size={26} tone="light" /></Link>
+        <div className="px-4 py-3.5 border-b border-sidebar-border/60">
+          <Link to="/"><AppLogo size={24} tone="light" /></Link>
         </div>
-        <nav className="flex-1 space-y-0.5 px-3">
+        <nav className="flex-1 space-y-0.5 px-2.5 py-2 overflow-y-auto">
           {nav.map((n) => {
             const active = isActive(n.to, "exact" in n ? n.exact : false);
             return (
               <Link
                 key={n.to}
                 to={n.to}
-                className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
+                className={`group flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-xs sm:text-[13px] font-semibold leading-snug transition-colors ${
                   active
                     ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-brand"
                     : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                 }`}
               >
                 <n.icon className="h-4 w-4 shrink-0" />
-                <span>{n.label}</span>
+                <span className="truncate">{n.label}</span>
                 {n.to === "/admin/chat" && unreadMessagesCount > 0 && (
                   <span className="ms-auto grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 text-[10px] font-bold text-brand-foreground shadow-sm">
                     {unreadMessagesCount}
@@ -114,10 +114,10 @@ function AdminLayout() {
             );
           })}
         </nav>
-        <div className="m-3 rounded-2xl bg-sidebar-accent p-4">
-          <div className="flex items-center gap-3">
-            <UserMenu size="lg" align="start" />
-            <p className="font-display text-sm font-semibold">{session.name}</p>
+        <div className="m-2.5 rounded-xl bg-sidebar-accent/80 p-3">
+          <div className="flex items-center gap-2.5">
+            <UserMenu size="md" align="start" />
+            <p className="font-display text-xs sm:text-sm font-semibold truncate">{session.name}</p>
           </div>
         </div>
       </aside>
@@ -126,12 +126,12 @@ function AdminLayout() {
       {open && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <div className="absolute inset-0 bg-foreground/40" onClick={() => setOpen(false)} />
-          <aside className="absolute inset-y-0 start-0 w-72 bg-sidebar p-4 text-sidebar-foreground">
-            <div className="mb-4 flex items-center justify-between">
+          <aside className="absolute inset-y-0 start-0 w-72 bg-sidebar p-3 text-sidebar-foreground flex flex-col h-full">
+            <div className="mb-3 flex items-center justify-between px-1">
               <AppLogo size={24} tone="light" />
               <button onClick={() => setOpen(false)} className="rounded-full p-1 text-sidebar-foreground/80"><X className="h-5 w-5" /></button>
             </div>
-            <nav className="space-y-0.5">
+            <nav className="flex-1 space-y-0.5 overflow-y-auto px-1">
               {nav.map((n) => {
                 const active = isActive(n.to, "exact" in n ? n.exact : false);
                 return (
@@ -139,9 +139,9 @@ function AdminLayout() {
                     key={n.to}
                     to={n.to}
                     onClick={() => setOpen(false)}
-                    className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium ${active ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground/80"}`}
+                    className={`flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-xs sm:text-[13px] font-semibold leading-snug ${active ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground/80"}`}
                   >
-                    <n.icon className="h-4 w-4" /> {n.label}
+                    <n.icon className="h-4 w-4" /> <span className="truncate">{n.label}</span>
                   </Link>
                 );
               })}
@@ -161,7 +161,7 @@ function AdminLayout() {
             <Link
               to="/admin/chat"
               className="relative rounded-full p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-              title="Messages & Chat"
+              title={t("messagesAndChat")}
             >
               <MessageSquare className="h-5 w-5" />
               {unreadMessagesCount > 0 && (
@@ -213,7 +213,7 @@ function getPageSlugForPath(path: string): string | null {
   if (path.startsWith("/admin/targets-overtime")) return "targets-overtime";
   if (path.startsWith("/admin/directory")) return "directory";
   if (path.startsWith("/admin/employee-access")) return "employee-access";
-  if (path.startsWith("/admin/audit")) return "audit";
+  if (path.startsWith("/admin/audit") || path.startsWith("/admin/biometrics-health")) return "audit";
   if (path.startsWith("/admin/reports")) return "reports";
   if (path.startsWith("/admin/settings/roles")) return "roles";
   if (path.startsWith("/admin/settings")) return "settings";

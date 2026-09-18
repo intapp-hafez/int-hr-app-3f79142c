@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Fingerprint, ScanFace, Trash2, Plus, CheckCircle2, ExternalLink, AlertTriangle } from "lucide-react";
 import {
-  listMyBiometrics, enrollFace, deleteFace, deleteWebauthnCredential,
+  listMyBiometrics, enrollFace, deleteWebauthnCredential,
   webauthnRegisterOptions, webauthnRegisterVerify,
 } from "@/backend/functions/biometrics.functions";
 import { FaceCapture } from "@/components/biometrics/FaceCapture";
@@ -16,7 +16,6 @@ function BiometricsPage() {
   const qc = useQueryClient();
   const listFn = useServerFn(listMyBiometrics);
   const enrollFn = useServerFn(enrollFace);
-  const delFaceFn = useServerFn(deleteFace);
   const delCredFn = useServerFn(deleteWebauthnCredential);
   const regOptsFn = useServerFn(webauthnRegisterOptions);
   const regVerifyFn = useServerFn(webauthnRegisterVerify);
@@ -31,12 +30,6 @@ function BiometricsPage() {
       qc.invalidateQueries({ queryKey: ["biometrics"] });
       setShowCapture(false);
     },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const delFaceM = useMutation({
-    mutationFn: () => delFaceFn(),
-    onSuccess: () => { toast.success("Face removed"); qc.invalidateQueries({ queryKey: ["biometrics"] }); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -146,14 +139,6 @@ function BiometricsPage() {
           >
             <Plus className="h-3.5 w-3.5" /> {face ? "Re-enroll" : "Enroll face"}
           </button>
-          {face && (
-            <button
-              onClick={() => delFaceM.mutate()}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-semibold text-destructive"
-            >
-              <Trash2 className="h-3.5 w-3.5" /> Remove
-            </button>
-          )}
         </div>
       </section>
 

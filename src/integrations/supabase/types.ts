@@ -205,6 +205,62 @@ export type Database = {
         }
         Relationships: []
       }
+      biometric_audit_log: {
+        Row: {
+          id: string
+          user_id: string | null
+          email: string | null
+          method: "face" | "fingerprint"
+          event: "enroll" | "unenroll" | "verify" | "login" | "check_in" | "check_out"
+          success: boolean
+          reason: string | null
+          distance: number | null
+          device_label: string | null
+          device_id: string | null
+          user_agent: string | null
+          ip_address: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          email?: string | null
+          method: "face" | "fingerprint"
+          event: "enroll" | "unenroll" | "verify" | "login" | "check_in" | "check_out"
+          success?: boolean
+          reason?: string | null
+          distance?: number | null
+          device_label?: string | null
+          device_id?: string | null
+          user_agent?: string | null
+          ip_address?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          email?: string | null
+          method?: "face" | "fingerprint"
+          event?: "enroll" | "unenroll" | "verify" | "login" | "check_in" | "check_out"
+          success?: boolean
+          reason?: string | null
+          distance?: number | null
+          device_label?: string | null
+          device_id?: string | null
+          user_agent?: string | null
+          ip_address?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "biometric_audit_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_channels: {
         Row: {
           allow_replies: boolean
@@ -4000,6 +4056,14 @@ export type Database = {
       is_chat_channel_member: {
         Args: { p_channel_id: string; p_user_id: string }
         Returns: boolean
+      }
+      biometric_verify_face: {
+        Args: { _email: string; _descriptor: Json }
+        Returns: Json
+      }
+      fn_euclidean_distance: {
+        Args: { a: Json; b: Json }
+        Returns: number
       }
       security_scan_exec: { Args: { _sql: string }; Returns: undefined }
       security_scan_query: { Args: { _sql: string }; Returns: Json[] }

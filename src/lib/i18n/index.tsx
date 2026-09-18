@@ -134,15 +134,37 @@ export function useTranslators() {
 export function LanguageToggle({ className = "" }: { className?: string }) {
   const { lang, setLang } = useI18n();
   return (
-    <button
-      type="button"
-      onClick={() => setLang(lang === "en" ? "ar" : "en")}
-      className={`inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent ${className}`}
-      aria-label="Toggle language"
+    <div
+      className={`inline-flex items-center rounded-full border border-border/70 bg-muted/40 p-1 backdrop-blur-sm shadow-sm shrink-0 ${className}`}
+      role="group"
+      aria-label="Language selector"
     >
-      <span className="font-display">{lang === "en" ? "EN" : "ع"}</span>
-      <span className="text-muted-foreground">/</span>
-      <span className="text-muted-foreground">{lang === "en" ? "ع" : "EN"}</span>
-    </button>
+      <button
+        type="button"
+        onClick={() => setLang("en")}
+        className={`flex items-center justify-center rounded-full px-2.5 sm:px-3 py-1 text-xs font-semibold transition-all duration-200 ${
+          lang === "en"
+            ? "bg-brand text-brand-foreground shadow-sm shadow-brand/30 font-bold"
+            : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+        }`}
+        aria-pressed={lang === "en"}
+      >
+        <span className="hidden sm:inline text-[11px] tracking-wide">English</span>
+        <span className="sm:hidden text-[11px] font-semibold">En</span>
+      </button>
+      <button
+        type="button"
+        onClick={() => setLang("ar")}
+        className={`flex items-center justify-center rounded-full px-2.5 sm:px-3 py-1 text-xs font-semibold transition-all duration-200 ${
+          lang === "ar"
+            ? "bg-brand text-brand-foreground shadow-sm shadow-brand/30 font-bold font-sans"
+            : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+        }`}
+        aria-pressed={lang === "ar"}
+      >
+        <span className="hidden sm:inline text-[11px]">العربية</span>
+        <span className="sm:hidden text-[11px] font-semibold">Ar</span>
+      </button>
+    </div>
   );
 }

@@ -64,10 +64,12 @@ function CheckInOutCard() {
   const [nearest, setNearest] = useState<{ name: string; distance: number; radius: number; inside: boolean } | null>(null);
   const [showFace, setShowFace] = useState<null | "in" | "out">(null);
   const [verified, setVerified] = useState<{ face: boolean; fp: boolean }>({ face: false, fp: false });
+  const [lastDistance, setLastDistance] = useState<number | null>(null);
 
   const hasFace = !!bioQ.data?.face;
+  const hasFp = (bioQ.data?.fingerprints?.length ?? 0) > 0;
   const requiresBio = true;
-  const bioOk = hasFace && verified.face;
+  const bioOk = (hasFace && verified.face) || (hasFp && verified.fp);
 
   const deviceCheckRequired = !!(meQ.data as any)?.profile?.device_check_required;
   const currentDevice = devQ.data?.find((d: any) => d.id === getCurrentDeviceId());
@@ -151,12 +153,12 @@ function CheckInOutCard() {
       toast.error(t("outsideGeofence") || "Outside allowed geofence area");
       return;
     }
-    if (!hasFace) {
-      toast.error("Face recognition is required. Please enroll your face in the Biometrics tab first.");
+    if (!hasFace && !hasFp) {
+      toast.error("Biometric verification is required. Please enroll your face or fingerprint in the Biometrics tab first.");
       return;
     }
     if (!bioOk) {
-      toast.error(t("verifyBiometricFirst"));
+      toast.error(t("verifyBiometricFirst") || "Please verify your biometrics before proceeding.");
       return;
     }
     setBusy(kind);
@@ -179,6 +181,7 @@ function CheckInOutCard() {
       }
       const isOnline = typeof navigator !== "undefined" ? navigator.onLine : true;
       const geo = coords.lat != null && coords.lng != null ? await reverseGeocodeCoords(coords.lat, coords.lng) : {};
+      const bioMethod: "face" | "fingerprint" = verified.fp ? "fingerprint" : "face";
       const payload = {
         branch,
         lat: coords.lat,
@@ -189,6 +192,8 @@ function CheckInOutCard() {
         city: geo.city,
         district: geo.district,
         street: geo.street,
+        biometric_method: bioMethod,
+        biometric_distance: bioMethod === "face" ? lastDistance : null,
       };
       const addr = geo.formatted || [geo.street, geo.district, geo.city].filter(Boolean).join(", ");
       if (kind === "in") {
@@ -202,6 +207,7 @@ function CheckInOutCard() {
       }
       setNote("");
       setVerified({ face: false, fp: false });
+      setLastDistance(null);
       qc.invalidateQueries({ queryKey: ["my-attendance"] });
     } catch (e) {
       toast.error((e as Error).message);
@@ -227,6 +233,7 @@ function CheckInOutCard() {
     const res = await verifyFaceFn({ data: { descriptor } });
     if (res.match) {
       setVerified((v) => ({ ...v, face: true }));
+      setLastDistance(res.distance ?? null);
       toast.success(`Face verified (distance ${res.distance?.toFixed(3)})`);
       setShowFace(null);
     } else {
@@ -304,20 +311,32 @@ function CheckInOutCard() {
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Biometric verification {bioOk ? "· ✓ verified" : "required"}
           </p>
-          <div className="flex flex-wrap gap-2">
-            {hasFace ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {hasFace && (
               <button
                 onClick={() => setShowFace("in")}
                 disabled={verified.face}
-                className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold ${
-                  verified.face ? "bg-success/20 text-success" : "bg-gradient-brand text-brand-foreground shadow-brand"
+                className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
+                  verified.face ? "bg-success/20 text-success" : "bg-gradient-brand text-brand-foreground shadow-brand hover:opacity-95"
                 }`}
               >
                 <ScanFace className="h-3.5 w-3.5" /> {verified.face ? "Face verified" : "Verify face"}
               </button>
-            ) : (
-              <p className="text-sm font-medium text-destructive">
-                Please enroll your face in the Settings &rarr; Biometrics tab first.
+            )}
+            {hasFp && (
+              <button
+                onClick={verifyFingerprint}
+                disabled={verified.fp}
+                className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
+                  verified.fp ? "bg-success/20 text-success" : "bg-gradient-brand text-brand-foreground shadow-brand hover:opacity-95"
+                }`}
+              >
+                <Fingerprint className="h-3.5 w-3.5" /> {verified.fp ? "Fingerprint verified" : "Verify fingerprint"}
+              </button>
+            )}
+            {!hasFace && !hasFp && (
+              <p className="text-xs font-medium text-destructive">
+                Please enroll your face or fingerprint in the Biometrics tab first.
               </p>
             )}
           </div>

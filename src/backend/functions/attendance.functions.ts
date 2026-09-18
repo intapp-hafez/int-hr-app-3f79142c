@@ -7,6 +7,7 @@ import { AttendanceCheckSchema, AdminAttendanceSchema } from "../schemas";
 import { isoWeekday } from "@/lib/date-format";
 import { reverseGeocodeCoords } from "@/lib/reverse-geocode";
 import { enforceAttendanceRateLimit } from "./attendance-rate-limit.server";
+import { logBiometricEvent } from "@/backend/server/biometric-audit.server";
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -24,20 +25,42 @@ function distMeters(aLat: number, aLng: number, bLat: number, bLng: number) {
   return 2 * R * Math.asin(Math.sqrt(s));
 }
 
+async function logAttendanceBio(
+  userId: string,
+  data: z.infer<typeof AttendanceCheckSchema>,
+  event: "check_in" | "check_out",
+  success: boolean,
+  reason?: string | null,
+) {
+  const method = data.biometric_method ?? "face";
+  await logBiometricEvent({
+    userId,
+    method,
+    event,
+    success,
+    reason: reason ?? null,
+    deviceId: data.device_id ?? null,
+    distance: data.biometric_distance ?? null,
+  });
+}
+
 export const checkIn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => AttendanceCheckSchema.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const block = async (code: any, reason: string, params: Record<string, any> = {}) => {
+      await logAttendanceBio(userId, data, "check_in", false, reason);
+      return { ok: false as const, blocked: true as const, code, params, reason };
+    };
+
     const rl = await enforceAttendanceRateLimit(supabase as any, userId, "check_in");
     if (rl.limited) {
-      return {
-        ok: false as const,
-        blocked: true as const,
-        code: "rate_limited" as const,
-        params: { retryAfterSeconds: rl.retryAfterSeconds, max: rl.max, windowSeconds: rl.windowSeconds } as Record<string, any>,
-        reason: `Check-in blocked · too many attempts (${rl.max} per ${rl.windowSeconds}s). Try again in ${rl.retryAfterSeconds}s.`,
-      };
+      return block(
+        "rate_limited",
+        `Check-in blocked · too many attempts (${rl.max} per ${rl.windowSeconds}s). Try again in ${rl.retryAfterSeconds}s.`,
+        { retryAfterSeconds: rl.retryAfterSeconds, max: rl.max, windowSeconds: rl.windowSeconds }
+      );
     }
     const now = new Date().toISOString();
     const today = now.slice(0, 10);
@@ -52,26 +75,14 @@ export const checkIn = createServerFn({ method: "POST" })
       .eq("date", today)
       .maybeSingle();
     if (existing?.in_time) {
-      return {
-        ok: false as const,
-        blocked: true as const,
-        code: "check_in_already" as const,
-        params: {} as Record<string, any>,
-        reason: "Check-in blocked · you have already checked in today.",
-      };
+      return block("check_in_already", "Check-in blocked · you have already checked in today.");
     }
 
     {
       const { checkDeviceAccess } = await import("@/backend/server/device-registry.server");
       const gate = await checkDeviceAccess(userId, data.device_id, "in");
       if (!gate.ok) {
-        return {
-          ok: false as const,
-          blocked: true as const,
-          code: "device_unauthorized" as const,
-          params: {} as Record<string, any>,
-          reason: gate.reason,
-        };
+        return block("device_unauthorized", gate.reason);
       }
     }
 
@@ -113,33 +124,27 @@ export const checkIn = createServerFn({ method: "POST" })
       const start = leaveRow.start_date ?? "";
       const end = leaveRow.end_date ?? "";
       const dateRange = start === end ? start : `${start} – ${end}`;
-      return {
-        ok: false as const,
-        blocked: true as const,
-        code: (hasName ? "leave" : "leave_noname") as "leave" | "leave_noname",
-        params: { action: "check_in", name: leaveName, range: dateRange } as Record<string, any>,
-        reason: `Check-in blocked · Today is ${leaveName} (${dateRange}).`,
-      };
+      return block(
+        hasName ? "leave" : "leave_noname",
+        `Check-in blocked · Today is ${leaveName} (${dateRange}).`,
+        { action: "check_in", name: leaveName, range: dateRange }
+      );
     }
     // 2. Holiday
     if (holidayRow && !isApprovedToWork) {
-      return {
-        ok: false as const,
-        blocked: true as const,
-        code: "holiday" as const,
-        params: { action: "check_in", name: holidayRow.name } as Record<string, any>,
-        reason: `Check-in blocked · today is a holiday (${holidayRow.name}).`,
-      };
+      return block(
+        "holiday",
+        `Check-in blocked · today is a holiday (${holidayRow.name}).`,
+        { action: "check_in", name: holidayRow.name }
+      );
     }
     // 3. Weekend (Fri/Sat)
     if (isWeekend && !isApprovedToWork) {
-      return {
-        ok: false as const,
-        blocked: true as const,
-        code: "weekend" as const,
-        params: { action: "check_in" } as Record<string, any>,
-        reason: "Check-in blocked · today is a weekend (Friday / Saturday).",
-      };
+      return block(
+        "weekend",
+        "Check-in blocked · today is a weekend (Friday / Saturday).",
+        { action: "check_in" }
+      );
     }
 
     const { loadAssignedFences, evaluateFence } = await import("@/backend/server/geofence.server");
@@ -192,13 +197,11 @@ export const checkIn = createServerFn({ method: "POST" })
           reasons.push(`network "${data.ssid}" is not authorized for you`);
         }
       }
-      return {
-        ok: false as const,
-        blocked: true as const,
-        code: "constraints" as const,
-        params: { action: "check_in", reasons: reasonCodes } as Record<string, any>,
-        reason: `Check-in blocked · ${reasons.join(" · ")}.`,
-      };
+      return block(
+        "constraints",
+        `Check-in blocked · ${reasons.join(" · ")}.`,
+        { action: "check_in", reasons: reasonCodes }
+      );
     }
 
     let city = data.city ?? null;
@@ -229,6 +232,8 @@ export const checkIn = createServerFn({ method: "POST" })
         street,
         free_check: freeCheck,
         status: "present",
+        verified_face: (data.biometric_method ?? "face") === "face",
+        verified_fp: data.biometric_method === "fingerprint",
       },
       { onConflict: "employee_id,date" },
     );
@@ -237,6 +242,8 @@ export const checkIn = createServerFn({ method: "POST" })
       const { touchDeviceCheck } = await import("@/backend/server/device-registry.server");
       await touchDeviceCheck(data.device_id!, "in");
     }
+
+    await logAttendanceBio(userId, data, "check_in", true, null);
     return {
       ok: true as const,
       blocked: false as const,
@@ -251,15 +258,18 @@ export const checkOut = createServerFn({ method: "POST" })
   .inputValidator((i) => AttendanceCheckSchema.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const block = async (code: any, reason: string, params: Record<string, any> = {}) => {
+      await logAttendanceBio(userId, data, "check_out", false, reason);
+      return { ok: false as const, blocked: true as const, code, params, reason };
+    };
+
     const rl = await enforceAttendanceRateLimit(supabase as any, userId, "check_out");
     if (rl.limited) {
-      return {
-        ok: false as const,
-        blocked: true as const,
-        code: "rate_limited" as const,
-        params: { retryAfterSeconds: rl.retryAfterSeconds, max: rl.max, windowSeconds: rl.windowSeconds } as Record<string, any>,
-        reason: `Check-out blocked · too many attempts (${rl.max} per ${rl.windowSeconds}s). Try again in ${rl.retryAfterSeconds}s.`,
-      };
+      return block(
+        "rate_limited",
+        `Check-out blocked · too many attempts (${rl.max} per ${rl.windowSeconds}s). Try again in ${rl.retryAfterSeconds}s.`,
+        { retryAfterSeconds: rl.retryAfterSeconds, max: rl.max, windowSeconds: rl.windowSeconds }
+      );
     }
     const now = new Date().toISOString();
     const today = now.slice(0, 10);
@@ -270,35 +280,17 @@ export const checkOut = createServerFn({ method: "POST" })
       .eq("date", today)
       .maybeSingle();
     if (!row?.in_time) {
-      return {
-        ok: false as const,
-        blocked: true as const,
-        code: "check_out_not_in" as const,
-        params: {} as Record<string, any>,
-        reason: "Check-out blocked · you have not checked in today.",
-      };
+      return block("check_out_not_in", "Check-out blocked · you have not checked in today.");
     }
     if (row.out_time) {
-      return {
-        ok: false as const,
-        blocked: true as const,
-        code: "check_out_already" as const,
-        params: {} as Record<string, any>,
-        reason: "Check-out blocked · you have already checked out today.",
-      };
+      return block("check_out_already", "Check-out blocked · you have already checked out today.");
     }
 
     {
       const { checkDeviceAccess } = await import("@/backend/server/device-registry.server");
       const gate = await checkDeviceAccess(userId, data.device_id, "out");
       if (!gate.ok) {
-        return {
-          ok: false as const,
-          blocked: true as const,
-          code: "device_unauthorized" as const,
-          params: {} as Record<string, any>,
-          reason: gate.reason,
-        };
+        return block("device_unauthorized", gate.reason);
       }
     }
 
@@ -311,13 +303,11 @@ export const checkOut = createServerFn({ method: "POST" })
       .limit(1);
 
     if (runningTasks && runningTasks.length > 0) {
-      return {
-        ok: false as const,
-        blocked: true as const,
-        code: "active_task_in_progress" as const,
-        params: { taskTitle: runningTasks[0].title } as Record<string, any>,
-        reason: `You still have an active task "${runningTasks[0].title}". Please complete or close the task before signing out.`,
-      };
+      return block(
+        "active_task_in_progress",
+        `You still have an active task "${runningTasks[0].title}". Please complete or close the task before signing out.`,
+        { taskTitle: runningTasks[0].title }
+      );
     }
 
     const { data: latestAct } = await supabase
@@ -329,13 +319,11 @@ export const checkOut = createServerFn({ method: "POST" })
       .maybeSingle();
 
     if (latestAct && latestAct.kind === "start_trip") {
-      return {
-        ok: false as const,
-        blocked: true as const,
-        code: "active_travel_in_progress" as const,
-        params: { travelTitle: latestAct.task_name } as Record<string, any>,
-        reason: `You still have an active travel session "${latestAct.task_name || "Travel"}". Please complete your travel before signing out.`,
-      };
+      return block(
+        "active_travel_in_progress",
+        `You still have an active travel session "${latestAct.task_name || "Travel"}". Please complete your travel before signing out.`,
+        { travelTitle: latestAct.task_name }
+      );
     }
 
     const dow = isoWeekday(today); // local-noon safe
@@ -362,31 +350,25 @@ export const checkOut = createServerFn({ method: "POST" })
       const start = leaveRow.start_date ?? "";
       const end = leaveRow.end_date ?? "";
       const dateRange = start === end ? start : `${start} – ${end}`;
-      return {
-        ok: false as const,
-        blocked: true as const,
-        code: (hasName ? "leave" : "leave_noname") as "leave" | "leave_noname",
-        params: { action: "check_out", name: leaveName, range: dateRange } as Record<string, any>,
-        reason: `Check-out blocked · Today is ${leaveName} (${dateRange}).`,
-      };
+      return block(
+        hasName ? "leave" : "leave_noname",
+        `Check-out blocked · Today is ${leaveName} (${dateRange}).`,
+        { action: "check_out", name: leaveName, range: dateRange }
+      );
     }
     if (holidayRow && !isApprovedToWork) {
-      return {
-        ok: false as const,
-        blocked: true as const,
-        code: "holiday" as const,
-        params: { action: "check_out", name: holidayRow.name } as Record<string, any>,
-        reason: `Check-out blocked · today is a holiday (${holidayRow.name}).`,
-      };
+      return block(
+        "holiday",
+        `Check-out blocked · today is a holiday (${holidayRow.name}).`,
+        { action: "check_out", name: holidayRow.name }
+      );
     }
     if (isWeekend && !isApprovedToWork) {
-      return {
-        ok: false as const,
-        blocked: true as const,
-        code: "weekend" as const,
-        params: { action: "check_out" } as Record<string, any>,
-        reason: "Check-out blocked · today is a weekend (Friday / Saturday).",
-      };
+      return block(
+        "weekend",
+        "Check-out blocked · today is a weekend (Friday / Saturday).",
+        { action: "check_out" }
+      );
     }
 
     let outCity = data.city ?? null;
@@ -413,16 +395,13 @@ export const checkOut = createServerFn({ method: "POST" })
             data.lat == null || data.lng == null
               ? [{ code: "gps_unavailable" }]
               : [{ code: "gps_outside_fence", params: { dist: fc?.distance_m ?? 0, allowed: fc?.allowed_m ?? 0 } }];
-          return {
-            ok: false as const,
-            blocked: true as const,
-            code: "constraints" as const,
-            params: { action: "check_out", reasons } as Record<string, any>,
-            reason:
-              data.lat == null || data.lng == null
-                ? "Check-out blocked · GPS location not available."
-                : `Check-out blocked · you are ${fc?.distance_m ?? 0} m away from "${fc?.name ?? "your work location"}" (allowed ${fc?.allowed_m ?? 0} m).`,
-          };
+          return block(
+            "constraints",
+            data.lat == null || data.lng == null
+              ? "Check-out blocked · GPS location not available."
+              : `Check-out blocked · you are ${fc?.distance_m ?? 0} m away from "${fc?.name ?? "your work location"}" (allowed ${fc?.allowed_m ?? 0} m).`,
+            { action: "check_out", reasons }
+          );
         }
       }
     }
@@ -445,6 +424,7 @@ export const checkOut = createServerFn({ method: "POST" })
       const { touchDeviceCheck } = await import("@/backend/server/device-registry.server");
       await touchDeviceCheck(data.device_id!, "out");
     }
+    await logAttendanceBio(userId, data, "check_out", true, null);
     return { ok: true as const, blocked: false as const };
   });
 

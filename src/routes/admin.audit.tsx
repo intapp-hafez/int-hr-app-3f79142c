@@ -1,15 +1,17 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { CheckCircle2, ShieldAlert, MapPin, Wifi, Filter, Download } from "lucide-react";
+import { CheckCircle2, ShieldAlert, MapPin, Wifi, Filter, Download, Clock, Fingerprint, Activity } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getAuditEvents } from "@/backend/functions/audit.functions";
+import { BiometricAuditViewer } from "@/components/admin/BiometricAuditViewer";
 
 export const Route = createFileRoute("/admin/audit")({
   component: AuditPage,
 });
 
+type TabKey = "attendance" | "biometrics";
 type ResultFilter = "all" | "success" | "blocked";
 type RangeKey = "all" | "today" | "week" | "month" | "custom";
 
@@ -27,6 +29,7 @@ function startOfMonth(d: Date) { const x = startOfDay(d); x.setDate(1); return x
 
 function AuditPage() {
   const { t } = useI18n();
+  const [activeTab, setActiveTab] = useState<TabKey>("attendance");
   const fetchAudit = useServerFn(getAuditEvents);
   const { data: events = [], isLoading } = useQuery({
     queryKey: ["audit-events"],
@@ -91,11 +94,11 @@ function AuditPage() {
   };
 
   const rangeOptions: { key: RangeKey; label: string }[] = [
-    { key: "all", label: "All time" },
-    { key: "today", label: "Today" },
-    { key: "week", label: "This week" },
-    { key: "month", label: "This month" },
-    { key: "custom", label: "Date range" },
+    { key: "all", label: t("rangeAllTime") },
+    { key: "today", label: t("rangeToday") },
+    { key: "week", label: t("rangeWeek") },
+    { key: "month", label: t("rangeMonth") },
+    { key: "custom", label: t("rangeCustom") },
   ];
 
   return (
@@ -103,12 +106,55 @@ function AuditPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl font-semibold tracking-tight md:text-3xl">{t("audit")}</h1>
-          <p className="text-sm text-muted-foreground">Every check-in/out attempt with GPS, network, and failure reasons</p>
+          <p className="text-sm text-muted-foreground">{t("auditSubtitle")}</p>
         </div>
-        <button onClick={exportCsv} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 text-sm">
-          <Download className="h-4 w-4" /> Export CSV
+        <div className="flex items-center gap-2">
+          <Link
+            to="/admin/biometrics-health"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 text-xs font-semibold text-foreground hover:bg-muted shadow-sm transition"
+          >
+            <Activity className="h-4 w-4 text-brand" />
+            <span>{t("biometricHealth")}</span>
+          </Link>
+          {activeTab === "attendance" && (
+            <button onClick={exportCsv} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 text-xs font-semibold text-foreground hover:bg-muted shadow-sm transition">
+              <Download className="h-4 w-4" /> {t("exportCsv")}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Tabs Switcher */}
+      <div className="flex items-center gap-2 border-b border-border pb-2">
+        <button
+          onClick={() => setActiveTab("attendance")}
+          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition ${
+            activeTab === "attendance"
+              ? "bg-gradient-brand text-brand-foreground shadow-brand"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted"
+          }`}
+        >
+          <Clock className="h-3.5 w-3.5" />
+          <span>{t("attendanceAudit")}</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("biometrics")}
+          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition ${
+            activeTab === "biometrics"
+              ? "bg-gradient-brand text-brand-foreground shadow-brand"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted"
+          }`}
+        >
+          <Fingerprint className="h-3.5 w-3.5" />
+          <span>{t("biometricsAudit")}</span>
         </button>
       </div>
+
+      {activeTab === "biometrics" ? (
+        <BiometricAuditViewer />
+      ) : (
+        <>
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="inline-flex rounded-full border border-border bg-card p-1 text-xs font-medium">
@@ -224,6 +270,8 @@ function AuditPage() {
             </button>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );
