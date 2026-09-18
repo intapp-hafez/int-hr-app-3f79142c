@@ -1258,6 +1258,63 @@ export type Database = {
           },
         ]
       }
+      employee_penalties: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          employee_id: string
+          id: string
+          is_paid: boolean
+          penalty_date: string
+          penalty_type: string
+          reason: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          employee_id: string
+          id?: string
+          is_paid?: boolean
+          penalty_date?: string
+          penalty_type: string
+          reason: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string
+          id?: string
+          is_paid?: boolean
+          penalty_date?: string
+          penalty_type?: string
+          reason?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_penalties_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_penalties_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_shifts: {
         Row: {
           created_at: string
@@ -1630,6 +1687,7 @@ export type Database = {
         Row: {
           assigned_at: string
           assigned_by: string | null
+          is_default: boolean
           location_id: string
           profile_id: string
           radius_m: number | null
@@ -1637,6 +1695,7 @@ export type Database = {
         Insert: {
           assigned_at?: string
           assigned_by?: string | null
+          is_default?: boolean
           location_id: string
           profile_id: string
           radius_m?: number | null
@@ -1644,6 +1703,7 @@ export type Database = {
         Update: {
           assigned_at?: string
           assigned_by?: string | null
+          is_default?: boolean
           location_id?: string
           profile_id?: string
           radius_m?: number | null
