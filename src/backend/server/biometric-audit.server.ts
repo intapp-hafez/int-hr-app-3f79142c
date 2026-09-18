@@ -39,7 +39,7 @@ export async function logBiometricEvent(entry: BiometricAuditEntry): Promise<voi
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const meta = requestMeta();
-    const { error } = await (supabaseAdmin.from("biometric_audit_log") as any).insert({
+    const { error } = await ((supabaseAdmin as any).from("biometric_audit_log") as any).insert({
       user_id: entry.userId ?? null,
       email: entry.email ?? null,
       method: entry.method,
