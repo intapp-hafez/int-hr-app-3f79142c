@@ -207,49 +207,49 @@ export type Database = {
       }
       biometric_audit_log: {
         Row: {
-          id: string
-          user_id: string | null
-          email: string | null
-          method: "face" | "fingerprint"
-          event: "enroll" | "unenroll" | "verify" | "login" | "check_in" | "check_out"
-          success: boolean
-          reason: string | null
-          distance: number | null
-          device_label: string | null
-          device_id: string | null
-          user_agent: string | null
-          ip_address: string | null
           created_at: string
+          device_id: string | null
+          device_label: string | null
+          distance: number | null
+          email: string | null
+          event: string
+          id: string
+          ip_address: string | null
+          method: string
+          reason: string | null
+          success: boolean
+          user_agent: string | null
+          user_id: string | null
         }
         Insert: {
-          id?: string
-          user_id?: string | null
-          email?: string | null
-          method: "face" | "fingerprint"
-          event: "enroll" | "unenroll" | "verify" | "login" | "check_in" | "check_out"
-          success?: boolean
-          reason?: string | null
-          distance?: number | null
-          device_label?: string | null
-          device_id?: string | null
-          user_agent?: string | null
-          ip_address?: string | null
           created_at?: string
+          device_id?: string | null
+          device_label?: string | null
+          distance?: number | null
+          email?: string | null
+          event: string
+          id?: string
+          ip_address?: string | null
+          method: string
+          reason?: string | null
+          success?: boolean
+          user_agent?: string | null
+          user_id?: string | null
         }
         Update: {
-          id?: string
-          user_id?: string | null
-          email?: string | null
-          method?: "face" | "fingerprint"
-          event?: "enroll" | "unenroll" | "verify" | "login" | "check_in" | "check_out"
-          success?: boolean
-          reason?: string | null
-          distance?: number | null
-          device_label?: string | null
-          device_id?: string | null
-          user_agent?: string | null
-          ip_address?: string | null
           created_at?: string
+          device_id?: string | null
+          device_label?: string | null
+          distance?: number | null
+          email?: string | null
+          event?: string
+          id?: string
+          ip_address?: string | null
+          method?: string
+          reason?: string | null
+          success?: boolean
+          user_agent?: string | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -4016,6 +4016,11 @@ export type Database = {
       }
     }
     Functions: {
+      biometric_verify_face: {
+        Args: { _descriptor: Json; _email: string }
+        Returns: Json
+      }
+      fn_euclidean_distance: { Args: { a: Json; b: Json }; Returns: number }
       get_staff_employee_names: {
         Args: { p_employee_ids?: string[] }
         Returns: {
@@ -4056,14 +4061,6 @@ export type Database = {
       is_chat_channel_member: {
         Args: { p_channel_id: string; p_user_id: string }
         Returns: boolean
-      }
-      biometric_verify_face: {
-        Args: { _email: string; _descriptor: Json }
-        Returns: Json
-      }
-      fn_euclidean_distance: {
-        Args: { a: Json; b: Json }
-        Returns: number
       }
       security_scan_exec: { Args: { _sql: string }; Returns: undefined }
       security_scan_query: { Args: { _sql: string }; Returns: Json[] }
