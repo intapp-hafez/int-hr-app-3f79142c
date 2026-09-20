@@ -2811,6 +2811,7 @@ export type Database = {
           external_income: number | null
           external_tax_paid: number | null
           extra_email: string | null
+          face_required: boolean
           full_name: string | null
           full_name_ar: string | null
           gender: string | null
@@ -2876,6 +2877,7 @@ export type Database = {
           external_income?: number | null
           external_tax_paid?: number | null
           extra_email?: string | null
+          face_required?: boolean
           full_name?: string | null
           full_name_ar?: string | null
           gender?: string | null
@@ -2941,6 +2943,7 @@ export type Database = {
           external_income?: number | null
           external_tax_paid?: number | null
           extra_email?: string | null
+          face_required?: boolean
           full_name?: string | null
           full_name_ar?: string | null
           gender?: string | null
