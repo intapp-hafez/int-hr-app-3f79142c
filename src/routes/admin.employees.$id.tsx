@@ -33,6 +33,8 @@ import {
   deleteEmployeeDevice,
   getDeviceRequirement,
   setDeviceRequirement,
+  getFaceRequirement,
+  setFaceRequirement,
 } from "@/backend/functions/devices.functions";
 import { listJobGrades } from "@/backend/functions/directory.functions";
 import {
@@ -3815,6 +3817,7 @@ function EmployeeDevicesPanel({ userId, canManage }: { userId: string; canManage
       </div>
 
       <DeviceRequirementToggle userId={userId} canManage={canManage} />
+      <FaceRequirementToggle userId={userId} canManage={canManage} />
       {isLoading ? (
         <p className="text-center text-sm text-muted-foreground">{t("loading") || "Loading…"}</p>
       ) : rows.length === 0 ? (
