@@ -313,7 +313,7 @@ function CheckInOutCard() {
       {requiresBio && (
         <div className="rounded-xl border border-border bg-muted/40 p-3 space-y-2">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Biometric verification {bioOk ? "· ✓ verified" : "required"}
+            {faceRequired ? "Face recognition" : "Biometric verification"} {bioOk ? "· ✓ verified" : "required"}
           </p>
           <div className="flex flex-wrap items-center gap-2">
             {hasFace && (
@@ -327,7 +327,7 @@ function CheckInOutCard() {
                 <ScanFace className="h-3.5 w-3.5" /> {verified.face ? "Face verified" : "Verify face"}
               </button>
             )}
-            {hasFp && (
+            {hasFp && !faceRequired && (
               <button
                 onClick={verifyFingerprint}
                 disabled={verified.fp}
