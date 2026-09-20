@@ -68,8 +68,12 @@ function CheckInOutCard() {
 
   const hasFace = !!bioQ.data?.face;
   const hasFp = (bioQ.data?.fingerprints?.length ?? 0) > 0;
+  // Face recognition is required by default; an admin can disable it per employee.
+  const faceRequired = (meQ.data as any)?.profile?.face_required !== false;
   const requiresBio = true;
-  const bioOk = (hasFace && verified.face) || (hasFp && verified.fp);
+  const bioOk = faceRequired
+    ? hasFace && verified.face
+    : (hasFace && verified.face) || (hasFp && verified.fp);
 
   const deviceCheckRequired = !!(meQ.data as any)?.profile?.device_check_required;
   const currentDevice = devQ.data?.find((d: any) => d.id === getCurrentDeviceId());
