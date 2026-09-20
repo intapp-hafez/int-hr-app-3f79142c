@@ -338,9 +338,11 @@ function CheckInOutCard() {
                 <Fingerprint className="h-3.5 w-3.5" /> {verified.fp ? "Fingerprint verified" : "Verify fingerprint"}
               </button>
             )}
-            {!hasFace && !hasFp && (
+            {(faceRequired ? !hasFace : !hasFace && !hasFp) && (
               <p className="text-xs font-medium text-destructive">
-                Please enroll your face or fingerprint in the Biometrics tab first.
+                {faceRequired
+                  ? "Please enroll your face in the Biometrics tab first — face recognition is required to check in."
+                  : "Please enroll your face or fingerprint in the Biometrics tab first."}
               </p>
             )}
           </div>
