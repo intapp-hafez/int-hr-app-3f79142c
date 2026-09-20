@@ -124,6 +124,36 @@ export const setDeviceRequirement = createServerFn({ method: "POST" })
     return { ok: true, required: data.required };
   });
 
+// ── Per-employee face-recognition requirement (on by default) ──
+export const getFaceRequirement = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { user_id: string }) => z.object({ user_id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: row, error } = await (context.supabase as any)
+      .from("profiles")
+      .select("face_required")
+      .eq("id", data.user_id)
+      .maybeSingle();
+    // Fail closed: if the column is unavailable, face stays required (default true).
+    if (error) return { required: true, available: false };
+    return { required: row?.face_required !== false, available: true };
+  });
+
+export const setFaceRequirement = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { user_id: string; required: boolean }) =>
+    z.object({ user_id: z.string().uuid(), required: z.boolean() }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.supabase, context.userId);
+    const { error } = await (context.supabase as any)
+      .from("profiles")
+      .update({ face_required: data.required })
+      .eq("id", data.user_id);
+    if (error) throw new Error(error.message);
+    return { ok: true, required: data.required };
+  });
+
 export const listMyDevices = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {

@@ -68,8 +68,12 @@ function CheckInOutCard() {
 
   const hasFace = !!bioQ.data?.face;
   const hasFp = (bioQ.data?.fingerprints?.length ?? 0) > 0;
+  // Face recognition is required by default; an admin can disable it per employee.
+  const faceRequired = (meQ.data as any)?.profile?.face_required !== false;
   const requiresBio = true;
-  const bioOk = (hasFace && verified.face) || (hasFp && verified.fp);
+  const bioOk = faceRequired
+    ? hasFace && verified.face
+    : (hasFace && verified.face) || (hasFp && verified.fp);
 
   const deviceCheckRequired = !!(meQ.data as any)?.profile?.device_check_required;
   const currentDevice = devQ.data?.find((d: any) => d.id === getCurrentDeviceId());
@@ -309,7 +313,7 @@ function CheckInOutCard() {
       {requiresBio && (
         <div className="rounded-xl border border-border bg-muted/40 p-3 space-y-2">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Biometric verification {bioOk ? "· ✓ verified" : "required"}
+            {faceRequired ? "Face recognition" : "Biometric verification"} {bioOk ? "· ✓ verified" : "required"}
           </p>
           <div className="flex flex-wrap items-center gap-2">
             {hasFace && (
@@ -323,7 +327,7 @@ function CheckInOutCard() {
                 <ScanFace className="h-3.5 w-3.5" /> {verified.face ? "Face verified" : "Verify face"}
               </button>
             )}
-            {hasFp && (
+            {hasFp && !faceRequired && (
               <button
                 onClick={verifyFingerprint}
                 disabled={verified.fp}
@@ -334,9 +338,11 @@ function CheckInOutCard() {
                 <Fingerprint className="h-3.5 w-3.5" /> {verified.fp ? "Fingerprint verified" : "Verify fingerprint"}
               </button>
             )}
-            {!hasFace && !hasFp && (
+            {(faceRequired ? !hasFace : !hasFace && !hasFp) && (
               <p className="text-xs font-medium text-destructive">
-                Please enroll your face or fingerprint in the Biometrics tab first.
+                {faceRequired
+                  ? "Please enroll your face in the Biometrics tab first — face recognition is required to check in."
+                  : "Please enroll your face or fingerprint in the Biometrics tab first."}
               </p>
             )}
           </div>

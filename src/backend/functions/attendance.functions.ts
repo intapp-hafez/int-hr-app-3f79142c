@@ -86,6 +86,22 @@ export const checkIn = createServerFn({ method: "POST" })
       }
     }
 
+    // Face recognition gate (on by default per employee; admin can disable)
+    {
+      const { data: faceRow, error: faceErr } = await (supabase as any)
+        .from("profiles")
+        .select("face_required")
+        .eq("id", userId)
+        .maybeSingle();
+      const faceRequired = faceErr ? true : faceRow?.face_required !== false;
+      if (faceRequired && data.biometric_method !== "face") {
+        return block(
+          "face_required",
+          "Check-in blocked · face recognition is required. Please scan your face first.",
+        );
+      }
+    }
+
     // Resolve assigned geofences + per-employee authorized networks + branch-level networks
     const [
       { data: assigns },
@@ -291,6 +307,22 @@ export const checkOut = createServerFn({ method: "POST" })
       const gate = await checkDeviceAccess(userId, data.device_id, "out");
       if (!gate.ok) {
         return block("device_unauthorized", gate.reason);
+      }
+    }
+
+    // Face recognition gate (on by default per employee; admin can disable)
+    {
+      const { data: faceRow, error: faceErr } = await (supabase as any)
+        .from("profiles")
+        .select("face_required")
+        .eq("id", userId)
+        .maybeSingle();
+      const faceRequired = faceErr ? true : faceRow?.face_required !== false;
+      if (faceRequired && data.biometric_method !== "face") {
+        return block(
+          "face_required",
+          "Check-out blocked · face recognition is required. Please scan your face first.",
+        );
       }
     }
 
