@@ -3779,6 +3779,55 @@ function DeviceRequirementToggle({ userId, canManage }: { userId: string; canMan
   );
 }
 
+function FaceRequirementToggle({ userId, canManage }: { userId: string; canManage: boolean }) {
+  const { t } = useI18n();
+  const getFn = useServerFn(getFaceRequirement);
+  const setFn = useServerFn(setFaceRequirement);
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["employee-face-requirement", userId],
+    queryFn: () => getFn({ data: { user_id: userId } }),
+  });
+  // On by default
+  const required = data?.required !== false;
+
+  async function toggle() {
+    try {
+      await setFn({ data: { user_id: userId, required: !required } });
+      toast.success(!required
+        ? (t("faceRequiredOnToast") || "Face recognition is now required for check-in/out")
+        : (t("faceRequiredOffToast") || "Face recognition is no longer required"));
+      qc.invalidateQueries({ queryKey: ["employee-face-requirement", userId] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed");
+    }
+  }
+
+  return (
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-muted/40 p-3">
+      <div className="min-w-0">
+        <p className="text-sm font-semibold">{t("requireFaceTitle") || "Require face recognition to check in/out"}</p>
+        <p className="text-xs text-muted-foreground">
+          {t("requireFaceDesc") || "On by default — the employee must scan their face before checking in or out. Turn it off to allow attendance without face verification."}
+        </p>
+      </div>
+      <button
+        type="button"
+        disabled={!canManage}
+        onClick={toggle}
+        aria-pressed={required}
+        className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-50 ${required ? "bg-gradient-brand" : "bg-border"
+          }`}
+      >
+        <span
+          className={`absolute top-1 h-5 w-5 rounded-full bg-card shadow transition-all ${required ? "left-6 rtl:right-6 rtl:left-auto" : "left-1 rtl:right-1 rtl:left-auto"
+            }`}
+        />
+      </button>
+    </div>
+  );
+}
+
 function EmployeeDevicesPanel({ userId, canManage }: { userId: string; canManage: boolean }) {
   const { t, lang } = useI18n();
   const listFn = useServerFn(listEmployeeDevices);
