@@ -310,6 +310,22 @@ export const checkOut = createServerFn({ method: "POST" })
       }
     }
 
+    // Face recognition gate (on by default per employee; admin can disable)
+    {
+      const { data: faceRow, error: faceErr } = await (supabase as any)
+        .from("profiles")
+        .select("face_required")
+        .eq("id", userId)
+        .maybeSingle();
+      const faceRequired = faceErr ? true : faceRow?.face_required !== false;
+      if (faceRequired && data.biometric_method !== "face") {
+        return block(
+          "face_required",
+          "Check-out blocked · face recognition is required. Please scan your face first.",
+        );
+      }
+    }
+
     // Interlock: check if an active task or travel is in progress
     const { data: runningTasks } = await supabase
       .from("tasks")
