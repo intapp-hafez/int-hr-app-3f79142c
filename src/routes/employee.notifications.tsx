@@ -64,8 +64,11 @@ export function NotificationsPage() {
       )}
       <ul className="space-y-2">
         {data.map((n: any) => {
-          const tone = toneMap[pickTone(n.severity)];
+          const p = (n.payload ?? {}) as any;
+          const tone = toneMap[pickTone(n.severity ?? p.severity)];
           const Icon = tone.icon;
+          const title = n.title ?? p.title ?? n.subject ?? n.event ?? "Notification";
+          const body = n.body ?? p.body ?? null;
           return (
             <li key={n.id} className="flex gap-3 rounded-2xl border border-border bg-card p-4">
               <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${tone.bg} ${tone.fg}`}>
