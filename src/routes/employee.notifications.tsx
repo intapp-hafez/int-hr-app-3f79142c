@@ -76,10 +76,10 @@ export function NotificationsPage() {
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-2">
-                  <p className="text-sm font-semibold">{n.title ?? n.event ?? "Notification"}</p>
+                  <p className="text-sm font-semibold">{title}</p>
                   <span className="shrink-0 text-[10px] text-muted-foreground">{fmtTime(n.created_at)}</span>
                 </div>
-                {n.body && <p className="text-xs text-muted-foreground">{n.body}</p>}
+                {body && <p className="text-xs text-muted-foreground">{body}</p>}
               </div>
             </li>
           );
