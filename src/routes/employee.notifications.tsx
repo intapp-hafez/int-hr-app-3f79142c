@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { syncMyFaceEnrollmentNotice } from "@/backend/functions/face-enrollment-notices.functions";
 import { CheckCircle2, Info, AlertTriangle, ShieldAlert, Loader2, BellOff } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useQuery } from "@tanstack/react-query";
@@ -33,10 +35,19 @@ function fmtTime(iso?: string | null) {
 export function NotificationsPage() {
   const { t } = useI18n();
   const listFn = useServerFn(listMyDeliveries);
-  const { data = [], isLoading } = useQuery({
+  const syncFaceFn = useServerFn(syncMyFaceEnrollmentNotice);
+  const faceSync = useQuery({
+    queryKey: ["face-enrollment-notice"],
+    queryFn: () => syncFaceFn(),
+    staleTime: 60_000,
+  });
+  const { data = [], isLoading, refetch } = useQuery({
     queryKey: ["my-notifications"],
     queryFn: () => listFn(),
   });
+  useEffect(() => {
+    if (faceSync.data?.notified) refetch();
+  }, [faceSync.data?.notified, refetch]);
   return (
     <div className="space-y-4">
       <h1 className="font-display text-2xl font-semibold tracking-tight">{t("notifications")}</h1>
@@ -53,8 +64,11 @@ export function NotificationsPage() {
       )}
       <ul className="space-y-2">
         {data.map((n: any) => {
-          const tone = toneMap[pickTone(n.severity)];
+          const p = (n.payload ?? {}) as any;
+          const tone = toneMap[pickTone(n.severity ?? p.severity)];
           const Icon = tone.icon;
+          const title = n.title ?? p.title ?? n.subject ?? n.event ?? "Notification";
+          const body = n.body ?? p.body ?? null;
           return (
             <li key={n.id} className="flex gap-3 rounded-2xl border border-border bg-card p-4">
               <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${tone.bg} ${tone.fg}`}>
@@ -62,10 +76,10 @@ export function NotificationsPage() {
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-2">
-                  <p className="text-sm font-semibold">{n.title ?? n.event ?? "Notification"}</p>
+                  <p className="text-sm font-semibold">{title}</p>
                   <span className="shrink-0 text-[10px] text-muted-foreground">{fmtTime(n.created_at)}</span>
                 </div>
-                {n.body && <p className="text-xs text-muted-foreground">{n.body}</p>}
+                {body && <p className="text-xs text-muted-foreground">{body}</p>}
               </div>
             </li>
           );
