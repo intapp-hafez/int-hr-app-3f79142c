@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { syncMyFaceEnrollmentNotice } from "@/backend/functions/face-enrollment-notices.functions";
 import { CheckCircle2, Info, AlertTriangle, ShieldAlert, Loader2, BellOff } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useQuery } from "@tanstack/react-query";
