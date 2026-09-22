@@ -89,6 +89,23 @@ function CheckInOutCard() {
   const hasCheckedIn = !!todayRow?.in_time;
   const hasCheckedOut = !!todayRow?.out_time;
 
+  // Face enrollment notices: writes an in-app notification when the state changes
+  // (missing / invalid / ready) and surfaces it right here as a toast.
+  const faceNoticeFn = useServerFn(syncMyFaceEnrollmentNotice);
+  const faceNoticeQ = useQuery({
+    queryKey: ["face-enrollment-notice"],
+    queryFn: () => faceNoticeFn(),
+    staleTime: 60_000,
+  });
+  const faceNotice = faceNoticeQ.data;
+  useEffect(() => {
+    if (!faceNotice?.notified) return;
+    qc.invalidateQueries({ queryKey: ["my-notifications"] });
+    if (faceNotice.state === "ready") toast.success(faceNotice.title, { description: faceNotice.body });
+    else if (faceNotice.state === "invalid") toast.warning(faceNotice.title, { description: faceNotice.body });
+    else if (faceNotice.state === "missing") toast.error(faceNotice.title, { description: faceNotice.body });
+  }, [faceNotice?.notified, faceNotice?.state, faceNotice?.title, faceNotice?.body, qc]);
+
   async function getCoords(): Promise<{ lat?: number; lng?: number; err?: string }> {
     if (typeof navigator === "undefined" || !navigator.geolocation) return { err: t("geolocNotSupported") };
     return new Promise((resolve) => {
