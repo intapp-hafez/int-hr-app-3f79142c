@@ -33,10 +33,19 @@ function fmtTime(iso?: string | null) {
 export function NotificationsPage() {
   const { t } = useI18n();
   const listFn = useServerFn(listMyDeliveries);
-  const { data = [], isLoading } = useQuery({
+  const syncFaceFn = useServerFn(syncMyFaceEnrollmentNotice);
+  const faceSync = useQuery({
+    queryKey: ["face-enrollment-notice"],
+    queryFn: () => syncFaceFn(),
+    staleTime: 60_000,
+  });
+  const { data = [], isLoading, refetch } = useQuery({
     queryKey: ["my-notifications"],
     queryFn: () => listFn(),
   });
+  useEffect(() => {
+    if (faceSync.data?.notified) refetch();
+  }, [faceSync.data?.notified, refetch]);
   return (
     <div className="space-y-4">
       <h1 className="font-display text-2xl font-semibold tracking-tight">{t("notifications")}</h1>
