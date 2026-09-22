@@ -18,6 +18,7 @@ import {
   webauthnAuthOptionsForSelf, webauthnAuthVerifyForSelf,
 } from "@/backend/functions/biometrics.functions";
 import { FaceCapture } from "@/components/biometrics/FaceCapture";
+import { syncMyFaceEnrollmentNotice } from "@/backend/functions/face-enrollment-notices.functions";
 import { useI18n } from "@/lib/i18n";
 import { DateRangeField } from "@/components/ui/date-input";
 import { formatDate, validateDateRange } from "@/lib/date-format";
