@@ -27,6 +27,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+import { FaceAlertPrefsCard } from "./FaceAlertPrefsCard";
+
 export function SettingsPage() {
   const { t, lang, setLang } = useI18n();
   const { tBranch, tDept } = useTranslators();
@@ -171,6 +173,8 @@ export function SettingsPage() {
           </div>
         </div>
       </section>
+
+      {!isStaff && <FaceAlertPrefsCard />}
 
       {/* My Profile — read-only details */}
       <section className="overflow-hidden rounded-2xl border border-border bg-card">
