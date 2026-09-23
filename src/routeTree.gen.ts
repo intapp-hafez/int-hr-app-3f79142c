@@ -70,6 +70,7 @@ import { Route as AdminKpisRouteImport } from './routes/admin.kpis'
 import { Route as AdminHolidaysRouteImport } from './routes/admin.holidays'
 import { Route as AdminHolidayTypesRouteImport } from './routes/admin.holiday-types'
 import { Route as AdminGeofencingRouteImport } from './routes/admin.geofencing'
+import { Route as AdminFaceNotificationsRouteImport } from './routes/admin.face-notifications'
 import { Route as AdminEmployeesRouteImport } from './routes/admin.employees'
 import { Route as AdminEmployeeAccessRouteImport } from './routes/admin.employee-access'
 import { Route as AdminDirectoryRouteImport } from './routes/admin.directory'
@@ -398,6 +399,11 @@ const AdminGeofencingRoute = AdminGeofencingRouteImport.update({
   path: '/geofencing',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminFaceNotificationsRoute = AdminFaceNotificationsRouteImport.update({
+  id: '/face-notifications',
+  path: '/face-notifications',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminEmployeesRoute = AdminEmployeesRouteImport.update({
   id: '/employees',
   path: '/employees',
@@ -527,6 +533,7 @@ export interface FileRoutesByFullPath {
   '/admin/directory': typeof AdminDirectoryRoute
   '/admin/employee-access': typeof AdminEmployeeAccessRoute
   '/admin/employees': typeof AdminEmployeesRouteWithChildren
+  '/admin/face-notifications': typeof AdminFaceNotificationsRoute
   '/admin/geofencing': typeof AdminGeofencingRoute
   '/admin/holiday-types': typeof AdminHolidayTypesRoute
   '/admin/holidays': typeof AdminHolidaysRoute
@@ -604,6 +611,7 @@ export interface FileRoutesByTo {
   '/admin/devices': typeof AdminDevicesRoute
   '/admin/directory': typeof AdminDirectoryRoute
   '/admin/employee-access': typeof AdminEmployeeAccessRoute
+  '/admin/face-notifications': typeof AdminFaceNotificationsRoute
   '/admin/geofencing': typeof AdminGeofencingRoute
   '/admin/holiday-types': typeof AdminHolidayTypesRoute
   '/admin/holidays': typeof AdminHolidaysRoute
@@ -689,6 +697,7 @@ export interface FileRoutesById {
   '/admin/directory': typeof AdminDirectoryRoute
   '/admin/employee-access': typeof AdminEmployeeAccessRoute
   '/admin/employees': typeof AdminEmployeesRouteWithChildren
+  '/admin/face-notifications': typeof AdminFaceNotificationsRoute
   '/admin/geofencing': typeof AdminGeofencingRoute
   '/admin/holiday-types': typeof AdminHolidayTypesRoute
   '/admin/holidays': typeof AdminHolidaysRoute
@@ -775,6 +784,7 @@ export interface FileRouteTypes {
     | '/admin/directory'
     | '/admin/employee-access'
     | '/admin/employees'
+    | '/admin/face-notifications'
     | '/admin/geofencing'
     | '/admin/holiday-types'
     | '/admin/holidays'
@@ -852,6 +862,7 @@ export interface FileRouteTypes {
     | '/admin/devices'
     | '/admin/directory'
     | '/admin/employee-access'
+    | '/admin/face-notifications'
     | '/admin/geofencing'
     | '/admin/holiday-types'
     | '/admin/holidays'
@@ -936,6 +947,7 @@ export interface FileRouteTypes {
     | '/admin/directory'
     | '/admin/employee-access'
     | '/admin/employees'
+    | '/admin/face-notifications'
     | '/admin/geofencing'
     | '/admin/holiday-types'
     | '/admin/holidays'
@@ -1442,6 +1454,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminGeofencingRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/face-notifications': {
+      id: '/admin/face-notifications'
+      path: '/face-notifications'
+      fullPath: '/admin/face-notifications'
+      preLoaderRoute: typeof AdminFaceNotificationsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/employees': {
       id: '/admin/employees'
       path: '/employees'
@@ -1644,6 +1663,7 @@ interface AdminRouteChildren {
   AdminDirectoryRoute: typeof AdminDirectoryRoute
   AdminEmployeeAccessRoute: typeof AdminEmployeeAccessRoute
   AdminEmployeesRoute: typeof AdminEmployeesRouteWithChildren
+  AdminFaceNotificationsRoute: typeof AdminFaceNotificationsRoute
   AdminGeofencingRoute: typeof AdminGeofencingRoute
   AdminHolidayTypesRoute: typeof AdminHolidayTypesRoute
   AdminHolidaysRoute: typeof AdminHolidaysRoute
@@ -1682,6 +1702,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminDirectoryRoute: AdminDirectoryRoute,
   AdminEmployeeAccessRoute: AdminEmployeeAccessRoute,
   AdminEmployeesRoute: AdminEmployeesRouteWithChildren,
+  AdminFaceNotificationsRoute: AdminFaceNotificationsRoute,
   AdminGeofencingRoute: AdminGeofencingRoute,
   AdminHolidayTypesRoute: AdminHolidayTypesRoute,
   AdminHolidaysRoute: AdminHolidaysRoute,
