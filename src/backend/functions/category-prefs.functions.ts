@@ -14,6 +14,10 @@ const CategoryEnum = z.enum([
   "absent",
   "checkin",
   "checkout",
+  "leave_decision",
+  "face_missing",
+  "face_invalid",
+  "face_ready",
 ]);
 const ChannelEnum = z.enum(["inapp", "email", "push"]);
 
