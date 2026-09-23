@@ -13,9 +13,12 @@ export type AlertCategory =
   | "late"
   | "absent"
   | "checkin"
-  | "checkout";
+  | "checkout"
+  | "face_missing"
+  | "face_invalid"
+  | "face_ready";
 
-export type AlertCategoryGroup = "expirations" | "requests" | "attendance";
+export type AlertCategoryGroup = "expirations" | "requests" | "attendance" | "biometrics";
 
 export type AlertChannel = "inapp" | "email" | "push";
 
@@ -36,6 +39,11 @@ export const CATEGORY_GROUPS: { id: AlertCategoryGroup; label: string; descripti
     id: "attendance",
     label: "Attendance & Clocking",
     description: "Daily workforce attendance events and shift anomalies",
+  },
+  {
+    id: "biometrics",
+    label: "Face Enrollment",
+    description: "Alerts about your face enrollment for check in and out",
   },
 ];
 
@@ -122,6 +130,11 @@ export const CATEGORY_META: {
     description: "Employees clocking out",
     group: "attendance",
   },
+
+  // Biometrics
+  { id: "face_missing", label: "Face enrollment missing", description: "Your face is not enrolled and check in/out is blocked", group: "biometrics" },
+  { id: "face_invalid", label: "Face enrollment invalid", description: "Your stored face data is corrupted and must be redone", group: "biometrics" },
+  { id: "face_ready", label: "Face enrollment ready", description: "Your face is enrolled and ready for check in/out", group: "biometrics" },
 ];
 
 export const CHANNEL_META: { id: AlertChannel; label: string; description: string }[] = [
@@ -143,6 +156,9 @@ const DEFAULT: CategoryPrefs = {
   absent:          { inapp: true, email: true,  push: false },
   checkin:         { inapp: true, email: false, push: false },
   checkout:        { inapp: true, email: false, push: false },
+  face_missing:    { inapp: true, email: true,  push: false },
+  face_invalid:    { inapp: true, email: true,  push: false },
+  face_ready:      { inapp: true, email: false, push: false },
 };
 
 const KEY = "notification-prefs:v1";

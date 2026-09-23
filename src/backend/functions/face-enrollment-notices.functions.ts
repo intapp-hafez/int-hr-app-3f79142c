@@ -12,6 +12,54 @@ export type FaceEnrollmentNotice = {
   notified: boolean;
 };
 
+const FACE_DEFAULTS = {
+  missing: { inapp: true, email: true, push: false },
+  invalid: { inapp: true, email: true, push: false },
+  ready: { inapp: true, email: false, push: false },
+};
+
+/** Admin/HR: every face-enrollment notice across all channels, with employee names. */
+export const listFaceEnrollmentHistory = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const [{ data: isAdmin }, { data: isHr }] = await Promise.all([
+      supabase.rpc("has_role", { _user_id: userId, _role: "admin" }),
+      supabase.rpc("has_role", { _user_id: userId, _role: "hr" }),
+    ]);
+    if (!isAdmin && !isHr) throw new Error("Forbidden");
+    const { data, error } = await (supabase as any)
+      .from("notif_deliveries")
+      .select("id, user_id, channel, status, recipient, error, created_at, payload")
+      .contains("payload", { kind: "face_enrollment" })
+      .order("created_at", { ascending: false })
+      .limit(1000);
+    if (error) throw new Error(error.message);
+    const rows = (data ?? []) as any[];
+    const ids = [...new Set(rows.map((r) => r.user_id).filter(Boolean))];
+    const names = new Map<string, { name: string; code: string | null }>();
+    if (ids.length) {
+      const { data: profs } = await (supabase as any)
+        .from("profiles")
+        .select("id, full_name, emp_code")
+        .in("id", ids);
+      for (const p of profs ?? []) names.set(p.id, { name: p.full_name ?? "—", code: p.emp_code ?? null });
+    }
+    return rows.map((r) => ({
+      id: r.id as string,
+      userId: r.user_id as string,
+      employee: names.get(r.user_id)?.name ?? "Unknown",
+      empCode: names.get(r.user_id)?.code ?? null,
+      channel: r.channel as string,
+      status: r.status as string,
+      recipient: (r.recipient ?? null) as string | null,
+      error: (r.error ?? null) as string | null,
+      createdAt: r.created_at as string,
+      state: (r.payload?.state ?? "unknown") as string,
+      title: (r.payload?.title ?? "") as string,
+    }));
+  });
+
 function isValidDescriptor(d: unknown): boolean {
   return (
     Array.isArray(d) &&
@@ -90,7 +138,6 @@ export const syncMyFaceEnrollmentNotice = createServerFn({ method: "POST" })
         .from("notif_deliveries")
         .select("id, payload")
         .eq("user_id", userId)
-        .eq("channel", "inapp")
         .contains("payload", { kind: "face_enrollment" })
         .order("created_at", { ascending: false })
         .limit(1)
@@ -98,21 +145,56 @@ export const syncMyFaceEnrollmentNotice = createServerFn({ method: "POST" })
 
       const lastState = (last?.payload as any)?.state as string | undefined;
       if (lastState !== state) {
+        // Employee's per-category channel preferences.
+        const category = `face_${state}`;
+        const chan = { ...FACE_DEFAULTS[state as "missing" | "invalid" | "ready"] };
+        try {
+          const { data: rows } = await (supabase as any)
+            .from("notification_category_prefs")
+            .select("channel, enabled")
+            .eq("user_id", userId)
+            .eq("category", category);
+          for (const r of rows ?? []) {
+            if (r.channel in chan) (chan as any)[r.channel] = !!r.enabled;
+          }
+        } catch {
+          /* fall back to defaults */
+        }
+
+        const payload = {
+          kind: "face_enrollment",
+          state,
+          severity: copy.severity,
+          title: copy.title,
+          body: copy.body,
+          url: "/employee/biometrics",
+        };
         const { error } = await supabase.from("notif_deliveries").insert({
           user_id: userId,
           channel: "inapp",
-          status: "sent",
+          status: chan.inapp ? "sent" : "suppressed",
           subject: copy.title,
-          payload: {
-            kind: "face_enrollment",
+          error: chan.inapp ? null : "disabled by employee",
+          payload,
+        } as any);
+        notified = !error && chan.inapp;
+
+        try {
+          const { dispatchFaceEnrollmentExternal } = await import(
+            "@/backend/server/face-enrollment-dispatch.server"
+          );
+          await dispatchFaceEnrollmentExternal({
+            userId,
             state,
-            severity: copy.severity,
             title: copy.title,
             body: copy.body,
-            url: "/employee/biometrics",
-          },
-        });
-        notified = !error;
+            severity: copy.severity,
+            email: chan.email,
+            push: chan.push,
+          });
+        } catch (e) {
+          console.error("[face-enrollment] external dispatch failed:", (e as Error).message);
+        }
       }
     }
 

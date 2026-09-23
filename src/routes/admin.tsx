@@ -213,7 +213,7 @@ function getPageSlugForPath(path: string): string | null {
   if (path.startsWith("/admin/targets-overtime")) return "targets-overtime";
   if (path.startsWith("/admin/directory")) return "directory";
   if (path.startsWith("/admin/employee-access")) return "employee-access";
-  if (path.startsWith("/admin/audit") || path.startsWith("/admin/biometrics-health")) return "audit";
+  if (path.startsWith("/admin/audit") || path.startsWith("/admin/biometrics-health") || path.startsWith("/admin/face-notifications")) return "audit";
   if (path.startsWith("/admin/reports")) return "reports";
   if (path.startsWith("/admin/settings/roles")) return "roles";
   if (path.startsWith("/admin/settings")) return "settings";
