@@ -145,11 +145,6 @@ function DirectoryPage() {
             <CustodyAcknowledgment />
           </Suspense>
         )}
-        {tab === "salaryInsights" && (
-          <Suspense fallback={<div className="h-40 rounded-2xl bg-muted/30" />}>
-            <SalaryInsights />
-          </Suspense>
-        )}
       </div>
     </div>
   );
