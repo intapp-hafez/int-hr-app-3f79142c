@@ -152,6 +152,9 @@ function AuditPage() {
         <a href="/admin/face-notifications" className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground">
           Face alert history
         </a>
+        <a href="/admin/biometric-terminals" className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground">
+          Biometric devices
+        </a>
       </div>
 
       {activeTab === "biometrics" ? (
