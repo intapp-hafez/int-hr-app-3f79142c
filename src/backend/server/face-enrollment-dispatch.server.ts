@@ -27,7 +27,7 @@ export async function sendFaceEmail(userId: string, title: string, body: string)
         text: body,
       },
     );
-    return { status: res.ok ? "sent" : "failed", error: res.ok ? null : res.message, recipient: email };
+    return { status: res.ok ? "sent" : "failed", error: res.ok ? null : (res.message ?? "send failed"), recipient: email };
   } catch (e) {
     return { status: "failed", error: (e as Error).message, recipient: email };
   }
