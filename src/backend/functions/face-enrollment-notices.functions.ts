@@ -57,7 +57,64 @@ export const listFaceEnrollmentHistory = createServerFn({ method: "GET" })
       createdAt: r.created_at as string,
       state: (r.payload?.state ?? "unknown") as string,
       title: (r.payload?.title ?? "") as string,
+      body: (r.payload?.body ?? "") as string,
+      retryOf: (r.payload?.retry_of ?? null) as string | null,
+      attempt: Number(r.payload?.attempt ?? 1),
+      retriedByName: (r.payload?.retried_by_name ?? null) as string | null,
     }));
+  });
+
+/** Admin/HR: re-send one failed email/push face-enrollment delivery. Each retry is a new attempt row. */
+export const retryFaceEnrollmentDelivery = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => {
+    if (!d || typeof d.id !== "string" || !/^[0-9a-f-]{36}$/i.test(d.id)) throw new Error("Invalid delivery id");
+    return d;
+  })
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const [{ data: isAdmin }, { data: isHr }] = await Promise.all([
+      supabase.rpc("has_role", { _user_id: userId, _role: "admin" }),
+      supabase.rpc("has_role", { _user_id: userId, _role: "hr" }),
+    ]);
+    if (!isAdmin && !isHr) throw new Error("Forbidden");
+    const { data: row, error } = await (supabase as any)
+      .from("notif_deliveries")
+      .select("id, user_id, channel, status, payload")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!row || row.payload?.kind !== "face_enrollment") throw new Error("Delivery not found");
+    if (row.channel !== "email" && row.channel !== "push") throw new Error("Only email and push deliveries can be retried");
+    if (row.status === "sent") throw new Error("This delivery already succeeded");
+    if (row.status === "suppressed") throw new Error("The employee turned this channel off");
+    const rootId: string = row.payload?.retry_of ?? row.id;
+    const { count } = await (supabase as any)
+      .from("notif_deliveries")
+      .select("id", { count: "exact", head: true })
+      .contains("payload", { kind: "face_enrollment", retry_of: rootId });
+    const { data: me } = await supabase.from("profiles").select("full_name").eq("id", userId).maybeSingle();
+    const { sendFaceEmail, sendFacePush } = await import("@/backend/server/face-enrollment-dispatch.server");
+    const title = row.payload?.title ?? "Face enrollment";
+    const body = row.payload?.body ?? "";
+    const res = row.channel === "email" ? await sendFaceEmail(row.user_id, title, body) : await sendFacePush(row.user_id, title, body);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await (supabaseAdmin as any).from("notif_deliveries").insert({
+      user_id: row.user_id,
+      channel: row.channel,
+      subject: title,
+      status: res.status,
+      error: res.error,
+      recipient: res.recipient,
+      payload: {
+        ...row.payload,
+        retry_of: rootId,
+        attempt: (count ?? 0) + 2,
+        retried_by: userId,
+        retried_by_name: (me as any)?.full_name ?? null,
+      },
+    });
+    return res;
   });
 
 function isValidDescriptor(d: unknown): boolean {
