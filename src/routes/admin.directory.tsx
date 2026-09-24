@@ -25,6 +25,9 @@ const SalaryCertificate = lazy(() => import("@/components/admin/HrDocuments").th
 const AdvancesAcknowledgment = lazy(() => import("@/components/admin/HrDocuments").then((mod) => ({ default: mod.AdvancesAcknowledgment })));
 const CustodyAcknowledgment = lazy(() => import("@/components/admin/HrDocuments").then((mod) => ({ default: mod.CustodyAcknowledgment })));
 
+type Tab = "departments" | "sections" | "positions" | "job_grades" | "cities" | "cost_centers" | "networks" | "devices" | "contractTemplates" | "sms" | "experienceCertificate" | "salaryDetails" | "advancesAck" | "custodyAck";
+const validTabs: Tab[] = ["departments", "sections", "positions", "job_grades", "cities", "cost_centers", "networks", "devices", "contractTemplates", "sms", "experienceCertificate", "salaryDetails", "advancesAck", "custodyAck"];
+
 export const Route = createFileRoute("/admin/directory")({
   component: DirectoryPage,
   validateSearch: (s: Record<string, unknown>): { tab?: Tab } => {
@@ -50,7 +53,6 @@ const tabs: { id: Tab; label: string }[] = [
   { id: "salaryDetails", label: "Salary Certificate" },
   { id: "advancesAck", label: "Advances Acknowledgment" },
   { id: "custodyAck", label: "Custody Acknowledgment" },
-  { id: "salaryInsights", label: "Salary Insights" },
 ];
 
 const PAGE_SIZE = 10;
