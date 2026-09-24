@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
-import { ArrowLeft, ScanFace, Search } from "lucide-react";
-import { listFaceEnrollmentHistory } from "@/backend/functions/face-enrollment-notices.functions";
+import { ArrowLeft, ScanFace, Search, RotateCw, Info, X } from "lucide-react";
+import { listFaceEnrollmentHistory, retryFaceEnrollmentDelivery } from "@/backend/functions/face-enrollment-notices.functions";
 
 export const Route = createFileRoute("/admin/face-notifications")({
   head: () => ({
@@ -38,6 +39,29 @@ const STATUS_CLS: Record<string, string> = {
 function FaceNotificationsPage() {
   const fn = useServerFn(listFaceEnrollmentHistory);
   const { data = [], isLoading, error } = useQuery({ queryKey: ["face-notif-history"], queryFn: () => fn() });
+  const retryFn = useServerFn(retryFaceEnrollmentDelivery);
+  const qc = useQueryClient();
+  const [detailRoot, setDetailRoot] = useState<string | null>(null);
+  const retry = useMutation({
+    mutationFn: (id: string) => retryFn({ data: { id } }),
+    onSuccess: (r) => {
+      if (r.status === "sent") toast.success("Delivered on retry");
+      else toast.error(`Retry ${r.status}: ${r.error ?? "unknown error"}`);
+      qc.invalidateQueries({ queryKey: ["face-notif-history"] });
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+  const rootOf = (r: { id: string; retryOf: string | null }) => r.retryOf ?? r.id;
+  const chains = useMemo(() => {
+    const m = new Map<string, typeof data>();
+    for (const r of data) {
+      const k = rootOf(r);
+      m.set(k, [...(m.get(k) ?? []), r]);
+    }
+    for (const v of m.values()) v.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    return m;
+  }, [data]);
+  const latestIds = useMemo(() => new Set([...chains.values()].map((v) => v[v.length - 1]!.id)), [chains]);
   const [q, setQ] = useState("");
   const [state, setState] = useState("all");
   const [channel, setChannel] = useState("all");
@@ -46,12 +70,13 @@ function FaceNotificationsPage() {
   const rows = useMemo(() => {
     const s = q.trim().toLowerCase();
     return data.filter((r) =>
+      latestIds.has(r.id) &&
       (state === "all" || r.state === state) &&
       (channel === "all" || r.channel === channel) &&
       (status === "all" || r.status === status) &&
       (!s || `${r.employee} ${r.empCode ?? ""} ${r.recipient ?? ""} ${r.error ?? ""}`.toLowerCase().includes(s)),
     );
-  }, [data, q, state, channel, status]);
+  }, [data, latestIds, q, state, channel, status]);
 
   const statuses = [...new Set(data.map((r) => r.status))];
   const sel = "rounded-xl border border-border bg-card px-3 py-2 text-xs";
@@ -95,12 +120,14 @@ function FaceNotificationsPage() {
               <th className="px-4 py-3 text-start">Channel</th>
               <th className="px-4 py-3 text-start">Status</th>
               <th className="px-4 py-3 text-start">Details</th>
+              <th className="px-4 py-3 text-start">Attempts</th>
+              <th className="px-4 py-3 text-end">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {isLoading && <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Loading…</td></tr>}
-            {error && <tr><td colSpan={6} className="px-4 py-8 text-center text-destructive">{(error as Error).message}</td></tr>}
-            {!isLoading && !error && rows.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">No notifications found.</td></tr>}
+            {isLoading && <tr><td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">Loading…</td></tr>}
+            {error && <tr><td colSpan={8} className="px-4 py-8 text-center text-destructive">{(error as Error).message}</td></tr>}
+            {!isLoading && !error && rows.length === 0 && <tr><td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">No notifications found.</td></tr>}
             {rows.map((r) => (
               <tr key={r.id} className="hover:bg-muted/10">
                 <td className="px-4 py-2.5 whitespace-nowrap font-mono">{fmt(r.createdAt)}</td>
@@ -111,12 +138,52 @@ function FaceNotificationsPage() {
                 <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 font-medium capitalize ${STATE_CLS[r.state] ?? "bg-muted"}`}>{r.state}</span></td>
                 <td className="px-4 py-2.5 capitalize">{r.channel === "inapp" ? "In-app" : r.channel}</td>
                 <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 font-medium ${STATUS_CLS[r.status] ?? "bg-muted text-muted-foreground"}`}>{r.status}</span></td>
-                <td className="px-4 py-2.5 text-muted-foreground">{r.error ?? r.recipient ?? "—"}</td>
+                <td className="px-4 py-2.5 text-muted-foreground max-w-[260px] truncate" title={r.error ?? ""}>{r.error ?? r.recipient ?? "—"}</td>
+                <td className="px-4 py-2.5 font-mono">{chains.get(rootOf(r))?.length ?? 1}</td>
+                <td className="px-4 py-2.5">
+                  <div className="flex justify-end gap-1.5">
+                    <button onClick={() => setDetailRoot(rootOf(r))} className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 hover:bg-muted"><Info className="h-3 w-3" /> Details</button>
+                    {(r.channel === "email" || r.channel === "push") && r.status !== "sent" && r.status !== "suppressed" && (
+                      <button disabled={retry.isPending} onClick={() => retry.mutate(r.id)} className="inline-flex items-center gap-1 rounded-lg bg-primary px-2 py-1 text-primary-foreground disabled:opacity-50">
+                        <RotateCw className={`h-3 w-3 ${retry.isPending && retry.variables === r.id ? "animate-spin" : ""}`} /> Retry
+                      </button>
+                    )}
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {detailRoot && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-2xl rounded-2xl border border-border bg-card p-5 shadow-lg">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="font-display text-lg font-semibold">Delivery attempts</h2>
+                <p className="text-xs text-muted-foreground">{chains.get(detailRoot)?.[0]?.employee} · {chains.get(detailRoot)?.[0]?.title}</p>
+              </div>
+              <button onClick={() => setDetailRoot(null)} aria-label="Close" className="rounded-lg p-1 hover:bg-muted"><X className="h-4 w-4" /></button>
+            </div>
+            <ol className="mt-4 max-h-[60vh] space-y-3 overflow-y-auto">
+              {(chains.get(detailRoot) ?? []).map((a, i) => (
+                <li key={a.id} className="rounded-xl border border-border p-3 text-xs">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold">Attempt {i + 1}</span>
+                    <span className="font-mono text-muted-foreground">{fmt(a.createdAt)}</span>
+                    <span className="capitalize">{a.channel === "inapp" ? "In-app" : a.channel}</span>
+                    <span className={`rounded-full px-2 py-0.5 font-medium ${STATUS_CLS[a.status] ?? "bg-muted text-muted-foreground"}`}>{a.status}</span>
+                    {a.retriedByName && <span className="text-muted-foreground">retried by {a.retriedByName}</span>}
+                  </div>
+                  <p className="mt-2"><span className="text-muted-foreground">Recipient: </span>{a.recipient ?? "—"}</p>
+                  <p className="mt-1 whitespace-pre-wrap break-words"><span className="text-muted-foreground">Error: </span>{a.error ?? "none"}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
