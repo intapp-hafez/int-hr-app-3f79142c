@@ -90,7 +90,7 @@ function AdminLayout() {
         <div className="px-4 py-3.5 border-b border-sidebar-border/60">
           <Link to="/"><AppLogo size={24} tone="light" /></Link>
         </div>
-        <nav className="flex-1 space-y-0.5 px-2.5 py-2 overflow-y-auto">
+        <nav className="flex-1 space-y-1 px-2.5 py-2 overflow-y-auto">
           {nav.map((n) => {
             const active = isActive(n.to, "exact" in n ? n.exact : false);
             return (
@@ -131,7 +131,7 @@ function AdminLayout() {
               <AppLogo size={24} tone="light" />
               <button onClick={() => setOpen(false)} className="rounded-full p-1 text-sidebar-foreground/80"><X className="h-5 w-5" /></button>
             </div>
-            <nav className="flex-1 space-y-0.5 overflow-y-auto px-1">
+            <nav className="flex-1 space-y-1 overflow-y-auto px-1">
               {nav.map((n) => {
                 const active = isActive(n.to, "exact" in n ? n.exact : false);
                 return (
