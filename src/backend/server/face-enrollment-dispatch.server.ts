@@ -5,6 +5,60 @@ import { loadSmtpConfig } from "./smtp-config.server";
 import { sendEmail } from "./smtp-client.server";
 import { sendPushTo } from "./web-push.server";
 
+type Attempt = { status: string; error: string | null; recipient: string | null };
+
+/** Sends one face-enrollment email. Used by the initial dispatch and admin retries. */
+export async function sendFaceEmail(userId: string, title: string, body: string): Promise<Attempt> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: prof } = await (supabaseAdmin as any).from("profiles").select("email").eq("id", userId).maybeSingle();
+  const email = (prof?.email as string | undefined) ?? null;
+  if (!email) return { status: "failed", error: "employee has no email address", recipient: null };
+  const smtp = await loadSmtpConfig();
+  if (!smtp || !smtp.host || !smtp.password) return { status: "skipped_smtp", error: "SMTP not configured", recipient: email };
+  try {
+    const res = await sendEmail(
+      { host: smtp.host, port: smtp.port, secure: smtp.secure, username: smtp.username, password: smtp.password },
+      {
+        from: smtp.from_name ? `${smtp.from_name} <${smtp.from_email}>` : smtp.from_email,
+        fromEmail: smtp.from_email,
+        to: [email],
+        subject: title,
+        html: `<div style="font-family:sans-serif"><h2>${title}</h2><p>${body}</p></div>`,
+        text: body,
+      },
+    );
+    return { status: res.ok ? "sent" : "failed", error: res.ok ? null : res.message, recipient: email };
+  } catch (e) {
+    return { status: "failed", error: (e as Error).message, recipient: email };
+  }
+}
+
+/** Sends one face-enrollment push to every subscribed device of the employee. */
+export async function sendFacePush(userId: string, title: string, body: string): Promise<Attempt> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: subs } = await (supabaseAdmin as any)
+    .from("push_subscriptions")
+    .select("endpoint, p256dh, auth_secret")
+    .eq("user_id", userId);
+  if (!subs?.length) return { status: "failed", error: "no push subscription on any device", recipient: null };
+  let ok = 0;
+  const errs: string[] = [];
+  for (const s of subs) {
+    try {
+      const r = await sendPushTo(s, { title, body, url: "/employee/biometrics", tag: "face-enrollment" });
+      if (r.ok) ok++;
+      else errs.push(r.error ?? "push failed");
+    } catch (e) {
+      errs.push((e as Error).message);
+    }
+  }
+  return {
+    status: ok > 0 ? "sent" : "failed",
+    error: ok > 0 ? (errs.length ? `${errs.length} of ${subs.length} devices failed: ${errs[0]}` : null) : errs.join(" | ") || "push failed",
+    recipient: `${subs.length} device(s)`,
+  };
+}
+
 export async function dispatchFaceEnrollmentExternal(input: {
   userId: string;
   state: string;
