@@ -24,10 +24,6 @@ const ExperienceCertificate = lazy(() => import("@/components/admin/HrDocuments"
 const SalaryCertificate = lazy(() => import("@/components/admin/HrDocuments").then((mod) => ({ default: mod.SalaryCertificate })));
 const AdvancesAcknowledgment = lazy(() => import("@/components/admin/HrDocuments").then((mod) => ({ default: mod.AdvancesAcknowledgment })));
 const CustodyAcknowledgment = lazy(() => import("@/components/admin/HrDocuments").then((mod) => ({ default: mod.CustodyAcknowledgment })));
-const SalaryInsights = lazy(() => import("@/components/admin/SalaryInsights").then((mod) => ({ default: mod.SalaryInsights })));
-
-type Tab = "departments" | "sections" | "positions" | "job_grades" | "cities" | "cost_centers" | "networks" | "devices" | "contractTemplates" | "sms" | "experienceCertificate" | "salaryDetails" | "advancesAck" | "custodyAck" | "salaryInsights";
-const validTabs: Tab[] = ["departments", "sections", "positions", "job_grades", "cities", "cost_centers", "networks", "devices", "contractTemplates", "sms", "experienceCertificate", "salaryDetails", "advancesAck", "custodyAck", "salaryInsights"];
 
 export const Route = createFileRoute("/admin/directory")({
   component: DirectoryPage,
