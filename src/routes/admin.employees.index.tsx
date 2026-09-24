@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Search, Filter, X, ChevronRight, Upload, FileText, ArrowUp, ArrowDown, ArrowUpDown, Pencil, Trash2, Eye, AlertCircle, AlertTriangle, Ban, CheckCircle2 } from "lucide-react";
+import { Plus, Search, Filter, X, ChevronRight, Upload, FileText, ArrowUp, ArrowDown, ArrowUpDown, Pencil, Trash2, Eye, AlertCircle, AlertTriangle, Ban, CheckCircle2, User, Building2, IdCard, Banknote, ShieldCheck, Sparkles, GraduationCap } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { Download } from "lucide-react";
@@ -495,6 +495,8 @@ function EmployeesPage() {
           shifts={geo?.shifts ?? []}
           sections={geo?.sections ?? []}
           jobGrades={geo?.jobGrades ?? []}
+          graduations={geo?.graduations ?? []}
+          majors={geo?.majors ?? []}
           onClose={() => setOpen(false)}
         />
       )}
@@ -563,6 +565,8 @@ function EditEmployeeDrawer({
   const [shiftId, setShiftId] = useState<string>(row.shift_id ?? "");
   const [medicalInsuranceNumber, setMedicalInsuranceNumber] = useState<string>(row.medical_insurance_number ?? "");
   const [medicalInsuranceType, setMedicalInsuranceType] = useState<string>(row.medical_insurance_type ?? "");
+  const [bankName, setBankName] = useState<string>(row.bank_name ?? "");
+  const [bankAccountNumber, setBankAccountNumber] = useState<string>(row.bank_account_number ?? "");
   const [status, setStatus] = useState<"Active" | "Inactive">(row.status === "Inactive" ? "Inactive" : "Active");
   const [inactiveReason, setInactiveReason] = useState<"" | InactiveReason>(
     (row.inactive_reason as InactiveReason | null) ?? ""
@@ -609,6 +613,8 @@ function EditEmployeeDrawer({
           shift_id: shiftId || null,
           medical_insurance_number: medicalInsuranceNumber.trim() || null,
           medical_insurance_type: (medicalInsuranceType || null) as any,
+          bank_name: bankName.trim() || null,
+          bank_account_number: bankAccountNumber.trim() || null,
           status,
           inactive_reason: status === "Active" ? null : (inactiveReason || null),
           avatar_url: avatarUrl || null,
@@ -734,6 +740,16 @@ function EditEmployeeDrawer({
             <span className="mb-1 block text-xs font-medium text-muted-foreground">{t("medicalInsuranceNumber")}</span>
             <input value={medicalInsuranceNumber} onChange={(e) => setMedicalInsuranceNumber(e.target.value)} placeholder="e.g. MED-123456"
               className="w-full rounded-xl border border-input bg-card px-3 py-2 text-sm" />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">{t("bankName" as any) || "Bank Name"}</span>
+            <input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="e.g. CIB, QNB, NBE..."
+              className="w-full rounded-xl border border-input bg-card px-3 py-2 text-sm" />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">{t("bankAccountNumber" as any) || "Bank Account Number"}</span>
+            <input value={bankAccountNumber} onChange={(e) => setBankAccountNumber(e.target.value)} placeholder="e.g. 100023456789 or IBAN"
+              className="w-full rounded-xl border border-input bg-card px-3 py-2 text-sm font-mono" />
           </label>
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-muted-foreground">Status</span>
@@ -878,7 +894,49 @@ function DateInput({
   );
 }
 
-function AddEmployeeModal({ departments, positions, cities, districts, managers, costCenters = [], shifts = [], sections = [], jobGrades = [], onClose }: { departments: { id: string; name: string }[]; positions: { id: string; name: string }[]; cities: CityOpt[]; districts: DistrictOpt[]; managers: { id: string; name: string }[]; costCenters?: { id: string; code: string; name_en: string; name_ar: string; status: string }[]; shifts?: { id: string; name: string; start_time: string; end_time: string; is_active: boolean }[]; sections?: { id: string; department_id: string; name_en: string }[]; jobGrades?: { id: string; name_en: string; name_ar: string; active: boolean }[]; onClose: () => void }) {
+function FormSection({
+  id,
+  icon: Icon,
+  iconBg = "bg-primary/10 text-primary",
+  title,
+  subtitle,
+  errorCount = 0,
+  children,
+}: {
+  id: string;
+  icon: React.ComponentType<{ className?: string }>;
+  iconBg?: string;
+  title: string;
+  subtitle?: string;
+  errorCount?: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <section id={`section-${id}`} className="scroll-mt-3 rounded-2xl border border-border/70 bg-card/60 p-4 shadow-2xs transition-all">
+      <div className="mb-3.5 flex flex-wrap items-center justify-between gap-2 border-b border-border/50 pb-2.5">
+        <div className="flex items-center gap-2.5">
+          <div className={`grid h-8 w-8 place-items-center rounded-xl ${iconBg}`}>
+            <Icon className="h-4 w-4" />
+          </div>
+          <div>
+            <h3 className="font-display text-sm font-semibold text-foreground flex items-center gap-2">
+              {title}
+              {errorCount > 0 && (
+                <span className="rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] font-medium text-destructive">
+                  {errorCount} {errorCount === 1 ? "field required" : "fields required"}
+                </span>
+              )}
+            </h3>
+            {subtitle && <p className="text-[11px] text-muted-foreground">{subtitle}</p>}
+          </div>
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function AddEmployeeModal({ departments, positions, cities, districts, managers, costCenters = [], shifts = [], sections = [], jobGrades = [], graduations = [], majors = [], onClose }: { departments: { id: string; name: string }[]; positions: { id: string; name: string }[]; cities: CityOpt[]; districts: DistrictOpt[]; managers: { id: string; name: string }[]; costCenters?: { id: string; code: string; name_en: string; name_ar: string; status: string }[]; shifts?: { id: string; name: string; start_time: string; end_time: string; is_active: boolean }[]; sections?: { id: string; department_id: string; name_en: string }[]; jobGrades?: { id: string; name_en: string; name_ar: string; active: boolean }[]; graduations?: { id: string; name_en: string; name_ar: string; active: boolean }[]; majors?: { id: string; name_en: string; name_ar: string; active: boolean }[]; onClose: () => void }) {
   const { t } = useI18n();
   const qc = useQueryClient();
   const validateBatch = useServerFn(validateEmployeesBatch);
@@ -891,6 +949,8 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
     shiftId: "",
     sectionId: "",
     jobGrade: "",
+    graduationId: "",
+    majorId: "",
     email: "",
     phone: "",
     dept: "",
@@ -934,6 +994,8 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
     idCardAddress: "",
     avatarUrl: "",
     personalPhone: "",
+    bankName: "",
+    bankAccountNumber: "",
   });
   const [docs, setDocs] = useState<Record<string, StoredDoc | undefined>>({});
   const [contractStartDate, setContractStartDate] = useState("");
@@ -1087,6 +1149,10 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
             isFivePercent: form.isFivePercent,
             socialInsuranceDate: form.socialInsuranceDate,
             customField: form.customField.trim(),
+            graduationId: form.graduationId || "",
+            majorId: form.majorId || "",
+            bankName: form.bankName.trim(),
+            bankAccountNumber: form.bankAccountNumber.trim(),
             loginUrl: `${window.location.origin}/auth`,
             appName: document.title || "HR Portal",
           },
@@ -1113,13 +1179,75 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
     })();
   }
 
+  const navSections = [
+    {
+      id: "personal",
+      label: "Personal & Account",
+      icon: User,
+      errors: (fieldErrors.name ? 1 : 0) + (fieldErrors.email ? 1 : 0) + (fieldErrors.phone ? 1 : 0) + (fieldErrors.password ? 1 : 0) + (fieldErrors.nationalId ? 1 : 0) + (fieldErrors.nationalIdExpiry ? 1 : 0),
+    },
+    {
+      id: "job",
+      label: "Employment Data",
+      icon: Building2,
+      errors: (fieldErrors.dept ? 1 : 0) + (fieldErrors.manager ? 1 : 0) + (fieldErrors.contractType ? 1 : 0),
+    },
+    {
+      id: "compensation",
+      label: "Compensation",
+      icon: Banknote,
+      errors: (fieldErrors.salary ? 1 : 0) + (fieldErrors.salaryMode ? 1 : 0) + (fieldErrors.target ? 1 : 0),
+    },
+    {
+      id: "insurance",
+      label: "Insurance",
+      icon: ShieldCheck,
+      errors: 0,
+    },
+    {
+      id: "custom",
+      label: "Custom Fields",
+      icon: Sparkles,
+      errors: 0,
+    },
+  ];
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-foreground/40 p-4 md:items-center">
-      <div onClick={(e) => e.stopPropagation()} className="my-auto w-full max-w-5xl rounded-3xl bg-background p-6 shadow-soft">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-display text-lg font-semibold">{t("addEmployee")}</h2>
-          <button onClick={onClose} className="rounded-full p-1.5 hover:bg-muted"><X className="h-4 w-4" /></button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-foreground/40 p-3 sm:p-4 backdrop-blur-xs">
+      <div onClick={(e) => e.stopPropagation()} className="my-auto flex max-h-[92vh] w-full max-w-5xl flex-col rounded-3xl bg-background p-5 sm:p-6 shadow-soft">
+        <div className="mb-3 flex shrink-0 items-center justify-between">
+          <div>
+            <h2 className="font-display text-lg font-semibold">{t("addEmployee")}</h2>
+            <p className="text-xs text-muted-foreground">Complete the employee details grouped by related sections</p>
+          </div>
+          <button onClick={onClose} className="rounded-full p-1.5 hover:bg-muted transition-colors"><X className="h-4 w-4" /></button>
         </div>
+
+        {/* Section Quick Jump Navigator */}
+        <div className="mb-4 shrink-0 flex flex-wrap items-center gap-2 rounded-2xl border border-border/60 bg-muted/30 p-1.5">
+          {navSections.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => {
+                document.getElementById(`section-${s.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${s.errors > 0
+                ? "border border-destructive/40 bg-destructive/15 text-destructive shadow-xs"
+                : "border border-border/60 bg-card text-muted-foreground hover:bg-background hover:text-foreground hover:shadow-xs"
+                }`}
+            >
+              <s.icon className={`h-3.5 w-3.5 ${s.errors > 0 ? "text-destructive" : "text-muted-foreground"}`} />
+              <span>{s.label}</span>
+              {s.errors > 0 && (
+                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white">
+                  {s.errors}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
         {setupIncomplete && (
           <div className="mb-3 flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -1133,275 +1261,447 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
             </div>
           </div>
         )}
-        <form onSubmit={submit} className="space-y-3 max-h-[65vh] overflow-y-auto pr-1">
-          <div className="flex items-center gap-4 rounded-2xl border border-border bg-muted/30 p-3">
-            <EmployeeAvatar
-              id="new"
-              name={form.name || form.email || "?"}
-              url={form.avatarUrl || null}
-              className="h-16 w-16"
-            />
-            <div className="min-w-0 flex-1">
-              <p className="mb-1 text-xs font-medium text-muted-foreground">Avatar</p>
-              <div className="flex flex-wrap items-center gap-2">
-                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-1.5 text-xs font-semibold hover:bg-muted">
-                  <Upload className="h-3.5 w-3.5" /> Upload
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      e.currentTarget.value = "";
-                      if (!f) return;
-                      if (!["image/png", "image/jpeg", "image/jpg", "image/webp"].includes(f.type)) {
-                        toast.error("Only PNG, JPEG or WEBP"); return;
-                      }
-                      if (f.size > 500 * 1024) { toast.error("Image must be 500 KB or less"); return; }
-                      const r = new FileReader();
-                      r.onload = () => upd("avatarUrl", String(r.result));
-                      r.onerror = () => toast.error("Could not read file");
-                      r.readAsDataURL(f);
-                    }}
-                  />
-                </label>
-                {form.avatarUrl && (
-                  <button type="button" onClick={() => upd("avatarUrl", "")} className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-1.5 text-xs">
-                    <X className="h-3.5 w-3.5" /> Remove
-                  </button>
-                )}
+
+        <form onSubmit={submit} className="flex-1 space-y-4 overflow-y-auto pr-1">
+          {/* Section 1: Personal & Account */}
+          <FormSection
+            id="personal"
+            icon={User}
+            iconBg="bg-blue-500/10 text-blue-600 dark:text-blue-400"
+            title="Personal & Account Information"
+            subtitle="Profile photo, credentials, contact info, identification, and official address"
+            errorCount={(fieldErrors.name ? 1 : 0) + (fieldErrors.email ? 1 : 0) + (fieldErrors.phone ? 1 : 0) + (fieldErrors.password ? 1 : 0) + (fieldErrors.nationalId ? 1 : 0) + (fieldErrors.nationalIdExpiry ? 1 : 0)}
+          >
+            {/* Top row: Employee ID & Profile Avatar */}
+            <div className="mb-3.5 grid gap-3 sm:grid-cols-1 md:grid-cols-12 items-stretch">
+              <div className="flex flex-col justify-between rounded-2xl border border-border/80 bg-muted/20 p-3 md:col-span-4">
+                <div className="mb-1.5 flex items-center justify-between">
+                  <span className="block text-xs font-medium text-muted-foreground">Employee ID</span>
+                  <label className="flex items-center gap-1.5 text-xs font-medium text-foreground cursor-pointer">
+                    <input type="checkbox" checked={autoGenId} onChange={(e) => {
+                      setAutoGenId(e.target.checked);
+                      if (e.target.checked) upd("empCode", "");
+                    }} className="h-3.5 w-3.5 accent-brand rounded" />
+                    Auto-generate
+                  </label>
+                </div>
                 <input
-                  value={form.avatarUrl}
-                  onChange={(e) => upd("avatarUrl", e.target.value)}
-                  placeholder="or paste image URL…"
-                  className={inputCls + " flex-1 min-w-[180px]"}
+                  value={form.empCode}
+                  onChange={(e) => upd("empCode", e.target.value)}
+                  maxLength={40}
+                  disabled={autoGenId}
+                  placeholder={autoGenId ? "Auto-generated on save" : "Enter Employee ID..."}
+                  className={inputCls + " font-mono disabled:opacity-50 disabled:bg-muted/50 w-full"}
                 />
               </div>
+
+              <div className="flex items-center gap-4 rounded-2xl border border-border/80 bg-muted/20 p-3 md:col-span-8">
+                <EmployeeAvatar
+                  id="new"
+                  name={form.name || form.email || "?"}
+                  url={form.avatarUrl || null}
+                  className="h-16 w-16 shrink-0 shadow-xs"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">Profile Avatar</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-1.5 text-xs font-semibold hover:bg-muted transition-colors shadow-2xs">
+                      <Upload className="h-3.5 w-3.5 text-brand" /> Upload
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          e.currentTarget.value = "";
+                          if (!f) return;
+                          if (!["image/png", "image/jpeg", "image/jpg", "image/webp"].includes(f.type)) {
+                            toast.error("Only PNG, JPEG or WEBP"); return;
+                          }
+                          if (f.size > 500 * 1024) { toast.error("Image must be 500 KB or less"); return; }
+                          const r = new FileReader();
+                          r.onload = () => upd("avatarUrl", String(r.result));
+                          r.onerror = () => toast.error("Could not read file");
+                          r.readAsDataURL(f);
+                        }}
+                      />
+                    </label>
+                    {form.avatarUrl && (
+                      <button type="button" onClick={() => upd("avatarUrl", "")} className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-1.5 text-xs text-destructive hover:bg-destructive/10 transition-colors">
+                        <X className="h-3.5 w-3.5" /> Remove
+                      </button>
+                    )}
+                    <input
+                      value={form.avatarUrl}
+                      onChange={(e) => upd("avatarUrl", e.target.value)}
+                      placeholder="or paste image URL…"
+                      className={inputCls + " flex-1 min-w-[160px]"}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="grid gap-3 md:grid-cols-4">
-            <Field label="Email (login)" error={fieldErrors.email}><input type="email" value={form.email} onChange={(e) => upd("email", e.target.value)} onBlur={() => handleBlur("email")} maxLength={120} className={inputCls} /></Field>
-            <Field label="Extra Email (Outlook,Gmail)"><input type="email" value={form.extraEmail} onChange={(e) => upd("extraEmail", e.target.value)} maxLength={120} className={inputCls} /></Field>
-            <Field label={t("password")} error={fieldErrors.password}>
-              <input type="text" value={form.password} onChange={(e) => upd("password", e.target.value)} onBlur={() => handleBlur("password")} maxLength={64} placeholder="min 6 chars" className={inputCls + " font-mono"} />
-            </Field>
-            <Field label="Full name" error={fieldErrors.name}><input value={form.name} onChange={(e) => upd("name", e.target.value)} onBlur={() => handleBlur("name")} maxLength={80} className={inputCls} /></Field>
-            <Field label={t("fullNameAr" as any) ?? "Full name (Arabic)"}>
-              <input dir="rtl" value={form.nameAr} onChange={(e) => upd("nameAr", e.target.value)} maxLength={80} placeholder="الاسم بالكامل بالعربية" className={inputCls} />
-            </Field>
-            <Field label="Phone" error={fieldErrors.phone}>
-              <input type="tel" dir="ltr" inputMode="tel" value={form.phone} onChange={(e) => upd("phone", formatEgPhone(e.target.value))} onBlur={() => handleBlur("phone")} maxLength={20} placeholder="+20 100 123 4567" className={inputCls + " font-mono"} />
-            </Field>
-            <div className="flex flex-col">
-              <div className="mb-1 flex items-center justify-between">
-                <span className="block text-xs font-medium text-muted-foreground">Employee ID</span>
-                <label className="flex items-center gap-1.5 text-xs font-medium text-foreground cursor-pointer">
-                  <input type="checkbox" checked={autoGenId} onChange={(e) => {
-                    setAutoGenId(e.target.checked);
-                    if (e.target.checked) upd("empCode", "");
-                  }} className="h-3.5 w-3.5 accent-brand rounded" />
-                  Auto-generate ID
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Field label="Full name *" error={fieldErrors.name}><input value={form.name} onChange={(e) => upd("name", e.target.value)} onBlur={() => handleBlur("name")} maxLength={80} placeholder="e.g. John Doe" className={inputCls} /></Field>
+              <Field label={t("fullNameAr" as any) ?? "Full name (Arabic)"}>
+                <input dir="rtl" value={form.nameAr} onChange={(e) => upd("nameAr", e.target.value)} maxLength={80} placeholder="الاسم بالكامل بالعربية" className={inputCls} />
+              </Field>
+              <Field label="Email (login) *" error={fieldErrors.email}><input type="email" value={form.email} onChange={(e) => upd("email", e.target.value)} onBlur={() => handleBlur("email")} maxLength={120} placeholder="name@company.com" className={inputCls} /></Field>
+              <Field label={t("password") + " *"} error={fieldErrors.password}>
+                <input type="text" value={form.password} onChange={(e) => upd("password", e.target.value)} onBlur={() => handleBlur("password")} maxLength={64} placeholder="min 6 chars" className={inputCls + " font-mono"} />
+              </Field>
+              <Field label="Extra Email (Outlook, Gmail)"><input type="email" value={form.extraEmail} onChange={(e) => upd("extraEmail", e.target.value)} maxLength={120} placeholder="optional@outlook.com" className={inputCls} /></Field>
+              <Field label="Phone *" error={fieldErrors.phone}>
+                <input type="tel" dir="ltr" inputMode="tel" value={form.phone} onChange={(e) => upd("phone", formatEgPhone(e.target.value))} onBlur={() => handleBlur("phone")} maxLength={20} placeholder="+20 100 741 9344" className={inputCls + " font-mono"} />
+              </Field>
+              <Field label={t("gender")}>
+                <select value={form.gender} onChange={(e) => upd("gender", e.target.value)} className={inputCls}>
+                  <option value="">—</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                </select>
+              </Field>
+              <Field label="Status">
+                <select value={form.status} onChange={(e) => upd("status", e.target.value)} className={inputCls}>
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                  <option value="Suspended">Suspended</option>
+                </select>
+              </Field>
+
+              <Field label="Graduation">
+                <select value={form.graduationId} onChange={(e) => upd("graduationId", e.target.value)} className={inputCls}>
+                  <option value="">— Select Graduation —</option>
+                  {graduations.filter((g) => g.active !== false || g.id === form.graduationId).map((g) => (
+                    <option key={g.id} value={g.id}>{g.name_en} {g.name_ar ? `(${g.name_ar})` : ""}</option>
+                  ))}
+                </select>
+              </Field>
+
+              <Field label="Major">
+                <select value={form.majorId} onChange={(e) => upd("majorId", e.target.value)} className={inputCls}>
+                  <option value="">— Select Major —</option>
+                  {majors.filter((m) => m.active !== false || m.id === form.majorId).map((m) => (
+                    <option key={m.id} value={m.id}>{m.name_en} {m.name_ar ? `(${m.name_ar})` : ""}</option>
+                  ))}
+                </select>
+              </Field>
+
+              {/* Identification & Address */}
+              <div className="col-span-full border-t border-border/70 pt-2.5 mt-1 flex items-center gap-2">
+                <IdCard className="h-4 w-4 text-amber-500" />
+                <span className="text-xs font-semibold text-foreground">Identification & Address</span>
+              </div>
+              <label className="block">
+                <span className="mb-1 flex items-center justify-between text-xs font-medium text-muted-foreground">
+                  <span>National ID / Passport *</span>
+                  <label className="flex cursor-pointer items-center gap-1.5 text-xs text-foreground">
+                    <input type="checkbox" checked={form.isPassport} onChange={(e) => { upd("isPassport", e.target.checked); handleBlur("nationalId"); }} className="rounded border-input text-brand focus:ring-brand" />
+                    Passport
+                  </label>
+                </span>
+                <input value={form.nationalId} onChange={(e) => { upd("nationalId", e.target.value); handleBlur("nationalId"); }} onBlur={() => handleBlur("nationalId")} maxLength={form.isPassport ? 15 : 14} className={inputCls + " font-mono" + (fieldErrors.nationalId ? " border-destructive" : "")} placeholder={form.isPassport ? "Passport Number" : "14-digit National ID"} />
+                {fieldErrors.nationalId && <p className="mt-1 text-[11px] text-destructive">{fieldErrors.nationalId}</p>}
+              </label>
+              <Field label="ID Issue Date">
+                <DateInput
+                  value={form.idIssueDate}
+                  onChange={(d) => {
+                    upd("idIssueDate", d);
+                    if (d) {
+                      const exp = new Date(d);
+                      exp.setFullYear(exp.getFullYear() + 7);
+                      exp.setDate(exp.getDate() - 1);
+                      upd("nationalIdExpiry", exp.toISOString().slice(0, 10));
+                    }
+                  }}
+                  className={inputCls + " font-mono"}
+                />
+              </Field>
+              <Field label="ID Expiry Date *" error={fieldErrors.nationalIdExpiry}>
+                <DateInput
+                  value={form.nationalIdExpiry}
+                  onChange={(d) => upd("nationalIdExpiry", d)}
+                  onBlur={() => handleBlur("nationalIdExpiry")}
+                  className={inputCls + " font-mono"}
+                />
+              </Field>
+              <Field label="City">
+                <select value={form.city} onChange={(e) => { upd("city", e.target.value); upd("district", ""); }} className={inputCls}>
+                  <option value="">— Select City —</option>
+                  {cities.map((c) => <option key={c.id} value={c.name_en}>{c.name_en}</option>)}
+                </select>
+              </Field>
+              <Field label="District">
+                {(() => {
+                  const cityId = cities.find((c) => c.name_en === form.city)?.id;
+                  const filtered = cityId ? districts.filter((d) => d.city_id === cityId) : [];
+                  return (
+                    <select value={form.district} onChange={(e) => upd("district", e.target.value)} disabled={!cityId} className={inputCls + " disabled:opacity-60"}>
+                      <option value="">{cityId ? "— Select District —" : "Select a city first"}</option>
+                      {filtered.map((d) => <option key={d.id} value={d.name_en}>{d.name_en}</option>)}
+                    </select>
+                  );
+                })()}
+              </Field>
+              <div className="sm:col-span-2 lg:col-span-3">
+                <Field label="Address on ID">
+                  <input value={form.idCardAddress} onChange={(e) => upd("idCardAddress", e.target.value)} maxLength={200} placeholder="As written on national ID / official record" className={inputCls} />
+                </Field>
+              </div>
+              <div className="col-span-full pt-1">
+                <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-muted-foreground hover:text-foreground">
+                  <input type="checkbox" className="h-4 w-4 accent-brand rounded" checked={allowPastExpiry} onChange={(e) => setAllowPastExpiry(e.target.checked)} />
+                  <span>Override: allow expiry date in the past (admin/HR only)</span>
                 </label>
               </div>
-              <input
-                value={form.empCode}
-                onChange={(e) => upd("empCode", e.target.value)}
-                maxLength={40}
-                disabled={autoGenId}
-                placeholder={autoGenId ? "Auto-generated on save (e.g. EMP-XXXX)" : "Enter Employee ID..."}
-                className={inputCls + " font-mono disabled:opacity-50 disabled:bg-muted/50"}
-              />
             </div>
-            <Field label="Status">
-              <select value={form.status} onChange={(e) => upd("status", e.target.value)} className={inputCls}>
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
-                <option value="Suspended">Suspended</option>
-              </select>
-            </Field>
-            <Field label="City">
-              <select value={form.city} onChange={(e) => { upd("city", e.target.value); upd("district", ""); }} className={inputCls}>
-                <option value="">—</option>
-                {cities.map((c) => <option key={c.id} value={c.name_en}>{c.name_en}</option>)}
-              </select>
-            </Field>
-            <Field label="District">
-              {(() => {
-                const cityId = cities.find((c) => c.name_en === form.city)?.id;
-                const filtered = cityId ? districts.filter((d) => d.city_id === cityId) : [];
-                return (
-                  <select value={form.district} onChange={(e) => upd("district", e.target.value)} disabled={!cityId} className={inputCls + " disabled:opacity-60"}>
-                    <option value="">{cityId ? "—" : "Select a city first"}</option>
-                    {filtered.map((d) => <option key={d.id} value={d.name_en}>{d.name_en}</option>)}
-                  </select>
-                );
-              })()}
-            </Field>
-            <Field label="Department" error={fieldErrors.dept}>
-              <select value={form.dept} onChange={(e) => {
-                upd("dept", e.target.value);
-                upd("sectionId", "");
-              }} disabled={departments.length === 0} className={inputCls + " disabled:opacity-60"}>
-                <option value="">—</option>
-                {departments.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
-              </select>
-            </Field>
-            <Field label="Level">
-              {(() => {
-                const selectedDeptId = departments.find((d) => d.name === form.dept)?.id;
-                const filteredSections = selectedDeptId ? sections.filter((s) => s.department_id === selectedDeptId) : sections;
-                return (
-                  <select value={form.sectionId} onChange={(e) => {
-                    upd("sectionId", e.target.value);
-                    const sec = sections.find((s) => s.id === e.target.value);
-                    if (sec && !form.dept) {
-                      const d = departments.find((dept) => dept.id === sec.department_id);
-                      if (d) upd("dept", d.name);
-                    }
-                  }} className={inputCls}>
-                    <option value="">—</option>
-                    {filteredSections.map((s) => <option key={s.id} value={s.id}>{s.name_en}</option>)}
-                  </select>
-                );
-              })()}
-            </Field>
-            <Field label="Position">
-              <select value={form.position} onChange={(e) => upd("position", e.target.value)} disabled={positions.length === 0} className={inputCls + " disabled:opacity-60"}>
-                <option value="">—</option>
-                {positions.map((p) => <option key={p.id} value={p.name}>{p.name}</option>)}
-              </select>
-            </Field>
-            <Field label="Job Grade">
-              <select value={form.jobGrade} onChange={(e) => upd("jobGrade", e.target.value)} className={inputCls}>
-                <option value="">—</option>
-                {jobGrades.filter((g) => g.active !== false || g.name_en === form.jobGrade).map((g) => (
-                  <option key={g.id} value={g.name_en}>{g.name_en} {g.name_ar ? `(${g.name_ar})` : ""}</option>
-                ))}
-              </select>
-            </Field>
-            <Field label={t("costCenter" as any) ?? "Cost Center"}>
-              <select value={form.costCenterId} onChange={(e) => upd("costCenterId", e.target.value)} className={inputCls}>
-                <option value="">—</option>
-                {costCenters.filter((c) => c.status === "active" || c.id === form.costCenterId).map((c) => (
-                  <option key={c.id} value={c.id}>#{c.code} - {c.name_en} {c.name_ar ? `(${c.name_ar})` : ""}</option>
-                ))}
-              </select>
-            </Field>
-            <Field label={t("shift" as any) ?? "Shift"}>
-              <select value={form.shiftId} onChange={(e) => upd("shiftId", e.target.value)} className={inputCls}>
-                <option value="">—</option>
-                {shifts.filter((s) => s.is_active !== false || s.id === form.shiftId).map((s) => (
-                  <option key={s.id} value={s.id}>{s.name} ({s.start_time} - {s.end_time})</option>
-                ))}
-              </select>
-            </Field>
-            <Field label={t("gender")}>
-              <select value={form.gender} onChange={(e) => upd("gender", e.target.value)} className={inputCls}>
-                <option value="">—</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-              </select>
-            </Field>
-            <Field label="Manager" error={fieldErrors.manager}>
-              <select value={form.manager} onChange={(e) => upd("manager", e.target.value)} className={inputCls}>
-                <option value="">—</option>
-                {managers.map((emp) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
-              </select>
-            </Field>
-            <label className="block">
-              <span className="mb-1 flex items-center justify-between text-xs font-medium text-muted-foreground">
-                National ID
-                <label className="flex cursor-pointer items-center gap-1.5">
-                  <input type="checkbox" checked={form.isPassport} onChange={(e) => { upd("isPassport", e.target.checked); handleBlur("nationalId"); }} className="rounded border-input text-brand focus:ring-brand" />
-                  Passport
+          </FormSection>
+
+          {/* Section 2: Employment Data */}
+          <FormSection
+            id="job"
+            icon={Building2}
+            iconBg="bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
+            title="Employment Data"
+            subtitle="Department assignment, organizational hierarchy, contract terms, cost center, and reporting line"
+            errorCount={(fieldErrors.dept ? 1 : 0) + (fieldErrors.manager ? 1 : 0) + (fieldErrors.contractType ? 1 : 0)}
+          >
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Field label="Department *" error={fieldErrors.dept}>
+                <select value={form.dept} onChange={(e) => {
+                  upd("dept", e.target.value);
+                  upd("sectionId", "");
+                }} disabled={departments.length === 0} className={inputCls + " disabled:opacity-60"}>
+                  <option value="">— Select Department —</option>
+                  {departments.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
+                </select>
+              </Field>
+              <Field label="Section / Level">
+                {(() => {
+                  const selectedDeptId = departments.find((d) => d.name === form.dept)?.id;
+                  const filteredSections = selectedDeptId ? sections.filter((s) => s.department_id === selectedDeptId) : sections;
+                  return (
+                    <select value={form.sectionId} onChange={(e) => {
+                      upd("sectionId", e.target.value);
+                      const sec = sections.find((s) => s.id === e.target.value);
+                      if (sec && !form.dept) {
+                        const d = departments.find((dept) => dept.id === sec.department_id);
+                        if (d) upd("dept", d.name);
+                      }
+                    }} className={inputCls}>
+                      <option value="">— Select Section —</option>
+                      {filteredSections.map((s) => <option key={s.id} value={s.id}>{s.name_en}</option>)}
+                    </select>
+                  );
+                })()}
+              </Field>
+              <Field label="Position">
+                <select value={form.position} onChange={(e) => upd("position", e.target.value)} disabled={positions.length === 0} className={inputCls + " disabled:opacity-60"}>
+                  <option value="">— Select Position —</option>
+                  {positions.map((p) => <option key={p.id} value={p.name}>{p.name}</option>)}
+                </select>
+              </Field>
+              <Field label="Job Grade">
+                <select value={form.jobGrade} onChange={(e) => upd("jobGrade", e.target.value)} className={inputCls}>
+                  <option value="">— Select Grade —</option>
+                  {jobGrades.filter((g) => g.active !== false || g.name_en === form.jobGrade).map((g) => (
+                    <option key={g.id} value={g.name_en}>{g.name_en} {g.name_ar ? `(${g.name_ar})` : ""}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Direct Manager" error={fieldErrors.manager}>
+                <select value={form.manager} onChange={(e) => upd("manager", e.target.value)} className={inputCls}>
+                  <option value="">— Select Manager —</option>
+                  {managers.map((emp) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
+                </select>
+              </Field>
+              <Field label="Contract Type *" error={fieldErrors.contractType}>
+                <select value={form.contractType} onChange={(e) => upd("contractType", e.target.value)} className={inputCls}>
+                  <option value="FullTime">Full-time</option>
+                  <option value="PartTime">Part-time</option>
+                  <option value="Temporary">Temporary</option>
+                  <option value="Internship">Internship</option>
+                  <option value="Probation3M">Probation (3 months)</option>
+                </select>
+              </Field>
+              <Field label="Contract Start Date">
+                <DateInput
+                  value={contractStartDate}
+                  onChange={setContractStartDate}
+                  className={inputCls + " font-mono"}
+                />
+              </Field>
+              <Field label="Contract End Date">
+                <DateInput
+                  value={contractEndDate}
+                  onChange={setContractEndDate}
+                  className={inputCls + " font-mono"}
+                />
+              </Field>
+              <Field label={t("shift" as any) ?? "Shift"}>
+                <select value={form.shiftId} onChange={(e) => upd("shiftId", e.target.value)} className={inputCls}>
+                  <option value="">— Select Shift —</option>
+                  {shifts.filter((s) => s.is_active !== false || s.id === form.shiftId).map((s) => (
+                    <option key={s.id} value={s.id}>{s.name} ({s.start_time} - {s.end_time})</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label={t("costCenter" as any) ?? "Cost Center"}>
+                <select value={form.costCenterId} onChange={(e) => upd("costCenterId", e.target.value)} className={inputCls}>
+                  <option value="">— Select Cost Center —</option>
+                  {costCenters.filter((c) => c.status === "active" || c.id === form.costCenterId).map((c) => (
+                    <option key={c.id} value={c.id}>#{c.code} - {c.name_en} {c.name_ar ? `(${c.name_ar})` : ""}</option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+          </FormSection>
+
+
+
+
+          {/* Section 5: Compensation & Targets */}
+          <FormSection
+            id="compensation"
+            icon={Banknote}
+            iconBg="bg-teal-500/10 text-teal-600 dark:text-teal-400"
+            title="Compensation & Targets"
+            subtitle="Salary computation basis, gross/net earnings, allowances, and target expectations"
+            errorCount={(fieldErrors.salary ? 1 : 0) + (fieldErrors.salaryMode ? 1 : 0) + (fieldErrors.target ? 1 : 0)}
+          >
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <Field label="Salary Basis" error={fieldErrors.salaryMode}>
+                <select value={form.salaryMode} onChange={(e) => upd("salaryMode", e.target.value as any)} className={inputCls}>
+                  <option value="gross">Gross</option>
+                  <option value="net">Net</option>
+                </select>
+              </Field>
+              <Field label="Salary Gross (EGP)" error={form.salaryMode === "gross" ? fieldErrors.salary : undefined}>
+                <input
+                  type="number"
+                  min={0}
+                  readOnly={form.salaryMode === "net"}
+                  value={form.salaryGross || ""}
+                  onChange={(e) => {
+                    const { gross, net } = computeSalaryPair(Number(e.target.value), "gross");
+                    upd("salaryGross", gross);
+                    upd("salaryNet", net);
+                    upd("salary", gross);
+                  }}
+                  placeholder="0"
+                  className={inputCls + " font-mono" + (form.salaryMode === "net" ? " bg-muted/40 text-muted-foreground" : "")}
+                />
+              </Field>
+              <Field label="Salary Net (EGP)" error={form.salaryMode === "net" ? fieldErrors.salary : undefined}>
+                <input
+                  type="number"
+                  min={0}
+                  readOnly={form.salaryMode === "gross"}
+                  value={form.salaryNet || ""}
+                  onChange={(e) => {
+                    const { gross, net } = computeSalaryPair(Number(e.target.value), "net");
+                    upd("salaryNet", net);
+                    upd("salaryGross", gross);
+                    upd("salary", net);
+                  }}
+                  placeholder="0"
+                  className={inputCls + " font-mono" + (form.salaryMode === "gross" ? " bg-muted/40 text-muted-foreground" : "")}
+                />
+              </Field>
+              <Field label="Allowance (EGP)">
+                <input type="number" min={0} value={form.allowance || ""} onChange={(e) => upd("allowance", Number(e.target.value))} placeholder="0" className={inputCls + " font-mono"} />
+              </Field>
+              <Field label="Target Value" error={fieldErrors.target}>
+                <input type="number" min={0} value={form.target || ""} onChange={(e) => upd("target", Number(e.target.value))} placeholder="20" className={inputCls + " font-mono"} />
+              </Field>
+              <Field label="Target Duration">
+                <select value={form.targetDuration} onChange={(e) => upd("targetDuration", e.target.value)} className={inputCls}>
+                  {["Daily", "Weekly", "Monthly", "Quarterly", "Yearly"].map((d) => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </Field>
+              <Field label={t("bankName" as any) || "Bank Name"}>
+                <input
+                  type="text"
+                  value={form.bankName}
+                  onChange={(e) => upd("bankName", e.target.value)}
+                  placeholder="e.g. CIB, QNB, NBE..."
+                  className={inputCls}
+                />
+              </Field>
+              <Field label={t("bankAccountNumber" as any) || "Bank Account Number"}>
+                <input
+                  type="text"
+                  value={form.bankAccountNumber}
+                  onChange={(e) => upd("bankAccountNumber", e.target.value)}
+                  placeholder="e.g. 100023456789 or IBAN"
+                  className={inputCls + " font-mono"}
+                />
+              </Field>
+            </div>
+          </FormSection>
+
+          {/* Section 6: Insurance & Compliance */}
+          <FormSection
+            id="insurance"
+            icon={ShieldCheck}
+            iconBg="bg-purple-500/10 text-purple-600 dark:text-purple-400"
+            title="Insurance & Compliance"
+            subtitle="Medical coverage, social insurance registration, military status, and quotas"
+          >
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <Field label={t("medicalInsuranceType")}>
+                <select value={form.medicalInsuranceType} onChange={(e) => upd("medicalInsuranceType", e.target.value as any)} className={inputCls}>
+                  <option value="">—</option>
+                  <option value="Private">{t("insurancePrivate")}</option>
+                  <option value="Governmental">{t("insuranceGovernmental")}</option>
+                </select>
+              </Field>
+              <Field label={t("medicalInsuranceNumber")}>
+                <input value={form.medicalInsuranceNumber} onChange={(e) => upd("medicalInsuranceNumber", e.target.value)} className={inputCls} placeholder="e.g. MED-123456" />
+              </Field>
+              <Field label="Medical Insurance Details">
+                <input value={form.medicalInsuranceDetails} onChange={(e) => upd("medicalInsuranceDetails", e.target.value)} placeholder="Coverage level, network, etc." className={inputCls} />
+              </Field>
+              <Field label="Social Insurance Date">
+                <DateInput
+                  value={form.socialInsuranceDate}
+                  onChange={(d) => upd("socialInsuranceDate", d)}
+                  className={inputCls + " font-mono"}
+                />
+              </Field>
+              <Field label="Military Expire Date">
+                <DateInput
+                  value={form.militaryExpireDate}
+                  onChange={(d) => upd("militaryExpireDate", d)}
+                  className={inputCls + " font-mono"}
+                />
+              </Field>
+              <div className="sm:col-span-2 lg:col-span-3 flex flex-wrap items-center gap-3 pt-2">
+                <label className="inline-flex cursor-pointer items-center gap-2.5 rounded-xl border border-border/80 bg-muted/20 px-3.5 py-2.5 text-xs font-medium text-foreground hover:bg-muted/40 transition-colors">
+                  <input type="checkbox" className="h-4 w-4 accent-brand rounded" checked={form.isInsured} onChange={(e) => upd("isInsured", e.target.checked)} />
+                  <span>Is Insured (مسجل تأمينياً)</span>
                 </label>
-              </span>
-              <input value={form.nationalId} onChange={(e) => { upd("nationalId", e.target.value); handleBlur("nationalId"); }} onBlur={() => handleBlur("nationalId")} maxLength={form.isPassport ? 15 : 14} className={inputCls + " font-mono" + (fieldErrors.nationalId ? " border-destructive" : "")} placeholder={form.isPassport ? "Passport Number" : "14-digit National ID"} />
-              {fieldErrors.nationalId && <p className="mt-1 text-[11px] text-destructive">{fieldErrors.nationalId}</p>}
-            </label>
-            <Field label="ID Issue Date">
-              <DateInput
-                value={form.idIssueDate}
-                onChange={(d) => {
-                  upd("idIssueDate", d);
-                  if (d) {
-                    const exp = new Date(d);
-                    exp.setFullYear(exp.getFullYear() + 7);
-                    exp.setDate(exp.getDate() - 1);
-                    upd("nationalIdExpiry", exp.toISOString().slice(0, 10));
-                  }
-                }}
-                className={inputCls + " font-mono"}
-              />
-            </Field>
-            <Field label="ID Expiry Date" error={fieldErrors.nationalIdExpiry}>
-              <DateInput
-                value={form.nationalIdExpiry}
-                onChange={(d) => upd("nationalIdExpiry", d)}
-                onBlur={() => handleBlur("nationalIdExpiry")}
-                className={inputCls + " font-mono"}
-              />
-            </Field>
-            <Field label="Address on ID">
-              <input value={form.idCardAddress} onChange={(e) => upd("idCardAddress", e.target.value)} maxLength={200} placeholder="As written on national ID" className={inputCls} />
-            </Field>
-            <Field label="Contract Type" error={fieldErrors.contractType}>
-              <select value={form.contractType} onChange={(e) => upd("contractType", e.target.value)} className={inputCls}>
-                <option value="FullTime">Full-time</option>
-                <option value="PartTime">Part-time</option>
-                <option value="Temporary">Temporary</option>
-                <option value="Internship">Internship</option>
-                <option value="Probation3M">Probation (3 months)</option>
-              </select>
-            </Field>
-            <Field label="Contract Start Date">
-              <DateInput
-                value={contractStartDate}
-                onChange={setContractStartDate}
-                className={inputCls + " font-mono"}
-              />
-            </Field>
-            <Field label="Contract End Date">
-              <DateInput
-                value={contractEndDate}
-                onChange={setContractEndDate}
-                className={inputCls + " font-mono"}
-              />
-            </Field>
-            <label className="hidden items-center gap-2 text-xs text-muted-foreground md:col-span-1">
-              <input type="checkbox" className="h-4 w-4 accent-brand" checked={contractCancelled} onChange={(e) => setContractCancelled(e.target.checked)} />
-              Contract cancelled
-            </label>
+                <label className="inline-flex cursor-pointer items-center gap-2.5 rounded-xl border border-border/80 bg-muted/20 px-3.5 py-2.5 text-xs font-medium text-foreground hover:bg-muted/40 transition-colors">
+                  <input type="checkbox" className="h-4 w-4 accent-brand rounded" checked={form.isFivePercent} onChange={(e) => upd("isFivePercent", e.target.checked)} />
+                  <span>5% Quota Disability (نسبة الـ 5% ذوي الاحتياجات)</span>
+                </label>
+              </div>
+            </div>
+          </FormSection>
 
-            <Field label={t("medicalInsuranceType")}>
-              <select value={form.medicalInsuranceType} onChange={(e) => upd("medicalInsuranceType", e.target.value as any)} className={inputCls}>
-                <option value="">—</option>
-                <option value="Private">{t("insurancePrivate")}</option>
-                <option value="Governmental">{t("insuranceGovernmental")}</option>
-              </select>
-            </Field>
-            <Field label={t("medicalInsuranceNumber")}>
-              <input value={form.medicalInsuranceNumber} onChange={(e) => upd("medicalInsuranceNumber", e.target.value)} className={inputCls} placeholder="e.g. MED-123456" />
-            </Field>
-            <Field label="Medical Insurance Details"><input value={form.medicalInsuranceDetails} onChange={(e) => upd("medicalInsuranceDetails", e.target.value)} className={inputCls} /></Field>
-
-            <Field label="Social Insurance Date">
-              <DateInput
-                value={form.socialInsuranceDate}
-                onChange={(d) => upd("socialInsuranceDate", d)}
-                className={inputCls + " font-mono"}
-              />
-            </Field>
-            <Field label="Military Expire Date">
-              <DateInput
-                value={form.militaryExpireDate}
-                onChange={(d) => upd("militaryExpireDate", d)}
-                className={inputCls + " font-mono"}
-              />
-            </Field>
-            <div className="md:col-span-4 space-y-3">
+          {/* Section 7: Custom Fields & Notes */}
+          <FormSection
+            id="custom"
+            icon={Sparkles}
+            iconBg="bg-pink-500/10 text-pink-600 dark:text-pink-400"
+            title="Custom Fields & Notes"
+            subtitle="Additional dynamic metadata, arbitrary attributes, and employee notes"
+          >
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <label className="block text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Custom Notes / Fields</label>
+                <span className="text-xs text-muted-foreground">Add arbitrary custom key-value pairs or notes</span>
                 <button type="button" onClick={() => {
                   let arr: any[] = [];
                   try {
@@ -1416,11 +1716,11 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
                   }
                   arr.push({ id: safeRandomUUID(), title: "", details: "", type: "text", value: "" });
                   upd("customField", JSON.stringify(arr));
-                }} className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-1 text-[10px] font-semibold hover:bg-muted">
+                }} className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-3 py-1 text-xs font-semibold hover:bg-muted transition-colors shadow-2xs">
                   <Plus className="h-3 w-3" /> Add Field
                 </button>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 {(() => {
                   let arr = [];
                   try {
@@ -1432,20 +1732,20 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
                     }
                   }
 
-                  if (arr.length === 0) return <p className="text-xs text-muted-foreground italic">No custom fields added.</p>;
+                  if (arr.length === 0) return <p className="text-xs text-muted-foreground italic py-2">No custom fields added yet.</p>;
 
                   return arr.map((f: any, i: number) => (
-                    <div key={f.id || i} className="flex gap-2 items-start rounded-xl border border-border bg-muted/10 p-3">
+                    <div key={f.id || i} className="flex gap-2 items-start rounded-xl border border-border/80 bg-muted/15 p-3">
                       <div className="grid flex-1 grid-cols-2 gap-3 sm:grid-cols-4">
                         <label className="block">
                           <span className="mb-1 block text-[10px] font-medium uppercase text-muted-foreground">Title</span>
-                          <input className={inputCls} value={f.title || ""} onChange={(e) => {
+                          <input className={inputCls} placeholder="e.g. Uniform Size" value={f.title || ""} onChange={(e) => {
                             const newArr = [...arr]; newArr[i].title = e.target.value; upd("customField", JSON.stringify(newArr));
                           }} />
                         </label>
                         <label className="block">
                           <span className="mb-1 block text-[10px] font-medium uppercase text-muted-foreground">Details</span>
-                          <input className={inputCls} value={f.details || ""} onChange={(e) => {
+                          <input className={inputCls} placeholder="Optional hint" value={f.details || ""} onChange={(e) => {
                             const newArr = [...arr]; newArr[i].details = e.target.value; upd("customField", JSON.stringify(newArr));
                           }} />
                         </label>
@@ -1475,7 +1775,7 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
                       <button type="button" onClick={() => {
                         const newArr = arr.filter((_: any, idx: number) => idx !== i);
                         upd("customField", JSON.stringify(newArr));
-                      }} className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive self-center">
+                      }} className="rounded p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive self-center transition-colors">
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
@@ -1483,76 +1783,19 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
                 })()}
               </div>
             </div>
-            <div className="col-span-full border-t border-border mt-2 mb-2"></div>
-            <Field label="Salary Basis" error={fieldErrors.salaryMode}>
-              <select value={form.salaryMode} onChange={(e) => upd("salaryMode", e.target.value as any)} className={inputCls}>
-                <option value="gross">Gross</option>
-                <option value="net">Net</option>
-              </select>
-            </Field>
-            <Field label="Salary Gross (EGP)" error={form.salaryMode === "gross" ? fieldErrors.salary : undefined}>
-              <input
-                type="number"
-                min={0}
-                readOnly={form.salaryMode === "net"}
-                value={form.salaryGross || ""}
-                onChange={(e) => {
-                  const { gross, net } = computeSalaryPair(Number(e.target.value), "gross");
-                  upd("salaryGross", gross);
-                  upd("salaryNet", net);
-                  upd("salary", gross);
-                }}
-                className={inputCls + " font-mono" + (form.salaryMode === "net" ? " bg-muted/40 text-muted-foreground" : "")}
-              />
-            </Field>
-            <Field label="Salary Net (EGP)" error={form.salaryMode === "net" ? fieldErrors.salary : undefined}>
-              <input
-                type="number"
-                min={0}
-                readOnly={form.salaryMode === "gross"}
-                value={form.salaryNet || ""}
-                onChange={(e) => {
-                  const { gross, net } = computeSalaryPair(Number(e.target.value), "net");
-                  upd("salaryNet", net);
-                  upd("salaryGross", gross);
-                  upd("salary", net);
-                }}
-                className={inputCls + " font-mono" + (form.salaryMode === "gross" ? " bg-muted/40 text-muted-foreground" : "")}
-              />
-            </Field>
-            <Field label="Allowance (EGP)">
-              <input type="number" min={0} value={form.allowance || ""} onChange={(e) => upd("allowance", Number(e.target.value))} className={inputCls + " font-mono"} />
-            </Field>
-            <Field label="Target Value" error={fieldErrors.target}>
-              <input type="number" min={0} value={form.target || ""} onChange={(e) => upd("target", Number(e.target.value))} className={inputCls + " font-mono"} />
-            </Field>
-            <Field label="Target Duration">
-              <select value={form.targetDuration} onChange={(e) => upd("targetDuration", e.target.value)} className={inputCls}>
-                {["Daily", "Weekly", "Monthly", "Quarterly", "Yearly"].map((d) => <option key={d} value={d}>{d}</option>)}
-              </select>
-            </Field>
-            <div className="flex h-full items-center pt-5">
-              <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-foreground">
-                <input type="checkbox" className="h-4 w-4 accent-brand" checked={form.isFivePercent} onChange={(e) => upd("isFivePercent", e.target.checked)} />
-                5% Quota (Disability)
-              </label>
+          </FormSection>
+
+          {err && (
+            <div className="flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-xs text-destructive">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>{err}</span>
             </div>
-            <div className="flex h-full items-center pt-5">
-              <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-foreground">
-                <input type="checkbox" className="h-4 w-4 accent-brand" checked={form.isInsured} onChange={(e) => upd("isInsured", e.target.checked)} />
-                Is Insured
-              </label>
-            </div>
-            <label className="inline-flex items-center gap-2 text-xs text-muted-foreground md:col-span-2">
-              <input type="checkbox" className="h-4 w-4 accent-brand" checked={allowPastExpiry} onChange={(e) => setAllowPastExpiry(e.target.checked)} />
-              Override: allow expiry date in the past (admin/HR only)
-            </label>
-          </div>
-          {err && <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{err}</p>}
+          )}
         </form>
-        <div className="mt-4 flex gap-2 border-t border-border pt-3">
-          <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-border bg-card py-2.5 text-sm font-semibold">{t("cancel")}</button>
-          <button type="button" onClick={submit as any} disabled={setupIncomplete} className="flex-1 rounded-xl bg-gradient-brand py-2.5 text-sm font-semibold text-brand-foreground shadow-brand disabled:opacity-50 disabled:cursor-not-allowed">{t("create")}</button>
+
+        <div className="mt-4 flex shrink-0 gap-2 border-t border-border pt-3">
+          <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-border bg-card py-2.5 text-sm font-semibold hover:bg-muted transition-colors">{t("cancel")}</button>
+          <button type="button" onClick={submit as any} disabled={setupIncomplete} className="flex-1 rounded-xl bg-gradient-brand py-2.5 text-sm font-semibold text-brand-foreground shadow-brand disabled:opacity-50 disabled:cursor-not-allowed transition-all">{t("create")}</button>
         </div>
       </div>
     </div>
@@ -1697,6 +1940,10 @@ type ExtraHr = {
   isInsured: boolean;
   militaryExpireDate: string; isFivePercent: boolean; socialInsuranceDate: string;
   customField: string;
+  graduationId: string;
+  majorId: string;
+  bankName: string;
+  bankAccountNumber: string;
 };
 type StoredDoc = { name: string; type: string; size: number; dataUrl: string };
 
@@ -1808,11 +2055,13 @@ function initials(name: string) {
 }
 
 const TEMPLATE_COLS = [
-  "empCode", "name", "email", "phone", "dept", "role", "branch", "status",
-  "salary", "salaryMode", "allowance", "target", "targetDuration", "password",
+  "empCode", "name", "nameAr", "email", "phone", "dept", "position", "jobGrade", "graduation", "major",
+  "role", "branch", "status",
+  "salary", "salaryMode", "allowance", "target", "targetDuration",
+  "bankName", "bankAccountNumber", "password",
   "personalPhone", "gender", "nationalId", "idIssueDate", "nationalIdExpiry", "idCardAddress",
   "country", "city", "district", "street", "building", "flat",
-  "position", "contractType", "manager", "avatarUrl", "notes",
+  "contractType", "medicalInsuranceType", "medicalInsuranceNumber", "manager", "avatarUrl", "notes",
 ] as const;
 
 function ImportExcelBar() {
@@ -1823,19 +2072,53 @@ function ImportExcelBar() {
   async function downloadTemplate() {
     const XLSX = await import("xlsx");
     const sample = [{
-      empCode: "INT-042", name: "Jane Doe", email: "jane@int.app", phone: "+20 100 123 4567",
-      dept: "Engineering", role: "employee", branch: locations[0]?.name ?? "Cairo HQ",
-      status: "Active", salary: 15000, salaryMode: "gross", allowance: 1500, target: 20,
-      targetDuration: "Monthly", password: "changeme",
-      personalPhone: "+20 100 765 4321", gender: "Female",
-      nationalId: "29001011234567", idIssueDate: "2020-01-01",
-      nationalIdExpiry: "2030-01-01", idCardAddress: "12 Road 9, Maadi, Cairo",
-      country: "Egypt", city: "Cairo", district: "Maadi", street: "Road 9",
-      building: "12", flat: "3", position: "Senior Developer",
-      contractType: "FullTime", manager: "", avatarUrl: "", notes: "",
+      empCode: "INT-042",
+      name: "Hafez Rahim",
+      nameAr: "حافظ رحيم",
+      email: "Hafez@int.app",
+      phone: "+20 100 741 9344",
+      dept: "Engineering",
+      position: "Senior Developer",
+      jobGrade: "Grade A",
+      graduation: "Bachelor of Computer Science",
+      major: "Software Engineering",
+      role: "employee",
+      branch: locations[0]?.name ?? "Cairo HQ",
+      status: "Active",
+      salary: 15000,
+      salaryMode: "gross",
+      allowance: 1500,
+      target: 20,
+      targetDuration: "Monthly",
+      bankName: "CIB",
+      bankAccountNumber: "100023456789",
+      password: "changeme",
+      personalPhone: "+20 100 765 4321",
+      gender: "Female",
+      nationalId: "29001011234567",
+      idIssueDate: "2020-01-01",
+      nationalIdExpiry: "2030-01-01",
+      idCardAddress: "12 Road 9, Maadi, Cairo",
+      country: "Egypt",
+      city: "Cairo",
+      district: "Maadi",
+      street: "Road 9",
+      building: "12",
+      flat: "3",
+      contractType: "FullTime",
+      medicalInsuranceType: "Private",
+      medicalInsuranceNumber: "MED-123456",
+      manager: "",
+      avatarUrl: "",
+      notes: "",
     }];
     const ws = XLSX.utils.json_to_sheet(sample, { header: [...TEMPLATE_COLS] });
-    ws["!cols"] = TEMPLATE_COLS.map(() => ({ wch: 16 }));
+    ws["!cols"] = TEMPLATE_COLS.map((col) => {
+      if (["email", "idCardAddress", "graduation", "major", "notes"].includes(col)) return { wch: 26 };
+      if (["name", "nameAr", "bankAccountNumber", "medicalInsuranceNumber", "position"].includes(col)) return { wch: 20 };
+      if (["phone", "personalPhone", "nationalId", "idIssueDate", "nationalIdExpiry"].includes(col)) return { wch: 16 };
+      return { wch: 14 };
+    });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Employees");
     XLSX.writeFile(wb, "employees_template.xlsx");
@@ -1971,19 +2254,53 @@ function ImportExcelButtonsOnly() {
   async function downloadTemplate() {
     const XLSX = await import("xlsx");
     const sample = [{
-      empCode: "INT-042", name: "Jane Doe", email: "jane@int.app", phone: "+20 100 123 4567",
-      dept: "Engineering", role: "employee", branch: locations[0]?.name ?? "Cairo HQ",
-      status: "Active", salary: 15000, salaryMode: "gross", allowance: 1500, target: 20,
-      targetDuration: "Monthly", password: "changeme",
-      personalPhone: "+20 100 765 4321", gender: "Female",
-      nationalId: "29001011234567", idIssueDate: "2020-01-01",
-      nationalIdExpiry: "2030-01-01", idCardAddress: "12 Road 9, Maadi, Cairo",
-      country: "Egypt", city: "Cairo", district: "Maadi", street: "Road 9",
-      building: "12", flat: "3", position: "Senior Developer",
-      contractType: "FullTime", manager: "", avatarUrl: "", notes: "",
+      empCode: "INT-042",
+      name: "Hafez Rahim",
+      nameAr: "حافظ رحيم",
+      email: "Hafez@int.app",
+      phone: "+20 100 741 9344",
+      dept: "Engineering",
+      position: "Senior Developer",
+      jobGrade: "Grade A",
+      graduation: "Bachelor of Computer Science",
+      major: "Software Engineering",
+      role: "employee",
+      branch: locations[0]?.name ?? "Cairo HQ",
+      status: "Active",
+      salary: 15000,
+      salaryMode: "gross",
+      allowance: 1500,
+      target: 20,
+      targetDuration: "Monthly",
+      bankName: "CIB",
+      bankAccountNumber: "100023456789",
+      password: "changeme",
+      personalPhone: "+20 100 765 4321",
+      gender: "Female",
+      nationalId: "29001011234567",
+      idIssueDate: "2020-01-01",
+      nationalIdExpiry: "2030-01-01",
+      idCardAddress: "12 Road 9, Maadi, Cairo",
+      country: "Egypt",
+      city: "Cairo",
+      district: "Maadi",
+      street: "Road 9",
+      building: "12",
+      flat: "3",
+      contractType: "FullTime",
+      medicalInsuranceType: "Private",
+      medicalInsuranceNumber: "MED-123456",
+      manager: "",
+      avatarUrl: "",
+      notes: "",
     }];
     const ws = XLSX.utils.json_to_sheet(sample, { header: [...TEMPLATE_COLS] });
-    ws["!cols"] = TEMPLATE_COLS.map(() => ({ wch: 16 }));
+    ws["!cols"] = TEMPLATE_COLS.map((col) => {
+      if (["email", "idCardAddress", "graduation", "major", "notes"].includes(col)) return { wch: 26 };
+      if (["name", "nameAr", "bankAccountNumber", "medicalInsuranceNumber", "position"].includes(col)) return { wch: 20 };
+      if (["phone", "personalPhone", "nationalId", "idIssueDate", "nationalIdExpiry"].includes(col)) return { wch: 16 };
+      return { wch: 14 };
+    });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Employees");
     XLSX.writeFile(wb, "employees_template.xlsx");

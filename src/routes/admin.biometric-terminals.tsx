@@ -71,7 +71,7 @@ function TerminalsPage() {
     }
     return [...m.entries()];
   }, [data, locFilter]);
-  const locName = (id: string) => locations.find((l) => l.id === id)?.name ?? "No location";
+  const locName = (id: string) => locations.find((l: any) => l.id === id)?.name ?? "No location";
   const inp = "w-full rounded-xl border border-border bg-background px-3 py-2 text-sm";
 
   return (
@@ -89,7 +89,7 @@ function TerminalsPage() {
         <div className="flex gap-2">
           <select value={locFilter} onChange={(e) => setLocFilter(e.target.value)} className="rounded-xl border border-border bg-card px-3 py-2 text-xs">
             <option value="all">All locations</option>
-            {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+            {locations.map((l: any) => <option key={l.id} value={l.id}>{l.name}</option>)}
           </select>
           <button onClick={() => { setFormErr(null); setForm({ ...EMPTY }); }} className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground">
             <Plus className="h-3.5 w-3.5" /> Register device
@@ -124,7 +124,7 @@ function TerminalsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {list.map((t) => (
+                {list.map((t: any) => (
                   <tr key={t.id}>
                     <td className="px-4 py-2.5">
                       <p className="font-medium">{t.name}</p>
@@ -177,7 +177,7 @@ function TerminalsPage() {
             <label className="block text-xs font-medium">Location
               <select className={inp} value={form.locationId} onChange={(e) => setForm({ ...form, locationId: e.target.value })}>
                 <option value="">Choose a location…</option>
-                {locations.map((l) => <option key={l.id} value={l.id}>{l.name}{l.active ? "" : " (inactive)"}</option>)}
+                {locations.map((l: any) => <option key={l.id} value={l.id}>{l.name}{l.active ? "" : " (inactive)"}</option>)}
               </select>
             </label>
             <label className="block text-xs font-medium">Notes<textarea className={inp} rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></label>
@@ -217,7 +217,7 @@ function ActivityDialog({ code, name, onClose }: { code: string; name: string; o
               {isLoading && <tr><td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">Loading…</td></tr>}
               {error && <tr><td colSpan={5} className="px-3 py-6 text-center text-destructive">{(error as Error).message}</td></tr>}
               {!isLoading && !error && data.length === 0 && <tr><td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">No activity recorded for this device.</td></tr>}
-              {data.map((a) => (
+              {data.map((a: any) => (
                 <tr key={a.id}>
                   <td className="px-3 py-2 font-mono whitespace-nowrap">{fmt(a.at)}</td>
                   <td className="px-3 py-2">{a.employee}</td>

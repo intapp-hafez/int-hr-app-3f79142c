@@ -54,9 +54,10 @@ function EmployeeLayout() {
     <div dir={dir} className="min-h-screen bg-muted/40">
       {/* Mobile-first frame, centered on larger screens */}
       <div className="mx-auto flex min-h-screen max-w-md flex-col bg-background shadow-soft">
-        <header className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-background/80 px-4 py-3 backdrop-blur">
-          <Link to="/"><AppLogo size={24} /></Link>
-          <div className="flex items-center gap-2">
+        <header className="sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-border bg-background/80 px-4 py-3 backdrop-blur">
+          <Link to="/" className="shrink-0"><AppLogo size={24} withWordmark={false} /></Link>
+          <LanguageToggle compact />
+          <div className="flex items-center gap-2 shrink-0">
             <Link
               to="/employee/chat"
               aria-label="Messages & Chat"
@@ -81,7 +82,6 @@ function EmployeeLayout() {
                 </span>
               )}
             </Link>
-            <LanguageToggle />
             <UserMenu size="sm" />
           </div>
         </header>

@@ -30,6 +30,8 @@ export type AdminEmployeeRow = {
   job_grade: string | null;
   medical_insurance_number?: string | null;
   medical_insurance_type?: string | null;
+  bank_name?: string | null;
+  bank_account_number?: string | null;
 };
 
 const SORT_COLS = ["full_name", "email", "created_at", "status", "contract_end_date", "contract_remaining"] as const;
@@ -57,19 +59,43 @@ function isStrictIsoDate(value: string) {
 const ImportEmployeeRowSchema = z.object({
   empCode: z.string().max(40).optional().default(""),
   name: z.string().max(120).optional().default(""),
+  nameAr: z.string().max(120).optional().default(""),
   email: z.string().max(160).optional().default(""),
   phone: z.string().max(40).optional().default(""),
   dept: z.string().max(120).optional().default(""),
   role: z.string().max(40).optional().default("employee"),
+  branch: z.string().max(120).optional().default(""),
   status: z.string().max(20).optional().default("Active"),
+  salary: z.union([z.number(), z.string()]).optional().default(0),
+  salaryMode: z.string().max(20).optional().default("gross"),
+  allowance: z.union([z.number(), z.string()]).optional().default(0),
+  target: z.union([z.number(), z.string()]).optional().default(20),
+  targetDuration: z.string().max(20).optional().default("Monthly"),
+  bankName: z.string().max(120).optional().default(""),
+  bankAccountNumber: z.string().max(120).optional().default(""),
   password: z.string().max(128).optional().default(""),
+  personalPhone: z.string().max(40).optional().default(""),
+  gender: z.string().max(20).optional().default(""),
   nationalId: z.string().max(40).optional().default(""),
   idIssueDate: z.string().max(20).optional().default(""),
   nationalIdExpiry: z.string().max(20).optional().default(""),
+  idCardAddress: z.string().max(255).optional().default(""),
+  country: z.string().max(80).optional().default("Egypt"),
   city: z.string().max(120).optional().default(""),
   district: z.string().max(120).optional().default(""),
+  street: z.string().max(120).optional().default(""),
+  building: z.string().max(40).optional().default(""),
+  flat: z.string().max(40).optional().default(""),
   position: z.string().max(120).optional().default(""),
+  jobGrade: z.string().max(100).optional().default(""),
+  graduation: z.string().max(120).optional().default(""),
+  major: z.string().max(120).optional().default(""),
+  contractType: z.string().max(40).optional().default("FullTime"),
+  medicalInsuranceType: z.string().max(40).optional().default(""),
+  medicalInsuranceNumber: z.string().max(80).optional().default(""),
+  manager: z.string().max(120).optional().default(""),
   avatarUrl: z.string().max(800_000).optional().default(""),
+  notes: z.string().max(1000).optional().default(""),
 });
 
 export type ImportEmployeeResult = {
@@ -122,6 +148,10 @@ const CreateEmployeeSchema = z.object({
   isFivePercent: z.boolean().optional().default(false),
   socialInsuranceDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal("")).default(""),
   customField: z.string().max(1000).optional().default(""),
+  graduationId: z.string().uuid().optional().or(z.literal("")).default(""),
+  majorId: z.string().uuid().optional().or(z.literal("")).default(""),
+  bankName: z.string().max(120).optional().default(""),
+  bankAccountNumber: z.string().max(80).optional().default(""),
   loginUrl: z.string().min(1).max(500),
   appName: z.string().max(120).optional().default(""),
 });
@@ -294,6 +324,8 @@ export const listEmployeesAdmin = createServerFn({ method: "POST" })
       job_grade: p.job_grade ?? null,
       medical_insurance_number: p.medical_insurance_number ?? null,
       medical_insurance_type: p.medical_insurance_type ?? null,
+      bank_name: (p as any).bank_name ?? null,
+      bank_account_number: (p as any).bank_account_number ?? null,
       roles: (rolesRows ?? []).filter((r: any) => r.user_id === p.id).map((r: any) => String(r.role)),
     }));
 
@@ -355,6 +387,8 @@ export const updateEmployeeAdmin = createServerFn({ method: "POST" })
         is_five_percent: z.boolean().optional(),
         social_insurance_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional().or(z.literal("")),
         custom_field: z.string().max(10000).nullable().optional(),
+        bank_name: z.string().max(120).nullable().optional().or(z.literal("")),
+        bank_account_number: z.string().max(80).nullable().optional().or(z.literal("")),
       })
       .parse(input),
   )
@@ -429,6 +463,8 @@ export const updateEmployeeAdmin = createServerFn({ method: "POST" })
     if (data.is_five_percent !== undefined) patch.is_five_percent = data.is_five_percent;
     if (data.social_insurance_date !== undefined) patch.social_insurance_date = data.social_insurance_date === "" ? null : data.social_insurance_date;
     if (data.custom_field !== undefined) patch.custom_field = data.custom_field;
+    if (data.bank_name !== undefined) patch.bank_name = data.bank_name === "" ? null : data.bank_name;
+    if (data.bank_account_number !== undefined) patch.bank_account_number = data.bank_account_number === "" ? null : data.bank_account_number;
     if (
       patch.contract_start_date &&
       patch.contract_end_date &&
@@ -634,12 +670,26 @@ export const importEmployeesAdmin = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/backend/server/admin-client.server");
     const { sendWelcomeEmail } = await import("@/backend/server/welcome-email.server");
 
-    const [{ data: departments }, { data: positions }] = await Promise.all([
+    const [{ data: departments }, { data: positions }, { data: graduations }, { data: majors }] = await Promise.all([
       supabase.from("departments").select("id, name_en"),
       supabase.from("positions").select("id, name_en"),
+      (supabase as any).from("graduations").select("id, name_en, name_ar"),
+      (supabase as any).from("majors").select("id, name_en, name_ar"),
     ]);
     const departmentMap = new Map((departments ?? []).map((d: any) => [String(d.name_en).toLowerCase(), d.id]));
     const positionMap = new Map((positions ?? []).map((p: any) => [String(p.name_en).toLowerCase(), p.id]));
+    const graduationMap = new Map<string, string>();
+    for (const g of (graduations as any[]) ?? []) {
+      if (g.name_en) graduationMap.set(String(g.name_en).toLowerCase(), g.id);
+      if (g.name_ar) graduationMap.set(String(g.name_ar).toLowerCase(), g.id);
+      graduationMap.set(String(g.id).toLowerCase(), g.id);
+    }
+    const majorMap = new Map<string, string>();
+    for (const m of (majors as any[]) ?? []) {
+      if (m.name_en) majorMap.set(String(m.name_en).toLowerCase(), m.id);
+      if (m.name_ar) majorMap.set(String(m.name_ar).toLowerCase(), m.id);
+      majorMap.set(String(m.id).toLowerCase(), m.id);
+    }
 
     // Pre-fetch existing empCodes to detect duplicates against the database.
     const incomingCodes = data.employees
@@ -697,6 +747,12 @@ export const importEmployeesAdmin = createServerFn({ method: "POST" })
 
         const department_id = row.dept.trim() ? (departmentMap.get(row.dept.trim().toLowerCase()) ?? null) : null;
         const position_id = row.position.trim() ? (positionMap.get(row.position.trim().toLowerCase()) ?? null) : null;
+        const graduation_id = row.graduation.trim() ? (graduationMap.get(row.graduation.trim().toLowerCase()) ?? null) : null;
+        const major_id = row.major.trim() ? (majorMap.get(row.major.trim().toLowerCase()) ?? null) : null;
+        const rawSal = Number(row.salary) || 0;
+        const sMode = String(row.salaryMode ?? "gross").toLowerCase() === "net" ? "net" : "gross";
+        const salaryGross = sMode === "gross" ? rawSal : Math.round(rawSal / 0.9);
+        const salaryNet = sMode === "net" ? rawSal : Math.round(rawSal * 0.9);
         if (row.dept.trim() && !department_id) throw new Error(`Unknown department: ${row.dept}`);
         if (row.position.trim() && !position_id) throw new Error(`Unknown position: ${row.position}`);
 
@@ -722,6 +778,7 @@ export const importEmployeesAdmin = createServerFn({ method: "POST" })
           };
           fillIfEmpty("emp_code", empCode || null);
           fillIfEmpty("full_name", fullName);
+          fillIfEmpty("full_name_ar", row.nameAr.trim() || null);
           fillIfEmpty("phone", row.phone.trim() || null);
           fillIfEmpty("city", row.city.trim() || null);
           fillIfEmpty("district", row.district.trim() || null);
@@ -731,6 +788,28 @@ export const importEmployeesAdmin = createServerFn({ method: "POST" })
           fillIfEmpty("national_id", row.nationalId.trim() || null);
           fillIfEmpty("id_issue_date", row.idIssueDate.trim() || null);
           fillIfEmpty("id_expiry_date", row.nationalIdExpiry.trim() || null);
+          fillIfEmpty("bank_name", row.bankName.trim() || null);
+          fillIfEmpty("bank_account_number", row.bankAccountNumber.trim() || null);
+          fillIfEmpty("job_grade", row.jobGrade.trim() || null);
+          fillIfEmpty("graduation_id", graduation_id);
+          fillIfEmpty("major_id", major_id);
+          fillIfEmpty("medical_insurance_type", (row.medicalInsuranceType.trim() || null) as any);
+          fillIfEmpty("medical_insurance_number", row.medicalInsuranceNumber.trim() || null);
+          fillIfEmpty("salary_mode", sMode);
+          if (rawSal > 0) {
+            fillIfEmpty("salary_gross", salaryGross);
+            fillIfEmpty("salary_net", salaryNet);
+          }
+          if (Number(row.allowance) > 0) {
+            fillIfEmpty("allowance", Number(row.allowance));
+          }
+          if (Number(row.target) > 0) {
+            fillIfEmpty("target_value", Number(row.target));
+            fillIfEmpty("target_duration", row.targetDuration || "Monthly");
+          }
+          if (row.contractType.trim()) {
+            fillIfEmpty("contract_type", row.contractType.trim());
+          }
 
           if (Object.keys(patch).length > 0) {
             const { error: updErr } = await (supabaseAdmin.from("profiles") as any)
@@ -767,6 +846,7 @@ export const importEmployeesAdmin = createServerFn({ method: "POST" })
           id: newId,
           emp_code: empCode || null,
           full_name: fullName,
+          full_name_ar: row.nameAr.trim() || null,
           email,
           phone: row.phone.trim() || null,
           role: role as any,
@@ -779,6 +859,20 @@ export const importEmployeesAdmin = createServerFn({ method: "POST" })
           national_id: row.nationalId.trim() || null,
           id_issue_date: row.idIssueDate.trim() || null,
           id_expiry_date: row.nationalIdExpiry.trim() || null,
+          bank_name: row.bankName.trim() || null,
+          bank_account_number: row.bankAccountNumber.trim() || null,
+          job_grade: row.jobGrade.trim() || null,
+          graduation_id,
+          major_id,
+          medical_insurance_type: (row.medicalInsuranceType.trim() || null) as any,
+          medical_insurance_number: row.medicalInsuranceNumber.trim() || null,
+          salary_mode: sMode as any,
+          salary_gross: rawSal > 0 ? salaryGross : null,
+          salary_net: rawSal > 0 ? salaryNet : null,
+          allowance: Number(row.allowance) || 0,
+          target_value: Number(row.target) || 0,
+          target_duration: row.targetDuration || "Monthly",
+          contract_type: (row.contractType.trim() || "FullTime") as any,
         } as any);
         if (profileError) throw new Error(profileError.message);
 
@@ -897,16 +991,20 @@ export const createEmployeeAdmin = createServerFn({ method: "POST" })
       }
     }
 
-    if (created?.id && (data.sectionId || data.jobGrade || data.medicalInsuranceNumber || data.medicalInsuranceType)) {
+    if (created?.id && (data.sectionId || data.jobGrade || data.medicalInsuranceNumber || data.medicalInsuranceType || data.graduationId || data.majorId || data.bankName || data.bankAccountNumber)) {
       try {
         const p: Record<string, any> = {};
         if (data.sectionId) p.section_id = data.sectionId;
         if (data.jobGrade) p.job_grade = data.jobGrade;
         if (data.medicalInsuranceNumber) p.medical_insurance_number = data.medicalInsuranceNumber;
         if (data.medicalInsuranceType) p.medical_insurance_type = data.medicalInsuranceType;
+        if (data.graduationId) p.graduation_id = data.graduationId;
+        if (data.majorId) p.major_id = data.majorId;
+        if (data.bankName) p.bank_name = data.bankName;
+        if (data.bankAccountNumber) p.bank_account_number = data.bankAccountNumber;
         await (supabase.from("profiles") as any).update(p).eq("id", created.id);
       } catch (err) {
-        console.warn("Failed to set sectionId / jobGrade / medical insurance on profile:", err);
+        console.warn("Failed to set sectionId / jobGrade / medical insurance / graduation / major / bank on profile:", err);
       }
     }
 
@@ -1024,9 +1122,11 @@ export const listCitiesAndDistricts = createServerFn({ method: "GET" })
     costCenters: { id: string; code: string; name_en: string; name_ar: string; status: string }[];
     shifts: ShiftOption[];
     jobGrades: { id: string; name_en: string; name_ar: string; active: boolean }[];
+    graduations: { id: string; name_en: string; name_ar: string; active: boolean }[];
+    majors: { id: string; name_en: string; name_ar: string; active: boolean }[];
   }> => {
     const { supabase } = context;
-    const [{ data: cities }, { data: districts }, { data: depts }, { data: secs }, { data: poss }, { data: mgrs }, { data: mgrRoles }, costCentersRes, shiftsRes, jobGradesRes] = await Promise.all([
+    const [{ data: cities }, { data: districts }, { data: depts }, { data: secs }, { data: poss }, { data: mgrs }, { data: mgrRoles }, costCentersRes, shiftsRes, jobGradesRes, graduationsRes, majorsRes] = await Promise.all([
       supabase.from("cities").select("id, name_en").order("name_en"),
       supabase.from("districts").select("id, city_id, name_en").order("name_en"),
       supabase.from("departments").select("id, name_en").order("name_en"),
@@ -1037,6 +1137,8 @@ export const listCitiesAndDistricts = createServerFn({ method: "GET" })
       (supabase as any).from("cost_centers").select("id, code, name_en, name_ar, status").order("code").then((r: any) => r.data ?? []).catch(() => []),
       (supabase as any).from("shifts").select("id, name, start_time, end_time, grace_minutes, is_overnight, is_active").order("name").then((r: any) => r.data ?? []).catch(() => []),
       (supabase as any).from("job_grades").select("id, name_en, name_ar, active").order("name_en").then((r: any) => r.data ?? []).catch(() => []),
+      (supabase as any).from("graduations").select("id, name_en, name_ar, active").order("name_en").then((r: any) => r.data ?? []).catch(() => []),
+      (supabase as any).from("majors").select("id, name_en, name_ar, active").order("name_en").then((r: any) => r.data ?? []).catch(() => []),
     ]);
     const allowedMgrIds = new Set((mgrRoles ?? []).map((r: any) => r.user_id));
     const filteredMgrs = (mgrs ?? []).filter((m: any) => allowedMgrIds.has(m.id));
@@ -1068,6 +1170,18 @@ export const listCitiesAndDistricts = createServerFn({ method: "GET" })
         name_en: g.name_en,
         name_ar: g.name_ar,
         active: g.active ?? true,
+      })),
+      graduations: (Array.isArray(graduationsRes) ? graduationsRes : []).map((g: any) => ({
+        id: g.id,
+        name_en: g.name_en,
+        name_ar: g.name_ar,
+        active: g.active ?? true,
+      })),
+      majors: (Array.isArray(majorsRes) ? majorsRes : []).map((m: any) => ({
+        id: m.id,
+        name_en: m.name_en,
+        name_ar: m.name_ar,
+        active: m.active ?? true,
       })),
     };
   });
@@ -1195,6 +1309,8 @@ export type EmployeeDetail = {
   updated_at: string | null;
   created_at: string;
   roles: string[];
+  bank_name: string | null;
+  bank_account_number: string | null;
 };
 
 export const getEmployeeDetail = createServerFn({ method: "POST" })
@@ -1301,6 +1417,8 @@ export const getEmployeeDetail = createServerFn({ method: "POST" })
       roles: (roles ?? []).map((r: any) => String(r.role)),
       insurance_salary: (p as any).insurance_salary !== null && (p as any).insurance_salary !== undefined ? Number((p as any).insurance_salary) : null,
       emergency_fund: (p as any).emergency_fund !== null && (p as any).emergency_fund !== undefined ? Number((p as any).emergency_fund) : null,
+      bank_name: (p as any).bank_name ?? null,
+      bank_account_number: (p as any).bank_account_number ?? null,
     };
   });
 

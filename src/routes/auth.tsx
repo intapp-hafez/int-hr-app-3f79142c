@@ -9,7 +9,7 @@ import {
   faceLogin,
 } from "@/backend/functions/biometrics.functions";
 import { useServerFn } from "@tanstack/react-start";
-import { useI18n } from "@/lib/i18n";
+import { useI18n, LanguageToggle } from "@/lib/i18n";
 import { AppLogo } from "@/components/AppLogo";
 import { FaceCapture } from "@/components/biometrics/FaceCapture";
 
@@ -420,36 +420,11 @@ function AuthPage() {
           {/* Brand header & Language switcher */}
           <div className="mb-4 xl:mb-6 pb-3 xl:pb-4 border-b border-border/50 flex items-center justify-between gap-3">
             <Link to="/" className="group transition hover:opacity-95">
-              <AppLogo size={30} badge={lang === "ar" ? "بوابة" : "Portal"} />
+              <AppLogo size={30} badge={lang === "ar" ? "بوابة" : "Portal"} hideWordmarkOnMobile={false} />
             </Link>
 
-            {/* Premium segmented language selector */}
-            <div className="flex items-center rounded-full border border-border/70 bg-muted/40 p-1 backdrop-blur-sm shadow-sm shrink-0">
-              <button
-                type="button"
-                onClick={() => setLang("en")}
-                className={`flex items-center justify-center rounded-full px-2.5 sm:px-3 py-1 text-xs font-semibold transition-all duration-200 ${
-                  lang === "en"
-                    ? "bg-brand text-brand-foreground shadow-sm shadow-brand/30 font-bold"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                }`}
-              >
-                <span className="hidden sm:inline text-[11px] tracking-wide">English</span>
-                <span className="sm:hidden text-[11px] font-semibold">En</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setLang("ar")}
-                className={`flex items-center justify-center rounded-full px-2.5 sm:px-3 py-1 text-xs font-semibold transition-all duration-200 ${
-                  lang === "ar"
-                    ? "bg-brand text-brand-foreground shadow-sm shadow-brand/30 font-bold font-sans"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                }`}
-              >
-                <span className="hidden sm:inline text-[11px]">العربية</span>
-                <span className="sm:hidden text-[11px] font-semibold">Ar</span>
-              </button>
-            </div>
+            {/* Language switcher */}
+            <LanguageToggle />
           </div>
 
           {/* Mobile Product Carousel (hidden on lg+) */}

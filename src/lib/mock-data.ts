@@ -18,7 +18,7 @@ export const liveActivity = [
 ];
 
 export const employees = [
-  { id: "INT-001", name: "Hafez Rahim", email: "hafez@int.app", phone: "+20 100 123 4567", dept: "Engineering", role: "Senior Developer", status: "Active", branch: "Cairo HQ", salary: 22000, allowance: 2500, target: 20, targetDuration: "Monthly", password: "hafez@2026", managerId: "" },
+  { id: "INT-001", name: "Hafez Rahim", email: "hafez@int.app", phone: "+20 100 741 9344", dept: "Engineering", role: "Senior Developer", status: "Active", branch: "Cairo HQ", salary: 22000, allowance: 2500, target: 20, targetDuration: "Monthly", password: "hafez@2026", managerId: "" },
   { id: "INT-002", name: "Omar Khalid", email: "omar@int.app", phone: "+20 101 234 5678", dept: "Sales", role: "Account Manager", status: "Active", branch: "Alexandria Office", salary: 18000, allowance: 2000, target: 22, targetDuration: "Monthly", password: "omar@2026", managerId: "INT-001" },
   { id: "INT-003", name: "Layla Hassan", email: "layla@int.app", phone: "+20 102 345 6789", dept: "Engineering", role: "HR Specialist", status: "Active", branch: "Cairo HQ", salary: 15000, allowance: 1500, target: 20, targetDuration: "Monthly", password: "layla@2026", managerId: "INT-001" },
   { id: "INT-004", name: "Yousef Saleh", email: "yousef@int.app", phone: "+20 106 456 7890", dept: "Operations", role: "Ops Lead", status: "Active", branch: "Giza Branch", salary: 17000, allowance: 1800, target: 21, targetDuration: "Monthly", password: "yousef@2026", managerId: "INT-001" },

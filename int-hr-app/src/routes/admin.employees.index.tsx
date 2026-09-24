@@ -139,7 +139,7 @@ function EmployeesPage() {
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Employees");
-    XLSX.writeFile(wb, `employees_export_${new Date().toISOString().slice(0,10)}.xlsx`);
+    XLSX.writeFile(wb, `employees_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
 
   const allOnPageSelected = rows.length > 0 && rows.every((r) => selected.has(r.id));
@@ -438,7 +438,7 @@ function EditEmployeeDrawer({
   async function onAvatarFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; e.currentTarget.value = "";
     if (!f) return;
-    if (!["image/png","image/jpeg","image/jpg","image/webp"].includes(f.type)) {
+    if (!["image/png", "image/jpeg", "image/jpg", "image/webp"].includes(f.type)) {
       toast.error("Only WEBP, PNG or JPEG allowed"); return;
     }
     if (f.size > 500 * 1024) { toast.error("Avatar must be 500 KB or less"); return; }
@@ -454,13 +454,15 @@ function EditEmployeeDrawer({
   async function save() {
     setBusy(true);
     try {
-      await updateFn({ data: {
-        id: row.id,
-        department_id: departmentId || null,
-        position_id: positionId || null,
-        status,
-        avatar_url: avatarUrl || null,
-      }});
+      await updateFn({
+        data: {
+          id: row.id,
+          department_id: departmentId || null,
+          position_id: positionId || null,
+          status,
+          avatar_url: avatarUrl || null,
+        }
+      });
       toast.success("Employee updated");
       onSaved();
     } catch (e: any) {
@@ -648,9 +650,8 @@ function AddEmployeeModal({ onClose }: { onClose: () => void }) {
               key={s.id}
               type="button"
               onClick={() => setTab(s.id)}
-              className={`flex-1 min-w-[110px] rounded-xl px-3 py-2 font-semibold transition-colors ${
-                tab === s.id ? "bg-gradient-brand text-brand-foreground shadow-brand" : "text-muted-foreground hover:text-foreground"
-              }`}
+              className={`flex-1 min-w-[110px] rounded-xl px-3 py-2 font-semibold transition-colors ${tab === s.id ? "bg-gradient-brand text-brand-foreground shadow-brand" : "text-muted-foreground hover:text-foreground"
+                }`}
             >
               {t(s.labelKey as any)}
             </button>
@@ -678,7 +679,7 @@ function AddEmployeeModal({ onClose }: { onClose: () => void }) {
                       onChange={async (e) => {
                         const f = e.target.files?.[0]; e.currentTarget.value = "";
                         if (!f) return;
-                        const okType = ["image/png","image/jpeg","image/jpg","image/webp"].includes(f.type);
+                        const okType = ["image/png", "image/jpeg", "image/jpg", "image/webp"].includes(f.type);
                         if (!okType) { toast.error("Only WEBP, PNG or JPEG allowed"); return; }
                         if (f.size > 500 * 1024) { toast.error("Avatar must be 500 KB or less"); return; }
                         setAvatarBusy(true);
@@ -706,7 +707,7 @@ function AddEmployeeModal({ onClose }: { onClose: () => void }) {
               <Field label={t("phone")}>
                 <input type="tel" dir="ltr" inputMode="tel" value={form.phone}
                   onChange={(e) => upd("phone", formatEgPhone(e.target.value))}
-                  maxLength={20} placeholder="+20 100 123 4567" className={inputCls + " font-mono"} />
+                  maxLength={20} placeholder="+20 100 741 9344" className={inputCls + " font-mono"} />
               </Field>
               <Field label={t("personalPhone")}>
                 <input type="tel" dir="ltr" inputMode="tel" value={form.personalPhone}
@@ -833,8 +834,8 @@ function AddEmployeeModal({ onClose }: { onClose: () => void }) {
           {err && <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{err}</p>}
         </form>
         <div className="mt-4 flex gap-2 border-t border-border pt-3">
-            <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-border bg-card py-2.5 text-sm font-semibold">{t("cancel")}</button>
-            <button type="button" onClick={submit as any} className="flex-1 rounded-xl bg-gradient-brand py-2.5 text-sm font-semibold text-brand-foreground shadow-brand">{t("create")}</button>
+          <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-border bg-card py-2.5 text-sm font-semibold">{t("cancel")}</button>
+          <button type="button" onClick={submit as any} className="flex-1 rounded-xl bg-gradient-brand py-2.5 text-sm font-semibold text-brand-foreground shadow-brand">{t("create")}</button>
         </div>
       </div>
     </div>
@@ -929,7 +930,7 @@ function ModalDocUpload({ label, doc, onChange }: { label: string; doc?: StoredD
     if (file.size > MAX) {
       const msg = t("fileTooLarge");
       toast.error(msg);
-      setStatus({ kind: "invalid", reason: `File too large (${(file.size/1024/1024).toFixed(2)} MB > 2 MB)` });
+      setStatus({ kind: "invalid", reason: `File too large (${(file.size / 1024 / 1024).toFixed(2)} MB > 2 MB)` });
       return;
     }
     setBusy(true);
@@ -1019,7 +1020,7 @@ function ImportExcelBar() {
 
   function downloadTemplate() {
     const sample = [{
-      empCode: "INT-042", name: "Jane Doe", email: "jane@int.app", phone: "+20 100 123 4567",
+      empCode: "INT-042", name: "Hafez Rahim", email: "Hafez@int.app", phone: "+20 100 741 9344",
       dept: "Engineering", role: "employee", branch: locations[0]?.name ?? "Cairo HQ",
       status: "Active", salary: 15000, salaryMode: "gross", allowance: 1500, target: 20,
       targetDuration: "Monthly", password: "changeme",
@@ -1165,7 +1166,7 @@ function ImportExcelButtonsOnly() {
 
   function downloadTemplate() {
     const sample = [{
-      empCode: "INT-042", name: "Jane Doe", email: "jane@int.app", phone: "+20 100 123 4567",
+      empCode: "INT-042", name: "Hafez Rahim", email: "Hafez@int.app", phone: "+20 100 741 9344",
       dept: "Engineering", role: "employee", branch: locations[0]?.name ?? "Cairo HQ",
       status: "Active", salary: 15000, salaryMode: "gross", allowance: 1500, target: 20,
       targetDuration: "Monthly", password: "changeme",

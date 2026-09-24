@@ -131,40 +131,85 @@ export function useTranslators() {
   };
 }
 
-export function LanguageToggle({ className = "" }: { className?: string }) {
+export function LanguageToggle({ className = "", compact = false }: { className?: string; compact?: boolean }) {
   const { lang, setLang } = useI18n();
-  return (
+
+  const compactToggle = (
     <div
-      className={`inline-flex items-center rounded-full border border-border/70 bg-muted/40 p-1 backdrop-blur-sm shadow-sm shrink-0 ${className}`}
+      className={`inline-flex items-center rounded-full border border-border/70 bg-muted/40 p-0.5 backdrop-blur-sm shadow-xs shrink-0 ${className}`}
       role="group"
       aria-label="Language selector"
     >
       <button
         type="button"
         onClick={() => setLang("en")}
-        className={`flex items-center justify-center rounded-full px-2.5 sm:px-3 py-1 text-xs font-semibold transition-all duration-200 ${
+        className={`flex items-center justify-center rounded-full min-w-[28px] h-6 px-1.5 text-[11px] font-bold transition-all duration-200 ${
           lang === "en"
-            ? "bg-brand text-brand-foreground shadow-sm shadow-brand/30 font-bold"
-            : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+            ? "bg-brand text-brand-foreground shadow-xs shadow-brand/30"
+            : "text-muted-foreground hover:text-foreground"
         }`}
         aria-pressed={lang === "en"}
       >
-        <span className="hidden sm:inline text-[11px] tracking-wide">English</span>
-        <span className="sm:hidden text-[11px] font-semibold">En</span>
+        EN
       </button>
+      <span className="text-muted-foreground/40 text-[10px] select-none px-0.5">/</span>
       <button
         type="button"
         onClick={() => setLang("ar")}
-        className={`flex items-center justify-center rounded-full px-2.5 sm:px-3 py-1 text-xs font-semibold transition-all duration-200 ${
+        className={`flex items-center justify-center rounded-full min-w-[28px] h-6 px-1.5 text-[11px] font-bold transition-all duration-200 ${
           lang === "ar"
-            ? "bg-brand text-brand-foreground shadow-sm shadow-brand/30 font-bold font-sans"
-            : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+            ? "bg-brand text-brand-foreground shadow-xs shadow-brand/30 font-sans"
+            : "text-muted-foreground hover:text-foreground"
         }`}
         aria-pressed={lang === "ar"}
       >
-        <span className="hidden sm:inline text-[11px]">العربية</span>
-        <span className="sm:hidden text-[11px] font-semibold">Ar</span>
+        AR
       </button>
     </div>
+  );
+
+  if (compact) {
+    return compactToggle;
+  }
+
+  return (
+    <>
+      {/* Mobile view: compact (EN/AR) */}
+      <div className="sm:hidden inline-flex">
+        {compactToggle}
+      </div>
+
+      {/* Desktop view: full segmented English / العربية */}
+      <div
+        className={`hidden sm:inline-flex items-center rounded-full border border-border/70 bg-muted/40 p-1 backdrop-blur-sm shadow-sm shrink-0 ${className}`}
+        role="group"
+        aria-label="Language selector"
+      >
+        <button
+          type="button"
+          onClick={() => setLang("en")}
+          className={`flex items-center justify-center rounded-full px-3 py-1 text-xs font-semibold transition-all duration-200 ${
+            lang === "en"
+              ? "bg-brand text-brand-foreground shadow-sm shadow-brand/30 font-bold"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+          }`}
+          aria-pressed={lang === "en"}
+        >
+          <span className="text-[11px] tracking-wide">English</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setLang("ar")}
+          className={`flex items-center justify-center rounded-full px-3 py-1 text-xs font-semibold transition-all duration-200 ${
+            lang === "ar"
+              ? "bg-brand text-brand-foreground shadow-sm shadow-brand/30 font-bold font-sans"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+          }`}
+          aria-pressed={lang === "ar"}
+        >
+          <span className="text-[11px]">العربية</span>
+        </button>
+      </div>
+    </>
   );
 }

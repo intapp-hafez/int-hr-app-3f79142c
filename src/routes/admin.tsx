@@ -90,14 +90,14 @@ function AdminLayout() {
         <div className="px-4 py-3.5 border-b border-sidebar-border/60">
           <Link to="/"><AppLogo size={24} tone="light" /></Link>
         </div>
-        <nav className="flex-1 space-y-1 px-2.5 py-2 overflow-y-auto">
+        <nav className="flex-1 space-y-1.5 px-3 py-3 overflow-y-auto">
           {nav.map((n) => {
             const active = isActive(n.to, "exact" in n ? n.exact : false);
             return (
               <Link
                 key={n.to}
                 to={n.to}
-                className={`group flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-xs sm:text-[13px] font-semibold leading-snug transition-colors ${
+                className={`group flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs sm:text-[13px] font-semibold leading-snug transition-colors ${
                   active
                     ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-brand"
                     : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -128,10 +128,10 @@ function AdminLayout() {
           <div className="absolute inset-0 bg-foreground/40" onClick={() => setOpen(false)} />
           <aside className="absolute inset-y-0 start-0 w-72 bg-sidebar p-3 text-sidebar-foreground flex flex-col h-full">
             <div className="mb-3 flex items-center justify-between px-1">
-              <AppLogo size={24} tone="light" />
+              <AppLogo size={24} tone="light" hideWordmarkOnMobile={false} />
               <button onClick={() => setOpen(false)} className="rounded-full p-1 text-sidebar-foreground/80"><X className="h-5 w-5" /></button>
             </div>
-            <nav className="flex-1 space-y-1 overflow-y-auto px-1">
+            <nav className="flex-1 space-y-1.5 overflow-y-auto px-1">
               {nav.map((n) => {
                 const active = isActive(n.to, "exact" in n ? n.exact : false);
                 return (
@@ -139,7 +139,7 @@ function AdminLayout() {
                     key={n.to}
                     to={n.to}
                     onClick={() => setOpen(false)}
-                    className={`flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-xs sm:text-[13px] font-semibold leading-snug ${active ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground/80"}`}
+                    className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs sm:text-[13px] font-semibold leading-snug ${active ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground/80"}`}
                   >
                     <n.icon className="h-4 w-4" /> <span className="truncate">{n.label}</span>
                   </Link>

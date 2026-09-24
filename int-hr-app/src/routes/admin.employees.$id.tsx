@@ -173,9 +173,8 @@ function EmployeeDetail() {
           <button
             key={k}
             onClick={() => setTab(k)}
-            className={`flex-1 rounded-full px-3 py-2 font-medium capitalize transition-colors ${
-              tab === k ? "bg-gradient-brand text-brand-foreground shadow-brand" : "text-muted-foreground hover:text-foreground"
-            }`}
+            className={`flex-1 rounded-full px-3 py-2 font-medium capitalize transition-colors ${tab === k ? "bg-gradient-brand text-brand-foreground shadow-brand" : "text-muted-foreground hover:text-foreground"
+              }`}
           >
             {t(k)}
           </button>
@@ -215,8 +214,8 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
     salary_net: detail.salary_net ?? 0,
     allowance: detail.allowance ?? 0,
     target_value: detail.target_value ?? 0,
-    target_duration: (detail.target_duration ?? "Monthly") as "Daily"|"Weekly"|"Monthly"|"Quarterly"|"Yearly",
-    contract_type: (detail.contract_type ?? "FullTime") as "FullTime"|"PartTime"|"Temporary"|"Internship"|"Probation3M",
+    target_duration: (detail.target_duration ?? "Monthly") as "Daily" | "Weekly" | "Monthly" | "Quarterly" | "Yearly",
+    contract_type: (detail.contract_type ?? "FullTime") as "FullTime" | "PartTime" | "Temporary" | "Internship" | "Probation3M",
   }), [detail]);
   const [form, setForm] = useState(initialForm);
   const isDirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(initialForm), [form, initialForm]);
@@ -349,72 +348,72 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
 
       {editing ? (
         <div className="overflow-hidden rounded-3xl border border-border bg-card">
-        {isDirty && (
-          <div className="flex items-center gap-2 border-b border-amber-500/20 bg-amber-500/10 px-5 py-2 text-xs font-medium text-amber-700">
-            <AlertCircle className="h-3.5 w-3.5" /> You have unsaved changes.
+          {isDirty && (
+            <div className="flex items-center gap-2 border-b border-amber-500/20 bg-amber-500/10 px-5 py-2 text-xs font-medium text-amber-700">
+              <AlertCircle className="h-3.5 w-3.5" /> You have unsaved changes.
+            </div>
+          )}
+          <div className="grid grid-cols-1 gap-3 p-5 text-sm md:grid-cols-2">
+            <EditField label="Full name"><input className={editInputCls} value={form.full_name} onChange={(e) => upd("full_name", e.target.value)} /></EditField>
+            <EditField label="Phone"><input className={editInputCls + " font-mono"} value={form.phone} onChange={(e) => upd("phone", e.target.value)} /></EditField>
+            <EditField label="Employee Code"><input className={editInputCls + " font-mono"} value={form.emp_code} onChange={(e) => upd("emp_code", e.target.value)} /></EditField>
+            <EditField label="Status">
+              <select className={editInputCls} value={form.status} onChange={(e) => upd("status", e.target.value as any)}>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+            </EditField>
+            <EditField label="City">
+              <select className={editInputCls} value={form.city_id} onChange={(e) => { upd("city_id", e.target.value); upd("district_id", ""); }}>
+                <option value="">—</option>
+                {(locs?.cities ?? []).map((c) => <option key={c.id} value={c.id}>{c.name_en}</option>)}
+              </select>
+            </EditField>
+            <EditField label="District">
+              <select className={editInputCls} value={form.district_id} onChange={(e) => upd("district_id", e.target.value)} disabled={!form.city_id}>
+                <option value="">—</option>
+                {districtsForCity.map((d) => <option key={d.id} value={d.id}>{d.name_en}</option>)}
+              </select>
+            </EditField>
+            <EditField label="National ID"><input className={editInputCls + " font-mono"} value={form.national_id} onChange={(e) => upd("national_id", e.target.value)} /></EditField>
+            <EditField label="ID Issue Date"><input type="date" className={editInputCls + " font-mono"} value={form.id_issue_date} onChange={(e) => upd("id_issue_date", e.target.value)} /></EditField>
+            <EditField label="ID Expiry Date"><input type="date" className={editInputCls + " font-mono"} value={form.id_expiry_date} onChange={(e) => upd("id_expiry_date", e.target.value)} /></EditField>
+            <EditField label="Contract Type">
+              <select className={editInputCls} value={form.contract_type} onChange={(e) => upd("contract_type", e.target.value as any)}>
+                <option value="FullTime">Full-time</option>
+                <option value="PartTime">Part-time</option>
+                <option value="Temporary">Temporary</option>
+                <option value="Internship">Internship</option>
+                <option value="Probation3M">Probation (3 months)</option>
+              </select>
+            </EditField>
+            <EditField label="Salary Basis">
+              <select className={editInputCls} value={form.salary_mode} onChange={(e) => upd("salary_mode", e.target.value as any)}>
+                <option value="gross">Gross</option>
+                <option value="net">Net</option>
+              </select>
+            </EditField>
+            <EditField label="Salary Gross (EGP)"><input type="number" min={0} className={editInputCls + " font-mono"} value={form.salary_gross || ""} onChange={(e) => upd("salary_gross", Number(e.target.value))} /></EditField>
+            <EditField label="Salary Net (EGP)"><input type="number" min={0} className={editInputCls + " font-mono"} value={form.salary_net || ""} onChange={(e) => upd("salary_net", Number(e.target.value))} /></EditField>
+            <EditField label="Allowance (EGP)"><input type="number" min={0} className={editInputCls + " font-mono"} value={form.allowance || ""} onChange={(e) => upd("allowance", Number(e.target.value))} /></EditField>
+            <EditField label="Target Value"><input type="number" min={0} className={editInputCls + " font-mono"} value={form.target_value || ""} onChange={(e) => upd("target_value", Number(e.target.value))} /></EditField>
+            <EditField label="Target Duration">
+              <select className={editInputCls} value={form.target_duration} onChange={(e) => upd("target_duration", e.target.value as any)}>
+                {["Daily", "Weekly", "Monthly", "Quarterly", "Yearly"].map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </EditField>
+            <label className="inline-flex items-center gap-2 text-xs text-muted-foreground md:col-span-2">
+              <input type="checkbox" className="h-4 w-4 accent-brand" checked={form.allow_past_expiry} onChange={(e) => upd("allow_past_expiry", e.target.checked)} />
+              Override: allow expiry date in the past (admin/HR only)
+            </label>
+            {err && <p className="md:col-span-2 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{err}</p>}
+            <div className="md:col-span-2 flex justify-end gap-2">
+              <button onClick={tryCancel} className="rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold">Cancel</button>
+              <button disabled={saving || !isDirty} onClick={save} className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-brand px-4 py-2 text-sm font-semibold text-brand-foreground shadow-brand disabled:opacity-60">
+                <Save className="h-3.5 w-3.5" /> {saving ? "Saving…" : "Save"}
+              </button>
+            </div>
           </div>
-        )}
-        <div className="grid grid-cols-1 gap-3 p-5 text-sm md:grid-cols-2">
-          <EditField label="Full name"><input className={editInputCls} value={form.full_name} onChange={(e) => upd("full_name", e.target.value)} /></EditField>
-          <EditField label="Phone"><input className={editInputCls + " font-mono"} value={form.phone} onChange={(e) => upd("phone", e.target.value)} /></EditField>
-          <EditField label="Employee Code"><input className={editInputCls + " font-mono"} value={form.emp_code} onChange={(e) => upd("emp_code", e.target.value)} /></EditField>
-          <EditField label="Status">
-            <select className={editInputCls} value={form.status} onChange={(e) => upd("status", e.target.value as any)}>
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
-            </select>
-          </EditField>
-          <EditField label="City">
-            <select className={editInputCls} value={form.city_id} onChange={(e) => { upd("city_id", e.target.value); upd("district_id", ""); }}>
-              <option value="">—</option>
-              {(locs?.cities ?? []).map((c) => <option key={c.id} value={c.id}>{c.name_en}</option>)}
-            </select>
-          </EditField>
-          <EditField label="District">
-            <select className={editInputCls} value={form.district_id} onChange={(e) => upd("district_id", e.target.value)} disabled={!form.city_id}>
-              <option value="">—</option>
-              {districtsForCity.map((d) => <option key={d.id} value={d.id}>{d.name_en}</option>)}
-            </select>
-          </EditField>
-          <EditField label="National ID"><input className={editInputCls + " font-mono"} value={form.national_id} onChange={(e) => upd("national_id", e.target.value)} /></EditField>
-          <EditField label="ID Issue Date"><input type="date" className={editInputCls + " font-mono"} value={form.id_issue_date} onChange={(e) => upd("id_issue_date", e.target.value)} /></EditField>
-          <EditField label="ID Expiry Date"><input type="date" className={editInputCls + " font-mono"} value={form.id_expiry_date} onChange={(e) => upd("id_expiry_date", e.target.value)} /></EditField>
-          <EditField label="Contract Type">
-            <select className={editInputCls} value={form.contract_type} onChange={(e) => upd("contract_type", e.target.value as any)}>
-              <option value="FullTime">Full-time</option>
-              <option value="PartTime">Part-time</option>
-              <option value="Temporary">Temporary</option>
-              <option value="Internship">Internship</option>
-              <option value="Probation3M">Probation (3 months)</option>
-            </select>
-          </EditField>
-          <EditField label="Salary Basis">
-            <select className={editInputCls} value={form.salary_mode} onChange={(e) => upd("salary_mode", e.target.value as any)}>
-              <option value="gross">Gross</option>
-              <option value="net">Net</option>
-            </select>
-          </EditField>
-          <EditField label="Salary Gross (EGP)"><input type="number" min={0} className={editInputCls + " font-mono"} value={form.salary_gross || ""} onChange={(e) => upd("salary_gross", Number(e.target.value))} /></EditField>
-          <EditField label="Salary Net (EGP)"><input type="number" min={0} className={editInputCls + " font-mono"} value={form.salary_net || ""} onChange={(e) => upd("salary_net", Number(e.target.value))} /></EditField>
-          <EditField label="Allowance (EGP)"><input type="number" min={0} className={editInputCls + " font-mono"} value={form.allowance || ""} onChange={(e) => upd("allowance", Number(e.target.value))} /></EditField>
-          <EditField label="Target Value"><input type="number" min={0} className={editInputCls + " font-mono"} value={form.target_value || ""} onChange={(e) => upd("target_value", Number(e.target.value))} /></EditField>
-          <EditField label="Target Duration">
-            <select className={editInputCls} value={form.target_duration} onChange={(e) => upd("target_duration", e.target.value as any)}>
-              {["Daily","Weekly","Monthly","Quarterly","Yearly"].map((d) => <option key={d} value={d}>{d}</option>)}
-            </select>
-          </EditField>
-          <label className="inline-flex items-center gap-2 text-xs text-muted-foreground md:col-span-2">
-            <input type="checkbox" className="h-4 w-4 accent-brand" checked={form.allow_past_expiry} onChange={(e) => upd("allow_past_expiry", e.target.checked)} />
-            Override: allow expiry date in the past (admin/HR only)
-          </label>
-          {err && <p className="md:col-span-2 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{err}</p>}
-          <div className="md:col-span-2 flex justify-end gap-2">
-            <button onClick={tryCancel} className="rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold">Cancel</button>
-            <button disabled={saving || !isDirty} onClick={save} className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-brand px-4 py-2 text-sm font-semibold text-brand-foreground shadow-brand disabled:opacity-60">
-              <Save className="h-3.5 w-3.5" /> {saving ? "Saving…" : "Save"}
-            </button>
-          </div>
-        </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-5 md:grid-cols-[220px_1fr]">
@@ -426,11 +425,10 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
                   <button
                     key={n.id}
                     onClick={() => setSideTab(n.id)}
-                    className={`inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
-                      active
+                    className={`inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap ${active
                         ? "bg-gradient-brand text-brand-foreground shadow-brand"
                         : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                    }`}
+                      }`}
                   >
                     <n.icon className="h-4 w-4" />
                     <span>{n.label}</span>
@@ -741,11 +739,10 @@ function DevicesTab({ devices }: { devices: Device[] }) {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${
-                d.status === "approved" ? "bg-success/15 text-success" :
-                d.status === "pending" ? "bg-warning/20 text-warning-foreground" :
-                "bg-destructive/15 text-destructive"
-              }`}>
+              <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${d.status === "approved" ? "bg-success/15 text-success" :
+                  d.status === "pending" ? "bg-warning/20 text-warning-foreground" :
+                    "bg-destructive/15 text-destructive"
+                }`}>
                 {d.status === "approved" ? t("approved") : d.status === "pending" ? t("pending") : t("revoke")}
               </span>
               {d.status !== "approved" && (
@@ -822,9 +819,9 @@ function LeavesHistoryPanel({ employeeId }: { employeeId: string }) {
   const rows = (data ?? []) as any[];
   const tone = (s: string) =>
     s === "approved" ? "bg-emerald-500/10 text-emerald-600" :
-    s === "rejected" ? "bg-destructive/10 text-destructive" :
-    s === "cancelled" ? "bg-muted text-muted-foreground" :
-    "bg-amber-500/10 text-amber-600";
+      s === "rejected" ? "bg-destructive/10 text-destructive" :
+        s === "cancelled" ? "bg-muted text-muted-foreground" :
+          "bg-amber-500/10 text-amber-600";
   return (
     <div className="rounded-3xl border border-border bg-card p-5">
       <h2 className="mb-4 font-display text-base font-semibold">Leaves</h2>
@@ -871,9 +868,8 @@ function LeavesTab({ leaves }: { leaves: Array<{ id: number; type: string; start
           <button
             key={k}
             onClick={() => setFilter(k)}
-            className={`rounded-2xl border px-3 py-2.5 text-start transition-colors ${
-              filter === k ? "border-brand bg-gradient-brand text-brand-foreground shadow-brand" : "border-border bg-card hover:bg-muted/50"
-            }`}
+            className={`rounded-2xl border px-3 py-2.5 text-start transition-colors ${filter === k ? "border-brand bg-gradient-brand text-brand-foreground shadow-brand" : "border-border bg-card hover:bg-muted/50"
+              }`}
           >
             <p className={`text-[10px] uppercase tracking-wider ${filter === k ? "text-brand-foreground/80" : "text-muted-foreground"}`}>{labels[k]}</p>
             <p className="font-display text-lg font-semibold tabular-nums">{counts[k]}</p>
@@ -994,11 +990,10 @@ function InfoTab({ employee }: { employee: Employee }) {
             <button
               key={k.id}
               onClick={() => setSubTab(k.id)}
-              className={`flex-1 min-w-[110px] rounded-xl px-3 py-2 font-semibold transition-colors ${
-                subTab === k.id
+              className={`flex-1 min-w-[110px] rounded-xl px-3 py-2 font-semibold transition-colors ${subTab === k.id
                   ? "bg-gradient-brand text-brand-foreground shadow-brand"
                   : "text-muted-foreground hover:text-foreground"
-              }`}
+                }`}
             >
               {t(k.labelKey as any)}
             </button>
@@ -1011,7 +1006,7 @@ function InfoTab({ employee }: { employee: Employee }) {
               <input
                 type="tel" dir="ltr" inputMode="tel" value={form.phone}
                 onChange={(ev) => upd("phone", formatEgPhone(ev.target.value))}
-                maxLength={20} placeholder="+20 100 123 4567"
+                maxLength={20} placeholder="+20 100 741 9344"
                 className={inputCls + " font-mono"}
               />
             </Field>
@@ -1106,11 +1101,10 @@ function InfoTab({ employee }: { employee: Employee }) {
                 {(["gross", "net"] as const).map((m) => (
                   <label
                     key={m}
-                    className={`flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition-colors ${
-                      form.salaryMode === m
+                    className={`flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition-colors ${form.salaryMode === m
                         ? "border-brand bg-gradient-brand text-brand-foreground shadow-brand"
                         : "border-border bg-card text-muted-foreground hover:text-foreground"
-                    }`}
+                      }`}
                   >
                     <input
                       type="radio"
@@ -1378,10 +1372,10 @@ function AttendanceTab({ employeeName }: { employeeName: string }) {
 
   const statusLabel = (s: string) =>
     s === "present" ? t("present") :
-    s === "late" ? t("late") :
-    s === "absent" ? t("absent") :
-    s === "leave" ? t("onLeave") :
-    s;
+      s === "late" ? t("late") :
+        s === "absent" ? t("absent") :
+          s === "leave" ? t("onLeave") :
+            s;
 
   // Shift policy: 09:00 → 17:00
   const SHIFT_IN = 9 * 60;
@@ -1491,25 +1485,25 @@ function AttendanceTab({ employeeName }: { employeeName: string }) {
                 const lm = lateMin(a.in);
                 const em = earlyMin(a.out);
                 return (
-                <tr key={a.date} className="hover:bg-muted/30">
-                  <td className="px-4 py-3 font-medium">{a.date}</td>
-                  <td className="px-4 py-3 font-mono tabular-nums text-muted-foreground">
-                    <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" />{a.in}</span>
-                  </td>
-                  <td className="px-4 py-3 font-mono tabular-nums text-muted-foreground">{a.out}</td>
-                  <td className={`px-4 py-3 text-end font-mono tabular-nums ${lm > 0 ? "text-warning-foreground" : "text-muted-foreground"}`}>
-                    {lm > 0 ? fmtMin(lm) : "—"}
-                  </td>
-                  <td className={`px-4 py-3 text-end font-mono tabular-nums ${em > 0 ? "text-destructive" : "text-muted-foreground"}`}>
-                    {em > 0 ? fmtMin(em) : "—"}
-                  </td>
-                  <td className="px-4 py-3 text-end font-mono tabular-nums">{a.hours}</td>
-                  <td className="px-4 py-3 text-end">
-                    <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${attTone(a.status)}`}>
-                      {statusLabel(a.status)}
-                    </span>
-                  </td>
-                </tr>
+                  <tr key={a.date} className="hover:bg-muted/30">
+                    <td className="px-4 py-3 font-medium">{a.date}</td>
+                    <td className="px-4 py-3 font-mono tabular-nums text-muted-foreground">
+                      <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" />{a.in}</span>
+                    </td>
+                    <td className="px-4 py-3 font-mono tabular-nums text-muted-foreground">{a.out}</td>
+                    <td className={`px-4 py-3 text-end font-mono tabular-nums ${lm > 0 ? "text-warning-foreground" : "text-muted-foreground"}`}>
+                      {lm > 0 ? fmtMin(lm) : "—"}
+                    </td>
+                    <td className={`px-4 py-3 text-end font-mono tabular-nums ${em > 0 ? "text-destructive" : "text-muted-foreground"}`}>
+                      {em > 0 ? fmtMin(em) : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-end font-mono tabular-nums">{a.hours}</td>
+                    <td className="px-4 py-3 text-end">
+                      <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${attTone(a.status)}`}>
+                        {statusLabel(a.status)}
+                      </span>
+                    </td>
+                  </tr>
                 );
               })}
             </tbody>

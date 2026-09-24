@@ -84,7 +84,7 @@ function ManagerLayout() {
           <div className="flex items-center gap-2 border-b border-sidebar-border px-4 py-4">
             <Link to="/"><AppLogo size={28} tone="light" /></Link>
           </div>
-          <nav className="flex-1 space-y-0.5 px-2.5 py-2 overflow-y-auto">
+          <nav className="flex-1 space-y-1.5 px-3 py-3 overflow-y-auto">
             {sidebarItems.map((it) => {
               const active = isActive(it.to, "exact" in it ? it.exact : false);
               const isChat = it.to === "/manager/chat";
@@ -94,7 +94,7 @@ function ManagerLayout() {
                 <Link
                   key={it.to}
                   to={it.to}
-                  className={`group flex items-center justify-between rounded-lg px-3 py-1.5 text-xs sm:text-[13px] font-semibold leading-snug transition-colors ${
+                  className={`group flex items-center justify-between rounded-xl px-3 py-2 text-xs sm:text-[13px] font-semibold leading-snug transition-colors ${
                     active
                       ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-brand"
                       : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"

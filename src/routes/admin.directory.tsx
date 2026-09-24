@@ -3,11 +3,13 @@ import { lazy, Suspense, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Plus, Trash2, Upload, Download, FileSpreadsheet } from "lucide-react";
+import { Plus, Trash2, Upload, Download, FileSpreadsheet, Pencil, Check, X } from "lucide-react";
 import {
   listDepartments, upsertDepartment, deleteDepartment,
   listPositions, upsertPosition, deletePosition,
   listJobGrades, upsertJobGrade, deleteJobGrade,
+  listGraduations, upsertGraduation, deleteGraduation,
+  listMajors, upsertMajor, deleteMajor,
   listCitiesWithDistricts, upsertCity, deleteCity, upsertDistrict, deleteDistrict,
 } from "@/backend/functions/directory.functions";
 import { listCitiesAndDistricts } from "@/backend/functions/employees.functions";
@@ -25,8 +27,8 @@ const SalaryCertificate = lazy(() => import("@/components/admin/HrDocuments").th
 const AdvancesAcknowledgment = lazy(() => import("@/components/admin/HrDocuments").then((mod) => ({ default: mod.AdvancesAcknowledgment })));
 const CustodyAcknowledgment = lazy(() => import("@/components/admin/HrDocuments").then((mod) => ({ default: mod.CustodyAcknowledgment })));
 
-type Tab = "departments" | "sections" | "positions" | "job_grades" | "cities" | "cost_centers" | "networks" | "devices" | "contractTemplates" | "sms" | "experienceCertificate" | "salaryDetails" | "advancesAck" | "custodyAck";
-const validTabs: Tab[] = ["departments", "sections", "positions", "job_grades", "cities", "cost_centers", "networks", "devices", "contractTemplates", "sms", "experienceCertificate", "salaryDetails", "advancesAck", "custodyAck"];
+type Tab = "departments" | "sections" | "positions" | "job_grades" | "graduations" | "majors" | "cities" | "cost_centers" | "networks" | "devices" | "contractTemplates" | "sms" | "experienceCertificate" | "salaryDetails" | "advancesAck" | "custodyAck";
+const validTabs: Tab[] = ["departments", "sections", "positions", "job_grades", "graduations", "majors", "cities", "cost_centers", "networks", "devices", "contractTemplates", "sms", "experienceCertificate", "salaryDetails", "advancesAck", "custodyAck"];
 
 export const Route = createFileRoute("/admin/directory")({
   component: DirectoryPage,
@@ -43,6 +45,8 @@ const tabs: { id: Tab; label: string }[] = [
   { id: "sections", label: "Levels" },
   { id: "positions", label: "Positions" },
   { id: "job_grades", label: "Job Grades" },
+  { id: "graduations", label: "Graduations" },
+  { id: "majors", label: "Majors" },
   { id: "cities", label: "Cities & Districts" },
   { id: "cost_centers", label: "Cost Centers" },
   { id: "networks", label: "Networks" },
@@ -115,6 +119,8 @@ function DirectoryPage() {
         {tab === "sections" && <SectionsManager />}
         {tab === "positions" && <NamedSection kind="positions" />}
         {tab === "job_grades" && <NamedSection kind="job_grades" />}
+        {tab === "graduations" && <NamedSection kind="graduations" />}
+        {tab === "majors" && <NamedSection kind="majors" />}
         {tab === "cities" && <CitiesSection />}
         {tab === "cost_centers" && <CostCentersManager />}
         {tab === "networks" && <NetworksManager />}
@@ -150,11 +156,26 @@ function DirectoryPage() {
   );
 }
 
-function NamedSection({ kind }: { kind: "departments" | "positions" | "job_grades" }) {
+function NamedSection({ kind }: { kind: "departments" | "positions" | "job_grades" | "graduations" | "majors" }) {
   const qc = useQueryClient();
-  const list = useServerFn(kind === "departments" ? listDepartments : kind === "positions" ? listPositions : listJobGrades);
-  const upsert = useServerFn(kind === "departments" ? upsertDepartment : kind === "positions" ? upsertPosition : upsertJobGrade);
-  const del = useServerFn(kind === "departments" ? deleteDepartment : kind === "positions" ? deletePosition : deleteJobGrade);
+  const list = useServerFn(
+    kind === "departments" ? listDepartments :
+    kind === "positions" ? listPositions :
+    kind === "job_grades" ? listJobGrades :
+    kind === "graduations" ? listGraduations : listMajors
+  );
+  const upsert = useServerFn(
+    kind === "departments" ? upsertDepartment :
+    kind === "positions" ? upsertPosition :
+    kind === "job_grades" ? upsertJobGrade :
+    kind === "graduations" ? upsertGraduation : upsertMajor
+  );
+  const del = useServerFn(
+    kind === "departments" ? deleteDepartment :
+    kind === "positions" ? deletePosition :
+    kind === "job_grades" ? deleteJobGrade :
+    kind === "graduations" ? deleteGraduation : deleteMajor
+  );
   const key = [kind];
   const q = useQuery({ queryKey: key, queryFn: () => list() });
   const isDept = kind === "departments";
@@ -177,7 +198,25 @@ function NamedSection({ kind }: { kind: "departments" | "positions" | "job_grade
     onError: (e: Error) => toast.error(e.message),
   });
   const [draft, setDraft] = useState<{ name_en: string; name_ar: string; responsible_person_id: string }>({ name_en: "", name_ar: "", responsible_person_id: "" });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<{ name_en: string; name_ar: string; active: boolean; responsible_person_id: string }>({ name_en: "", name_ar: "", active: true, responsible_person_id: "" });
   const [structureDept, setStructureDept] = useState<{ id: string; name_en: string } | null>(null);
+
+  function handleSaveEdit(id: string) {
+    if (!editDraft.name_en.trim()) return toast.error("Name (EN) required");
+    mUpsert.mutate(
+      {
+        id,
+        name_en: editDraft.name_en.trim(),
+        name_ar: editDraft.name_ar.trim(),
+        active: editDraft.active,
+        ...(isDept ? { responsible_person_id: editDraft.responsible_person_id || null } : {}),
+      },
+      {
+        onSuccess: () => setEditingId(null),
+      }
+    );
+  }
 
   const headers = ["name_en", "name_ar", "active"];
   const paged = usePaged<any>(q.data ?? []);
@@ -238,30 +277,88 @@ function NamedSection({ kind }: { kind: "departments" | "positions" | "job_grade
         </button>
       </div>
       <Table cols={isDept ? ["Name (EN)", "Name (AR)", "Responsible", "Active", ""] : ["Name (EN)", "Name (AR)", "Active", ""]}>
-        {paged.slice.map((r: any) => (
-          <tr key={r.id} className="hover:bg-muted/30">
-            <td className="px-3 py-2 font-medium">{r.name_en}</td>
-            <td className="px-3 py-2">{r.name_ar}</td>
+        {paged.slice.map((r: any) => editingId === r.id ? (
+          <tr key={r.id} className="bg-brand/5">
+            <td className="px-3 py-2">
+              <input
+                autoFocus
+                className={inputCls}
+                placeholder="Name (EN)"
+                value={editDraft.name_en}
+                onChange={(e) => setEditDraft({ ...editDraft, name_en: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSaveEdit(r.id);
+                  if (e.key === "Escape") setEditingId(null);
+                }}
+              />
+            </td>
+            <td className="px-3 py-2">
+              <input
+                className={inputCls}
+                placeholder="Name (AR)"
+                value={editDraft.name_ar}
+                onChange={(e) => setEditDraft({ ...editDraft, name_ar: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSaveEdit(r.id);
+                  if (e.key === "Escape") setEditingId(null);
+                }}
+              />
+            </td>
             {isDept && (
               <td className="px-3 py-2">
                 <select
                   className={inputCls}
-                  value={r.responsible_person_id ?? ""}
-                  onChange={(e) =>
-                    mUpsert.mutate({
-                      id: r.id, name_en: r.name_en, name_ar: r.name_ar, active: r.active,
-                      responsible_person_id: e.target.value || null,
-                    })
-                  }
+                  value={editDraft.responsible_person_id}
+                  onChange={(e) => setEditDraft({ ...editDraft, responsible_person_id: e.target.value })}
                 >
-                  <option value="">—</option>
+                  <option value="">— Select Responsible —</option>
                   {managers.map((m) => (
                     <option key={m.id} value={m.id}>{m.name}</option>
                   ))}
-                  {r.responsible_person_id && !managers.find((m) => m.id === r.responsible_person_id) && (
-                    <option value={r.responsible_person_id}>{r.responsible_person_name ?? "(unknown)"}</option>
+                  {editDraft.responsible_person_id && !managers.find((m) => m.id === editDraft.responsible_person_id) && (
+                    <option value={editDraft.responsible_person_id}>{r.responsible_person_name ?? "(unknown)"}</option>
                   )}
                 </select>
+              </td>
+            )}
+            <td className="px-3 py-2">
+              <button
+                type="button"
+                onClick={() => setEditDraft({ ...editDraft, active: !editDraft.active })}
+                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${editDraft.active ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}
+              >
+                {editDraft.active ? "Yes" : "No"}
+              </button>
+            </td>
+            <td className="px-3 py-2 text-end">
+              <div className="flex items-center justify-end gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => handleSaveEdit(r.id)}
+                  disabled={mUpsert.isPending}
+                  className="rounded-lg p-1.5 text-brand bg-brand/10 hover:bg-brand/20 disabled:opacity-50"
+                  title="Save changes"
+                >
+                  <Check className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingId(null)}
+                  className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted"
+                  title="Cancel"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </td>
+          </tr>
+        ) : (
+          <tr key={r.id} className="hover:bg-muted/30">
+            <td className="px-3 py-2 font-medium">{r.name_en}</td>
+            <td className="px-3 py-2">{r.name_ar || "—"}</td>
+            {isDept && (
+              <td className="px-3 py-2 text-xs text-muted-foreground">
+                {r.responsible_person_name || "—"}
               </td>
             )}
             <td className="px-3 py-2">
@@ -271,13 +368,34 @@ function NamedSection({ kind }: { kind: "departments" | "positions" | "job_grade
               </button>
             </td>
             <td className="px-3 py-2 text-end">
-              <div className="flex items-center justify-end gap-2">
+              <div className="flex items-center justify-end gap-1.5">
                 {isDept && (
                   <button onClick={() => setStructureDept(r)} className="rounded-lg bg-brand/10 p-1.5 text-brand hover:bg-brand/20 text-xs font-semibold px-3">
                     Manage Structure
                   </button>
                 )}
-                <button onClick={() => mDel.mutate(r.id)} className="rounded-lg p-1.5 text-destructive hover:bg-destructive/10">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingId(r.id);
+                    setEditDraft({
+                      name_en: r.name_en ?? "",
+                      name_ar: r.name_ar ?? "",
+                      active: r.active ?? true,
+                      responsible_person_id: r.responsible_person_id ?? "",
+                    });
+                  }}
+                  className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  title="Edit"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { if (confirm("Delete this item?")) mDel.mutate(r.id); }}
+                  className="rounded-lg p-1.5 text-destructive hover:bg-destructive/10"
+                  title="Delete"
+                >
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
@@ -410,7 +528,7 @@ const inputCls = "w-full rounded-lg border border-input bg-background px-3 py-2 
 
 function Table({ cols, children }: { cols: string[]; children: React.ReactNode }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-border">
+    <div className="overflow-x-auto rounded-2xl border border-border">
       <table className="w-full text-sm">
         <thead className="bg-muted/50 text-[11px] uppercase tracking-wider text-muted-foreground">
           <tr>{cols.map((c) => <th key={c} className="px-3 py-2 text-start font-semibold">{c}</th>)}</tr>

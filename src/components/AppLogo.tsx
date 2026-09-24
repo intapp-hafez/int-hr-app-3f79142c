@@ -4,12 +4,14 @@ import { useI18n } from "@/lib/i18n";
 export function AppLogo({
   size = 28,
   withWordmark = true,
+  hideWordmarkOnMobile = true,
   tone = "auto",
   badge,
   className = "",
 }: {
   size?: number;
   withWordmark?: boolean;
+  hideWordmarkOnMobile?: boolean;
   tone?: "auto" | "light" | "dark";
   badge?: string;
   className?: string;
@@ -46,7 +48,7 @@ export function AppLogo({
       </div>
 
       {withWordmark && (
-        <div className="flex flex-col text-start leading-none">
+        <div className={`flex-col text-start leading-none ${hideWordmarkOnMobile ? "hidden sm:flex" : "flex"}`}>
           <div className="flex items-center gap-1.5">
             <span
               className={`font-display text-base font-extrabold tracking-tight ${

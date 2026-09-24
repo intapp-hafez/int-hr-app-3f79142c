@@ -1,8 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { useI18n, useTranslators } from "@/lib/i18n";
-import { ChevronRight, Globe, Bell, MapPin, Wifi, Lock, LogOut, Smartphone, Check, ChevronDown, Shield, Signal, CircleDot, X, Eye, EyeOff, CalendarDays, MessageSquare, IdCard, User, Phone, Mail, Building2, UserCog, Wallet, FileSignature, CalendarClock, Fingerprint, Banknote } from "lucide-react";
+import { useI18n, useTranslators, LanguageToggle } from "@/lib/i18n";
+import { ChevronRight, Globe, Bell, MapPin, Wifi, Lock, LogOut, Smartphone, Check, ChevronDown, Shield, Signal, CircleDot, X, Eye, EyeOff, CalendarDays, MessageSquare, IdCard, User, Phone, Mail, Building2, UserCog, Wallet, FileSignature, CalendarClock, Fingerprint, Banknote, Clock } from "lucide-react";
 import { InstallButton } from "@/components/InstallButton";
 import {
   useStore,
@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import { FaceAlertPrefsCard } from "./FaceAlertPrefsCard";
+import { EmployeePermissionsPanel } from "@/components/admin/EmployeePermissionsPanel";
 
 export function SettingsPage() {
   const { t, lang, setLang } = useI18n();
@@ -47,6 +48,8 @@ export function SettingsPage() {
   const [openLoc, setOpenLoc] = useState(false);
   const [openNet, setOpenNet] = useState(false);
   const [openPwd, setOpenPwd] = useState(false);
+  const [openPermissions, setOpenPermissions] = useState(false);
+  const empUserId = realProfile?.id || session?.employeeId;
 
   const myLocations = locations.filter((l) => l.name === me?.branch);
   const myNetworks = networks.filter((n) => n.branch === me?.branch);
@@ -174,8 +177,6 @@ export function SettingsPage() {
         </div>
       </section>
 
-      {!isStaff && <FaceAlertPrefsCard />}
-
       {/* My Profile — read-only details */}
       <section className="overflow-hidden rounded-2xl border border-border bg-card">
         <ExpandableRow
@@ -218,6 +219,21 @@ export function SettingsPage() {
         </ExpandableRow>
       </section>
 
+      {/* Permissions & Request (by default collapsed) */}
+      <section className="overflow-hidden rounded-2xl border border-border bg-card">
+        <ExpandableRow
+          icon={Clock}
+          label={t("employeePermissions") || "Permissions"}
+          hint="4 hrs/month • Max 2 requests • Request permission"
+          open={openPermissions}
+          onToggle={() => setOpenPermissions((v) => !v)}
+        >
+          <div className="pt-2">
+            <EmployeePermissionsPanel employeeId={empUserId} canManage={false} />
+          </div>
+        </ExpandableRow>
+      </section>
+
       <section className="overflow-hidden rounded-2xl border border-border bg-card">
         <Link to="/employee/advances" className="block">
           <Row icon={Banknote} label="Advances" right={<ChevronRight className="h-4 w-4 text-muted-foreground rtl-flip" />} />
@@ -231,19 +247,7 @@ export function SettingsPage() {
       </section>
 
       <section className="overflow-hidden rounded-2xl border border-border bg-card">
-        <Row icon={Globe} label={t("language")} right={
-          <div className="flex gap-1 rounded-full bg-muted p-0.5 text-xs font-medium">
-            {(["en", "ar"] as const).map((l) => (
-              <button
-                key={l}
-                onClick={() => setLang(l)}
-                className={`rounded-full px-3 py-1 transition-colors ${lang === l ? "bg-background shadow-soft" : "text-muted-foreground"}`}
-              >
-                {l === "en" ? "EN" : "ع"}
-              </button>
-            ))}
-          </div>
-        } />
+        <Row icon={Globe} label={t("language")} right={<LanguageToggle compact />} />
         <Row icon={Bell} label={t("pushNotifications")} right={<Toggle defaultOn />} />
         <button type="button" onClick={() => setOpenPwd(true)} className="block w-full text-start">
           <Row icon={Lock} label={t("changePassword")} />
@@ -327,6 +331,8 @@ export function SettingsPage() {
           )}
         </ExpandableRow>
       </section>
+
+      {!isStaff && <FaceAlertPrefsCard defaultOpen={false} />}
 
       {/* Device */}
       <section className="rounded-2xl border border-border bg-card p-4 space-y-3">

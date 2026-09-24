@@ -11,6 +11,7 @@ import { listLeaveTypes } from "@/backend/functions/directory.functions";
 import { LeaveTypesManager } from "@/components/admin/LeaveTypesManager";
 import { HolidayTypesManager } from "@/components/admin/HolidayTypesManager";
 import { HolidaysManager } from "@/components/HolidaysManager";
+import { PermissionsManager } from "@/components/admin/PermissionsManager";
 import { LEAVES_TABS, TAB_LABELS, type LeavesTab } from "@/lib/leaves-tabs";
 import { formatDate } from "@/lib/date-format";
 
@@ -213,6 +214,9 @@ function AdminLeaves() {
         ))}
       </div>
 
+      {tab === "permissions" && (
+        <PermissionsManager />
+      )}
       {tab === "leaveTypes" && (
         <div className="rounded-3xl border border-border bg-card p-5"><LeaveTypesManager /></div>
       )}

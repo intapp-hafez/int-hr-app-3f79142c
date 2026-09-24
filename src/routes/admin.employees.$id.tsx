@@ -5,6 +5,7 @@ import { formatDate, parseISODate } from "@/lib/date-format";
 import { EmployeeTripsPanel } from "@/components/employee/EmployeeTripsPanel";
 import { EmployeeCustodyPanel } from "@/components/admin/EmployeeCustodyPanel";
 import { EmployeePenaltiesPanel } from "@/components/admin/EmployeePenaltiesPanel";
+import { EmployeePermissionsPanel } from "@/components/admin/EmployeePermissionsPanel";
 import { AvatarUploader } from "@/components/AvatarUploader";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -66,7 +67,7 @@ import {
   EyeOff,
   Lock,
 } from "lucide-react";
-import { User as UserIcon, ShieldCheck, IdCard, Briefcase, CalendarDays, Plane, AlertCircle, StickyNote as StickyNoteIcon, Plus, Banknote, Loader2, ExternalLink, ArrowRight } from "lucide-react";
+import { User as UserIcon, ShieldCheck, IdCard, Briefcase, CalendarDays, Plane, AlertCircle, StickyNote as StickyNoteIcon, Plus, Banknote, CreditCard, Loader2, ExternalLink, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -376,6 +377,8 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
     is_five_percent: !!(detail as any).is_five_percent,
     social_insurance_date: (detail as any).social_insurance_date ?? "",
     custom_field: (detail as any).custom_field ?? "",
+    bank_name: (detail as any).bank_name ?? "",
+    bank_account_number: (detail as any).bank_account_number ?? "",
   }), [detail]);
   const [form, setForm] = useState(initialForm);
   const isDirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(initialForm), [form, initialForm]);
@@ -414,7 +417,7 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
   const upd = <K extends keyof typeof form>(k: K, v: typeof form[K]) => setForm((f) => ({ ...f, [k]: v }));
   const districtsForCity = (locs?.districts ?? []).filter((d) => !form.city_id || d.city_id === form.city_id);
   const sectionsForDept = (locs?.sections ?? []).filter((s: any) => !form.department_id || s.department_id === form.department_id);
-  type SideTab = "overview" | "employment" | "assignments" | "attendance" | "leaves" | "documents" | "devices" | "notes" | "advances" | "penalties" | "status" | "offboarding" | "trips" | "custody";
+  type SideTab = "overview" | "employment" | "assignments" | "attendance" | "leaves" | "permissions" | "documents" | "devices" | "notes" | "advances" | "penalties" | "status" | "offboarding" | "trips" | "custody";
   const [sideTab, setSideTab] = useState<SideTab>("overview");
   const sideNav: { id: SideTab; label: string; icon: any }[] = [
     { id: "overview", label: "Overview", icon: UserIcon },
@@ -422,6 +425,7 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
     { id: "assignments", label: "Assignments", icon: Target },
     { id: "attendance", label: "Attendance", icon: CalendarDays },
     { id: "leaves", label: "Leaves", icon: Plane },
+    { id: "permissions", label: t("employeePermissions" as any) || "Permissions", icon: Clock },
     { id: "documents", label: "Documents", icon: FileText },
     { id: "devices", label: "Allowed devices", icon: Smartphone },
     { id: "notes", label: "Notes", icon: StickyNoteIcon },
@@ -512,6 +516,8 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
           is_five_percent: form.is_five_percent,
           social_insurance_date: form.social_insurance_date || null,
           custom_field: form.custom_field.trim() || null,
+          bank_name: form.bank_name.trim() || null,
+          bank_account_number: form.bank_account_number.trim() || null,
         },
       });
       toast.success("Saved");
@@ -764,6 +770,12 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
               <input className={editInputCls} value={form.medical_insurance_number} onChange={(e) => upd("medical_insurance_number", e.target.value)} placeholder="e.g. MED-123456" />
             </EditField>
             <EditField label="Medical Insurance Details"><input className={editInputCls} value={form.medical_insurance_details} onChange={(e) => upd("medical_insurance_details", e.target.value)} /></EditField>
+            <EditField label={t("bankName" as any) || "Bank Name"}>
+              <input className={editInputCls} value={form.bank_name} onChange={(e) => upd("bank_name", e.target.value)} placeholder="e.g. CIB, QNB, NBE..." />
+            </EditField>
+            <EditField label={t("bankAccountNumber" as any) || "Bank Account Number"}>
+              <input className={editInputCls + " font-mono"} value={form.bank_account_number} onChange={(e) => upd("bank_account_number", e.target.value)} placeholder="e.g. 100023456789 or IBAN" />
+            </EditField>
 
             <EditField label="Social Insurance Date">
               <input type="date" className={editInputCls + " font-mono"} value={form.social_insurance_date} onChange={(e) => upd("social_insurance_date", e.target.value)} />
@@ -1041,6 +1053,8 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
                   <Info icon={ShieldCheck} label={t("medicalInsuranceType")} value={detail.medical_insurance_type ? (detail.medical_insurance_type === "Governmental" ? t("insuranceGovernmental") : t("insurancePrivate")) : "—"} />
                   <Info icon={FileText} label={t("medicalInsuranceNumber")} value={detail.medical_insurance_number ?? "—"} mono />
                   <Info icon={FileText} label={t("medicalInsuranceDetails") || "Medical Insurance Details"} value={detail.medical_insurance_details ?? "—"} />
+                  <Info icon={Banknote} label={t("bankName" as any) || "Bank Name"} value={(detail as any).bank_name ?? "—"} />
+                  <Info icon={CreditCard} label={t("bankAccountNumber" as any) || "Bank Account Number"} value={(detail as any).bank_account_number ?? "—"} mono />
                 </div>
               </div>
             )}
@@ -1067,6 +1081,10 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
 
             {sideTab === "leaves" && (
               <LeavesHistoryPanel employeeId={detail.id} />
+            )}
+
+            {sideTab === "permissions" && (
+              <EmployeePermissionsPanel employeeId={detail.id} canManage={canEdit} />
             )}
 
             {sideTab === "devices" && (
@@ -1359,8 +1377,8 @@ function AdminOffboarding({
                       <span>
                         {totalCustodyCount > 0
                           ? (isAr
-                              ? `تم التحقق واسترداد جميع الـ ${totalCustodyCount} عهدة المسندة للموظف.`
-                              : `All ${totalCustodyCount} assigned custody item(s) have been verified and returned.`)
+                            ? `تم التحقق واسترداد جميع الـ ${totalCustodyCount} عهدة المسندة للموظف.`
+                            : `All ${totalCustodyCount} assigned custody item(s) have been verified and returned.`)
                           : (t("noCustodyItemsAssigned") || "No active custody items or equipment currently assigned to this employee.")}
                       </span>
                     </div>
@@ -2822,6 +2840,8 @@ function InfoTab({ employee }: { employee: Employee }) {
     target: String(e.target ?? ""),
     targetDuration: e.targetDuration ?? "Monthly",
     password: e.password ?? "",
+    bankName: e.bankName ?? e.bank_name ?? "",
+    bankAccountNumber: e.bankAccountNumber ?? e.bank_account_number ?? "",
   });
   const [err, setErr] = useState<string | null>(null);
   const [docs, setDocs] = useState<Record<string, StoredDoc | undefined>>(e.documents ?? {});
@@ -2890,7 +2910,7 @@ function InfoTab({ employee }: { employee: Employee }) {
               <input
                 type="tel" dir="ltr" inputMode="tel" value={form.phone}
                 onChange={(ev) => upd("phone", formatEgPhone(ev.target.value))}
-                maxLength={20} placeholder="+20 100 123 4567"
+                maxLength={20} placeholder="+20 100 741 9344"
                 className={inputCls + " font-mono"}
               />
             </Field>
@@ -3040,6 +3060,12 @@ function InfoTab({ employee }: { employee: Employee }) {
                 <option value="Monthly">{t("targetMonthly")}</option>
                 <option value="Quarterly">{t("targetQuarterly")}</option>
               </select>
+            </Field>
+            <Field label={t("bankName" as any) || "Bank Name"}>
+              <input value={form.bankName} onChange={(ev) => upd("bankName", ev.target.value)} className={inputCls} placeholder="e.g. CIB, QNB, NBE..." />
+            </Field>
+            <Field label={t("bankAccountNumber" as any) || "Bank Account Number"}>
+              <input value={form.bankAccountNumber} onChange={(ev) => upd("bankAccountNumber", ev.target.value)} className={inputCls + " font-mono"} placeholder="e.g. 100023456789 or IBAN" />
             </Field>
             <Field label={t("contractType")}>
               <select value={form.contractType} onChange={(ev) => upd("contractType", ev.target.value)} className={inputCls}>

@@ -369,3 +369,83 @@ export const deleteCostCenter = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+// ── Graduations ──────────────────────────────────────
+export const listGraduations = createServerFn({ method: "GET" })
+  .middleware([requireAdminAccess])
+  .handler(async ({ context }) => {
+    try {
+      const { data, error } = await (context.supabase as any).from("graduations").select("*").order("name_en");
+      if (error) {
+        if (error.message?.includes("graduations")) return [];
+        throw new Error(error.message);
+      }
+      return data ?? [];
+    } catch (err: any) {
+      if (err.message?.includes("graduations")) return [];
+      throw err;
+    }
+  });
+
+export const upsertGraduation = createServerFn({ method: "POST" })
+  .middleware([requireAdminAccess])
+  .inputValidator((i) => NamedRowSchema.parse(i))
+  .handler(async ({ data, context }) => {
+    const { error } = await (context.supabase as any).from("graduations").upsert({
+      id: data.id,
+      name_en: data.name_en,
+      name_ar: data.name_ar,
+      active: data.active ?? true,
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const deleteGraduation = createServerFn({ method: "POST" })
+  .middleware([requireAdminAccess])
+  .inputValidator((i) => z.object({ id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { error } = await (context.supabase as any).from("graduations").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ── Majors ──────────────────────────────────────────
+export const listMajors = createServerFn({ method: "GET" })
+  .middleware([requireAdminAccess])
+  .handler(async ({ context }) => {
+    try {
+      const { data, error } = await (context.supabase as any).from("majors").select("*").order("name_en");
+      if (error) {
+        if (error.message?.includes("majors")) return [];
+        throw new Error(error.message);
+      }
+      return data ?? [];
+    } catch (err: any) {
+      if (err.message?.includes("majors")) return [];
+      throw err;
+    }
+  });
+
+export const upsertMajor = createServerFn({ method: "POST" })
+  .middleware([requireAdminAccess])
+  .inputValidator((i) => NamedRowSchema.parse(i))
+  .handler(async ({ data, context }) => {
+    const { error } = await (context.supabase as any).from("majors").upsert({
+      id: data.id,
+      name_en: data.name_en,
+      name_ar: data.name_ar,
+      active: data.active ?? true,
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const deleteMajor = createServerFn({ method: "POST" })
+  .middleware([requireAdminAccess])
+  .inputValidator((i) => z.object({ id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { error } = await (context.supabase as any).from("majors").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
