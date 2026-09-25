@@ -113,6 +113,14 @@ import { safeRandomUUID } from "@/lib/utils";
 
 
 export const Route = createFileRoute("/admin/employees/$id")({
+  head: () => ({ meta: [
+    { title: "Employee Details | INT-HR" },
+    { name: "description", content: "Review employee identity, work information, location, access, and activity in INT-HR." },
+    { property: "og:title", content: "Employee Details | INT-HR" },
+    { property: "og:description", content: "Review employee identity, work information, location, access, and activity in INT-HR." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   component: EmployeeDetail,
 });
 

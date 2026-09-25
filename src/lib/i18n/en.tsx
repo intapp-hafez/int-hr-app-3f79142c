@@ -617,7 +617,6 @@ export const ui = {
   notePlaceholder: "Add a brief update for your manager…",
   startedAt: "Started",
   completedAt: "Completed",
-  hoursShort: "h",
   taskCheckIn: "Task check-in",
   taskCheckOut: "Task check-out",
   locationRequiredStart: "You must be in the related area of task to start",
