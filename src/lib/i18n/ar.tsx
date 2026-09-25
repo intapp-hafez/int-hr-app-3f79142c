@@ -612,7 +612,6 @@ export const ui: Record<UiKey, string> = {
   notePlaceholder: "أضف تحديثًا قصيرًا للمدير…",
   startedAt: "بدأت",
   completedAt: "اكتملت",
-  hoursShort: "س",
   taskCheckIn: "تسجيل دخول للمهمة",
   taskCheckOut: "تسجيل خروج من المهمة",
   locationRequiredStart: "يجب أن تكون في المنطقة المحددة للمهمة للبدء",

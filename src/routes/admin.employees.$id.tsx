@@ -113,6 +113,14 @@ import { safeRandomUUID } from "@/lib/utils";
 
 
 export const Route = createFileRoute("/admin/employees/$id")({
+  head: () => ({ meta: [
+    { title: "Employee Details | INT-HR" },
+    { name: "description", content: "Review employee identity, work information, location, access, and activity in INT-HR." },
+    { property: "og:title", content: "Employee Details | INT-HR" },
+    { property: "og:description", content: "Review employee identity, work information, location, access, and activity in INT-HR." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   component: EmployeeDetail,
 });
 
@@ -962,40 +970,60 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
           <div className="space-y-5 min-w-0">
             {sideTab === "overview" && (
               <div className="rounded-3xl border border-border bg-card p-5">
-                <h2 className="mb-4 font-display text-base font-semibold">Overview</h2>
-                <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-3">
-                  <Info icon={UserIcon} label={t("fullNameAr" as any) ?? "Full name (Arabic)"} value={detail.full_name_ar ?? "—"} />
-                  <Info icon={Calendar} label="Employee Code" value={detail.emp_code ?? "—"} mono />
-                  <Info icon={Building2} label={t("department")} value={detail.department ?? "—"} />
-                  <Info icon={Briefcase} label={t("position") ?? "Position"} value={detail.position ?? "—"} />
-                  <Info icon={Building2} label={t("costCenter" as any) ?? "Cost Center"} value={detail.cost_center_code ? `#${detail.cost_center_code} - ${detail.cost_center_name ?? ""}` : "—"} />
-                  <Info icon={Clock} label={t("shift" as any) ?? "Shift"} value={detail.shift_name ?? "—"} />
-                  <Info icon={MapPin} label={t("city")} value={detail.city ?? "—"} />
-                  <Info icon={MapPin} label="District" value={detail.district ?? "—"} />
-                  <Info icon={UserIcon} label="Manager" value={detail.manager_name ?? detail.manager_id ?? "—"} />
-                  <Info icon={Calendar} label="Locale" value={detail.locale ?? "—"} />
-                  <Info icon={Plane} label="Job Grade (Trips)" value={detail.job_grade ?? "—"} />
-                  <Info icon={FileText} label="National ID" value={detail.national_id ?? "—"} mono />
-                  <Info icon={Calendar} label="ID Issue Date" value={detail.id_issue_date ?? "—"} />
-                  <Info icon={Calendar} label="ID Expiry Date" value={detail.id_expiry_date ?? "—"} />
-                  <Info icon={Calendar} label="Created" value={detail.created_at ? new Date(detail.created_at).toLocaleString() : "—"} />
-                  <Info icon={Calendar} label="Updated" value={detail.updated_at ? new Date(detail.updated_at).toLocaleString() : "—"} />
-                  <Info icon={UserIcon} label="5% Quota (Disability)" value={(detail as any).is_five_percent ? "Yes" : "No"} />
-                  <Info icon={UserIcon} label="Is Insured" value={(detail as any).is_insured ? "Yes" : "No"} />
-                  <div className="flex flex-col gap-1 md:col-span-3 mt-2">
-                    <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Roles</span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {detail.roles.length === 0 ? (
-                        <span className="text-sm text-muted-foreground">—</span>
-                      ) : (
-                        detail.roles.map((r) => (
-                          <span key={r} className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-foreground">{r}</span>
-                        ))
-                      )}
+                <h2 className="mb-5 font-display text-base font-semibold">Overview</h2>
+                <div className="space-y-6 text-sm">
+                  <section aria-labelledby="overview-identity">
+                    <h3 id="overview-identity" className="mb-3 text-xs font-semibold uppercase text-muted-foreground">Identity &amp; ID</h3>
+                    <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+                      <Info icon={UserIcon} label={t("fullNameAr" as any) ?? "Full name (Arabic)"} value={detail.full_name_ar ?? "—"} />
+                      <Info icon={Calendar} label="Employee Code" value={detail.emp_code ?? "—"} mono />
+                      <Info icon={FileText} label="National ID" value={detail.national_id ?? "—"} mono />
+                      <Info icon={Calendar} label="ID Issue Date" value={detail.id_issue_date ?? "—"} />
+                      <Info icon={Calendar} label="ID Expiry Date" value={detail.id_expiry_date ?? "—"} />
+                      <Info icon={UserIcon} label="5% Quota (Disability)" value={(detail as any).is_five_percent ? "Yes" : "No"} />
                     </div>
-                  </div>
-                  <div className="flex flex-col gap-2 md:col-span-3 mt-4 border-t border-border pt-4">
-                    <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Custom Notes / Fields</span>
+                  </section>
+                  <section aria-labelledby="overview-work" className="border-t border-border pt-5">
+                    <h3 id="overview-work" className="mb-3 text-xs font-semibold uppercase text-muted-foreground">Work &amp; reporting</h3>
+                    <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+                      <Info icon={Building2} label={t("department")} value={detail.department ?? "—"} />
+                      <Info icon={Briefcase} label={t("position") ?? "Position"} value={detail.position ?? "—"} />
+                      <Info icon={UserIcon} label="Manager" value={detail.manager_name ?? detail.manager_id ?? "—"} />
+                      <Info icon={Building2} label={t("costCenter" as any) ?? "Cost Center"} value={detail.cost_center_code ? `#${detail.cost_center_code} - ${detail.cost_center_name ?? ""}` : "—"} />
+                      <Info icon={Clock} label={t("shift" as any) ?? "Shift"} value={detail.shift_name ?? "—"} />
+                      <Info icon={Plane} label="Job Grade (Trips)" value={detail.job_grade ?? "—"} />
+                      <Info icon={UserIcon} label="Is Insured" value={(detail as any).is_insured ? "Yes" : "No"} />
+                    </div>
+                  </section>
+                  <section aria-labelledby="overview-location" className="border-t border-border pt-5">
+                    <h3 id="overview-location" className="mb-3 text-xs font-semibold uppercase text-muted-foreground">Location &amp; language</h3>
+                    <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+                      <Info icon={MapPin} label={t("city")} value={detail.city ?? "—"} />
+                      <Info icon={MapPin} label="District" value={detail.district ?? "—"} />
+                      <Info icon={Calendar} label="Locale" value={detail.locale ?? "—"} />
+                    </div>
+                  </section>
+                  <section aria-labelledby="overview-account" className="border-t border-border pt-5">
+                    <h3 id="overview-account" className="mb-3 text-xs font-semibold uppercase text-muted-foreground">Account &amp; record</h3>
+                    <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+                      <Info icon={Calendar} label="Created" value={detail.created_at ? new Date(detail.created_at).toLocaleString() : "—"} />
+                      <Info icon={Calendar} label="Updated" value={detail.updated_at ? new Date(detail.updated_at).toLocaleString() : "—"} />
+                      <div className="flex flex-col gap-1 col-span-2 md:col-span-3">
+                        <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Roles</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {detail.roles.length === 0 ? (
+                            <span className="text-sm text-muted-foreground">—</span>
+                          ) : (
+                            detail.roles.map((r) => (
+                              <span key={r} className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-foreground">{r}</span>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+                  <section aria-labelledby="overview-custom" className="flex flex-col gap-2 border-t border-border pt-5">
+                    <h3 id="overview-custom" className="text-xs font-semibold uppercase text-muted-foreground">Custom Notes / Fields</h3>
                     {(() => {
                       let arr = [];
                       try {
@@ -1017,7 +1045,7 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
                         </div>
                       );
                     })()}
-                  </div>
+                  </section>
                 </div>
               </div>
             )}
