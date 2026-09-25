@@ -261,6 +261,59 @@ export type Database = {
           },
         ]
       }
+      biometric_terminals: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          device_code: string
+          disabled_at: string | null
+          id: string
+          kind: string
+          last_seen_at: string | null
+          location_id: string | null
+          name: string
+          notes: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          device_code: string
+          disabled_at?: string | null
+          id?: string
+          kind?: string
+          last_seen_at?: string | null
+          location_id?: string | null
+          name: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          device_code?: string
+          disabled_at?: string | null
+          id?: string
+          kind?: string
+          last_seen_at?: string | null
+          location_id?: string | null
+          name?: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "biometric_terminals_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "geofence_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_channels: {
         Row: {
           allow_replies: boolean
@@ -1371,6 +1424,69 @@ export type Database = {
           },
         ]
       }
+      employee_permissions: {
+        Row: {
+          created_at: string
+          date: string
+          decision_at: string | null
+          decision_by: string | null
+          decision_note: string | null
+          duration_hours: number
+          employee_id: string
+          end_time: string
+          id: string
+          reason: string
+          start_time: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          decision_at?: string | null
+          decision_by?: string | null
+          decision_note?: string | null
+          duration_hours: number
+          employee_id: string
+          end_time: string
+          id?: string
+          reason: string
+          start_time: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          decision_at?: string | null
+          decision_by?: string | null
+          decision_note?: string | null
+          duration_hours?: number
+          employee_id?: string
+          end_time?: string
+          id?: string
+          reason?: string
+          start_time?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_permissions_decision_by_fkey"
+            columns: ["decision_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_permissions_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_shifts: {
         Row: {
           created_at: string
@@ -1832,6 +1948,33 @@ export type Database = {
           },
         ]
       }
+      graduations: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          name_ar: string
+          name_en: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name_ar: string
+          name_en: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name_ar?: string
+          name_en?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       holiday_types: {
         Row: {
           affects_attendance: boolean
@@ -2168,6 +2311,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      majors: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          name_ar: string
+          name_en: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name_ar: string
+          name_en: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name_ar?: string
+          name_en?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       manager_assignment_history: {
         Row: {
@@ -2815,6 +2985,7 @@ export type Database = {
           full_name: string | null
           full_name_ar: string | null
           gender: string | null
+          graduation_id: string | null
           id: string
           id_expiry_date: string | null
           id_issue_date: string | null
@@ -2827,6 +2998,7 @@ export type Database = {
           job_grade: string | null
           last_action_date: string | null
           locale: string
+          major_id: string | null
           manager_id: string | null
           martyrs_fund_applicable: boolean
           medical_insurance: number | null
@@ -2881,6 +3053,7 @@ export type Database = {
           full_name?: string | null
           full_name_ar?: string | null
           gender?: string | null
+          graduation_id?: string | null
           id: string
           id_expiry_date?: string | null
           id_issue_date?: string | null
@@ -2893,6 +3066,7 @@ export type Database = {
           job_grade?: string | null
           last_action_date?: string | null
           locale?: string
+          major_id?: string | null
           manager_id?: string | null
           martyrs_fund_applicable?: boolean
           medical_insurance?: number | null
@@ -2947,6 +3121,7 @@ export type Database = {
           full_name?: string | null
           full_name_ar?: string | null
           gender?: string | null
+          graduation_id?: string | null
           id?: string
           id_expiry_date?: string | null
           id_issue_date?: string | null
@@ -2959,6 +3134,7 @@ export type Database = {
           job_grade?: string | null
           last_action_date?: string | null
           locale?: string
+          major_id?: string | null
           manager_id?: string | null
           martyrs_fund_applicable?: boolean
           medical_insurance?: number | null
@@ -3011,6 +3187,20 @@ export type Database = {
             columns: ["district_id"]
             isOneToOne: false
             referencedRelation: "districts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_graduation_id_fkey"
+            columns: ["graduation_id"]
+            isOneToOne: false
+            referencedRelation: "graduations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_major_id_fkey"
+            columns: ["major_id"]
+            isOneToOne: false
+            referencedRelation: "majors"
             referencedColumns: ["id"]
           },
           {
