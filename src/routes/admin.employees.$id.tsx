@@ -414,6 +414,7 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [nationalIdErr, setNationalIdErr] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   function validateNationalId(id: string, isPassport: boolean): string | null {
     if (!id) return "Required";
@@ -422,6 +423,46 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
     }
     return /^[23]\d{13}$/.test(id) ? null : "Must be 14 digits starting with 2 or 3";
   }
+
+  const isIsoDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(new Date(v + "T00:00:00").getTime());
+
+  /** Full inline validation: required fields, date sanity, employment/compensation consistency. */
+  function validateForm(): Record<string, string> {
+    const fe: Record<string, string> = {};
+    if (!form.full_name.trim() || form.full_name.trim().length < 2) fe.full_name = "Full name is required (min 2 characters).";
+    if (form.extra_email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.extra_email.trim())) fe.extra_email = "Invalid email address.";
+    const nidErr = validateNationalId(form.national_id.trim(), form.is_passport);
+    if (nidErr) fe.national_id = nidErr;
+    if (form.id_issue_date && !isIsoDate(form.id_issue_date)) fe.id_issue_date = "Invalid date.";
+    if (form.id_expiry_date && !isIsoDate(form.id_expiry_date)) fe.id_expiry_date = "Invalid date.";
+    if (!fe.id_issue_date && !fe.id_expiry_date && form.id_issue_date && form.id_expiry_date && form.id_issue_date > form.id_expiry_date) {
+      fe.id_expiry_date = "Expiry date must be on or after the issue date.";
+    }
+    if (!fe.id_expiry_date && form.id_expiry_date && !form.allow_past_expiry) {
+      const today = new Date().toISOString().slice(0, 10);
+      if (form.id_expiry_date < today) fe.id_expiry_date = "Expiry date is in the past — tick the override to save anyway.";
+    }
+    if (form.contract_start_date && !isIsoDate(form.contract_start_date)) fe.contract_start_date = "Invalid date.";
+    if (form.contract_end_date && !isIsoDate(form.contract_end_date)) fe.contract_end_date = "Invalid date.";
+    if (!fe.contract_start_date && !fe.contract_end_date && form.contract_start_date && form.contract_end_date && form.contract_start_date > form.contract_end_date) {
+      fe.contract_end_date = "Contract end must be on or after the start date.";
+    }
+    const gross = Number(form.salary_gross) || 0;
+    const net = Number(form.salary_net) || 0;
+    const insurance = Number(form.insurance_salary) || 0;
+    if (gross < 0) fe.salary_gross = "Salary cannot be negative.";
+    if (net < 0) fe.salary_net = "Salary cannot be negative.";
+    if (!fe.salary_gross && !fe.salary_net && gross > 0 && net > gross) fe.salary_net = "Net salary cannot exceed gross salary.";
+    if (insurance < 0) fe.insurance_salary = "Insurance salary cannot be negative.";
+    else if (gross > 0 && insurance > gross) fe.insurance_salary = "Insurance salary cannot exceed gross salary.";
+    if ((Number(form.allowance) || 0) < 0) fe.allowance = "Allowance cannot be negative.";
+    if ((Number(form.emergency_fund) || 0) < 0) fe.emergency_fund = "Amount cannot be negative.";
+    if ((Number(form.target_value) || 0) < 0) fe.target_value = "Target value cannot be negative.";
+    if (form.status === "Inactive" && !form.inactive_reason) fe.inactive_reason = t("inactiveReasonRequired");
+    return fe;
+  }
+
+  const clr = (key: string) => setFieldErrors((fe) => (fe[key] ? { ...fe, [key]: "" } : fe));
 
   const upd = <K extends keyof typeof form>(k: K, v: typeof form[K]) => setForm((f) => ({ ...f, [k]: v }));
   const districtsForCity = (locs?.districts ?? []).filter((d) => !form.city_id || d.city_id === form.city_id);
