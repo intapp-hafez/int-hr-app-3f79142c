@@ -489,39 +489,20 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
 
   async function save() {
     setErr(null);
-    if (!form.national_id) {
-      setErr("National ID is required");
+    const fe = validateForm();
+    const firstErrorKey = Object.keys(fe).find((k) => fe[k]);
+    if (firstErrorKey) {
+      setFieldErrors(fe);
+      if (fe.national_id) setNationalIdErr(fe.national_id);
+      setErr("Please fix the highlighted fields before saving.");
+      requestAnimationFrame(() => {
+        document.querySelector(`[data-field="${firstErrorKey}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
       return;
     }
-    if (form.is_passport) {
-      if (!/^[a-zA-Z0-9]{1,15}$/.test(form.national_id)) {
-        setErr("Invalid passport format");
-        return;
-      }
-    } else {
-      if (!/^[23]\d{13}$/.test(form.national_id)) {
-        setErr("Must be 14 digits starting with 2 or 3");
-        return;
-      }
-    }
-    if (form.id_issue_date && form.id_expiry_date && form.id_issue_date > form.id_expiry_date) {
-      setErr("Issue date cannot be after expiry date.");
-      return;
-    }
-    if (form.id_expiry_date && !form.allow_past_expiry) {
-      const today = new Date().toISOString().slice(0, 10);
-      if (form.id_expiry_date < today) {
-        setErr("Expiry date is in the past. Tick the override to save anyway.");
-        return;
-      }
-    }
+    setFieldErrors({});
     setSaving(true);
     try {
-      if (form.status === "Inactive" && !form.inactive_reason) {
-        setErr(t("inactiveReasonRequired"));
-        setSaving(false);
-        return;
-      }
       await updateFn({
         data: {
           id: detail.id,
