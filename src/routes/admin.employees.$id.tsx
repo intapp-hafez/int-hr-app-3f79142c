@@ -1672,12 +1672,12 @@ function AdminOffboarding({
 
 const editInputCls = "w-full rounded-xl border border-input bg-background px-3 py-2 text-sm";
 
-function EditField({ label, children, error }: { label: string; children: React.ReactNode; error?: string }) {
+function EditField({ label, children, error, fieldKey }: { label: string; children: React.ReactNode; error?: string; fieldKey?: string }) {
   return (
-    <label className="block">
+    <label className="block" data-field={error ? fieldKey : undefined}>
       <span className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{label}</span>
       {children}
-      {error && <p className="mt-1 text-xs font-medium text-destructive">{error}</p>}
+      {error && <p role="alert" className="mt-1 text-xs font-medium text-destructive">{error}</p>}
     </label>
   );
 }
