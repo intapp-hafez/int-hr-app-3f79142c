@@ -1,3 +1,4 @@
+import { ExportProfilePdf } from "@/components/admin/ExportProfilePdf";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { EmployeeAvatar } from "@/components/EmployeeAvatar";
@@ -970,12 +971,21 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
           <div className="space-y-5 min-w-0">
             {sideTab === "overview" && (
               <div className="rounded-3xl border border-border bg-card p-5">
-                <h2 className="mb-5 font-display text-base font-semibold">Overview</h2>
+                <div className="mb-5 flex items-center justify-between gap-3">
+                  <h2 className="font-display text-base font-semibold">Overview</h2>
+                  <ExportProfilePdf detail={detail as any} />
+                </div>
                 <div className="space-y-6 text-sm">
                   <section aria-labelledby="overview-identity">
                     <h3 id="overview-identity" className="mb-3 text-xs font-semibold uppercase text-muted-foreground">Identity &amp; ID</h3>
                     <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+                      <Info icon={UserIcon} label="Full name" value={detail.full_name ?? "—"} />
                       <Info icon={UserIcon} label={t("fullNameAr" as any) ?? "Full name (Arabic)"} value={detail.full_name_ar ?? "—"} />
+                      <Info icon={FileText} label="Email" value={detail.email ?? "—"} />
+                      <Info icon={FileText} label="Extra Email" value={(detail as any).extra_email ?? "—"} />
+                      <Info icon={Phone} label="Phone" value={detail.phone ?? "—"} mono />
+                      <Info icon={UserIcon} label="Gender" value={detail.gender ? String(detail.gender).replace(/^./, (c) => c.toUpperCase()) : "—"} />
+                      <Info icon={FileText} label="ID Type" value={detail.national_id ? (/^\d{14}$/.test(detail.national_id) ? "National ID" : "Passport") : "—"} />
                       <Info icon={Calendar} label="Employee Code" value={detail.emp_code ?? "—"} mono />
                       <Info icon={FileText} label="National ID" value={detail.national_id ?? "—"} mono />
                       <Info icon={Calendar} label="ID Issue Date" value={detail.id_issue_date ?? "—"} />
@@ -993,6 +1003,44 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
                       <Info icon={Clock} label={t("shift" as any) ?? "Shift"} value={detail.shift_name ?? "—"} />
                       <Info icon={Plane} label="Job Grade (Trips)" value={detail.job_grade ?? "—"} />
                       <Info icon={UserIcon} label="Is Insured" value={(detail as any).is_insured ? "Yes" : "No"} />
+                    </div>
+                  </section>
+                  <section aria-labelledby="overview-education" className="border-t border-border pt-5">
+                    <h3 id="overview-education" className="mb-3 text-xs font-semibold uppercase text-muted-foreground">Education</h3>
+                    <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+                      <Info icon={FileText} label="Graduation" value={(detail as any).graduation ?? "—"} />
+                      <Info icon={FileText} label="Major" value={(detail as any).major ?? "—"} />
+                    </div>
+                  </section>
+                  <section aria-labelledby="overview-contract" className="border-t border-border pt-5">
+                    <h3 id="overview-contract" className="mb-3 text-xs font-semibold uppercase text-muted-foreground">Contract</h3>
+                    <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+                      <Info icon={Building2} label="Section" value={(detail as any).section_name ?? "—"} />
+                      <Info icon={FileText} label="Contract Type" value={(detail as any).contract_type ?? "—"} />
+                      <Info icon={Calendar} label="Contract Start" value={(detail as any).contract_start_date ?? "—"} />
+                      <Info icon={Calendar} label="Contract End" value={(detail as any).contract_end_date ?? "—"} />
+                    </div>
+                  </section>
+                  <section aria-labelledby="overview-comp" className="border-t border-border pt-5">
+                    <h3 id="overview-comp" className="mb-3 text-xs font-semibold uppercase text-muted-foreground">Compensation &amp; insurance</h3>
+                    <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+                      {(() => { const d = detail as any; const n = (v: any) => (v === null || v === undefined || v === "" ? "—" : Number(v).toLocaleString()); return (<>
+                      <Info icon={Banknote} label="Salary Basis" value={d.salary_mode ? String(d.salary_mode).toUpperCase() : "—"} />
+                      <Info icon={Banknote} label="Gross Salary" value={n(d.salary_gross)} />
+                      <Info icon={Banknote} label="Net Salary" value={n(d.salary_net)} />
+                      <Info icon={Banknote} label="Allowance" value={n(d.allowance)} />
+                      <Info icon={ShieldCheck} label="Insurance Salary" value={n(d.insurance_salary)} />
+                      <Info icon={ShieldCheck} label="Emergency Relief Fund" value={n(d.emergency_fund)} />
+                      <Info icon={Briefcase} label="Target Value" value={n(d.target_value)} />
+                      <Info icon={Clock} label="Target Duration" value={d.target_duration ?? "—"} />
+                      <Info icon={CreditCard} label="Bank Name" value={d.bank_name ?? "—"} />
+                      <Info icon={CreditCard} label="Bank Account" value={d.bank_account_number ?? "—"} mono />
+                      <Info icon={ShieldCheck} label="Medical Insurance Type" value={d.medical_insurance_type ?? "—"} />
+                      <Info icon={ShieldCheck} label="Medical Insurance No." value={d.medical_insurance_number ?? "—"} mono />
+                      <Info icon={ShieldCheck} label="Medical Insurance Details" value={d.medical_insurance_details ?? "—"} />
+                      <Info icon={Calendar} label="Social Insurance Date" value={d.social_insurance_date ?? "—"} />
+                      <Info icon={Calendar} label="Military Expire Date" value={d.military_expire_date ?? "—"} />
+                      </>); })()}
                     </div>
                   </section>
                   <section aria-labelledby="overview-location" className="border-t border-border pt-5">
