@@ -1339,6 +1339,24 @@ export const getEmployeeDetail = createServerFn({ method: "POST" })
     }
     if (error) throw new Error(error.message);
     if (!p) return null;
+    // Optional columns — tolerate older schemas.
+    const extra: Record<string, any> = {};
+    try {
+      const ex = await supabase.from("profiles").select("graduation_id, major_id, section_id, bank_name, bank_account_number").eq("id", data.id).maybeSingle();
+      if (!ex.error && ex.data) Object.assign(extra, ex.data);
+    } catch {}
+    const lookupName = async (table: string, id: any) => {
+      if (!id) return null;
+      try {
+        const r = await (supabase as any).from(table).select("*").eq("id", id).maybeSingle();
+        return r.data ? (r.data.name_en ?? r.data.name ?? null) : null;
+      } catch { return null; }
+    };
+    const [gradName, majorName, sectionName] = await Promise.all([
+      lookupName("graduations", extra.graduation_id),
+      lookupName("majors", extra.major_id),
+      lookupName("sections", extra.section_id),
+    ]);
     const [{ data: dept }, { data: pos }, { data: roles }, { data: mgr }, { data: cityRow }, { data: distRow }, ccRow, shiftRow] = await Promise.all([
       (p as any).department_id
         ? supabase.from("departments").select("name_en").eq("id", (p as any).department_id).maybeSingle()
@@ -1417,9 +1435,13 @@ export const getEmployeeDetail = createServerFn({ method: "POST" })
       roles: (roles ?? []).map((r: any) => String(r.role)),
       insurance_salary: (p as any).insurance_salary !== null && (p as any).insurance_salary !== undefined ? Number((p as any).insurance_salary) : null,
       emergency_fund: (p as any).emergency_fund !== null && (p as any).emergency_fund !== undefined ? Number((p as any).emergency_fund) : null,
-      bank_name: (p as any).bank_name ?? null,
-      bank_account_number: (p as any).bank_account_number ?? null,
-    };
+      bank_name: extra.bank_name ?? (p as any).bank_name ?? null,
+      bank_account_number: extra.bank_account_number ?? (p as any).bank_account_number ?? null,
+      graduation: gradName,
+      major: majorName,
+      section_id: extra.section_id ?? null,
+      section_name: sectionName,
+    } as any;
   });
 
 async function assertAdminOrHr(supabase: any, userId: string) {
