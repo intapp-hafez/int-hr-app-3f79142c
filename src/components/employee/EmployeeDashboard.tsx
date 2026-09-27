@@ -9,7 +9,6 @@ import {
   FileText,
   CalendarCheck2,
   TrendingUp,
-  MoreHorizontal,
   ArrowUpRight,
   Clock,
   Calendar,
@@ -18,6 +17,7 @@ import {
   Award,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { useI18n, useTranslators } from "@/lib/i18n";
 import { getMe } from "@/backend/functions/auth.functions";
 import { listMyAttendance } from "@/backend/functions/attendance.functions";
@@ -103,176 +103,66 @@ export function EmployeeDashboard() {
   );
 
   const localeTag = lang === "ar" ? "ar-EG" : "en-GB";
-  const time = now.toLocaleTimeString(localeTag, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   const date = now.toLocaleDateString(localeTag, { weekday: "long", day: "numeric", month: "long" });
 
   const loading = meQ.isLoading || attQ.isLoading;
 
   return (
     <div className="space-y-5">
-      <section className="text-center">
-        <p className="text-sm text-muted-foreground">{t("welcome")}</p>
-        <h1 className="font-display text-2xl font-semibold tracking-tight">
+      <section className="min-w-0 text-start">
+        <p className="text-xs font-medium text-muted-foreground">{t("welcome")}</p>
+        <h1 className="mt-1 break-words font-display text-2xl font-semibold">
           {loading ? "…" : tName(profile?.full_name) || profile?.email || "—"}
         </h1>
-        <p className="text-xs text-muted-foreground">
+        <p className="mt-1 text-xs text-muted-foreground">
           {tDept(profile?.department ?? "")} {profile?.branch ? `• ${tBranch(profile.branch)}` : ""}
         </p>
       </section>
 
-      {/* 6 Action & Module Cards */}
-      <section className="grid grid-cols-2 gap-3 sm:gap-4">
-        {/* 1 - Check in-Out (Emerald / Green) */}
-        <Link
-          to="/employee/check"
-          className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/15 via-emerald-500/5 to-card p-4 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-500/60 hover:shadow-md hover:shadow-emerald-500/10 active:scale-[0.98]"
-        >
-          <div className="flex items-start justify-between">
-            <div className={`flex h-11 w-11 items-center justify-center rounded-xl shadow-md transition-colors ${
-              isCheckedIn
-                ? "bg-emerald-600 text-white shadow-emerald-600/30"
-                : "bg-emerald-500 text-white shadow-emerald-500/30"
-            }`}>
-              {isCheckedIn ? <LogOut className="h-5 w-5" /> : <LogIn className="h-5 w-5" />}
-            </div>
-            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold border ${
-              isCheckedIn
-                ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
-                : dayComplete
-                  ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/25"
-                  : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20"
-            }`}>
-              {isCheckedIn && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />}
-              {isCheckedIn ? t("checkIn") : dayComplete ? t("checkOut") + " ✓" : t("ready") || "Check In"}
-            </span>
-          </div>
-          <div className="mt-4">
-            <h3 className="font-display text-sm font-semibold text-foreground group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-              {t("checkInOut")}
-            </h3>
-            <p className="mt-0.5 text-[11px] text-muted-foreground truncate">
+      <Link
+        to="/employee/check"
+        className="group block rounded-md border border-border bg-card p-4 shadow-soft transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent"
+      >
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-muted-foreground">{date}</p>
+            <h2 className="mt-2 font-display text-lg font-semibold text-foreground">{t("checkInOut")}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
               {todayRow?.in_time
                 ? `${new Date(todayRow.in_time).toLocaleTimeString(localeTag, { hour: "2-digit", minute: "2-digit" })}${todayRow.out_time ? ` → ${new Date(todayRow.out_time).toLocaleTimeString(localeTag, { hour: "2-digit", minute: "2-digit" })}` : ""}`
-                : "Biometric & GPS"}
+                : t("ready")}
             </p>
           </div>
-        </Link>
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-md bg-primary text-primary-foreground">
+            {isCheckedIn ? <LogOut className="h-5 w-5" /> : <LogIn className="h-5 w-5" />}
+          </span>
+        </div>
+        <div className="mt-4 flex items-center justify-between border-t border-border pt-3 text-sm font-semibold text-primary">
+          <span>{isCheckedIn ? t("checkOut") : dayComplete ? t("checkInOut") : t("checkIn")}</span>
+          <ArrowUpRight className="h-4 w-4 rtl:-scale-x-100" />
+        </div>
+      </Link>
 
-        {/* 2 - My Tasks (Electric Sky Blue) */}
-        <Link
-          to="/employee/tasks"
-          className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-blue-500/30 bg-gradient-to-br from-blue-500/15 via-sky-500/5 to-card p-4 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-500/60 hover:shadow-md hover:shadow-blue-500/10 active:scale-[0.98]"
-        >
-          <div className="flex items-start justify-between">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-500/30">
-              <ListChecks className="h-5 w-5" />
-            </div>
-            <span className="inline-flex items-center rounded-full bg-blue-500/20 px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:text-blue-300 border border-blue-500/30">
-              {myTasks.length} {t("tasks")}
-            </span>
-          </div>
-          <div className="mt-4">
-            <h3 className="font-display text-sm font-semibold text-foreground group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-              {t("myTasks")}
-            </h3>
-            <p className="mt-0.5 text-[11px] text-muted-foreground truncate">
-              {completedTasksCount} {t("completed") || "done"} · {myTasks.length} {t("pending") || "pending"}
-            </p>
-          </div>
-        </Link>
-
-        {/* 3 - Requests (Leaves, Permissions, loans) (Warm Amber / Sunset Orange) */}
-        <Link
-          to="/employee/leaves"
-          className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-500/15 via-orange-500/5 to-card p-4 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-500/60 hover:shadow-md hover:shadow-amber-500/10 active:scale-[0.98]"
-        >
-          <div className="flex items-start justify-between">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-500 text-white shadow-md shadow-amber-500/30">
-              <FileText className="h-5 w-5" />
-            </div>
-            <span className="inline-flex items-center rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-300 border border-amber-500/30">
-              {monthStats.leaves} {t("leaves")}
-            </span>
-          </div>
-          <div className="mt-4">
-            <h3 className="font-display text-sm font-semibold text-foreground group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
-              {lang === "ar" ? "الطلبات" : "Requests"}
-            </h3>
-            <p className="mt-0.5 text-[11px] text-muted-foreground line-clamp-1">
-              {lang === "ar" ? "إجازات، أذونات، سلف" : "Leaves, Permissions, loans"}
-            </p>
-          </div>
-        </Link>
-
-        {/* 4 - Attendance Records (Royal Violet / Purple) */}
-        <Link
-          to="/employee/attendance"
-          className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-violet-500/30 bg-gradient-to-br from-violet-500/15 via-purple-500/5 to-card p-4 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-violet-500/60 hover:shadow-md hover:shadow-violet-500/10 active:scale-[0.98]"
-        >
-          <div className="flex items-start justify-between">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-600 text-white shadow-md shadow-violet-500/30">
-              <CalendarCheck2 className="h-5 w-5" />
-            </div>
-            <span className="inline-flex items-center rounded-full bg-violet-500/20 px-2 py-0.5 text-[10px] font-semibold text-violet-700 dark:text-violet-300 border border-violet-500/30">
-              {monthStats.present} {t("present")}
-            </span>
-          </div>
-          <div className="mt-4">
-            <h3 className="font-display text-sm font-semibold text-foreground group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors">
-              {t("attendanceRecords")}
-            </h3>
-            <p className="mt-0.5 text-[11px] text-muted-foreground truncate">
-              {monthStats.late} {t("late")} · {t("history") || "Monthly records"}
-            </p>
-          </div>
-        </Link>
-
-        {/* 5 - KPIS (Hot Rose / Fuchsia) */}
-        <button
-          type="button"
-          onClick={() => setShowKpiModal(true)}
-          className="group relative flex flex-col justify-between text-start overflow-hidden rounded-2xl border border-rose-500/30 bg-gradient-to-br from-rose-500/15 via-pink-500/5 to-card p-4 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-rose-500/60 hover:shadow-md hover:shadow-rose-500/10 active:scale-[0.98]"
-        >
-          <div className="flex items-start justify-between w-full">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-rose-500 text-white shadow-md shadow-rose-500/30">
-              <TrendingUp className="h-5 w-5" />
-            </div>
-            <span className="inline-flex items-center rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] font-semibold text-rose-700 dark:text-rose-300 border border-rose-500/30">
-              {monthStats.attendanceRate}%
-            </span>
-          </div>
-          <div className="mt-4 w-full">
-            <h3 className="font-display text-sm font-semibold text-foreground group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors">
-              {t("kpis")}
-            </h3>
-            <p className="mt-0.5 text-[11px] text-muted-foreground truncate">
-              {lang === "ar" ? "الأداء والأهداف" : "Performance & Goals"}
-            </p>
-          </div>
-        </button>
-
-        {/* 6 - More (Ocean Teal / Cyan) */}
-        <Link
-          to="/employee/settings"
-          className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-teal-500/30 bg-gradient-to-br from-teal-500/15 via-cyan-500/5 to-card p-4 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-teal-500/60 hover:shadow-md hover:shadow-teal-500/10 active:scale-[0.98]"
-        >
-          <div className="flex items-start justify-between">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-teal-600 text-white shadow-md shadow-teal-500/30">
-              <MoreHorizontal className="h-5 w-5" />
-            </div>
-            <div className="grid h-7 w-7 place-items-center rounded-full bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/30 group-hover:bg-teal-500 group-hover:text-white transition-colors">
-              <ArrowUpRight className="h-4 w-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-            </div>
-          </div>
-          <div className="mt-4">
-            <h3 className="font-display text-sm font-semibold text-foreground group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
-              {t("more")}
-            </h3>
-            <p className="mt-0.5 text-[11px] text-muted-foreground truncate">
-              {lang === "ar" ? "الإعدادات، الملف، الأجهزة" : "Settings, Profile & Devices"}
-            </p>
-          </div>
-        </Link>
+      <section className="space-y-3">
+        <h2 className="font-display text-base font-semibold text-foreground">{lang === "ar" ? "مساحة العمل" : "Workspace"}</h2>
+        <div className="grid grid-cols-2 gap-2.5">
+          <Link to="/employee/tasks" className="flex min-w-0 flex-col gap-3 rounded-md border border-border bg-card p-3.5 transition-colors hover:border-info/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted">
+            <ListChecks className="h-5 w-5 text-info" />
+            <div className="min-w-0"><h3 className="text-sm font-semibold">{t("myTasks")}</h3><p className="mt-1 text-xs text-muted-foreground">{myTasks.length} {t("pending")}</p></div>
+          </Link>
+          <Link to="/employee/leaves" className="flex min-w-0 flex-col gap-3 rounded-md border border-border bg-card p-3.5 transition-colors hover:border-warning/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted">
+            <FileText className="h-5 w-5 text-warning-foreground" />
+            <div className="min-w-0"><h3 className="text-sm font-semibold">{lang === "ar" ? "الطلبات" : "Requests"}</h3><p className="mt-1 text-xs text-muted-foreground">{monthStats.leaves} {t("leaves")}</p></div>
+          </Link>
+          <Link to="/employee/attendance" className="flex min-w-0 flex-col gap-3 rounded-md border border-border bg-card p-3.5 transition-colors hover:border-success/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted">
+            <CalendarCheck2 className="h-5 w-5 text-success" />
+            <div className="min-w-0"><h3 className="text-sm font-semibold">{t("attendance")}</h3><p className="mt-1 text-xs text-muted-foreground">{monthStats.present} {t("present")}</p></div>
+          </Link>
+          <Button type="button" variant="outline" onClick={() => setShowKpiModal(true)} className="h-auto min-w-0 flex-col items-start gap-3 whitespace-normal rounded-md border-border bg-card p-3.5 text-start shadow-none hover:border-primary/40 hover:bg-muted">
+            <TrendingUp className="h-5 w-5 text-primary" />
+            <div className="min-w-0"><h3 className="text-sm font-semibold">{t("kpis")}</h3><p className="mt-1 text-xs text-muted-foreground">{monthStats.attendanceRate}% {t("attendanceRate")}</p></div>
+          </Button>
+        </div>
       </section>
 
       {/* KPI Details Modal */}
