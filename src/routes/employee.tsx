@@ -58,8 +58,9 @@ function EmployeeLayout() {
       <div className="mx-auto flex min-h-screen max-w-md flex-col bg-background shadow-soft">
         <header className="sticky top-0 z-20 border-b border-border bg-background/95 px-4 pb-3 pt-[max(env(safe-area-inset-top),0.75rem)] backdrop-blur-md">
           <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-            <Link to="/employee" aria-label={t("dashboard")} className="min-w-0 w-fit rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <AppLogo size={23} withWordmark hideWordmarkOnMobile={false} badge="" />
+            <Link to="/employee" aria-label={t("dashboard")} className="flex min-w-0 w-fit items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <AppLogo size={23} withWordmark={false} />
+              <span className="truncate font-display text-base font-bold text-foreground">INT<span className="text-brand">·</span>HR</span>
             </Link>
             <div className="shrink-0"><UserMenu size="sm" /></div>
           </div>

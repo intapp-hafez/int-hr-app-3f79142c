@@ -17,6 +17,7 @@ import {
   Award,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { useI18n, useTranslators } from "@/lib/i18n";
 import { getMe } from "@/backend/functions/auth.functions";
 import { listMyAttendance } from "@/backend/functions/attendance.functions";
@@ -157,10 +158,10 @@ export function EmployeeDashboard() {
             <CalendarCheck2 className="h-5 w-5 text-success" />
             <div className="min-w-0"><h3 className="text-sm font-semibold">{t("attendance")}</h3><p className="mt-1 text-xs text-muted-foreground">{monthStats.present} {t("present")}</p></div>
           </Link>
-          <button type="button" onClick={() => setShowKpiModal(true)} className="flex min-w-0 flex-col gap-3 rounded-md border border-border bg-card p-3.5 text-start transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted">
+          <Button type="button" variant="outline" onClick={() => setShowKpiModal(true)} className="h-auto min-w-0 flex-col items-start gap-3 whitespace-normal rounded-md border-border bg-card p-3.5 text-start shadow-none hover:border-primary/40 hover:bg-muted">
             <TrendingUp className="h-5 w-5 text-primary" />
             <div className="min-w-0"><h3 className="text-sm font-semibold">{t("kpis")}</h3><p className="mt-1 text-xs text-muted-foreground">{monthStats.attendanceRate}% {t("attendanceRate")}</p></div>
-          </button>
+          </Button>
         </div>
       </section>
 
