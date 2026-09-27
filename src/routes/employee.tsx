@@ -14,7 +14,7 @@ export const Route = createFileRoute("/employee")({
 });
 
 function EmployeeLayout() {
-  const { t, dir } = useI18n();
+  const { t, dir, lang } = useI18n();
   const path = useRouterState({ select: (s) => s.location.pathname });
   const session = useSession();
   const ready = useAuthReady();
@@ -45,12 +45,13 @@ function EmployeeLayout() {
   const items = [
     { to: "/employee", icon: Home, label: t("dashboard") },
     { to: "/employee/attendance", icon: Clock, label: t("attendance") },
-    { to: "/employee/check", icon: LogIn, label: t("checkInOut") },
+    { to: "/employee/check", icon: LogIn, label: lang === "ar" ? "حضور" : "Check" },
     { to: "/employee/tasks", icon: ListChecks, label: t("tasks") },
     { to: "/employee/settings", icon: MoreHorizontal, label: t("more") },
   ] as const;
-  const currentPage = items.find((item) => item.to === path)?.label ??
-    (path.startsWith("/employee/chat") ? "Messages" : path.startsWith("/employee/notifications") ? t("notifications") : t("more"));
+  const currentPage = path === "/employee/check" ? t("checkInOut") :
+    items.find((item) => item.to === path)?.label ??
+    (path.startsWith("/employee/chat") ? lang === "ar" ? "الرسائل" : "Messages" : path.startsWith("/employee/notifications") ? t("notifications") : t("more"));
 
   return (
     <div dir={dir} className="min-h-screen bg-muted/40">
@@ -68,30 +69,30 @@ function EmployeeLayout() {
             <h2 className="min-w-0 truncate font-display text-lg font-semibold text-foreground">{currentPage}</h2>
             <div className="flex shrink-0 items-center gap-1.5">
               <LanguageToggle compact />
-            <Link
-              to="/employee/chat"
-              aria-label="Messages & Chat"
-              className="relative grid h-9 w-9 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <MessageSquare className="h-5 w-5" />
-              {chatUnreadCount > 0 && (
-                <span className="absolute -end-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 text-[10px] font-semibold text-brand-foreground">
-                  {chatUnreadCount}
-                </span>
-              )}
-            </Link>
-            <Link
-              to="/employee/notifications"
-              aria-label={t("notifications")}
-              className="relative grid h-9 w-9 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <Bell className="h-5 w-5" />
-              {unreadCount > 0 && (
-                <span className="absolute -end-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 text-[10px] font-semibold text-brand-foreground">
-                  {unreadCount}
-                </span>
-              )}
-            </Link>
+              <Link
+                to="/employee/chat"
+                aria-label="Messages & Chat"
+                className="relative grid h-9 w-9 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <MessageSquare className="h-5 w-5" />
+                {chatUnreadCount > 0 && (
+                  <span className="absolute -end-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 text-[10px] font-semibold text-brand-foreground">
+                    {chatUnreadCount}
+                  </span>
+                )}
+              </Link>
+              <Link
+                to="/employee/notifications"
+                aria-label={t("notifications")}
+                className="relative grid h-9 w-9 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <Bell className="h-5 w-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute -end-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 text-[10px] font-semibold text-brand-foreground">
+                    {unreadCount}
+                  </span>
+                )}
+              </Link>
             </div>
           </div>
         </header>

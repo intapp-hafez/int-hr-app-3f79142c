@@ -138,7 +138,7 @@ export function EmployeeDashboard() {
           </span>
         </div>
         <div className="mt-4 flex items-center justify-between border-t border-border pt-3 text-sm font-semibold text-primary">
-          <span>{isCheckedIn ? t("checkOut") : dayComplete ? t("attendanceRecords") : t("checkIn")}</span>
+          <span>{isCheckedIn ? t("checkOut") : dayComplete ? t("checkInOut") : t("checkIn")}</span>
           <ArrowUpRight className="h-4 w-4 rtl:-scale-x-100" />
         </div>
       </Link>
