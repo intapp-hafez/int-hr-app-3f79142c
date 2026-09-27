@@ -26,11 +26,14 @@ const ExperienceCertificate = lazy(() => import("@/components/admin/HrDocuments"
 const SalaryCertificate = lazy(() => import("@/components/admin/HrDocuments").then((mod) => ({ default: mod.SalaryCertificate })));
 const AdvancesAcknowledgment = lazy(() => import("@/components/admin/HrDocuments").then((mod) => ({ default: mod.AdvancesAcknowledgment })));
 const CustodyAcknowledgment = lazy(() => import("@/components/admin/HrDocuments").then((mod) => ({ default: mod.CustodyAcknowledgment })));
-
 const LoanRequestForm = lazy(() => import("@/components/admin/HrDocuments").then((mod) => ({ default: mod.LoanRequestForm })));
+const InvestigationForm = lazy(() => import("@/components/admin/HrDocuments").then((mod) => ({ default: mod.InvestigationForm })));
+const FirstWarningForm = lazy(() => import("@/components/admin/HrDocuments").then((mod) => ({ default: mod.FirstWarningForm })));
+const SecondWarningForm = lazy(() => import("@/components/admin/HrDocuments").then((mod) => ({ default: mod.SecondWarningForm })));
+const SocialInsuranceForm1 = lazy(() => import("@/components/admin/HrDocuments").then((mod) => ({ default: mod.SocialInsuranceForm1 })));
 
-type Tab = "departments" | "sections" | "positions" | "job_grades" | "graduations" | "majors" | "cities" | "cost_centers" | "networks" | "devices" | "contractTemplates" | "sms" | "experienceCertificate" | "salaryDetails" | "advancesAck" | "custodyAck" | "loanRequest";
-const validTabs: Tab[] = ["departments", "sections", "positions", "job_grades", "graduations", "majors", "cities", "cost_centers", "networks", "devices", "contractTemplates", "sms", "experienceCertificate", "salaryDetails", "advancesAck", "custodyAck", "loanRequest"];
+type Tab = "departments" | "sections" | "positions" | "job_grades" | "graduations" | "majors" | "cities" | "cost_centers" | "networks" | "devices" | "contractTemplates" | "sms" | "experienceCertificate" | "salaryDetails" | "advancesAck" | "custodyAck" | "loanRequest" | "investigation" | "warning1" | "warning2" | "socialIns1";
+const validTabs: Tab[] = ["departments", "sections", "positions", "job_grades", "graduations", "majors", "cities", "cost_centers", "networks", "devices", "contractTemplates", "sms", "experienceCertificate", "salaryDetails", "advancesAck", "custodyAck", "loanRequest", "investigation", "warning1", "warning2", "socialIns1"];
 
 export const Route = createFileRoute("/admin/directory")({
   component: DirectoryPage,
@@ -60,6 +63,10 @@ const tabs: { id: Tab; label: string }[] = [
   { id: "advancesAck", label: "Advances Acknowledgment" },
   { id: "custodyAck", label: "Custody Acknowledgment" },
   { id: "loanRequest", label: "Loan Request Form" },
+  { id: "investigation", label: "Investigation Form" },
+  { id: "warning1", label: "First Warning" },
+  { id: "warning2", label: "Second Warning" },
+  { id: "socialIns1", label: "Form 1 (س1)" },
 ];
 
 const PAGE_SIZE = 10;
@@ -157,6 +164,26 @@ function DirectoryPage() {
         {tab === "custodyAck" && (
           <Suspense fallback={<div className="h-40 rounded-2xl bg-muted/30" />}>
             <CustodyAcknowledgment />
+          </Suspense>
+        )}
+        {tab === "investigation" && (
+          <Suspense fallback={<div className="h-40 rounded-2xl bg-muted/30" />}>
+            <InvestigationForm />
+          </Suspense>
+        )}
+        {tab === "warning1" && (
+          <Suspense fallback={<div className="h-40 rounded-2xl bg-muted/30" />}>
+            <FirstWarningForm />
+          </Suspense>
+        )}
+        {tab === "warning2" && (
+          <Suspense fallback={<div className="h-40 rounded-2xl bg-muted/30" />}>
+            <SecondWarningForm />
+          </Suspense>
+        )}
+        {tab === "socialIns1" && (
+          <Suspense fallback={<div className="h-40 rounded-2xl bg-muted/30" />}>
+            <SocialInsuranceForm1 />
           </Suspense>
         )}
       </div>

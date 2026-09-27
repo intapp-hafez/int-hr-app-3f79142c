@@ -65,6 +65,7 @@ function EmployeesPage() {
   const [deptFilter, setDeptFilter] = useState("");
   const [posFilter, setPosFilter] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
+  const [genderFilter, setGenderFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<"" | "Active" | "Inactive">("");
   const [inactiveReasonFilter, setInactiveReasonFilter] = useState<"" | InactiveReason>("");
   const [page, setPage] = useState(1);
@@ -84,13 +85,13 @@ function EmployeesPage() {
     staleTime: 60_000,
   });
   const isAdmin = (me?.roles ?? []).includes("admin");
-  const queryKey = ["admin", "employees", "list", { q, deptFilter, posFilter, roleFilter, statusFilter, inactiveReasonFilter, page, pageSize, sort, dir }] as const;
+  const queryKey = ["admin", "employees", "list", { q, deptFilter, posFilter, roleFilter, genderFilter, statusFilter, inactiveReasonFilter, page, pageSize, sort, dir }] as const;
   const { data, isLoading, isFetching } = useQuery<ListEmployeesResult>({
     queryKey,
     queryFn: () => listFn({
       data: {
         q, departmentId: deptFilter, positionId: posFilter, role: roleFilter,
-        status: statusFilter, inactiveReason: inactiveReasonFilter,
+        gender: genderFilter, status: statusFilter, inactiveReason: inactiveReasonFilter,
         page, pageSize, sort, dir,
       },
     }),
@@ -238,6 +239,12 @@ function EmployeesPage() {
           <option value="">All roles</option>
           {allRoles.map((r) => <option key={r} value={r}>{r}</option>)}
         </select>
+        <select value={genderFilter} onChange={(e) => { setGenderFilter(e.target.value); resetPage(); }}
+          className="rounded-full border border-input bg-card px-3 py-2 text-sm">
+          <option value="">All genders</option>
+          <option value="male">Male</option>
+          <option value="female">Female</option>
+        </select>
         <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value as any); setInactiveReasonFilter(""); resetPage(); }}
           className="rounded-full border border-input bg-card px-3 py-2 text-sm">
           <option value="">All statuses</option>
@@ -251,9 +258,9 @@ function EmployeesPage() {
             {INACTIVE_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
           </select>
         )}
-        {(deptFilter || posFilter || roleFilter || statusFilter || inactiveReasonFilter || q) && (
+        {(deptFilter || posFilter || roleFilter || genderFilter || statusFilter || inactiveReasonFilter || q) && (
           <button
-            onClick={() => { setQ(""); setDeptFilter(""); setPosFilter(""); setRoleFilter(""); setStatusFilter(""); setInactiveReasonFilter(""); resetPage(); }}
+            onClick={() => { setQ(""); setDeptFilter(""); setPosFilter(""); setRoleFilter(""); setGenderFilter(""); setStatusFilter(""); setInactiveReasonFilter(""); resetPage(); }}
             className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-3 py-2 text-xs"
           ><X className="h-3 w-3" /> Clear</button>
         )}
@@ -372,7 +379,15 @@ function EmployeesPage() {
                     <div>
                       <p className="font-medium">{e.full_name ?? "—"}</p>
                       {e.full_name_ar && <p className="text-xs text-muted-foreground" dir="rtl">{e.full_name_ar}</p>}
-                      <p className="text-[11px] text-muted-foreground">{e.email}</p>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <p className="text-[11px] text-muted-foreground">{e.email}</p>
+                        {e.gender && (
+                          <>
+                            <span className="text-[11px] text-muted-foreground">·</span>
+                            <span className="text-[11px] font-medium uppercase text-muted-foreground">{e.gender}</span>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </td>
@@ -565,6 +580,8 @@ function EditEmployeeDrawer({
   const [shiftId, setShiftId] = useState<string>(row.shift_id ?? "");
   const [medicalInsuranceNumber, setMedicalInsuranceNumber] = useState<string>(row.medical_insurance_number ?? "");
   const [medicalInsuranceType, setMedicalInsuranceType] = useState<string>(row.medical_insurance_type ?? "");
+  const [insuranceNumber, setInsuranceNumber] = useState<string>(row.insurance_number ?? "");
+  const [isInsured, setIsInsured] = useState<boolean>(!!row.is_insured);
   const [bankName, setBankName] = useState<string>(row.bank_name ?? "");
   const [bankAccountNumber, setBankAccountNumber] = useState<string>(row.bank_account_number ?? "");
   const [status, setStatus] = useState<"Active" | "Inactive">(row.status === "Inactive" ? "Inactive" : "Active");
@@ -613,6 +630,8 @@ function EditEmployeeDrawer({
           shift_id: shiftId || null,
           medical_insurance_number: medicalInsuranceNumber.trim() || null,
           medical_insurance_type: (medicalInsuranceType || null) as any,
+          insurance_number: insuranceNumber.trim() || null,
+          is_insured: isInsured,
           bank_name: bankName.trim() || null,
           bank_account_number: bankAccountNumber.trim() || null,
           status,
@@ -735,6 +754,27 @@ function EditEmployeeDrawer({
               <option value="Private">{t("insurancePrivate")}</option>
               <option value="Governmental">{t("insuranceGovernmental")}</option>
             </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">Social Insurance Number</span>
+            <input 
+              value={insuranceNumber} 
+              onChange={(e) => {
+                const val = e.target.value;
+                setInsuranceNumber(val);
+                if (val.trim()) setIsInsured(true);
+              }} 
+              className="w-full rounded-xl border border-input bg-card px-3 py-2 text-sm font-mono" 
+            />
+          </label>
+          <label className="block flex items-center gap-2 mt-6">
+            <input 
+              type="checkbox" 
+              checked={isInsured} 
+              onChange={(e) => setIsInsured(e.target.checked)} 
+              className="h-4 w-4 accent-brand" 
+            />
+            <span className="text-sm font-medium text-muted-foreground">Is Insured</span>
           </label>
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-muted-foreground">{t("medicalInsuranceNumber")}</span>

@@ -54,13 +54,13 @@ export function AttendancePage() {
   }, [attQ.data]);
 
   return (
-    <div className="min-w-0 space-y-6">
-      <header className="space-y-1 text-start">
-        <h1 className="font-display text-2xl font-semibold">{t("attendanceRecords")}</h1>
-        <p className="text-sm text-muted-foreground">{t("attendanceSubtitle")}</p>
+    <div className="space-y-5">
+      <header className="text-center space-y-1">
+        <h1 className="font-display text-2xl font-semibold tracking-tight">{t("attendance")}</h1>
+        <p className="text-xs text-muted-foreground">{t("attendanceSubtitle")}</p>
       </header>
 
-      <section className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+      <section className="grid grid-cols-4 gap-2">
         <Stat label={t("present")} value={stats.present} tone="text-success" />
         <Stat label={t("late")} value={stats.late} tone="text-warning-foreground" />
         <Stat label={t("absent")} value={stats.absent} tone="text-destructive" />
@@ -75,26 +75,26 @@ export function AttendancePage() {
 
       <section className="space-y-2">
         {attQ.isLoading && (
-          <div className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">{t("loading")}</div>
+          <div className="rounded-2xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground">{t("loading")}</div>
         )}
         {!attQ.isLoading && (attQ.data ?? []).length === 0 && (
-          <div className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">{t("noAttendanceRecordsYet")}</div>
+          <div className="rounded-2xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground">{t("noAttendanceRecordsYet")}</div>
         )}
         {(attQ.data ?? []).map((a: any) => {
           const overlapping = approvedLeaves.filter((l: any) => dateInRange(a.date, l.start_date, l.end_date));
           const hasGeo = a.lat != null && a.lng != null;
           const hours = hoursBetween(a.in_time, a.out_time);
           return (
-            <article key={a.id} className="min-w-0 space-y-3 rounded-md border border-border bg-card p-4">
-              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
-                <div className="min-w-0">
+            <article key={a.id} className="rounded-2xl border border-border bg-card p-4 space-y-2">
+              <div className="flex items-start justify-between gap-2">
+                <div>
                   <p className="text-sm font-semibold">{formatDate(a.date)}</p>
-                  <p className="mt-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-                    <Clock className="h-3.5 w-3.5 shrink-0" /> {fmtTime(a.in_time)} → {fmtTime(a.out_time)}
-                    {hours && <span className="font-mono tabular-nums">· {hours}</span>}
+                  <p className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
+                    <Clock className="h-3 w-3" /> {fmtTime(a.in_time)} → {fmtTime(a.out_time)}
+                    {hours && <span className="ml-1 font-mono tabular-nums">· {hours}</span>}
                   </p>
                 </div>
-                <span className={`shrink-0 rounded-sm px-2 py-1 text-[10px] font-semibold uppercase ${statusStyle[a.status] ?? "bg-muted text-muted-foreground"}`}>
+                <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${statusStyle[a.status] ?? "bg-muted text-muted-foreground"}`}>
                   {a.status}
                 </span>
               </div>
@@ -149,9 +149,9 @@ export function AttendancePage() {
 
 function Stat({ label, value, tone }: { label: string; value: number; tone: string }) {
   return (
-    <div className="min-w-0 rounded-md border border-border bg-card px-3 py-3 text-start">
-      <p className={`font-display text-2xl font-semibold tabular-nums ${tone}`}>{value}</p>
-      <p className="mt-1 truncate text-xs text-muted-foreground">{label}</p>
+    <div className="rounded-2xl border border-border bg-card p-3 text-center">
+      <p className={`font-display text-xl font-semibold tabular-nums ${tone}`}>{value}</p>
+      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
     </div>
   );
 }

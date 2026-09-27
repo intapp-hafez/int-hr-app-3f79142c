@@ -18,6 +18,7 @@ export type AdminEmployeeRow = {
   district: string | null;
   roles: string[];
   status: string;
+  gender: string | null;
   inactive_reason: string | null;
   avatar_url: string | null;
   created_at: string;
@@ -29,7 +30,9 @@ export type AdminEmployeeRow = {
   section_id: string | null;
   job_grade: string | null;
   medical_insurance_number?: string | null;
+  insurance_number?: string | null;
   medical_insurance_type?: string | null;
+  is_insured?: boolean | null;
   bank_name?: string | null;
   bank_account_number?: string | null;
 };
@@ -188,6 +191,7 @@ export const listEmployeesAdmin = createServerFn({ method: "POST" })
         positionId: z.string().optional().default(""),
         role: z.string().optional().default(""),
         status: z.enum(["", "Active", "Inactive"]).optional().default(""),
+        gender: z.string().optional().default(""),
         inactiveReason: z.string().optional().default(""),
       })
       .parse(input ?? {}),
@@ -225,7 +229,7 @@ export const listEmployeesAdmin = createServerFn({ method: "POST" })
     let q = supabase
       .from("profiles")
       .select(
-        "id, emp_code, full_name, full_name_ar, cost_center_id, email, phone, department_id, position_id, city, district, status, inactive_reason, avatar_url, created_at, contract_start_date, contract_end_date, contract_cancelled, medical_insurance_number, medical_insurance_type",
+        "id, emp_code, full_name, full_name_ar, gender, cost_center_id, email, phone, department_id, position_id, city, district, status, inactive_reason, avatar_url, created_at, contract_start_date, contract_end_date, contract_cancelled, medical_insurance_number, medical_insurance_type, insurance_number, is_insured",
         { count: "exact" },
       );
 
@@ -240,6 +244,7 @@ export const listEmployeesAdmin = createServerFn({ method: "POST" })
     }
     if (data.departmentId) q = q.eq("department_id", data.departmentId);
     if (data.positionId) q = q.eq("position_id", data.positionId);
+    if (data.gender) q = q.eq("gender", data.gender);
     if (data.status) q = q.eq("status", data.status);
     if (data.inactiveReason) q = q.eq("inactive_reason", data.inactiveReason);
     if (roleUserIds) q = q.in("id", roleUserIds);
@@ -257,7 +262,7 @@ export const listEmployeesAdmin = createServerFn({ method: "POST" })
       let qFallback = supabase
         .from("profiles")
         .select(
-          "id, emp_code, full_name, email, phone, department_id, position_id, city, district, status, inactive_reason, avatar_url, created_at, contract_start_date, contract_end_date, contract_cancelled",
+          "id, emp_code, full_name, gender, email, phone, department_id, position_id, city, district, status, inactive_reason, avatar_url, created_at, contract_start_date, contract_end_date, contract_cancelled",
           { count: "exact" },
         );
       if (data.q) {
@@ -271,6 +276,7 @@ export const listEmployeesAdmin = createServerFn({ method: "POST" })
       }
       if (data.departmentId) qFallback = qFallback.eq("department_id", data.departmentId);
       if (data.positionId) qFallback = qFallback.eq("position_id", data.positionId);
+      if (data.gender) qFallback = qFallback.eq("gender", data.gender);
       if (data.status) qFallback = qFallback.eq("status", data.status);
       if (data.inactiveReason) qFallback = qFallback.eq("inactive_reason", data.inactiveReason);
       if (roleUserIds) qFallback = qFallback.in("id", roleUserIds);
@@ -309,6 +315,7 @@ export const listEmployeesAdmin = createServerFn({ method: "POST" })
       position_id: p.position_id ?? null,
       department: p.department_id ? (dMap.get(p.department_id) ?? null) : null,
       position: p.position_id ? (pMap.get(p.position_id) ?? null) : null,
+      gender: p.gender ?? null,
       city: p.city,
       district: p.district,
       status: p.status ?? "Active",
@@ -323,7 +330,9 @@ export const listEmployeesAdmin = createServerFn({ method: "POST" })
       section_id: p.section_id ?? null,
       job_grade: p.job_grade ?? null,
       medical_insurance_number: p.medical_insurance_number ?? null,
+      insurance_number: p.insurance_number ?? null,
       medical_insurance_type: p.medical_insurance_type ?? null,
+      is_insured: p.is_insured ?? false,
       bank_name: (p as any).bank_name ?? null,
       bank_account_number: (p as any).bank_account_number ?? null,
       roles: (rolesRows ?? []).filter((r: any) => r.user_id === p.id).map((r: any) => String(r.role)),
@@ -381,6 +390,7 @@ export const updateEmployeeAdmin = createServerFn({ method: "POST" })
         extra_email: z.string().email().max(255).nullable().optional().or(z.literal("")),
         medical_insurance_details: z.string().max(1000).nullable().optional(),
         medical_insurance_number: z.string().max(100).nullable().optional().or(z.literal("")),
+        insurance_number: z.string().max(100).nullable().optional().or(z.literal("")),
         medical_insurance_type: z.enum(["Private", "Governmental"]).nullable().optional().or(z.literal("")),
         is_insured: z.boolean().optional(),
         military_expire_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional().or(z.literal("")),
@@ -458,6 +468,7 @@ export const updateEmployeeAdmin = createServerFn({ method: "POST" })
     if (data.extra_email !== undefined) patch.extra_email = data.extra_email === "" ? null : data.extra_email;
     if (data.medical_insurance_details !== undefined) patch.medical_insurance_details = data.medical_insurance_details;
     if (data.medical_insurance_number !== undefined) patch.medical_insurance_number = data.medical_insurance_number === "" ? null : data.medical_insurance_number;
+    if (data.insurance_number !== undefined) patch.insurance_number = data.insurance_number === "" ? null : data.insurance_number;
     if (data.medical_insurance_type !== undefined) patch.medical_insurance_type = data.medical_insurance_type === "" ? null : data.medical_insurance_type;
     if (data.is_insured !== undefined) patch.is_insured = data.is_insured;
     if (data.military_expire_date !== undefined) patch.military_expire_date = data.military_expire_date === "" ? null : data.military_expire_date;
@@ -1302,6 +1313,7 @@ export type EmployeeDetail = {
   medical_insurance_details: string | null;
   medical_insurance_number: string | null;
   medical_insurance_type: string | null;
+  insurance_number: string | null;
   is_insured: boolean;
   military_expire_date: string | null;
   is_five_percent: boolean;
@@ -1323,7 +1335,7 @@ export const getEmployeeDetail = createServerFn({ method: "POST" })
     const { supabase } = context;
     let { data: p, error } = await supabase
       .from("profiles")
-      .select("id, emp_code, full_name, full_name_ar, cost_center_id, email, phone, gender, department_id, position_id, city_id, district_id, city, district, status, inactive_reason, avatar_url, manager_id, locale, national_id, id_issue_date, id_expiry_date, salary_mode, salary_gross, salary_net, allowance, target_value, target_duration, contract_type, contract_start_date, contract_end_date, contract_cancelled, job_grade, extra_email, medical_insurance_details, medical_insurance_number, medical_insurance_type, is_insured, military_expire_date, is_five_percent, social_insurance_date, custom_field, last_action_date, created_at, updated_at, insurance_salary, emergency_fund, employment_documents_checklist")
+      .select("id, emp_code, full_name, full_name_ar, cost_center_id, email, phone, gender, department_id, position_id, city_id, district_id, city, district, status, inactive_reason, avatar_url, manager_id, locale, national_id, id_issue_date, id_expiry_date, salary_mode, salary_gross, salary_net, allowance, target_value, target_duration, contract_type, contract_start_date, contract_end_date, contract_cancelled, job_grade, extra_email, medical_insurance_details, medical_insurance_number, medical_insurance_type, insurance_number, is_insured, military_expire_date, is_five_percent, social_insurance_date, custom_field, last_action_date, created_at, updated_at, insurance_salary, emergency_fund, employment_documents_checklist")
       .eq("id", data.id)
       .maybeSingle();
     if (error && (
@@ -1334,7 +1346,7 @@ export const getEmployeeDetail = createServerFn({ method: "POST" })
     )) {
       const fb = await supabase
         .from("profiles")
-        .select("id, emp_code, full_name, email, phone, gender, department_id, position_id, city_id, district_id, city, district, status, inactive_reason, avatar_url, manager_id, locale, national_id, id_issue_date, id_expiry_date, salary_mode, salary_gross, salary_net, allowance, target_value, target_duration, contract_type, contract_start_date, contract_end_date, contract_cancelled, job_grade, extra_email, medical_insurance_details, is_insured, military_expire_date, is_five_percent, social_insurance_date, custom_field, last_action_date, created_at, updated_at, insurance_salary, emergency_fund, employment_documents_checklist")
+        .select("id, emp_code, full_name, email, phone, gender, department_id, position_id, city_id, district_id, city, district, status, inactive_reason, avatar_url, manager_id, locale, national_id, id_issue_date, id_expiry_date, salary_mode, salary_gross, salary_net, allowance, target_value, target_duration, contract_type, contract_start_date, contract_end_date, contract_cancelled, job_grade, extra_email, medical_insurance_details, insurance_number, is_insured, military_expire_date, is_five_percent, social_insurance_date, custom_field, last_action_date, created_at, updated_at, insurance_salary, emergency_fund, employment_documents_checklist")
         .eq("id", data.id)
         .maybeSingle();
       p = fb.data as any;
@@ -1427,6 +1439,7 @@ export const getEmployeeDetail = createServerFn({ method: "POST" })
       medical_insurance_details: (p as any).medical_insurance_details ?? null,
       medical_insurance_number: (p as any).medical_insurance_number ?? null,
       medical_insurance_type: (p as any).medical_insurance_type ?? null,
+      insurance_number: (p as any).insurance_number ?? null,
       is_insured: !!(p as any).is_insured,
       military_expire_date: (p as any).military_expire_date ?? null,
       is_five_percent: !!(p as any).is_five_percent,

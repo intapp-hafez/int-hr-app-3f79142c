@@ -386,6 +386,7 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
     military_expire_date: (detail as any).military_expire_date ?? "",
     is_five_percent: !!(detail as any).is_five_percent,
     social_insurance_date: (detail as any).social_insurance_date ?? "",
+    insurance_number: (detail as any).insurance_number ?? "",
     custom_field: (detail as any).custom_field ?? "",
     bank_name: (detail as any).bank_name ?? "",
     bank_account_number: (detail as any).bank_account_number ?? "",
@@ -547,6 +548,7 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
           military_expire_date: form.military_expire_date || null,
           is_five_percent: form.is_five_percent,
           social_insurance_date: form.social_insurance_date || null,
+          insurance_number: form.insurance_number.trim() || null,
           custom_field: form.custom_field.trim() || null,
           bank_name: form.bank_name.trim() || null,
           bank_account_number: form.bank_account_number.trim() || null,
@@ -809,6 +811,17 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
               <input className={editInputCls + " font-mono"} value={form.bank_account_number} onChange={(e) => upd("bank_account_number", e.target.value)} placeholder="e.g. 100023456789 or IBAN" />
             </EditField>
 
+            <EditField label="Social Insurance Number">
+              <input 
+                className={editInputCls + " font-mono"} 
+                value={form.insurance_number} 
+                onChange={(e) => {
+                  const val = e.target.value;
+                  upd("insurance_number", val);
+                  if (val.trim()) upd("is_insured", true);
+                }} 
+              />
+            </EditField>
             <EditField label="Social Insurance Date">
               <input type="date" className={editInputCls + " font-mono"} value={form.social_insurance_date} onChange={(e) => upd("social_insurance_date", e.target.value)} />
             </EditField>

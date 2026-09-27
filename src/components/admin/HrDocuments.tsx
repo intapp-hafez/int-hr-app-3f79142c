@@ -188,7 +188,7 @@ function EmployeePicker({ picker, label = "Employee" }: { picker: ReturnType<typ
   );
 }
 
-function DocShell({ children }: { children: React.ReactNode }) {
+function DocShell({ children, formCode }: { children: React.ReactNode, formCode?: string }) {
   return (
     <div
       id="hr-doc-print-area"
@@ -197,10 +197,17 @@ function DocShell({ children }: { children: React.ReactNode }) {
       style={{ fontFamily: "'Traditional Arabic', 'Amiri', 'Segoe UI', serif" }}
     >
       <div className="mb-6 flex items-center justify-between border-b-2 border-gray-800 pb-4">
-        <AppLogo size={34} />
-        <div className="text-left text-xs text-gray-500">
-          <p>تاريخ الإصدار: {formatDate(todayISO())}</p>
-        </div>
+        <img src="/int-logo%20for%20docx.png" alt="Integrated Technics Logo" className="h-16 object-contain" />
+        {formCode ? (
+          <div className="flex flex-col items-center justify-center border border-gray-800 px-4 py-2 rounded text-gray-900 bg-white">
+            <span className="text-[11px] font-semibold mb-0.5">تاريخ الإصدار: {formatDate(todayISO())}</span>
+            <span className="text-sm font-bold">نموذج رقم {formCode}</span>
+          </div>
+        ) : (
+          <div className="text-left text-xs text-gray-500">
+            <p>تاريخ الإصدار: {formatDate(todayISO())}</p>
+          </div>
+        )}
       </div>
       {children}
     </div>
@@ -214,6 +221,18 @@ function InfoRow({ label, value }: { label: string; value?: string | number | nu
       <span>{value ?? "—"}</span>
     </div>
   );
+}
+
+function EmployeeDocName({ e }: { e: any }) {
+  if (e.full_name_ar && e.full_name) {
+    return (
+      <span className="inline-flex flex-col items-center align-middle mx-1 leading-tight">
+        <span>{e.full_name_ar}</span>
+        <span className="text-xs font-normal text-gray-500 font-sans tracking-wide mt-1">{e.full_name}</span>
+      </span>
+    );
+  }
+  return <span className="mx-1">{e.full_name_ar || e.full_name}</span>;
 }
 
 function SignatureBlock() {
@@ -253,29 +272,29 @@ export function ExperienceCertificate() {
           <p className="mb-6 text-center text-xs text-gray-500">Experience Certificate</p>
 
           <p className="mb-4 text-sm leading-8 text-justify">
-            تشهد إدارة الشركة بأن السيد/ة <strong>{e.full_name}</strong>
+            تشهد إدارة الشركة بأن {e.gender === "female" ? "السيدة" : "السيد"}/ <strong className="inline-flex items-center"><EmployeeDocName e={e} /></strong>
             {e.national_id ? <> (بطاقة رقم قومي: <strong>{e.national_id}</strong>)</> : ""}
-            ، قد عمل / يعمل لدينا بوظيفة <strong>{e.position ?? "—"}</strong> بقسم <strong>{e.department ?? "—"}</strong>
+            ، قد {e.gender === "female" ? "عملت / تعمل" : "عمل / يعمل"} لدينا بوظيفة <strong>{e.position ?? "—"}</strong> بقسم <strong>{e.department ?? "—"}</strong>
             {e.contract_start_date ? (
               <> اعتباراً من تاريخ <strong>{formatDate(e.contract_start_date)}</strong></>
             ) : null}
             {e.contract_end_date ? (
               <> وحتى تاريخ <strong>{formatDate(e.contract_end_date)}</strong></>
             ) : (
-              <>، وما زال على رأس عمله حتى تاريخه</>
+              <>، وما زال{e.gender === "female" ? "ت" : ""} على رأس عمل{e.gender === "female" ? "ها" : "ه"} حتى تاريخه</>
             )}
             .
           </p>
           <p className="mb-4 text-sm leading-8 text-justify">
-            وخلال فترة عمله بالشركة أظهر الكفاءة وحسن السير والسلوك والتعاون التام مع زملائه ورؤسائه في العمل.
+            وخلال فترة عمل{e.gender === "female" ? "ها" : "ه"} بالشركة أظهر{e.gender === "female" ? "ت" : ""} الكفاءة وحسن السير والسلوك والتعاون التام مع زملائ{e.gender === "female" ? "ها" : "ه"} ورؤسائ{e.gender === "female" ? "ها" : "ه"} في العمل.
           </p>
           <p className="mb-6 text-sm leading-8 text-justify text-gray-600">
-            وقد أُعطيت له هذه الشهادة بناءً على طلبه لتقديمها إلى من يهمه الأمر دون أدنى مسؤولية أو التزام على الشركة تجاه الغير.
+            وقد أُعطيت ل{e.gender === "female" ? "ها" : "ه"} هذه الشهادة بناءً على طلب{e.gender === "female" ? "ها" : "ه"} لتقديمها إلى من يهمه الأمر دون أدنى مسؤولية أو التزام على الشركة تجاه الغير.
           </p>
 
           <h3 className="mb-2 mt-6 font-bold text-gray-800">بيانات الموظف</h3>
           <InfoRow label="كود الموظف" value={e.emp_code} />
-          <InfoRow label="الاسم بالكامل" value={e.full_name} />
+          <InfoRow label="الاسم بالكامل" value={e.full_name_ar || e.full_name} />
           <InfoRow label="الرقم القومي" value={e.national_id} />
           <InfoRow label="المسمى الوظيفي" value={e.position} />
           <InfoRow label="القسم / الإدارة" value={e.department} />
@@ -314,78 +333,55 @@ export function SalaryCertificate() {
         <p className="py-10 text-center text-sm text-muted-foreground">Loading…</p>
       ) : (
         <DocShell>
-          <h2 className="mb-1 text-center text-xl font-bold">شهادة مفردات مرتب</h2>
-          <p className="mb-6 text-center text-xs text-gray-500">Salary Details Certificate</p>
-
-          <p className="mb-4 text-sm leading-8 text-justify">
-            تشهد إدارة الشركة بأن السيد/ة <strong>{e.full_name}</strong>
-            {e.national_id ? <> (بطاقة رقم قومي: <strong>{e.national_id}</strong>)</> : ""}،
-            يعمل لدينا بوظيفة <strong>{e.position ?? "—"}</strong> بقسم <strong>{e.department ?? "—"}</strong>
-            {e.contract_start_date ? (
-              <> منذ تاريخ <strong>{formatDate(e.contract_start_date)}</strong></>
-            ) : null}
-            ، وما زال على رأس عمله حتى تاريخه، وبيان مفردات مرتبه الشهري كالآتي:
-          </p>
-
-          <h3 className="mb-2 mt-4 font-bold text-gray-800">البيانات الوظيفية</h3>
-          <InfoRow label="كود الموظف" value={e.emp_code} />
-          <InfoRow label="الاسم" value={e.full_name} />
-          <InfoRow label="الرقم القومي" value={e.national_id} />
-          <InfoRow label="الوظيفة" value={e.position} />
-          <InfoRow label="القسم" value={e.department} />
-          <InfoRow label="نوع التعاقد" value={e.contract_type} />
-          <InfoRow label="تاريخ بداية التعاقد" value={formatDate(e.contract_start_date)} />
-
-          <h3 className="mb-2 mt-6 font-bold text-gray-800">بيان مفردات المرتب الشهري</h3>
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="bg-gray-100">
-                <th className="border border-gray-300 px-3 py-2 text-right">البند</th>
-                <th className="border border-gray-300 px-3 py-2 text-right">القيمة (ج.م)</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td className="border border-gray-300 px-3 py-2 font-medium">إجمالي المرتب (Gross Salary)</td>
-                <td className="border border-gray-300 px-3 py-2 font-semibold">{fmtMoney(e.salary_gross)}</td>
-              </tr>
-              <tr>
-                <td className="border border-gray-300 px-3 py-2 font-medium">صافي المرتب (Net Salary)</td>
-                <td className="border border-gray-300 px-3 py-2 font-semibold text-brand">{fmtMoney(e.salary_net)}</td>
-              </tr>
-              <tr>
-                <td className="border border-gray-300 px-3 py-2">البدلات (Allowances)</td>
-                <td className="border border-gray-300 px-3 py-2">{fmtMoney(e.allowance)}</td>
-              </tr>
-              <tr>
-                <td className="border border-gray-300 px-3 py-2">مرتب التأمينات (Insurance Salary)</td>
-                <td className="border border-gray-300 px-3 py-2">{fmtMoney(e.insurance_salary)}</td>
-              </tr>
-              {e.emergency_fund ? (
-                <tr>
-                  <td className="border border-gray-300 px-3 py-2">صندوق الطوارئ</td>
-                  <td className="border border-gray-300 px-3 py-2">{fmtMoney(e.emergency_fund)}</td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-
-          <p className="mt-6 text-xs text-gray-500 leading-6 text-justify">
-            وقد أعطيت هذه الشهادة للموظف المذكور بناءً على طلبه لتقديمها إلى الجهات المعنية دون أدنى مسؤولية أو التزام مالي على الشركة تجاه الغير.
-          </p>
-
-          <div className="mt-12 grid grid-cols-3 gap-6 text-center text-sm">
-            <div>
-              <p className="font-bold">الإدارة المالية</p>
-              <div className="mt-10 border-t border-gray-400 pt-1 text-xs text-gray-600">الاسم والتوقيع</div>
+          <div className="mx-auto max-w-4xl bg-white px-8 py-10 text-gray-900 print:px-0 print:py-0" dir="rtl" style={{ fontFamily: 'Tajawal, Cairo, "Segoe UI", Tahoma, sans-serif' }}>
+            <div className="mb-10 text-left print:text-left">
+              <span className="text-gray-500 font-medium tracking-wider print:text-gray-800">تحريرا فى :</span>
+              <span className="mr-3 font-semibold text-gray-800">{new Date().toLocaleDateString("ar-EG")}</span>
             </div>
-            <div>
-              <p className="font-bold">الموارد البشرية</p>
-              <div className="mt-10 border-t border-gray-400 pt-1 text-xs text-gray-600">الاسم والتوقيع</div>
+
+            <div className="mb-12 space-y-2">
+              <p className="text-2xl font-bold text-gray-900">الي من يهمه الامر،،،</p>
+              <p className="text-2xl font-bold text-gray-900">تحية طيبة وبعد،،</p>
             </div>
-            <div>
-              <p className="font-bold">اعتماد الإدارة والختم</p>
-              <div className="mt-10 border-t border-gray-400 pt-1 text-xs text-gray-600">خاتم الشركة</div>
+
+            <div className="space-y-10 text-lg leading-[2.2]">
+              <p className="text-justify text-gray-800">
+                تشهد شركة التقنيات المتكاملة (Integrated Technics)
+                <br />
+                بسجل تجارى رقم <strong className="font-mono">98033</strong> ، وعنوانها/ 9و – ابراج سما – دائري المعادي- القاهره – الدور الارضي.
+              </p>
+
+              <div className="bg-gray-50/50 p-6 rounded-2xl border border-gray-100 shadow-sm print:shadow-none print:border-transparent print:bg-transparent print:p-0 space-y-4">
+                <p className="text-gray-800 flex items-center">
+                  بأن {e.gender === "female" ? "السيدة" : "السيد"}/ <strong className="text-2xl text-brand print:text-black mx-1 inline-flex items-center"><EmployeeDocName e={e} /></strong>
+                </p>
+                <div className="flex flex-wrap gap-y-4 gap-x-12">
+                  <p>
+                    بطاقة رقم: <strong className="font-mono text-xl">{e.national_id || "................................"}</strong>
+                  </p>
+                  <p>
+                    ورقمة التاميني: <strong className="font-mono text-xl">{e.insurance_number || "................................"}</strong>
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-justify text-gray-800">
+                وأن {e.gender === "female" ? "الموظفة تعمل" : "الموظف يعمل"} بالهيكل الادارى بوظيفة <strong className="text-xl">{e.position ?? "................................"}</strong> ، وذلك فى الفترة من تاريخ <strong>{e.contract_start_date ? formatDate(e.contract_start_date) : "................................"}</strong> وحتى الان بعقد يجدد تلقائياً كل سنه ، وان صافي راتب{e.gender === "female" ? "ها" : "ه"} الشهرى <strong className="text-brand print:text-black font-bold text-xl px-1">{fmtMoney(e.salary_net)}</strong>
+                <br />
+                <span className="text-gray-600">(فقط لاغير).</span>
+              </p>
+
+              <p className="text-justify text-gray-600">
+                وقد قدمت هذه الشهادة بناء على طلب{e.gender === "female" ? "ها" : "ه"} دون ادنى مسئولية على الشركة.
+              </p>
+            </div>
+
+            <div className="mt-20 flex justify-end">
+              <div className="text-center w-80">
+                <p className="mb-4 font-bold text-lg text-gray-800">وتفضلوا بقبول فائق الاحترام،،،</p>
+                <p className="mb-20 font-bold text-lg text-gray-800">مقدمة لسيادتكم شركة التقنيات المتكاملة</p>
+                <p className="border-t-[3px] border-gray-800 pt-3 font-bold text-xl text-gray-900">توقيع المديــــر المسئــــول</p>
+              </div>
             </div>
           </div>
         </DocShell>
@@ -434,10 +430,10 @@ export function AdvancesAcknowledgment() {
           <p className="mb-6 text-center text-xs text-gray-500">Advances Acknowledgment</p>
 
           <p className="mb-4 text-sm leading-8 text-justify">
-            أقر أنا الموقع أدناه <strong>{e.full_name}</strong>
+            أقر أنا الموقع أدناه <strong className="inline-flex items-center"><EmployeeDocName e={e} /></strong>
             {e.national_id ? <> (بطاقة رقم قومي: <strong>{e.national_id}</strong>)</> : null}،
-            الموظف بوظيفة <strong>{e.position ?? "—"}</strong> بقسم <strong>{e.department ?? "—"}</strong>،
-            بأنني مدين للشركة بالسلف المالية الموضحة في الجدول أدناه بإجمالي مبلغ متبقي قدره (<strong>{fmtMoney(totalAdvance)} ج.م</strong>)،
+            {e.gender === "female" ? "الموظفة" : "الموظف"} بوظيفة <strong>{e.position ?? "—"}</strong> بقسم <strong>{e.department ?? "—"}</strong>،
+            بأنني مدين{e.gender === "female" ? "ة" : ""} للشركة بالسلف المالية الموضحة في الجدول أدناه بإجمالي مبلغ متبقي قدره (<strong>{fmtMoney(totalAdvance)} ج.م</strong>)،
             وأتعهد بسداد هذا المبلغ طبقاً للأقساط المحددة، وفي حالة تركي للعمل أو انتهاء خدمتي بالشركة لأي سبب من الأسباب
             تصبح كافة المبالغ المتبقية مستحقة السداد فوراً، وأوافق دون قيد أو شرط على خصمها من مستحقاتي أو مكافآتي طرف الشركة.
           </p>
@@ -528,9 +524,9 @@ export function CustodyAcknowledgment() {
           <p className="mb-6 text-center text-xs text-gray-500">Custody Receipt &amp; Acknowledgment</p>
 
           <p className="mb-4 text-sm leading-8 text-justify">
-            أقر أنا الموقع أدناه <strong>{e.full_name}</strong>
+            أقر أنا الموقع أدناه <strong className="inline-flex items-center"><EmployeeDocName e={e} /></strong>
             {e.national_id ? <> (بطاقة رقم قومي: <strong>{e.national_id}</strong>)</> : null}،
-            الموظف بوظيفة <strong>{e.position ?? "—"}</strong> بقسم <strong>{e.department ?? "—"}</strong>،
+            {e.gender === "female" ? "الموظفة" : "الموظف"} بوظيفة <strong>{e.position ?? "—"}</strong> بقسم <strong>{e.department ?? "—"}</strong>،
             بأنني استلمت العهد والأجهزة والأدوات الموضحة أدناه بحالة جيدة وصالحة للاستعمال، وأتعهد بالمحافظة عليها
             واستخدامها فقط في أغراض العمل الموكلة إليّ، كما أتعهد بردها بالحالة التي استلمتها بها فور طلبها أو عند
             انتهاء علاقة العمل بالشركة، وفي حالة فقدها أو تلفها نتيجة الإهمال أو التقصير أتحمل قيمتها كاملة دون أدنى اعتراض،
@@ -635,7 +631,7 @@ export function LoanRequestForm() {
             <div className="grid grid-cols-2 gap-y-3 gap-x-6 text-sm">
               <div className="flex justify-between border-b border-gray-200 pb-1">
                 <span className="font-semibold text-gray-600">الاسم:</span>
-                <span className="font-bold">{e.full_name}</span>
+                <span className="font-bold inline-flex items-center"><EmployeeDocName e={e} /></span>
               </div>
               <div className="flex justify-between border-b border-gray-200 pb-1">
                 <span className="font-semibold text-gray-600">الرقم الوظيفي:</span>
@@ -728,3 +724,549 @@ export function AdvancesCustodyAcknowledgment() {
   return <AdvancesAcknowledgment />;
 }
 
+/** نموذج تحقيق مع موظف */
+export function InvestigationForm() {
+  const picker = useEmployeePicker();
+  const e = picker.detail as any;
+
+  return (
+    <div className="space-y-4">
+      <EmployeePicker picker={picker} label="Select Employee for Investigation Form" />
+      {!picker.employeeId ? (
+        <p className="py-10 text-center text-sm text-muted-foreground">Select an employee to generate the Investigation form</p>
+      ) : picker.loading || !e ? (
+        <p className="py-10 text-center text-sm text-muted-foreground">Loading…</p>
+      ) : (
+        <DocShell formCode="F-HR-020">
+          <h2 className="mb-6 mt-2 text-center text-xl font-bold underline underline-offset-8">نموذج تحقيق مع موظف</h2>
+
+          <div className="mb-6 rounded-lg border border-gray-800 p-0 shadow-sm bg-gray-50/30">
+            <table className="w-full text-sm border-collapse">
+              <tbody>
+                <tr>
+                  <td className="border-b border-l border-gray-800 p-2 font-semibold w-32 bg-gray-100">اسم الموظف:</td>
+                  <td className="border-b border-gray-800 p-2 font-bold flex items-center h-full"><EmployeeDocName e={e} /></td>
+                </tr>
+                <tr>
+                  <td className="border-b border-l border-gray-800 p-2 font-semibold w-32 bg-gray-100">الرقم الوظيفي:</td>
+                  <td className="border-b border-gray-800 p-2 font-bold">{e.emp_code || "—"}</td>
+                </tr>
+                <tr>
+                  <td className="border-b border-l border-gray-800 p-2 font-semibold w-32 bg-gray-100">الوظيفة:</td>
+                  <td className="border-b border-gray-800 p-2 font-bold">{e.position || "—"}</td>
+                </tr>
+                <tr>
+                  <td className="border-l border-gray-800 p-2 font-semibold w-32 bg-gray-100">موقع العمل:</td>
+                  <td className="p-2 font-bold">{e.department || "—"}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mb-8">
+            <p className="mb-3 font-semibold text-gray-800">حيث أن {e.gender === "female" ? "الموظفة المذكور بياناتها" : "الموظف المذكور بياناته"} أعلاه ، قد {e.gender === "female" ? "قامت" : "قام"} بالآتي:</p>
+            <div className="space-y-6 mt-4">
+              <div className="border-b-2 border-dashed border-gray-400"></div>
+              <div className="border-b-2 border-dashed border-gray-400"></div>
+              <div className="border-b-2 border-dashed border-gray-400"></div>
+            </div>
+          </div>
+
+          <div className="mb-8 mt-12">
+            <h3 className="mb-3 font-bold text-gray-800">إفادة {e.gender === "female" ? "الموظفة" : "الموظف"}:</h3>
+            <div className="space-y-6 mt-4">
+              <div className="border-b-2 border-dashed border-gray-400"></div>
+              <div className="border-b-2 border-dashed border-gray-400"></div>
+              <div className="border-b-2 border-dashed border-gray-400"></div>
+              <div className="border-b-2 border-dashed border-gray-400"></div>
+            </div>
+            
+            <div className="mt-8 flex justify-end">
+              <div className="text-left w-64">
+                <p className="font-semibold text-gray-800 mb-8 text-right">توقيع {e.gender === "female" ? "الموظفة" : "الموظف"} على إفادت{e.gender === "female" ? "ها" : "ه"}:</p>
+                <div className="border-b border-gray-500"></div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-12 mt-12">
+            <h3 className="mb-3 font-bold text-gray-800">التوصيات والقرارات:</h3>
+            <div className="space-y-6 mt-4">
+              <div className="border-b-2 border-dashed border-gray-400"></div>
+              <div className="border-b-2 border-dashed border-gray-400"></div>
+              <div className="border-b-2 border-dashed border-gray-400"></div>
+              <div className="border-b-2 border-dashed border-gray-400"></div>
+            </div>
+          </div>
+
+          <div className="mt-16 grid grid-cols-2 gap-8 text-center text-sm font-semibold text-gray-800">
+            <div className="flex flex-col items-center">
+              <p className="mb-10 text-right w-full">الاعتماد:</p>
+            </div>
+            <div className="flex flex-col justify-start text-right">
+              <p className="mb-8">موظف الشئون الإدارية الذي قام بالتحقيق:</p>
+              <div className="flex items-center mb-6">
+                <span className="w-16">الاسم:</span>
+                <div className="flex-1 border-b border-gray-500"></div>
+              </div>
+              <div className="flex items-center">
+                <span className="w-16">التوقيع:</span>
+                <div className="flex-1 border-b border-gray-500"></div>
+              </div>
+            </div>
+          </div>
+        </DocShell>
+      )}
+    </div>
+  );
+}
+
+function AbsenceWarningForm({ type }: { type: "first" | "second" }) {
+  const picker = useEmployeePicker();
+  const e = picker.detail as any;
+
+  const isFirst = type === "first";
+  const title = isFirst ? "إنذار أول بالغياب المتصل بمدة 5 أيام" : "إنذار ثاني بالغياب المتصل بمدة أيام";
+
+  return (
+    <div className="space-y-4">
+      <EmployeePicker picker={picker} label={`Select Employee for ${isFirst ? 'First' : 'Second'} Warning`} />
+      {!picker.employeeId ? (
+        <p className="py-10 text-center text-sm text-muted-foreground">Select an employee to generate the Warning form</p>
+      ) : picker.loading || !e ? (
+        <p className="py-10 text-center text-sm text-muted-foreground">Loading…</p>
+      ) : (
+        <DocShell>
+          <div className="mx-auto w-full max-w-2xl text-justify text-lg leading-[2.2]" style={{ fontFamily: "'Traditional Arabic', 'Amiri', 'Segoe UI', serif" }}>
+            <div className="mb-12 border-2 border-gray-900 bg-gray-100 p-3 text-center">
+              <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
+            </div>
+
+            <div className="mb-10 space-y-4 font-bold text-gray-900 text-xl">
+              <div className="flex">
+                <span className="w-24">التاريخ</span>
+                <span className="mr-2">: {formatDate(todayISO())}</span>
+              </div>
+              <div className="flex">
+                <span className="w-24">الإسم</span>
+                <span className="mr-2 flex items-center">: <span className="mx-2 inline-flex items-center"><EmployeeDocName e={e} /></span></span>
+              </div>
+              <div className="flex">
+                <span className="w-24">{isFirst ? "الوظيفة" : "القسم"}</span>
+                <span className="mr-2">: {isFirst ? (e.position || "................................") : (e.department || "................................")}</span>
+              </div>
+            </div>
+
+            <div className="mb-8 space-y-6">
+              <p>
+                نظراً لانقطاعكم عن العمل بشركة التقنيات المتكاملة منذ {isFirst ? "يوم" : "اليوم الاول الأحد"} ........................ الموافق &nbsp;&nbsp;&nbsp;&nbsp; / &nbsp;&nbsp;&nbsp;&nbsp; / 202 م
+                <br/>
+                و حتى يوم {isFirst ? "" : "الخميس "}........................ الموافق &nbsp;&nbsp;&nbsp;&nbsp; / &nbsp;&nbsp;&nbsp;&nbsp; / 202 م بصفة متواصلة من دون إبداء أي سبب مشروع أو إبلاغ الإدارة بسبب الانقطاع وبناء على نص قانون العمل.
+              </p>
+              
+              <p>
+                وعليه يعتبر هذا الخطاب إنذار كتابي {isFirst ? "أول وفي حال الاستمرار فى الانقطاع لمدة خمسة أيام أخرى" : "ثاني وفي حال الاستمرار فى الانقطاع"} يحق للشركة إنهاء خدمتكم وطلبكم بالتعويض المشار إليه في العقد.
+              </p>
+            </div>
+
+            <div className="mt-16 space-y-8 font-bold text-xl text-gray-900">
+              <p className="text-center underline underline-offset-8">ولكم منا جزيل الشكر,,,</p>
+              <div className="flex justify-start mt-16 pl-12">
+                <div className="text-center">
+                  <p>المدير المسئول</p>
+                  <div className="mt-12 w-48 border-b-2 border-gray-900"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </DocShell>
+      )}
+    </div>
+  );
+}
+
+export function FirstWarningForm() {
+  return <AbsenceWarningForm type="first" />;
+}
+
+export function SecondWarningForm() {
+  return <AbsenceWarningForm type="second" />;
+}
+
+
+function EditableText({ value, className }: { value?: string, className?: string }) {
+  const [key, setKey] = useState(value);
+  useEffect(() => setKey(value), [value]);
+  return (
+    <span 
+      key={key}
+      contentEditable 
+      suppressContentEditableWarning 
+      className={`outline-none hover:bg-gray-100 focus:bg-gray-100 cursor-text px-1 min-w-[20px] inline-block ${className || ""}`}
+    >
+      {value}
+    </span>
+  );
+}
+
+function DigitBox({ count, value = "" }: { count: number, value?: string }) {
+  const [val, setVal] = useState(value.toString());
+  useEffect(() => setVal(value.toString()), [value]);
+  const chars = val.padStart(count, " ").slice(-count).split("");
+  return (
+    <div className="flex relative" dir="ltr">
+      <input 
+        type="text" 
+        value={val} 
+        onChange={(e) => setVal(e.target.value.replace(/[^0-9 ]/g, '').slice(0, count))} 
+        className="absolute inset-0 opacity-0 cursor-text outline-none w-full h-full" 
+        maxLength={count}
+      />
+      {chars.map((char, i) => (
+        <div key={i} className="w-[20px] h-[24px] border border-black flex items-center justify-center font-bold text-black text-sm -ml-[1px]">
+          {char.trim()}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CheckSquare({ checked }: { checked?: boolean }) {
+  return (
+    <div className="w-[18px] h-[18px] border border-black flex items-center justify-center text-sm font-bold -mt-0.5">
+      {checked && "✓"}
+    </div>
+  );
+}
+
+export function SocialInsuranceForm1() {
+  const picker = useEmployeePicker();
+  const e = picker.detail as any;
+
+  return (
+    <div className="space-y-4">
+      <EmployeePicker picker={picker} label="Select Employee for Form 1 (س1)" />
+      {!picker.employeeId ? (
+        <p className="py-10 text-center text-sm text-muted-foreground">Select an employee to generate Form 1</p>
+      ) : picker.loading || !e ? (
+        <p className="py-10 text-center text-sm text-muted-foreground">Loading…</p>
+      ) : (
+        <div
+          id="hr-doc-print-area"
+          dir="rtl"
+          className="mx-auto w-full max-w-4xl bg-white p-8 text-black shadow-sm print:max-w-none print:p-0 print:shadow-none font-bold text-[15px]"
+          style={{ fontFamily: "'Traditional Arabic', 'Amiri', 'Segoe UI', serif", lineHeight: 1.6 }}
+        >
+          {/* Page 1 */}
+          <div className="min-h-[1050px]">
+            {/* Header */}
+            <div className="flex justify-between items-start border-b-[3px] border-black pb-2 mb-4">
+              <div className="text-right flex flex-col gap-1 w-1/3">
+                <h1 className="text-xl font-bold">الهيئة القومية للتأمين الاجتماعى</h1>
+                <h2 className="text-xl font-bold">مكتب : اكتوبر</h2>
+              </div>
+              <div className="text-center w-1/3 flex flex-col items-center">
+                 <img src="/images/social-insurance-logo.png" alt="الهيئة القومية للتأمين الاجتماعي" className="h-20 object-contain mb-1 mix-blend-multiply" />
+              </div>
+              <div className="text-left w-1/3 flex justify-end">
+                <div className="font-bold text-lg mt-2">نموذج رقم ( 1 )</div>
+              </div>
+            </div>
+            
+            <div className="text-center mt-2 mb-6">
+              <span className="text-xl font-bold px-8">طلــــــــب اشتراك مــؤمــــن عليـــــــــه</span>
+            </div>
+            
+            {/* Class Section */}
+            <div className="flex justify-between items-center mb-6 px-4">
+              <div className="flex items-center gap-4">
+                <span className="font-bold text-lg">الفئة</span>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 border border-black flex justify-center items-center font-bold">1</div>
+                    <span className="font-bold">عاملين لدى الغير</span>
+                    <div className="w-8 h-8 border-[2px] border-black flex justify-center items-center text-2xl">✓</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 border border-black flex justify-center items-center font-bold">3</div>
+                    <span className="font-bold">العاملين بالمخابز</span>
+                    <div className="w-8 h-8 border-[2px] border-black"></div>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="w-6 h-6 border border-black flex justify-center items-center font-bold">2</div>
+                <span className="font-bold">أصحاب أعمال لهم منشآت</span>
+                <div className="w-8 h-8 border-[2px] border-black"></div>
+              </div>
+            </div>
+
+            {/* Applicant Data */}
+            <div className="relative mt-8 mb-6 border-t-[2px] border-black">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-white px-6 border-[2px] border-[#4a9bd4] text-[#4a9bd4] rounded-lg text-lg font-bold">
+                بيانات مقدم الطلب
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mt-8 mb-6">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <span className="w-28 font-bold text-lg">مقدم الطلب :</span>
+                  <EditableText value="احمد رفعت فكري" className="font-bold text-lg" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-28 font-bold text-lg">الرقم التأمينى :</span>
+                  <DigitBox count={9} value="77379162" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-28 font-bold text-lg">الرقم قومى :</span>
+                  <DigitBox count={14} value="29907210102595" />
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <span className="w-36 font-bold text-lg">صفة مقدم الطلب :</span>
+                  <EditableText value="مفوض" className="font-bold text-lg" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-36 font-bold text-lg">رقم التليفون :</span>
+                  <EditableText value="01143974889" className="font-bold text-lg" />
+                </div>
+              </div>
+            </div>
+
+            {/* Insured Data */}
+            <div className="relative mt-12 mb-6 border-t-[2px] border-black">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-white px-6 border-[2px] border-[#4a9bd4] text-[#4a9bd4] rounded-lg text-lg font-bold">
+                بيانات المؤمن عليه
+              </div>
+            </div>
+
+            <div className="space-y-4 mt-8">
+              <div className="flex items-center gap-2">
+                 <span className="w-28 font-bold text-lg">الرقم التأمينى :</span>
+                 <DigitBox count={9} value={e.insurance_number || ""} />
+                 <span className="w-36 font-bold text-lg text-left pl-2">اسم المؤمن عليه :</span>
+                 <span className="font-bold text-lg flex-1"><EmployeeDocName e={e} /></span>
+              </div>
+              <div className="flex items-center gap-2">
+                 <span className="w-28 font-bold text-lg">الرقم القومى :</span>
+                 <DigitBox count={14} value={e.national_id || ""} />
+                 <span className="w-36 font-bold text-lg text-left pl-2">الجنسية :</span>
+                 <EditableText value="مصرى" className="font-bold text-lg" />
+              </div>
+              <div className="flex items-center gap-2 mt-4">
+                 <span className="w-24 font-bold text-lg">المؤهل :</span>
+                 <EditableText value="بكالوريوس هندسه" className="font-bold text-lg flex-1" />
+                 <span className="w-24 font-bold text-lg">المهنة :</span>
+                 <EditableText value={e.position || "مهندسه شبكات"} className="font-bold text-lg flex-1" />
+              </div>
+              <div className="flex items-center gap-2 mt-4">
+                 <span className="w-36 font-bold text-lg">تاريخ بدء الإشتراك :</span>
+                 <DigitBox count={8} value={new Date().toISOString().split('T')[0].replace(/-/g, "")} /> 
+                 <span className="w-20 font-bold text-lg mr-8">القطاع :</span>
+                 <EditableText value="3" className="font-bold text-lg" />
+              </div>
+              <div className="flex items-center gap-2 mt-4">
+                 <span className="w-32 font-bold text-lg">كود الاشتراك:</span>
+                 <span className="border-b-[2px] border-dotted border-orange-400 w-48"></span>
+                 <span className="w-24 font-bold text-lg mr-8">نوع المدة :</span>
+                 <span className="border-b-[2px] border-dotted border-orange-400 w-48"></span>
+              </div>
+              
+              <div className="flex items-center justify-between mt-6 px-12">
+                 <div className="flex items-center gap-2">
+                   <span className="font-bold text-lg ml-2">أجر / دخل الإشتراك</span>
+                   <div className="border border-black text-center min-w-[120px]">
+                     <div className="border-b border-black text-sm p-1">جنيــــــــــــــــــــه</div>
+                     <div className="font-bold text-xl tracking-[0.4em] py-1 relative">
+       <EditableText value={e.salary || "16700"} />
+     </div>
+                   </div>
+                 </div>
+                 <div className="flex items-center gap-2">
+                   <span className="font-bold text-lg ml-2">الأجر<br/>الشامل</span>
+                   <div className="border border-black text-center min-w-[120px]">
+                     <div className="border-b border-black text-sm p-1">جنيــــــــــــــــــــه</div>
+                     <div className="font-bold text-xl tracking-[0.4em] py-1 relative">
+       <EditableText value={e.salary ? (e.salary + 4600).toString() : "21300"} />
+     </div>
+                   </div>
+                 </div>
+              </div>
+              
+              <div className="flex items-center gap-2 mt-6">
+                 <span className="font-bold text-lg">بيانات العجز إن وجدت : تاريخ بداية العجز :</span>
+                 <DigitBox count={8} />
+                 <span className="font-bold text-lg mr-4">نسبة العجز :</span>
+                 <span className="border-b-[2px] border-dotted border-orange-400 w-32"></span>
+                 <span className="text-orange-400 font-bold">%</span>
+              </div>
+              
+              <div className="flex items-center gap-4 mt-6">
+                 <span className="font-bold text-lg">استيفاء الكشف الطبي الإبتدائى :</span>
+                 <span className="font-bold text-lg">نعم</span>
+                 <div className="w-8 h-8 border-[2px] border-black flex justify-center items-center text-2xl">✓</div>
+                 <span className="font-bold text-lg mr-4">لا</span>
+                 <div className="w-8 h-8 border-[2px] border-black"></div>
+              </div>
+            </div>
+
+            {/* Establishment Data */}
+            <div className="relative mt-12 mb-6 border-t-[2px] border-black">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-white px-6 border-[2px] border-[#4a9bd4] text-[#4a9bd4] rounded-lg text-lg font-bold">
+                بيانات المنشأة
+              </div>
+            </div>
+            
+            <div className="space-y-6 mt-8">
+              <div className="flex items-center gap-6">
+                 <span className="font-bold text-lg">نوع المنشأة :</span>
+                 <div className="flex items-center gap-2">
+                   <span className="font-bold text-lg">نمطى</span>
+                   <div className="w-6 h-6 border-[2px] border-black flex justify-center items-center font-bold">✓</div>
+                 </div>
+                 <div className="flex items-center gap-2">
+                   <span className="font-bold text-lg">سيارة</span>
+                   <div className="w-6 h-6 border-[2px] border-black"></div>
+                 </div>
+                 <div className="flex items-center gap-2">
+                   <span className="font-bold text-lg">مركب صيد</span>
+                   <div className="w-6 h-6 border-[2px] border-black"></div>
+                 </div>
+                 <div className="flex items-center gap-2">
+                   <span className="font-bold text-lg">مخابز بلدية</span>
+                   <div className="w-6 h-6 border-[2px] border-black"></div>
+                 </div>
+              </div>
+              <div className="flex items-center gap-4">
+                 <span className="font-bold text-lg">اسم المنشأة :</span>
+                 <EditableText value="التقنيات المتكامله" className="font-bold text-lg flex-1" />
+                 <span className="font-bold text-lg">رقم المنشأة :</span>
+                 <DigitBox count={7} value="2966716" />
+              </div>
+            </div>
+
+            {/* Address */}
+            <div className="relative mt-12 mb-6 border-t-[2px] border-black">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-white px-6 border-[2px] border-[#4a9bd4] text-[#4a9bd4] rounded-lg text-lg font-bold">
+                بيانات محل اقامه المؤمن عليه
+              </div>
+            </div>
+            
+            <div className="flex justify-between mt-8 px-4">
+               <div className="flex items-center gap-4">
+                 <span className="font-bold text-lg">عقار رقم</span>
+                 <EditableText value="0" className="font-bold text-lg" />
+                 <span className="font-bold text-lg mr-12">شارع :</span>
+                 <EditableText value="0" className="font-bold text-lg" />
+               </div>
+               <div className="flex items-center gap-4">
+                 <span className="font-bold text-lg">قرية #</span>
+               </div>
+               <div className="w-32"></div>
+            </div>
+            <div className="flex justify-between mt-4 px-4">
+               <div className="flex items-center gap-4">
+                 <span className="font-bold text-lg">قسم / مركز #</span>
+               </div>
+               <div className="flex items-center gap-4 mr-16">
+                 <span className="font-bold text-lg">محافظة #</span>
+               </div>
+               <div className="w-32"></div>
+            </div>
+
+            {/* Signatures */}
+            <div className="relative mt-12 mb-6 border-t-[2px] border-black">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-white px-6 border-[2px] border-[#4a9bd4] text-[#4a9bd4] rounded-lg text-lg font-bold">
+                التوقيع
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-8 mt-8">
+               <div className="space-y-6">
+                 <div className="flex gap-2 items-center">
+                   <span className="w-36 font-bold text-lg">توقيع المؤمن عليه :</span>
+                   <span className="border-b-[2px] border-dotted border-orange-400 flex-1"></span>
+                 </div>
+                 <div className="flex gap-2 items-center">
+                   <span className="w-36 font-bold text-lg">رقم التليفون :</span>
+                   <span className="border-b-[2px] border-dotted border-orange-400 flex-1"></span>
+                 </div>
+                 <div className="font-bold text-lg mt-2">تحريراً فى :</div>
+               </div>
+               <div className="space-y-4">
+                 <div className="font-bold text-lg mb-8 text-center">توقيع صاحب العمل / المدير المسئول</div>
+                 <div className="border-b-[2px] border-dotted border-orange-400 w-full mt-4"></div>
+               </div>
+            </div>
+
+            {/* Validation */}
+            <div className="relative mt-12 mb-6 border-t-[2px] border-black">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-white px-6 border-[2px] border-[#4a9bd4] text-[#4a9bd4] rounded-lg text-lg font-bold">
+                مطابقة التوقيع
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-4 mt-8 pb-12 border-b-[3px] border-black">
+               <span className="font-bold text-lg">توقيع الموظف المختص بالمطابقة :</span>
+               <span className="border-b-[2px] border-dotted border-orange-400 w-48"></span>
+               <span className="font-bold text-lg mr-8">تاريخ المطابقة :</span>
+               <EditableText className="font-bold text-lg ml-2 min-w-[20px] text-center" />
+               <span className="font-bold text-lg">/</span>
+               <EditableText className="font-bold text-lg mx-2 min-w-[20px] text-center" />
+               <span className="font-bold text-lg">/</span>
+               <EditableText className="font-bold text-lg mr-2 min-w-[40px]" />
+            </div>
+          </div>
+          
+          {/* Page 2 */}
+          <div className="break-before-page min-h-[1050px] pt-12">
+            <div className="text-center font-bold text-sm mb-4">
+              ملحوظة: على صاحب العمل والعامل الإطلاع على التوجيهات الموضحة خلف النموذج مع التوقيع على الإقرار. (انظر خلفه)
+            </div>
+            <h2 className="text-center font-bold text-2xl mb-8">إرشـــــــادات</h2>
+            
+            <div className="space-y-4 text-[17px] font-bold leading-[2]">
+              <p>1- على صاحب العمل أن يرسل هذا النموذج مع طلب اشتراكه في الهيئة لأول مرة وخلال أسبوعين على الأكثر من تاريخ التحاق أي عامل جديد بالعمل لديه سواء كان التحاقا نهائياً أو تحت الاختبار .</p>
+              <p>2- التوقيع على هذا النموذج بما يفيد الاطلاع والموافقة على جميع البيانات الواردة به ولا يجوز لمـــــن وقَّع عليها أن يعارض في تلك البيانات أمام الهيئة وله أن يلجأ إلى مكتب علاقات العمل المختص أو القضاء.</p>
+              <p>3- يستخدم هذا النموذج كطلب اشتراك في تأمين إصابات العمل فقط بالنسبة للفئات التاليه:</p>
+              <p className="pr-4">(أ) من تجاوز سن الشيخوخة وأوقف انتفاعه بتأمين الشيخوخة والعجز والوفاة.</p>
+              <p className="pr-4">(ب) العاملون الذين يخضعون لأحكام قانون العمل ممن تقل أعمارهم عن 18 سنة.</p>
+              <p className="pr-4">(ج) العاملون المتدرجون والتلاميذ الصناعيون والطلاب المشتغلون في مشروعات التشغيل الصيفي والخدمة العامة، ويشترط اعتماد النموذج المحرر لهم من المدير المسئول بالهيئة التي تشرف على التلمذة الصناعية، والتدريب مع ختمها بخاتم هذه الجهة مع إرفاق نسخة من عقد عمل المتدرب أو المستند المثبت لنوع العمل في جميع هذه الحالات.</p>
+              <p className="pr-4">(د) يقتصر استيفاء الأجر على الفئات التي يتقاضى فيها المؤمن عليه أجرا من صاحب العمل.</p>
+            </div>
+            
+            <h2 className="text-center font-bold text-2xl mt-12 mb-8">إقـــــــــرار</h2>
+            
+            <div className="flex justify-between items-center text-xl font-bold mb-4">
+              <div>اسم المنشأة التقنيات المتكامله</div>
+              <div>رقمها التأميني: 2966716</div>
+            </div>
+            <div className="text-xl font-bold mb-8">العنوان: 9و ابراج سما المعادي</div>
+            
+            <p className="text-[17px] font-bold leading-[2] text-justify mb-12">
+              أقر أنا الموقع على هذا النموذج بالالتزام بعرض المؤمن عليه على اللجنة الطبية المختصة بالهيئة المعنية بالتأمين الصحي أو الجهة الطبية المختصة لإجراء الفحص الطبي الأولي وإثبات حالته الصحية وقت توقيع الكشف الطبي مع الالتزام بموافاة بتقرير اللياقة الطبية الصادر من الجهة الطبية المختصة عن حالته الصحية خلال أسبوعين على الأكثر من تاريخ التحاقه بالعمل تطبيقا لأحكام قانون العمل.
+            </p>
+            
+            <div className="text-xl font-bold text-left pl-12 mb-20">
+              <div className="mb-12 text-center w-72 inline-block">توقيع (صاحب العمل / المدير المسئول)</div>
+              <br/>
+              <div className="w-72 inline-block text-center">( &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; )</div>
+            </div>
+            
+            <p className="text-[17px] font-bold leading-[2] text-justify mb-12">
+              أقر انا {e.full_name_ar || e.full_name ? <EmployeeDocName e={e} /> : "...................................."} العامل بالمنشأة عاليه بأن اثبت حالتي الصحية أمام اللجنة الطبية المختصة بالهيئة المعنية بالتأمين الصحي أو الجهة الطبية المختصة وموافاة الهيئة بالتقرير الطبي عن حالتي الصحية خلال أسبوعين من تاريخ التحاقي بالعمل وفي حالة عدم قيامي بذلك فإن الهيئة القومية للتأمين الاجتماعي ليس عليها أدنى التزام قانوني بعرضى على اللجان الطبية لاثبات العجدز او صرف أية مستحقات تأمينية تترتب على العجز أيا كان نوعه السابق أو المعاصر لتاريخ الالتحاق بالعمل.
+            </p>
+            
+            <div className="text-xl font-bold text-left pl-12">
+              <div className="mb-12 text-center w-72 inline-block">توقيع المؤمن عليه</div>
+              <br/>
+              <div className="w-72 inline-block text-center">( &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; )</div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
