@@ -67,6 +67,7 @@ import {
   Eye,
   EyeOff,
   Lock,
+  Printer,
 } from "lucide-react";
 import { User as UserIcon, ShieldCheck, IdCard, Briefcase, CalendarDays, Plane, AlertCircle, StickyNote as StickyNoteIcon, Plus, Banknote, CreditCard, Loader2, ExternalLink, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
@@ -1170,7 +1171,7 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
             )}
 
             {sideTab === "documents" && (
-              <DocumentsPanel profileId={detail.id} canManage={canEdit} />
+              <DocumentsPanel profileId={detail.id} canManage={canEdit} detail={detail} />
             )}
 
             {sideTab === "attendance" && (
@@ -1758,8 +1759,9 @@ const DOC_KIND_LABELS: Record<string, string> = {
   docOther: "Other",
 };
 
-function DocumentsPanel({ profileId, canManage }: { profileId: string; canManage: boolean }) {
+function DocumentsPanel({ profileId, canManage, detail }: { profileId: string; canManage: boolean; detail?: any }) {
   const qc = useQueryClient();
+  const updateFn = useServerFn(updateEmployeeAdmin);
   const listFn = useServerFn(listEmployeeDocuments);
   const uploadFn = useServerFn(uploadEmployeeDocument);
   const deleteFn = useServerFn(deleteEmployeeDocument);
@@ -1767,6 +1769,7 @@ function DocumentsPanel({ profileId, canManage }: { profileId: string; canManage
   const fileRef = useRef<HTMLInputElement>(null);
   const [kind, setKind] = useState<string>("docIdFront");
   const [busy, setBusy] = useState(false);
+  const [newDocLabel, setNewDocLabel] = useState("");
   const { data: docs, isLoading } = useQuery({
     queryKey: ["employee", "documents", profileId],
     queryFn: () => listFn({ data: { profile_id: profileId } }),
@@ -1858,6 +1861,185 @@ function DocumentsPanel({ profileId, canManage }: { profileId: string; canManage
           ))}
         </ul>
       )}
+
+      {/* Employment Documents Checklist */}
+      <div className="mt-8 border-t border-border pt-6 print:mt-0 print:border-none print:pt-0 print:bg-white print:text-black">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="font-display text-lg font-bold text-foreground print:text-2xl print:mb-2">Employment Documents Checklist</h3>
+            <p className="text-sm text-muted-foreground print:hidden">Track and manage required onboarding documents.</p>
+          </div>
+          <button
+            onClick={() => window.print()}
+            className="print:hidden flex items-center gap-2 rounded-xl bg-secondary/60 px-4 py-2 text-sm font-semibold text-secondary-foreground transition-colors hover:bg-secondary shadow-sm"
+          >
+            <Printer className="h-4 w-4" />
+            Download PDF
+          </button>
+        </div>
+        <div className="flex flex-col gap-3 print:gap-1.5">
+          {(() => {
+            const standardItems = [
+              { key: "bornIdentity", label: "Born Identity (اصل شهادة الميلاد)" },
+              { key: "graduationCert", label: "Graduation Certificate (اصل شهادة المؤهل الدراسي)" },
+              { key: "engineeringUnion", label: "Engineering Union Membership (صورة القيد بنقابة المهندسين)" },
+              { key: "militaryStatus", label: "Military Status Certificate (اصل شهادة المعاملة العسكرية)" },
+              { key: "policeDeclaration", label: "Police Declaration (صحيفة الحالة الجنائية)" },
+              { key: "workPermission", label: "Governmental Work Permission (كعب العمل)" },
+              { key: "socialInsurance", label: "Social Insurance no. Form 6 (استمارة 6)" },
+              { key: "newReceipt", label: "New Receipt (ايصال حديث كهرباء، غاز، مياه)" },
+              { key: "sixPhotos", label: "Six Personal Photos (عدد 6 صور شخصية)" },
+              { key: "personalId", label: "A Copy of Personal ID (صورة البطاقة الشخصية)" },
+              { key: "insurancePrint", label: "Insurance Print (طابعة تامينية بالمدد التامينية)" },
+              { key: "medicalForm", label: "Medical Form 111 (استماره 111 - تامين صحي)" },
+            ];
+            
+            const existingChecklist = detail?.employment_documents_checklist || {};
+            const standardKeys = new Set(standardItems.map((i) => i.key));
+            const customKeys = Object.keys(existingChecklist).filter((k) => !standardKeys.has(k) && typeof existingChecklist[k] === "object");
+            
+            const allItems = [
+              ...standardItems,
+              ...customKeys.map((k) => ({ key: k, label: k })),
+            ];
+
+            return allItems.map((item) => {
+              const current = existingChecklist[item.key] || { ticked: false, note: "" };
+              
+              const handleUpdate = async (updates: any) => {
+                if (!canManage) return;
+                const newChecklist = {
+                  ...existingChecklist,
+                  [item.key]: { ...current, ...updates }
+                };
+                
+                // Optimistic update
+                qc.setQueryData(["employee", "detail", profileId], (old: any) => old ? { ...old, employment_documents_checklist: newChecklist } : old);
+
+                try {
+                  await updateFn({ data: { id: profileId, employment_documents_checklist: newChecklist } });
+                  qc.invalidateQueries({ queryKey: ["employee", "detail", profileId] });
+                } catch (e: any) {
+                  toast.error(e.message || "Failed to update checklist");
+                }
+              };
+
+              const handleRemove = async () => {
+                if (!canManage || !confirm(`Remove custom document "${item.label}"?`)) return;
+                const newChecklist = { ...existingChecklist };
+                delete newChecklist[item.key];
+                
+                // Optimistic update
+                qc.setQueryData(["employee", "detail", profileId], (old: any) => old ? { ...old, employment_documents_checklist: newChecklist } : old);
+
+                try {
+                  await updateFn({ data: { id: profileId, employment_documents_checklist: newChecklist } });
+                  qc.invalidateQueries({ queryKey: ["employee", "detail", profileId] });
+                } catch (e: any) {
+                  toast.error(e.message || "Failed to remove checklist item");
+                }
+              };
+
+              return (
+                <div 
+                  key={item.key} 
+                  className="group relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-border bg-card p-4 transition-all hover:border-brand/30 hover:shadow-sm print:flex-row print:rounded-none print:border-b print:border-t-0 print:border-x-0 print:border-gray-300 print:bg-transparent print:p-2 print:shadow-none"
+                >
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
+                    <div className="print:hidden shrink-0">
+                      <label className="relative flex cursor-pointer items-center rounded-full">
+                        <input
+                          type="checkbox"
+                          checked={!!current.ticked}
+                          disabled={!canManage}
+                          onChange={(e) => handleUpdate({ ticked: e.target.checked })}
+                          className="peer h-6 w-6 cursor-pointer appearance-none rounded-xl border-2 border-muted-foreground/30 checked:border-brand checked:bg-brand focus:outline-none focus:ring-2 focus:ring-brand/30 focus:ring-offset-1 disabled:opacity-50 transition-all"
+                        />
+                        <Check className="absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 text-white opacity-0 peer-checked:opacity-100 transition-opacity" strokeWidth={3} />
+                      </label>
+                    </div>
+                    
+                    <div className="hidden print:block shrink-0 font-mono text-lg font-bold">
+                      {current.ticked ? "[ X ]" : "[   ]"}
+                    </div>
+
+                    <div className="flex flex-col min-w-0">
+                      <span className={`text-sm font-semibold truncate transition-colors ${current.ticked ? 'text-foreground print:text-black' : 'text-foreground/80 print:text-gray-700'}`}>
+                        {item.label}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 w-full sm:w-2/5 shrink-0">
+                    <input
+                      type="text"
+                      placeholder="Add a note..."
+                      defaultValue={current.note}
+                      disabled={!canManage}
+                      onBlur={(e) => {
+                        if (e.target.value !== current.note) {
+                          handleUpdate({ note: e.target.value });
+                        }
+                      }}
+                      className="w-full rounded-xl border-transparent bg-secondary/40 px-4 py-2.5 text-sm transition-all placeholder:text-muted-foreground/60 focus:border-brand/40 focus:bg-background focus:ring-2 focus:ring-brand/20 disabled:opacity-50 print:bg-transparent print:border-none print:px-0 print:py-0 print:text-xs print:text-gray-600"
+                    />
+                    {!standardKeys.has(item.key) && canManage && (
+                      <button
+                        onClick={handleRemove}
+                        className="print:hidden shrink-0 rounded-lg p-2.5 text-destructive/50 transition-colors hover:bg-destructive/10 hover:text-destructive"
+                        title="Remove custom item"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            });
+          })()}
+        </div>
+
+        {canManage && (
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const label = newDocLabel.trim();
+              if (!label) return;
+              const newChecklist = {
+                ...(detail?.employment_documents_checklist || {}),
+                [label]: { ticked: false, note: "" }
+              };
+              
+              // Optimistic update
+              qc.setQueryData(["employee", "detail", profileId], (old: any) => old ? { ...old, employment_documents_checklist: newChecklist } : old);
+
+              try {
+                await updateFn({ data: { id: profileId, employment_documents_checklist: newChecklist } });
+                qc.invalidateQueries({ queryKey: ["employee", "detail", profileId] });
+                setNewDocLabel("");
+              } catch (err: any) {
+                toast.error(err.message || "Failed to add document row");
+              }
+            }}
+            className="mt-4 flex flex-col sm:flex-row items-center gap-3 w-full sm:max-w-xl print:hidden"
+          >
+            <input
+              type="text"
+              placeholder="Add custom document requirement..."
+              value={newDocLabel}
+              onChange={(e) => setNewDocLabel(e.target.value)}
+              className="flex-1 w-full rounded-xl border border-input bg-background px-4 py-2.5 text-sm transition-all focus:border-brand/40 focus:ring-2 focus:ring-brand/20"
+            />
+            <button
+              type="submit"
+              disabled={!newDocLabel.trim()}
+              className="w-full sm:w-auto shrink-0 rounded-xl bg-gradient-brand px-6 py-2.5 text-sm font-semibold text-brand-foreground shadow-brand transition-all disabled:opacity-60"
+            >
+              Add Row
+            </button>
+          </form>
+        )}
+      </div>
     </div>
   );
 }
@@ -2563,26 +2745,6 @@ function AttendanceHistoryPanel({ employeeId }: { employeeId: string }) {
 }
 
 function LeavesHistoryPanel({ employeeId }: { employeeId: string }) {
-  const qc = useQueryClient();
-  const currentYear = new Date().getFullYear();
-  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
-  const [editingBalance, setEditingBalance] = useState<{
-    id: string;
-    leave_type_id: string;
-    leave_type_name: string;
-    year: number;
-    total_days: number;
-  } | null>(null);
-  const [editTotalDays, setEditTotalDays] = useState<number>(0);
-  const [savingBalance, setSavingBalance] = useState(false);
-
-  // Leave balances query
-  const balFn = useServerFn(getEmployeeLeaveBalances);
-  const { data: balances = [], isLoading: balLoading } = useQuery({
-    queryKey: ["employee", "leave-balances", employeeId, selectedYear],
-    queryFn: () => balFn({ data: { employee_id: employeeId, year: selectedYear } }),
-  });
-
   // Leave requests history query
   const fn = useServerFn(getEmployeeLeavesHistory);
   const { data: leavesData, isLoading: leavesLoading } = useQuery({
@@ -2591,164 +2753,14 @@ function LeavesHistoryPanel({ employeeId }: { employeeId: string }) {
   });
   const rows = (leavesData ?? []) as any[];
 
-  const upsertBalFn = useServerFn(upsertEmployeeLeaveBalance);
-
-  const totalEntitled = useMemo(() => balances.reduce((sum, b) => sum + (b.total_days || 0), 0), [balances]);
-  const totalUsed = useMemo(() => balances.reduce((sum, b) => sum + (b.used_days || 0), 0), [balances]);
-  const totalRemaining = useMemo(() => balances.reduce((sum, b) => sum + (b.remaining || 0), 0), [balances]);
-
   const tone = (s: string) =>
     s === "approved" ? "bg-emerald-500/10 text-emerald-600" :
       s === "rejected" ? "bg-destructive/10 text-destructive" :
         s === "cancelled" ? "bg-muted text-muted-foreground" :
           "bg-amber-500/10 text-amber-600";
 
-  async function handleSaveBalance() {
-    if (!editingBalance) return;
-    setSavingBalance(true);
-    try {
-      await upsertBalFn({
-        data: {
-          id: editingBalance.id.startsWith("virtual-") ? undefined : editingBalance.id,
-          employee_id: employeeId,
-          leave_type_id: editingBalance.leave_type_id,
-          year: editingBalance.year,
-          total_days: Number(editTotalDays) || 0,
-        },
-      });
-      toast.success("Leave balance updated");
-      await qc.invalidateQueries({ queryKey: ["employee", "leave-balances", employeeId] });
-      await qc.invalidateQueries({ queryKey: ["admin", "leave-balances"] });
-      setEditingBalance(null);
-    } catch (e: any) {
-      toast.error(e.message || "Failed to update balance");
-    } finally {
-      setSavingBalance(false);
-    }
-  }
-
   return (
     <div className="space-y-6">
-      {/* Leave Balances Section */}
-      <div className="rounded-3xl border border-border bg-card p-5">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="font-display text-base font-semibold">Leave Balances</h2>
-            <p className="text-xs text-muted-foreground">Annual entitlement, usage, and remaining leave balance</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-muted-foreground">Year</span>
-            <div className="inline-flex rounded-xl border border-border bg-background p-1 text-xs">
-              {[currentYear - 1, currentYear, currentYear + 1].map((y) => (
-                <button
-                  key={y}
-                  type="button"
-                  onClick={() => setSelectedYear(y)}
-                  className={`rounded-lg px-2.5 py-1 font-medium transition ${selectedYear === y
-                    ? "bg-primary text-primary-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
-                    }`}
-                >
-                  {y}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* High-level Summary Cards */}
-        <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div className="rounded-2xl border border-border bg-muted/30 p-4">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>Total Entitlement</span>
-              <CalendarDays className="h-4 w-4 opacity-70" />
-            </div>
-            <div className="mt-2 font-display text-2xl font-bold tracking-tight">
-              {balLoading ? "…" : `${totalEntitled} days`}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-border bg-muted/30 p-4">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>Days Used</span>
-              <Clock className="h-4 w-4 opacity-70" />
-            </div>
-            <div className="mt-2 font-display text-2xl font-bold tracking-tight text-amber-600">
-              {balLoading ? "…" : `${totalUsed} days`}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4">
-            <div className="flex items-center justify-between text-xs text-emerald-700 dark:text-emerald-400">
-              <span className="font-semibold">Remaining Balance</span>
-              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-            </div>
-            <div className="mt-2 font-display text-2xl font-bold tracking-tight text-emerald-700 dark:text-emerald-400">
-              {balLoading ? "…" : `${totalRemaining} days`}
-            </div>
-          </div>
-        </div>
-
-        {/* Leave Type Breakdown Cards */}
-        {balLoading ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">
-            <Loader2 className="mx-auto h-4 w-4 animate-spin text-muted-foreground" />
-          </p>
-        ) : balances.length === 0 ? (
-          <p className="py-4 text-center text-sm text-muted-foreground">No leave balances found for {selectedYear}.</p>
-        ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {balances.map((b) => {
-              const pct = b.total_days > 0 ? Math.min(100, Math.round((b.used_days / b.total_days) * 100)) : 0;
-              return (
-                <div key={b.id || b.leave_type_id} className="flex flex-col justify-between rounded-2xl border border-border bg-background p-4 shadow-xs">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <h3 className="text-sm font-semibold">{b.leave_type_name}</h3>
-                      <p className="text-xs text-muted-foreground font-mono">
-                        {b.used_days} used / {b.total_days} total
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${b.remaining > 0 ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" : "bg-destructive/15 text-destructive"
-                        }`}>
-                        {b.remaining}d left
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingBalance({
-                            id: b.id,
-                            leave_type_id: b.leave_type_id,
-                            leave_type_name: b.leave_type_name,
-                            year: b.year,
-                            total_days: b.total_days,
-                          });
-                          setEditTotalDays(b.total_days);
-                        }}
-                        title="Adjust balance"
-                        className="grid h-6 w-6 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
-                      >
-                        <Pencil className="h-3 w-3" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="mt-3">
-                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                      <div
-                        className={`h-full transition-all duration-300 ${pct >= 90 ? "bg-destructive" : pct >= 70 ? "bg-amber-500" : "bg-primary"
-                          }`}
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
 
       {/* Leave Requests History */}
       <div className="rounded-3xl border border-border bg-card p-5">
@@ -2777,48 +2789,6 @@ function LeavesHistoryPanel({ employeeId }: { employeeId: string }) {
         )}
       </div>
 
-      {/* Dialog to adjust balance */}
-      {editingBalance && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-sm rounded-3xl border border-border bg-card p-6 shadow-xl">
-            <h3 className="text-base font-bold">Adjust Leave Entitlement</h3>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {editingBalance.leave_type_name} ({editingBalance.year})
-            </p>
-            <div className="mt-4 space-y-3">
-              <label className="block text-xs font-semibold text-muted-foreground">
-                Total Allowed Days
-                <input
-                  type="number"
-                  min="0"
-                  max="365"
-                  value={editTotalDays}
-                  onChange={(e) => setEditTotalDays(Math.max(0, parseInt(e.target.value) || 0))}
-                  className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:border-brand focus:outline-hidden"
-                />
-              </label>
-            </div>
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                type="button"
-                disabled={savingBalance}
-                onClick={() => setEditingBalance(null)}
-                className="rounded-xl border border-border px-3.5 py-1.5 text-xs font-semibold hover:bg-muted"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={savingBalance}
-                onClick={handleSaveBalance}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-brand px-4 py-1.5 text-xs font-semibold text-brand-foreground shadow-brand"
-              >
-                {savingBalance && <Loader2 className="h-3 w-3 animate-spin" />} Save
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -2839,26 +2809,7 @@ function LeavesTab({ leaves }: { leaves: Array<{ id: number; type: string; start
 
   return (
     <div className="space-y-4">
-      {/* Leave Balances Summary */}
-      <div className="rounded-3xl border border-border bg-card p-5">
-        <h2 className="mb-3 font-display text-base font-semibold">Leave Balances</h2>
-        <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-2xl border border-border bg-muted/30 p-3">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Total Entitlement</p>
-            <p className="mt-1 font-display text-lg font-bold">30 days</p>
-          </div>
-          <div className="rounded-2xl border border-border bg-muted/30 p-3">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Days Used</p>
-            <p className="mt-1 font-display text-lg font-bold text-amber-600">{leaves.filter(l => l.status === "Approved").length * 2} days</p>
-          </div>
-          <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-3">
-            <p className="text-[10px] uppercase tracking-wider text-emerald-700 dark:text-emerald-400 font-semibold">Remaining</p>
-            <p className="mt-1 font-display text-lg font-bold text-emerald-700 dark:text-emerald-400">
-              {Math.max(0, 30 - (leaves.filter(l => l.status === "Approved").length * 2))} days
-            </p>
-          </div>
-        </div>
-      </div>
+
 
       <div className="grid grid-cols-4 gap-2">
         {(["All", "Pending", "Approved", "Rejected"] as LeaveStatus[]).map((k) => (

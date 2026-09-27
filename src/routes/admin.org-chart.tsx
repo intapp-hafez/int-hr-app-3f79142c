@@ -396,9 +396,16 @@ function DeptNode({
             {editing ? (
               <InlineRename value={dept.name} onSave={(v) => onRename(dept.id, v)} className="text-lg font-black" />
             ) : (
-              <h3 className="truncate text-lg font-black text-foreground">{dept.name}</h3>
+              <h3 className="truncate text-lg font-black text-foreground">
+                {dept.name}
+                {dept.parentName && (
+                  <span className="ml-2 inline-flex items-center rounded-full bg-muted/60 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground border">
+                    Part of {dept.parentName}
+                  </span>
+                )}
+              </h3>
             )}
-            <p className="text-xs font-medium text-muted-foreground">
+            <p className="text-xs font-medium text-muted-foreground mt-1">
               {dept.total} Actual · {dept.plannedTotal || 0} Planned · {dept.positions.length} positions
             </p>
           </span>

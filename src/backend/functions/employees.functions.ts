@@ -389,6 +389,7 @@ export const updateEmployeeAdmin = createServerFn({ method: "POST" })
         custom_field: z.string().max(10000).nullable().optional(),
         bank_name: z.string().max(120).nullable().optional().or(z.literal("")),
         bank_account_number: z.string().max(80).nullable().optional().or(z.literal("")),
+        employment_documents_checklist: z.record(z.object({ ticked: z.boolean().optional(), note: z.string().optional() })).nullable().optional(),
       })
       .parse(input),
   )
@@ -465,6 +466,7 @@ export const updateEmployeeAdmin = createServerFn({ method: "POST" })
     if (data.custom_field !== undefined) patch.custom_field = data.custom_field;
     if (data.bank_name !== undefined) patch.bank_name = data.bank_name === "" ? null : data.bank_name;
     if (data.bank_account_number !== undefined) patch.bank_account_number = data.bank_account_number === "" ? null : data.bank_account_number;
+    if (data.employment_documents_checklist !== undefined) patch.employment_documents_checklist = data.employment_documents_checklist;
     if (
       patch.contract_start_date &&
       patch.contract_end_date &&
@@ -1311,6 +1313,7 @@ export type EmployeeDetail = {
   roles: string[];
   bank_name: string | null;
   bank_account_number: string | null;
+  employment_documents_checklist?: Record<string, { ticked: boolean; note: string }> | null;
 };
 
 export const getEmployeeDetail = createServerFn({ method: "POST" })
@@ -1320,7 +1323,7 @@ export const getEmployeeDetail = createServerFn({ method: "POST" })
     const { supabase } = context;
     let { data: p, error } = await supabase
       .from("profiles")
-      .select("id, emp_code, full_name, full_name_ar, cost_center_id, email, phone, gender, department_id, position_id, city_id, district_id, city, district, status, inactive_reason, avatar_url, manager_id, locale, national_id, id_issue_date, id_expiry_date, salary_mode, salary_gross, salary_net, allowance, target_value, target_duration, contract_type, contract_start_date, contract_end_date, contract_cancelled, job_grade, extra_email, medical_insurance_details, medical_insurance_number, medical_insurance_type, is_insured, military_expire_date, is_five_percent, social_insurance_date, custom_field, last_action_date, created_at, updated_at, insurance_salary, emergency_fund")
+      .select("id, emp_code, full_name, full_name_ar, cost_center_id, email, phone, gender, department_id, position_id, city_id, district_id, city, district, status, inactive_reason, avatar_url, manager_id, locale, national_id, id_issue_date, id_expiry_date, salary_mode, salary_gross, salary_net, allowance, target_value, target_duration, contract_type, contract_start_date, contract_end_date, contract_cancelled, job_grade, extra_email, medical_insurance_details, medical_insurance_number, medical_insurance_type, is_insured, military_expire_date, is_five_percent, social_insurance_date, custom_field, last_action_date, created_at, updated_at, insurance_salary, emergency_fund, employment_documents_checklist")
       .eq("id", data.id)
       .maybeSingle();
     if (error && (
@@ -1331,7 +1334,7 @@ export const getEmployeeDetail = createServerFn({ method: "POST" })
     )) {
       const fb = await supabase
         .from("profiles")
-        .select("id, emp_code, full_name, email, phone, gender, department_id, position_id, city_id, district_id, city, district, status, inactive_reason, avatar_url, manager_id, locale, national_id, id_issue_date, id_expiry_date, salary_mode, salary_gross, salary_net, allowance, target_value, target_duration, contract_type, contract_start_date, contract_end_date, contract_cancelled, job_grade, extra_email, medical_insurance_details, is_insured, military_expire_date, is_five_percent, social_insurance_date, custom_field, last_action_date, created_at, updated_at, insurance_salary, emergency_fund")
+        .select("id, emp_code, full_name, email, phone, gender, department_id, position_id, city_id, district_id, city, district, status, inactive_reason, avatar_url, manager_id, locale, national_id, id_issue_date, id_expiry_date, salary_mode, salary_gross, salary_net, allowance, target_value, target_duration, contract_type, contract_start_date, contract_end_date, contract_cancelled, job_grade, extra_email, medical_insurance_details, is_insured, military_expire_date, is_five_percent, social_insurance_date, custom_field, last_action_date, created_at, updated_at, insurance_salary, emergency_fund, employment_documents_checklist")
         .eq("id", data.id)
         .maybeSingle();
       p = fb.data as any;
@@ -1441,6 +1444,7 @@ export const getEmployeeDetail = createServerFn({ method: "POST" })
       major: majorName,
       section_id: extra.section_id ?? null,
       section_name: sectionName,
+      employment_documents_checklist: (p as any).employment_documents_checklist ?? null,
     } as any;
   });
 

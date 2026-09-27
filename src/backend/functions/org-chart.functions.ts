@@ -16,11 +16,15 @@ export type OrgPerson = {
 export type OrgDept = {
   id: string;
   name: string;
+  code: string | null;
+  parentId: string | null;
+  parentName?: string | null;
   head: OrgPerson | null;
   positions: { id: string; name: string; people: OrgPerson[]; plannedHeadcount?: number }[];
   unassigned: OrgPerson[];
   total: number;
   plannedTotal?: number;
+  children?: OrgDept[];
 };
 
 export type OrgChart = {
@@ -35,7 +39,7 @@ export const getOrgChart = createServerFn({ method: "GET" })
   .handler(async ({ context }): Promise<OrgChart> => {
     const sb = context.supabase;
     const [{ data: depts }, { data: positions }, { data: profiles }, { data: plans }] = await Promise.all([
-      sb.from("departments").select("id, name_en, name_ar, sort_order, responsible_person_id").order("sort_order").order("name_en"),
+      sb.from("departments").select("id, name_en, name_ar, sort_order, responsible_person_id, parent_id, code").order("sort_order").order("name_en"),
       sb.from("positions").select("id, name_en, name_ar, sort_order").order("sort_order").order("name_en"),
       sb
         .from("profiles")
@@ -55,6 +59,8 @@ export const getOrgChart = createServerFn({ method: "GET" })
     const deptList = (depts ?? []).map((d: any) => ({
       id: d.id as string,
       name: (d.name_en ?? d.name_ar ?? "Department") as string,
+      code: (d.code ?? null) as string | null,
+      parentId: (d.parent_id ?? null) as string | null,
       responsibleId: (d.responsible_person_id ?? null) as string | null,
     }));
 
@@ -152,6 +158,9 @@ export const getOrgChart = createServerFn({ method: "GET" })
       return {
         id: d.id,
         name: d.name,
+        code: d.code,
+        parentId: d.parentId,
+        parentName: d.parentId ? deptList.find(x => x.id === d.parentId)?.name : null,
         head,
         positions: posArr,
         unassigned,

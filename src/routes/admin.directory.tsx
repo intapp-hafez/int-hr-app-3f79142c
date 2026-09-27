@@ -27,8 +27,10 @@ const SalaryCertificate = lazy(() => import("@/components/admin/HrDocuments").th
 const AdvancesAcknowledgment = lazy(() => import("@/components/admin/HrDocuments").then((mod) => ({ default: mod.AdvancesAcknowledgment })));
 const CustodyAcknowledgment = lazy(() => import("@/components/admin/HrDocuments").then((mod) => ({ default: mod.CustodyAcknowledgment })));
 
-type Tab = "departments" | "sections" | "positions" | "job_grades" | "graduations" | "majors" | "cities" | "cost_centers" | "networks" | "devices" | "contractTemplates" | "sms" | "experienceCertificate" | "salaryDetails" | "advancesAck" | "custodyAck";
-const validTabs: Tab[] = ["departments", "sections", "positions", "job_grades", "graduations", "majors", "cities", "cost_centers", "networks", "devices", "contractTemplates", "sms", "experienceCertificate", "salaryDetails", "advancesAck", "custodyAck"];
+const LoanRequestForm = lazy(() => import("@/components/admin/HrDocuments").then((mod) => ({ default: mod.LoanRequestForm })));
+
+type Tab = "departments" | "sections" | "positions" | "job_grades" | "graduations" | "majors" | "cities" | "cost_centers" | "networks" | "devices" | "contractTemplates" | "sms" | "experienceCertificate" | "salaryDetails" | "advancesAck" | "custodyAck" | "loanRequest";
+const validTabs: Tab[] = ["departments", "sections", "positions", "job_grades", "graduations", "majors", "cities", "cost_centers", "networks", "devices", "contractTemplates", "sms", "experienceCertificate", "salaryDetails", "advancesAck", "custodyAck", "loanRequest"];
 
 export const Route = createFileRoute("/admin/directory")({
   component: DirectoryPage,
@@ -57,6 +59,7 @@ const tabs: { id: Tab; label: string }[] = [
   { id: "salaryDetails", label: "Salary Certificate" },
   { id: "advancesAck", label: "Advances Acknowledgment" },
   { id: "custodyAck", label: "Custody Acknowledgment" },
+  { id: "loanRequest", label: "Loan Request Form" },
 ];
 
 const PAGE_SIZE = 10;
@@ -146,6 +149,11 @@ function DirectoryPage() {
             <AdvancesAcknowledgment />
           </Suspense>
         )}
+        {tab === "loanRequest" && (
+          <Suspense fallback={<div className="h-40 rounded-2xl bg-muted/30" />}>
+            <LoanRequestForm />
+          </Suspense>
+        )}
         {tab === "custodyAck" && (
           <Suspense fallback={<div className="h-40 rounded-2xl bg-muted/30" />}>
             <CustodyAcknowledgment />
@@ -188,7 +196,7 @@ function NamedSection({ kind }: { kind: "departments" | "positions" | "job_grade
   });
   const managers: Array<{ id: string; name: string }> = (mgrQ.data as any)?.managers ?? [];
   const mUpsert = useMutation({
-    mutationFn: (row: { id?: string; name_en: string; name_ar: string; active?: boolean; responsible_person_id?: string | null }) => upsert({ data: row }),
+    mutationFn: (row: { id?: string; name_en: string; name_ar: string; active?: boolean; responsible_person_id?: string | null; code?: string | null; parent_id?: string | null; reports_to_position_id?: string | null }) => upsert({ data: row }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: key }); toast.success("Saved"); },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -197,9 +205,9 @@ function NamedSection({ kind }: { kind: "departments" | "positions" | "job_grade
     onSuccess: () => { qc.invalidateQueries({ queryKey: key }); toast.success("Deleted"); },
     onError: (e: Error) => toast.error(e.message),
   });
-  const [draft, setDraft] = useState<{ name_en: string; name_ar: string; responsible_person_id: string }>({ name_en: "", name_ar: "", responsible_person_id: "" });
+  const [draft, setDraft] = useState<{ name_en: string; name_ar: string; responsible_person_id: string; code: string; parent_id: string; reports_to_position_id: string }>({ name_en: "", name_ar: "", responsible_person_id: "", code: "", parent_id: "", reports_to_position_id: "" });
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editDraft, setEditDraft] = useState<{ name_en: string; name_ar: string; active: boolean; responsible_person_id: string }>({ name_en: "", name_ar: "", active: true, responsible_person_id: "" });
+  const [editDraft, setEditDraft] = useState<{ name_en: string; name_ar: string; active: boolean; responsible_person_id: string; code: string; parent_id: string; reports_to_position_id: string }>({ name_en: "", name_ar: "", active: true, responsible_person_id: "", code: "", parent_id: "", reports_to_position_id: "" });
   const [structureDept, setStructureDept] = useState<{ id: string; name_en: string } | null>(null);
 
   function handleSaveEdit(id: string) {
@@ -210,6 +218,9 @@ function NamedSection({ kind }: { kind: "departments" | "positions" | "job_grade
         name_en: editDraft.name_en.trim(),
         name_ar: editDraft.name_ar.trim(),
         active: editDraft.active,
+        code: editDraft.code.trim() || null,
+        parent_id: editDraft.parent_id || null,
+        reports_to_position_id: editDraft.reports_to_position_id || null,
         ...(isDept ? { responsible_person_id: editDraft.responsible_person_id || null } : {}),
       },
       {
@@ -246,7 +257,8 @@ function NamedSection({ kind }: { kind: "departments" | "positions" | "job_grade
         onTemplate={() => downloadTemplate(`${kind}_template.xlsx`, headers, [{ name_en: "Sales", name_ar: "المبيعات", active: true }])}
         onImport={handleImport}
       />
-      <div className={`grid gap-3 ${isDept ? "md:grid-cols-4" : "md:grid-cols-3"}`}>
+      <div className={`grid gap-3 ${isDept ? "md:grid-cols-6" : "md:grid-cols-5"}`}>
+        <input className={inputCls} placeholder="Code" value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} />
         <input className={inputCls} placeholder="Name (EN)" value={draft.name_en} onChange={(e) => setDraft({ ...draft, name_en: e.target.value })} />
         <input className={inputCls} placeholder="Name (AR)" value={draft.name_ar} onChange={(e) => setDraft({ ...draft, name_ar: e.target.value })} />
         {isDept && (
@@ -268,17 +280,23 @@ function NamedSection({ kind }: { kind: "departments" | "positions" | "job_grade
               name_en: draft.name_en,
               name_ar: draft.name_ar,
               active: true,
+              code: draft.code || null,
+              parent_id: draft.parent_id || null,
+              reports_to_position_id: draft.reports_to_position_id || null,
               ...(isDept ? { responsible_person_id: draft.responsible_person_id || null } : {}),
             });
-            setDraft({ name_en: "", name_ar: "", responsible_person_id: "" });
+            setDraft({ name_en: "", name_ar: "", responsible_person_id: "", code: "", parent_id: "", reports_to_position_id: "" });
           }}
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-brand px-4 py-2 text-sm font-semibold text-brand-foreground shadow-brand">
           <Plus className="h-4 w-4" /> Add
         </button>
       </div>
-      <Table cols={isDept ? ["Name (EN)", "Name (AR)", "Responsible", "Active", ""] : ["Name (EN)", "Name (AR)", "Active", ""]}>
+      <Table cols={isDept ? ["Code", "Name (EN)", "Name (AR)", "Parent", "Responsible", "Active", ""] : ["Code", "Name (EN)", "Name (AR)", "Reports To", "Active", ""]}>
         {paged.slice.map((r: any) => editingId === r.id ? (
           <tr key={r.id} className="bg-brand/5">
+            <td className="px-3 py-2">
+              <input className={inputCls} placeholder="Code" value={editDraft.code} onChange={(e) => setEditDraft({ ...editDraft, code: e.target.value })} />
+            </td>
             <td className="px-3 py-2">
               <input
                 autoFocus
@@ -304,6 +322,11 @@ function NamedSection({ kind }: { kind: "departments" | "positions" | "job_grade
                 }}
               />
             </td>
+            {isDept ? (
+              <td className="px-3 py-2 text-xs text-muted-foreground">{r.parent_name || "—"}</td>
+            ) : (
+              <td className="px-3 py-2 text-xs text-muted-foreground">{r.reports_to_name || "—"}</td>
+            )}
             {isDept && (
               <td className="px-3 py-2">
                 <select
@@ -354,8 +377,14 @@ function NamedSection({ kind }: { kind: "departments" | "positions" | "job_grade
           </tr>
         ) : (
           <tr key={r.id} className="hover:bg-muted/30">
+            <td className="px-3 py-2 font-medium">{r.code || "—"}</td>
             <td className="px-3 py-2 font-medium">{r.name_en}</td>
             <td className="px-3 py-2">{r.name_ar || "—"}</td>
+            {isDept ? (
+              <td className="px-3 py-2 text-xs text-muted-foreground">{r.parent_name || "—"}</td>
+            ) : (
+              <td className="px-3 py-2 text-xs text-muted-foreground">{r.reports_to_name || "—"}</td>
+            )}
             {isDept && (
               <td className="px-3 py-2 text-xs text-muted-foreground">
                 {r.responsible_person_name || "—"}
@@ -383,6 +412,9 @@ function NamedSection({ kind }: { kind: "departments" | "positions" | "job_grade
                       name_ar: r.name_ar ?? "",
                       active: r.active ?? true,
                       responsible_person_id: r.responsible_person_id ?? "",
+                      code: r.code ?? "",
+                      parent_id: r.parent_id ?? "",
+                      reports_to_position_id: r.reports_to_position_id ?? "",
                     });
                   }}
                   className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"

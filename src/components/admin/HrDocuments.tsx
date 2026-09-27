@@ -589,7 +589,142 @@ export function CustodyAcknowledgment() {
   );
 }
 
+/** نموذج طلب سلفة */
+export function LoanRequestForm() {
+  const picker = useEmployeePicker();
+  const e = picker.detail as any;
+
+  const advancesFn = useServerFn(listAdvancesForHR);
+  const advancesQ = useQuery({
+    queryKey: ["hr-doc-advances", picker.employeeId],
+    queryFn: async () => {
+      const res: any = await advancesFn({ data: { page: 1, limit: 200 } });
+      return (res?.advances ?? []).filter((a: any) => a.employee_id === picker.employeeId);
+    },
+    enabled: !!picker.employeeId,
+  });
+
+  const advances: any[] = advancesQ.data ?? [];
+  const totalAdvance = advances.reduce(
+    (s, a) => s + (Number(a.approved_amount ?? a.requested_amount ?? 0) - Number(a.paid_amount ?? 0)),
+    0,
+  );
+  const loading = advancesQ.isFetching || picker.loading;
+
+  return (
+    <div className="space-y-4">
+      <EmployeePicker picker={picker} label="Select Employee for Loan Request" />
+      {!picker.employeeId ? (
+        <p className="py-10 text-center text-sm text-muted-foreground">Select an employee to generate the Loan Request form</p>
+      ) : loading || !e ? (
+        <p className="py-10 text-center text-sm text-muted-foreground">Loading…</p>
+      ) : (
+        <DocShell>
+          <div className="mb-6 flex justify-between items-end border-b-2 border-gray-800 pb-2">
+            <div>
+              <h2 className="text-2xl font-black text-gray-900">طلب سلفة مالية</h2>
+              <p className="text-sm font-semibold text-gray-600 mt-1">Loan / Advance Request Form</p>
+            </div>
+            <div className="text-left text-sm font-medium">
+              <p>التاريخ: {formatDate(todayISO())}</p>
+            </div>
+          </div>
+
+          <div className="mb-6 rounded-lg border border-gray-300 p-4 shadow-sm bg-gray-50/50">
+            <h3 className="mb-3 font-bold text-gray-800 text-lg border-b pb-1">بيانات الموظف / Employee Details</h3>
+            <div className="grid grid-cols-2 gap-y-3 gap-x-6 text-sm">
+              <div className="flex justify-between border-b border-gray-200 pb-1">
+                <span className="font-semibold text-gray-600">الاسم:</span>
+                <span className="font-bold">{e.full_name}</span>
+              </div>
+              <div className="flex justify-between border-b border-gray-200 pb-1">
+                <span className="font-semibold text-gray-600">الرقم الوظيفي:</span>
+                <span className="font-bold">{e.emp_code || "—"}</span>
+              </div>
+              <div className="flex justify-between border-b border-gray-200 pb-1">
+                <span className="font-semibold text-gray-600">الوظيفة:</span>
+                <span className="font-bold">{e.position || "—"}</span>
+              </div>
+              <div className="flex justify-between border-b border-gray-200 pb-1">
+                <span className="font-semibold text-gray-600">الإدارة/القسم:</span>
+                <span className="font-bold">{e.department || "—"}</span>
+              </div>
+              <div className="flex justify-between border-b border-gray-200 pb-1">
+                <span className="font-semibold text-gray-600">تاريخ التعيين:</span>
+                <span className="font-bold">{e.contract_start_date ? formatDate(e.contract_start_date) : "—"}</span>
+              </div>
+              <div className="flex justify-between border-b border-gray-200 pb-1">
+                <span className="font-semibold text-gray-600">الراتب الأساسي:</span>
+                <span className="font-bold">{fmtMoney(e.salary_net ?? e.salary_gross)} ج.م</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-6 rounded-lg border border-gray-300 p-4 shadow-sm">
+            <h3 className="mb-3 font-bold text-gray-800 text-lg border-b pb-1">بيانات السلفة المطلوبة / Requested Loan Details</h3>
+            <div className="grid grid-cols-1 gap-4 text-sm mt-2">
+              <div className="flex items-center gap-4">
+                <span className="font-semibold w-40">قيمة السلفة المطلوبة:</span>
+                <div className="flex-1 border-b-2 border-dotted border-gray-400 h-6"></div>
+                <span>ج.م</span>
+              </div>
+              <div className="flex items-center gap-4">
+                <span className="font-semibold w-40">أسباب الطلب:</span>
+                <div className="flex-1 border-b-2 border-dotted border-gray-400 h-6"></div>
+              </div>
+              <div className="flex items-center gap-4 mt-2">
+                <div className="flex-1 border-b-2 border-dotted border-gray-400 h-6"></div>
+              </div>
+              <div className="flex items-center gap-4 mt-2">
+                <span className="font-semibold w-40">طريقة السداد المقترحة:</span>
+                <div className="flex-1 border-b-2 border-dotted border-gray-400 h-6 flex items-end pb-1 justify-center text-gray-500">
+                  (تخصم على عدد ........ أقساط شهرية)
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-6 rounded-lg border border-gray-300 p-4 shadow-sm bg-gray-50/50">
+            <h3 className="mb-3 font-bold text-gray-800 text-lg border-b pb-1">السلف السابقة / Existing Advances</h3>
+            {advances.length === 0 ? (
+              <p className="text-center text-sm text-gray-500 py-2">لا توجد سلف قائمة حالياً / No active advances</p>
+            ) : (
+              <div className="flex justify-between items-center bg-white p-3 rounded border border-gray-200">
+                <span className="font-semibold">إجمالي السلف القائمة غير المسددة:</span>
+                <span className="font-bold text-lg text-rose-600">{fmtMoney(totalAdvance)} ج.م</span>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-12 rounded-lg border-2 border-gray-800 p-4">
+            <h3 className="mb-6 font-bold text-gray-800 text-center text-lg bg-gray-100 p-2 rounded">الاعتمادات والموافقات / Approvals</h3>
+            <div className="grid grid-cols-4 gap-4 text-center text-sm">
+              <div className="flex flex-col h-32 justify-between">
+                <p className="font-bold text-gray-700">توقيع الموظف</p>
+                <div className="border-t border-gray-400 pt-2 text-xs text-gray-500">الاسم والتوقيع</div>
+              </div>
+              <div className="flex flex-col h-32 justify-between">
+                <p className="font-bold text-gray-700">المدير المباشر</p>
+                <div className="border-t border-gray-400 pt-2 text-xs text-gray-500">يعتمد / لا يعتمد</div>
+              </div>
+              <div className="flex flex-col h-32 justify-between">
+                <p className="font-bold text-gray-700">الموارد البشرية</p>
+                <div className="border-t border-gray-400 pt-2 text-xs text-gray-500">الاعتماد</div>
+              </div>
+              <div className="flex flex-col h-32 justify-between">
+                <p className="font-bold text-gray-700">المدير العام / المالي</p>
+                <div className="border-t border-gray-400 pt-2 text-xs text-gray-500">التصديق النهائي</div>
+              </div>
+            </div>
+          </div>
+        </DocShell>
+      )}
+    </div>
+  );
+}
+
 /** إقرار على سلف وعهد (مدمجة للتوافق مع الإصدارات السابقة) */
 export function AdvancesCustodyAcknowledgment() {
   return <AdvancesAcknowledgment />;
 }
+

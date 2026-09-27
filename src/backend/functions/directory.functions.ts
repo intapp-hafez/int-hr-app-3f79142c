@@ -9,6 +9,8 @@ type DepartmentUpsert = {
   name_ar: string;
   active: boolean;
   responsible_person_id: string | null;
+  code?: string | null;
+  parent_id?: string | null;
 };
 
 // ── Departments ────────────────────────────────────
@@ -17,12 +19,13 @@ export const listDepartments = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
       .from("departments")
-      .select("*, responsible:profiles!departments_responsible_person_id_fkey(id, full_name, email)")
+      .select("*, responsible:profiles!departments_responsible_person_id_fkey(id, full_name, email), parent:departments!departments_parent_id_fkey(name_en)")
       .order("name_en");
     if (error) throw new Error(error.message);
     return (data ?? []).map((d: any) => ({
       ...d,
       responsible_person_name: d.responsible?.full_name ?? d.responsible?.email ?? null,
+      parent_name: d.parent?.name_en ?? null,
     }));
   });
 
@@ -36,6 +39,8 @@ export const upsertDepartment = createServerFn({ method: "POST" })
       name_ar: data.name_ar,
       active: data.active ?? true,
       responsible_person_id: data.responsible_person_id ?? null,
+      code: data.code ?? null,
+      parent_id: data.parent_id ?? null,
     };
     // Cast: supabase generated types haven't been regenerated to include
     // the new `responsible_person_id` column yet. RLS still enforces
@@ -157,16 +162,22 @@ export const deleteDepartmentPosition = createServerFn({ method: "POST" })
 export const listPositions = createServerFn({ method: "GET" })
   .middleware([requireAdminAccess])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase.from("positions").select("*").order("name_en");
+    const { data, error } = await context.supabase
+      .from("positions")
+      .select("*, reports_to:positions!positions_reports_to_position_id_fkey(name_en)")
+      .order("name_en");
     if (error) throw new Error(error.message);
-    return data ?? [];
+    return (data ?? []).map((p: any) => ({
+      ...p,
+      reports_to_name: p.reports_to?.name_en ?? null,
+    }));
   });
 export const upsertPosition = createServerFn({ method: "POST" })
   .middleware([requireAdminAccess])
   .inputValidator((i) => NamedRowSchema.parse(i))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.from("positions").upsert({
-      id: data.id, name_en: data.name_en, name_ar: data.name_ar, active: data.active ?? true,
+      id: data.id, name_en: data.name_en, name_ar: data.name_ar, active: data.active ?? true, code: data.code ?? null, reports_to_position_id: data.reports_to_position_id ?? null,
     });
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -193,7 +204,7 @@ export const upsertJobGrade = createServerFn({ method: "POST" })
   .inputValidator((i) => NamedRowSchema.parse(i))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.from("job_grades" as any).upsert({
-      id: data.id, name_en: data.name_en, name_ar: data.name_ar, active: data.active ?? true,
+      id: data.id, name_en: data.name_en, name_ar: data.name_ar, active: data.active ?? true, code: data.code ?? null,
     });
     if (error) throw new Error(error.message);
     return { ok: true };

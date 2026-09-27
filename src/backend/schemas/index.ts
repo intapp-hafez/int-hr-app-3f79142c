@@ -77,6 +77,9 @@ export const NamedRowSchema = z.object({
   name_ar: z.string().max(120).default(""),
   active: z.boolean().optional(),
   responsible_person_id: z.string().uuid().nullable().optional(),
+  code: z.string().max(50).nullable().optional(),
+  parent_id: z.string().uuid().nullable().optional(),
+  reports_to_position_id: z.string().uuid().nullable().optional(),
 });
 export const DistrictRowSchema = z.object({
   id: z.string().uuid().optional(),

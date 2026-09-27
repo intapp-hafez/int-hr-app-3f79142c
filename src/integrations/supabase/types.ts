@@ -823,30 +823,36 @@ export type Database = {
       departments: {
         Row: {
           active: boolean
+          code: string | null
           created_at: string
           id: string
           name_ar: string
           name_en: string
+          parent_id: string | null
           responsible_person_id: string | null
           sort_order: number
           updated_at: string
         }
         Insert: {
           active?: boolean
+          code?: string | null
           created_at?: string
           id?: string
           name_ar?: string
           name_en: string
+          parent_id?: string | null
           responsible_person_id?: string | null
           sort_order?: number
           updated_at?: string
         }
         Update: {
           active?: boolean
+          code?: string | null
           created_at?: string
           id?: string
           name_ar?: string
           name_en?: string
+          parent_id?: string | null
           responsible_person_id?: string | null
           sort_order?: number
           updated_at?: string
@@ -2050,6 +2056,7 @@ export type Database = {
       job_grades: {
         Row: {
           active: boolean
+          code: string | null
           created_at: string
           id: string
           name_ar: string
@@ -2058,6 +2065,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          code?: string | null
           created_at?: string
           id?: string
           name_ar: string
@@ -2066,6 +2074,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          code?: string | null
           created_at?: string
           id?: string
           name_ar?: string
@@ -2881,28 +2890,34 @@ export type Database = {
       positions: {
         Row: {
           active: boolean
+          code: string | null
           created_at: string
           id: string
           name_ar: string
           name_en: string
+          reports_to_position_id: string | null
           sort_order: number
           updated_at: string
         }
         Insert: {
           active?: boolean
+          code?: string | null
           created_at?: string
           id?: string
           name_ar?: string
           name_en: string
+          reports_to_position_id?: string | null
           sort_order?: number
           updated_at?: string
         }
         Update: {
           active?: boolean
+          code?: string | null
           created_at?: string
           id?: string
           name_ar?: string
           name_en?: string
+          reports_to_position_id?: string | null
           sort_order?: number
           updated_at?: string
         }
@@ -2978,6 +2993,7 @@ export type Database = {
           email: string | null
           emergency_fund: number
           emp_code: string | null
+          employment_documents_checklist: Json | null
           external_income: number | null
           external_tax_paid: number | null
           extra_email: string | null
@@ -3046,6 +3062,7 @@ export type Database = {
           email?: string | null
           emergency_fund?: number
           emp_code?: string | null
+          employment_documents_checklist?: Json | null
           external_income?: number | null
           external_tax_paid?: number | null
           extra_email?: string | null
@@ -3114,6 +3131,7 @@ export type Database = {
           email?: string | null
           emergency_fund?: number
           emp_code?: string | null
+          employment_documents_checklist?: Json | null
           external_income?: number | null
           external_tax_paid?: number | null
           extra_email?: string | null

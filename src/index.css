@@ -1,0 +1,6 @@
+
+
+@media print {
+  aside, header, nav, .print\\:hidden { display: none !important; }
+  main, body { padding: 0 !important; margin: 0 !important; }
+}
