@@ -163,6 +163,15 @@ export const createTask = createServerFn({ method: "POST" })
       status: "pending",
     }).select("id").single();
     if (error) throw new Error(error.message);
+    {
+      const { notifyUsers } = await import("@/backend/server/notify.server");
+      await notifyUsers({
+        userIds: data.assignees.filter((a: string) => a !== context.userId),
+        title: "New task assigned",
+        body: `${data.title}${data.due_date ? ` — due ${data.due_date}` : ""}`,
+        url: "/employee/tasks", category: "task", severity: data.priority === "high" ? "warning" : "info",
+      });
+    }
     return { id: row.id };
   });
 
@@ -248,10 +257,17 @@ export const updateTaskAssignees = createServerFn({ method: "POST" })
     assignees: z.array(z.string().uuid()).min(1).max(50),
   }).parse(i))
   .handler(async ({ data, context }) => {
+    const { data: before } = await context.supabase.from("tasks").select("title, assignees").eq("id", data.id).maybeSingle();
     const { error } = await context.supabase
       .from("tasks")
       .update({ assignees: data.assignees })
       .eq("id", data.id);
     if (error) throw new Error(error.message);
+    const prev = new Set<string>(((before as any)?.assignees ?? []) as string[]);
+    const added = data.assignees.filter((a) => !prev.has(a) && a !== context.userId);
+    if (added.length) {
+      const { notifyUsers } = await import("@/backend/server/notify.server");
+      await notifyUsers({ userIds: added, title: "New task assigned", body: (before as any)?.title ?? "A task was assigned to you.", url: "/employee/tasks", category: "task" });
+    }
     return { ok: true };
   });

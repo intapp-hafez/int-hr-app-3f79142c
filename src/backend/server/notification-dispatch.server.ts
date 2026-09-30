@@ -3,6 +3,7 @@ import { loadSmtpConfig } from "./smtp-config.server";
 import { sendEmail } from "./smtp-client.server";
 import { isQuietNow } from "./quiet-hours.server";
 import { renderTaskNotifEmail } from "./email-render.server";
+import { sendPushTo } from "./web-push.server";
 
 export type DispatchTaskNotif = {
   recipientUserIds: string[];
@@ -88,10 +89,18 @@ export async function dispatchTaskNotification(input: DispatchTaskNotif) {
     }
 
     if (pref.push_enabled && !quiet) {
-      await supabaseAdmin.from("notif_deliveries").insert({
-        user_id: prof.id, channel: "push", status: "skipped_smtp",
-        subject, error: "push transport not configured",
-      });
+      const { data: subs } = await (supabaseAdmin as any)
+        .from("push_subscriptions").select("endpoint, p256dh, auth_secret").eq("user_id", prof.id);
+      for (const s of (subs ?? []) as any[]) {
+        const res = await sendPushTo(s, { title: subject, body: text.slice(0, 180), url: "/admin", tag: input.kind });
+        await supabaseAdmin.from("notif_deliveries").insert({
+          user_id: prof.id, channel: "push", status: res.ok ? "sent" : "failed",
+          subject, error: res.ok ? null : res.error ?? null,
+        });
+        if (!res.ok && (res.status === 404 || res.status === 410)) {
+          await (supabaseAdmin as any).from("push_subscriptions").delete().eq("endpoint", s.endpoint);
+        }
+      }
     }
   }
 }
