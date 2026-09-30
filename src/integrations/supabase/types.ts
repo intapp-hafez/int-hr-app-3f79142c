@@ -2992,6 +2992,7 @@ export type Database = {
           avatar_url: string | null
           bank_account_name: string | null
           bank_account_number: string | null
+          bank_name: string | null
           city: string | null
           city_id: string | null
           contract_cancelled: boolean
@@ -3061,6 +3062,7 @@ export type Database = {
           avatar_url?: string | null
           bank_account_name?: string | null
           bank_account_number?: string | null
+          bank_name?: string | null
           city?: string | null
           city_id?: string | null
           contract_cancelled?: boolean
@@ -3130,6 +3132,7 @@ export type Database = {
           avatar_url?: string | null
           bank_account_name?: string | null
           bank_account_number?: string | null
+          bank_name?: string | null
           city?: string | null
           city_id?: string | null
           contract_cancelled?: boolean
