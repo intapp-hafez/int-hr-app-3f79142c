@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { z } from "zod";
 import { NotificationPrefsSchema } from "../schemas";
 
 export const getMyPreferences = createServerFn({ method: "GET" })
@@ -38,6 +39,7 @@ export const listMyDeliveries = createServerFn({ method: "GET" })
       .from("notif_deliveries")
       .select("*")
       .eq("user_id", userId)
+      .eq("channel", "inapp")
       .order("created_at", { ascending: false })
       .limit(100);
     return data ?? [];
@@ -53,4 +55,23 @@ export const listAllDeliveries = createServerFn({ method: "GET" })
       .order("created_at", { ascending: false })
       .limit(200);
     return data ?? [];
+  });
+export const markMyNotificationsRead = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => z.object({ ids: z.array(z.string().uuid()).max(200).optional() }).parse(i ?? {}))
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    let q = supabaseAdmin.from("notif_deliveries").select("id, payload")
+      .eq("user_id", context.userId).eq("channel", "inapp").limit(200);
+    if (data.ids?.length) q = q.in("id", data.ids);
+    const { data: rows } = await q;
+    const now = new Date().toISOString();
+    let n = 0;
+    for (const r of rows ?? []) {
+      const p = (r.payload ?? {}) as Record<string, unknown>;
+      if (p.read_at) continue;
+      await supabaseAdmin.from("notif_deliveries").update({ payload: { ...p, read_at: now } as any }).eq("id", r.id);
+      n++;
+    }
+    return { updated: n };
   });

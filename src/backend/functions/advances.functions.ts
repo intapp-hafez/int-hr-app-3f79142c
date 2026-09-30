@@ -209,8 +209,8 @@ export const createAdvanceRequest = createServerFn({ method: "POST" })
     {
       const { getManagerId, getEmployeeName } = await import("@/backend/server/notify.server");
       const [mgr, name] = await Promise.all([getManagerId(context.userId), getEmployeeName(context.userId)]);
-      if (mgr) await notifyAdvance([mgr], "New advance request", `${name} requested an advance of ${data.requested_amount} ${data.currency ?? "EGP"}.`, "info", "/manager");
-      await notifyAdvance([context.userId], "Advance request submitted", `Your request for ${data.requested_amount} ${data.currency ?? "EGP"} was sent to your manager.`, "info", "/employee/requests");
+      if (mgr) await notifyAdvance([mgr], "New advance request", `${name} requested an advance of ${data.requested_amount} ${data.currency ?? "EGP"}.`, "info", "/manager/advances");
+      await notifyAdvance([context.userId], "Advance request submitted", `Your request for ${data.requested_amount} ${data.currency ?? "EGP"} was sent to your manager.`, "info", "/employee/advances");
     }
     return { id: row.id, request_number: row.request_number };
   });
@@ -319,7 +319,7 @@ export const managerDecideAdvance = createServerFn({ method: "POST" })
     await notifyAdvance([row.employee_id],
       data.action === "approved" ? "Advance approved by your manager" : data.action === "returned" ? "Advance returned for changes" : "Advance rejected",
       data.action === "approved" ? "Your advance request moved to HR review." : (data.comments || "Your manager did not approve this request."),
-      data.action === "approved" ? "success" : data.action === "returned" ? "warning" : "danger", "/employee/requests");
+      data.action === "approved" ? "success" : data.action === "returned" ? "warning" : "danger", "/employee/advances");
     if (data.action === "approved") {
       const { listRoleUserIds } = await import("@/backend/server/notify.server");
       await notifyAdvance(await listRoleUserIds(["hr"]), "Advance awaiting HR review", "A manager approved an advance request.", "info", "/admin/advances");
@@ -421,10 +421,10 @@ export const hrDecideAdvance = createServerFn({ method: "POST" })
     await notifyAdvance([row.employee_id],
       data.action === "approved" ? "Advance approved by HR" : data.action === "returned" ? "Advance returned by HR" : "Advance rejected by HR",
       data.action === "approved" ? "Your advance request moved to Finance for payment." : (data.comments || "HR did not approve this request."),
-      data.action === "approved" ? "success" : data.action === "returned" ? "warning" : "danger", "/employee/requests");
+      data.action === "approved" ? "success" : data.action === "returned" ? "warning" : "danger", "/employee/advances");
     if (data.action === "approved") {
       const { listRoleUserIds } = await import("@/backend/server/notify.server");
-      await notifyAdvance(await listRoleUserIds(["finance"]), "Advance awaiting payment approval", "HR approved an advance request.", "info", "/admin/advances");
+      await notifyAdvance(await listRoleUserIds(["finance"]), "Advance awaiting payment approval", "HR approved an advance request.", "info", "/finance/advances");
     }
     return { ok: true };
   });
@@ -544,7 +544,7 @@ export const financeApprovePayment = createServerFn({ method: "POST" })
     if (insResult.error) throw new Error("Failed to insert installments: " + insResult.error.message);
 
     await appendAuditLog(data.id, context.userId, "finance", "approved", data.comments);
-    await notifyAdvance([row.employee_id], "Advance approved for payment", `Your advance will be repaid over ${data.installment_count} installment(s).`, "success", "/employee/requests");
+    await notifyAdvance([row.employee_id], "Advance approved for payment", `Your advance will be repaid over ${data.installment_count} installment(s).`, "success", "/employee/advances");
     return { ok: true };
   });
 
@@ -574,7 +574,7 @@ export const financeMarkPaid = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
 
     await appendAuditLog(data.id, context.userId, "finance", "paid", data.comments);
-    await notifyAdvance([row.employee_id], "Advance paid", `Your advance of ${row.approved_amount ?? ""} has been paid.`, "success", "/employee/requests");
+    await notifyAdvance([row.employee_id], "Advance paid", `Your advance of ${row.approved_amount ?? ""} has been paid.`, "success", "/employee/advances");
     return { ok: true };
   });
 
@@ -605,7 +605,7 @@ export const financeRejectAdvance = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
 
     await appendAuditLog(data.id, context.userId, "finance", "rejected", data.comments);
-    await notifyAdvance([row.employee_id], "Advance rejected by Finance", data.comments || "Finance did not approve this request.", "danger", "/employee/requests");
+    await notifyAdvance([row.employee_id], "Advance rejected by Finance", data.comments || "Finance did not approve this request.", "danger", "/employee/advances");
     return { ok: true };
   });
 
