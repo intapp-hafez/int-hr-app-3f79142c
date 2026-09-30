@@ -28,7 +28,7 @@ function stubServerModules(): Plugin {
   };
 }
 
-import { biometricsDevPlugin } from "./src/lib/biometrics-dev-api";
+import { biometricsDevPlugin } from "./scripts/biometrics-dev-api";
 
 export default defineConfig({
   plugins: [
