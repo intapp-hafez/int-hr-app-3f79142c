@@ -121,6 +121,12 @@ async function getActiveOutstandingBalance(employeeId: string): Promise<number> 
 
 // ─── EMPLOYEE: Create Request ────────────────────────────────────────────────
 
+
+async function notifyAdvance(userIds: string[], title: string, body: string, severity: "info" | "success" | "warning" | "danger", url: string) {
+  const { notifyUsers } = await import("@/backend/server/notify.server");
+  await notifyUsers({ userIds, title, body, url, severity, category: "advance" });
+}
+
 export const createAdvanceRequest = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => AdvanceRequestSchema.parse(i))
@@ -200,6 +206,12 @@ export const createAdvanceRequest = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
 
     await appendAuditLog(row.id, context.userId, "system", "submitted");
+    {
+      const { getManagerId, getEmployeeName } = await import("@/backend/server/notify.server");
+      const [mgr, name] = await Promise.all([getManagerId(context.userId), getEmployeeName(context.userId)]);
+      if (mgr) await notifyAdvance([mgr], "New advance request", `${name} requested an advance of ${data.requested_amount} ${data.currency ?? "EGP"}.`, "info", "/manager");
+      await notifyAdvance([context.userId], "Advance request submitted", `Your request for ${data.requested_amount} ${data.currency ?? "EGP"} was sent to your manager.`, "info", "/employee/requests");
+    }
     return { id: row.id, request_number: row.request_number };
   });
 
@@ -304,6 +316,14 @@ export const managerDecideAdvance = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
 
     await appendAuditLog(data.id, context.userId, "manager", data.action as any, data.comments);
+    await notifyAdvance([row.employee_id],
+      data.action === "approved" ? "Advance approved by your manager" : data.action === "returned" ? "Advance returned for changes" : "Advance rejected",
+      data.action === "approved" ? "Your advance request moved to HR review." : (data.comments || "Your manager did not approve this request."),
+      data.action === "approved" ? "success" : data.action === "returned" ? "warning" : "danger", "/employee/requests");
+    if (data.action === "approved") {
+      const { listRoleUserIds } = await import("@/backend/server/notify.server");
+      await notifyAdvance(await listRoleUserIds(["hr"]), "Advance awaiting HR review", "A manager approved an advance request.", "info", "/admin/advances");
+    }
     return { ok: true };
   });
 
@@ -398,6 +418,14 @@ export const hrDecideAdvance = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
 
     await appendAuditLog(data.id, context.userId, "hr", data.action as any, data.comments);
+    await notifyAdvance([row.employee_id],
+      data.action === "approved" ? "Advance approved by HR" : data.action === "returned" ? "Advance returned by HR" : "Advance rejected by HR",
+      data.action === "approved" ? "Your advance request moved to Finance for payment." : (data.comments || "HR did not approve this request."),
+      data.action === "approved" ? "success" : data.action === "returned" ? "warning" : "danger", "/employee/requests");
+    if (data.action === "approved") {
+      const { listRoleUserIds } = await import("@/backend/server/notify.server");
+      await notifyAdvance(await listRoleUserIds(["finance"]), "Advance awaiting payment approval", "HR approved an advance request.", "info", "/admin/advances");
+    }
     return { ok: true };
   });
 
@@ -516,6 +544,7 @@ export const financeApprovePayment = createServerFn({ method: "POST" })
     if (insResult.error) throw new Error("Failed to insert installments: " + insResult.error.message);
 
     await appendAuditLog(data.id, context.userId, "finance", "approved", data.comments);
+    await notifyAdvance([row.employee_id], "Advance approved for payment", `Your advance will be repaid over ${data.installment_count} installment(s).`, "success", "/employee/requests");
     return { ok: true };
   });
 
@@ -529,7 +558,7 @@ export const financeMarkPaid = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { data: row, error: fetchErr } = await (supabaseAdmin as any)
       .from("employee_advances")
-      .select("id, status, approved_amount")
+      .select("id, status, approved_amount, employee_id")
       .eq("id", data.id)
       .single();
     if (fetchErr || !row) throw new Error("Advance not found");
@@ -545,6 +574,7 @@ export const financeMarkPaid = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
 
     await appendAuditLog(data.id, context.userId, "finance", "paid", data.comments);
+    await notifyAdvance([row.employee_id], "Advance paid", `Your advance of ${row.approved_amount ?? ""} has been paid.`, "success", "/employee/requests");
     return { ok: true };
   });
 
@@ -558,7 +588,7 @@ export const financeRejectAdvance = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { data: row, error: fetchErr } = await (supabaseAdmin as any)
       .from("employee_advances")
-      .select("id, status")
+      .select("id, status, employee_id")
       .eq("id", data.id)
       .single();
     if (fetchErr || !row) throw new Error("Advance not found");
@@ -575,6 +605,7 @@ export const financeRejectAdvance = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
 
     await appendAuditLog(data.id, context.userId, "finance", "rejected", data.comments);
+    await notifyAdvance([row.employee_id], "Advance rejected by Finance", data.comments || "Finance did not approve this request.", "danger", "/employee/requests");
     return { ok: true };
   });
 
