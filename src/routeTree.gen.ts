@@ -9,114 +9,94 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as StaffRouteImport } from './routes/staff'
-import { Route as ManagerRouteImport } from './routes/manager'
-import { Route as FinanceRouteImport } from './routes/finance'
-import { Route as EmployeeRouteImport } from './routes/employee'
-import { Route as AuthRouteImport } from './routes/auth'
-import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as StaffIndexRouteImport } from './routes/staff.index'
-import { Route as ManagerIndexRouteImport } from './routes/manager.index'
-import { Route as FinanceIndexRouteImport } from './routes/finance.index'
-import { Route as EmployeeIndexRouteImport } from './routes/employee.index'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as EmployeeRouteImport } from './routes/employee'
+import { Route as FinanceRouteImport } from './routes/finance'
+import { Route as ManagerRouteImport } from './routes/manager'
+import { Route as StaffRouteImport } from './routes/staff'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
-import { Route as StaffProfileRouteImport } from './routes/staff.profile'
-import { Route as StaffNotificationsRouteImport } from './routes/staff.notifications'
-import { Route as StaffLeavesRouteImport } from './routes/staff.leaves'
-import { Route as StaffChatRouteImport } from './routes/staff.chat'
-import { Route as StaffAttendanceRouteImport } from './routes/staff.attendance'
-import { Route as ManagerTripsRouteImport } from './routes/manager.trips'
-import { Route as ManagerTeamRouteImport } from './routes/manager.team'
-import { Route as ManagerTasksRouteImport } from './routes/manager.tasks'
-import { Route as ManagerProfileRouteImport } from './routes/manager.profile'
-import { Route as ManagerLeavesRouteImport } from './routes/manager.leaves'
-import { Route as ManagerCheckRouteImport } from './routes/manager.check'
-import { Route as ManagerChatRouteImport } from './routes/manager.chat'
-import { Route as ManagerAdvancesRouteImport } from './routes/manager.advances'
-import { Route as FinanceStickyNotesRouteImport } from './routes/finance.sticky-notes'
-import { Route as FinanceProfileRouteImport } from './routes/finance.profile'
-import { Route as FinancePayrollSettingsRouteImport } from './routes/finance.payroll-settings'
-import { Route as FinancePayrollRouteImport } from './routes/finance.payroll'
-import { Route as FinanceAdvancesRouteImport } from './routes/finance.advances'
-import { Route as EmployeeVerifyOtpRouteImport } from './routes/employee.verify-otp'
-import { Route as EmployeeTasksRouteImport } from './routes/employee.tasks'
-import { Route as EmployeeSettingsRouteImport } from './routes/employee.settings'
-import { Route as EmployeeNotificationsRouteImport } from './routes/employee.notifications'
-import { Route as EmployeeMessagesRouteImport } from './routes/employee.messages'
-import { Route as EmployeeLeavesRouteImport } from './routes/employee.leaves'
-import { Route as EmployeeCheckRouteImport } from './routes/employee.check'
-import { Route as EmployeeChatRouteImport } from './routes/employee.chat'
-import { Route as EmployeeBiometricsRouteImport } from './routes/employee.biometrics'
-import { Route as EmployeeAttendanceRouteImport } from './routes/employee.attendance'
-import { Route as EmployeeAdvancesRouteImport } from './routes/employee.advances'
-import { Route as AdminWorkLocationsRouteImport } from './routes/admin.work-locations'
-import { Route as AdminTargetsOvertimeRouteImport } from './routes/admin.targets-overtime'
-import { Route as AdminStickyNotesRouteImport } from './routes/admin.sticky-notes'
-import { Route as AdminSmsRouteImport } from './routes/admin.sms'
-import { Route as AdminShiftsRouteImport } from './routes/admin.shifts'
-import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
-import { Route as AdminReportsRouteImport } from './routes/admin.reports'
-import { Route as AdminReassignManagersRouteImport } from './routes/admin.reassign-managers'
-import { Route as AdminPayrollSettingsRouteImport } from './routes/admin.payroll-settings'
-import { Route as AdminPayrollRouteImport } from './routes/admin.payroll'
-import { Route as AdminOrgChartRouteImport } from './routes/admin.org-chart'
-import { Route as AdminNotificationPreferencesRouteImport } from './routes/admin.notification-preferences'
-import { Route as AdminNetworksRouteImport } from './routes/admin.networks'
-import { Route as AdminLeavesRequestsRouteImport } from './routes/admin.leaves-requests'
-import { Route as AdminLeavesRouteImport } from './routes/admin.leaves'
-import { Route as AdminLatePenaltiesRouteImport } from './routes/admin.late-penalties'
-import { Route as AdminKpisRouteImport } from './routes/admin.kpis'
-import { Route as AdminHolidaysRouteImport } from './routes/admin.holidays'
-import { Route as AdminHolidayTypesRouteImport } from './routes/admin.holiday-types'
-import { Route as AdminGeofencingRouteImport } from './routes/admin.geofencing'
-import { Route as AdminFaceNotificationsRouteImport } from './routes/admin.face-notifications'
-import { Route as AdminEmployeesRouteImport } from './routes/admin.employees'
-import { Route as AdminEmployeeAccessRouteImport } from './routes/admin.employee-access'
-import { Route as AdminDirectoryRouteImport } from './routes/admin.directory'
-import { Route as AdminDevicesRouteImport } from './routes/admin.devices'
-import { Route as AdminContractsRouteImport } from './routes/admin.contracts'
-import { Route as AdminChatRouteImport } from './routes/admin.chat'
-import { Route as AdminBiometricsHealthRouteImport } from './routes/admin.biometrics-health'
-import { Route as AdminBiometricTerminalsRouteImport } from './routes/admin.biometric-terminals'
-import { Route as AdminAuditRouteImport } from './routes/admin.audit'
-import { Route as AdminAttendanceReportRouteImport } from './routes/admin.attendance-report'
-import { Route as AdminAttendanceRouteImport } from './routes/admin.attendance'
-import { Route as AdminAllowancesRouteImport } from './routes/admin.allowances'
 import { Route as AdminAdvancesRouteImport } from './routes/admin.advances'
-import { Route as AdminEmployeesIndexRouteImport } from './routes/admin.employees.index'
-import { Route as AdminContractsIndexRouteImport } from './routes/admin.contracts.index'
-import { Route as ApiPublicEmployeesRouteImport } from './routes/api/public/employees'
-import { Route as AdminSettingsRolesRouteImport } from './routes/admin.settings_.roles'
-import { Route as AdminEmployeesIdRouteImport } from './routes/admin.employees.$id'
-import { Route as AdminContractsNotificationsRouteImport } from './routes/admin.contracts.notifications'
+import { Route as AdminAllowancesRouteImport } from './routes/admin.allowances'
+import { Route as AdminAttendanceRouteImport } from './routes/admin.attendance'
+import { Route as AdminAttendanceReportRouteImport } from './routes/admin.attendance-report'
+import { Route as AdminAuditRouteImport } from './routes/admin.audit'
+import { Route as AdminBiometricTerminalsRouteImport } from './routes/admin.biometric-terminals'
+import { Route as AdminBiometricsHealthRouteImport } from './routes/admin.biometrics-health'
+import { Route as AdminChatRouteImport } from './routes/admin.chat'
+import { Route as AdminContractsRouteImport } from './routes/admin.contracts'
+import { Route as AdminDevicesRouteImport } from './routes/admin.devices'
+import { Route as AdminDirectoryRouteImport } from './routes/admin.directory'
+import { Route as AdminEmployeeAccessRouteImport } from './routes/admin.employee-access'
+import { Route as AdminEmployeesRouteImport } from './routes/admin.employees'
+import { Route as AdminFaceNotificationsRouteImport } from './routes/admin.face-notifications'
+import { Route as AdminGeofencingRouteImport } from './routes/admin.geofencing'
+import { Route as AdminHolidayTypesRouteImport } from './routes/admin.holiday-types'
+import { Route as AdminHolidaysRouteImport } from './routes/admin.holidays'
+import { Route as AdminKpisRouteImport } from './routes/admin.kpis'
+import { Route as AdminLatePenaltiesRouteImport } from './routes/admin.late-penalties'
+import { Route as AdminLeavesRouteImport } from './routes/admin.leaves'
+import { Route as AdminLeavesRequestsRouteImport } from './routes/admin.leaves-requests'
+import { Route as AdminNetworksRouteImport } from './routes/admin.networks'
+import { Route as AdminNotificationPreferencesRouteImport } from './routes/admin.notification-preferences'
+import { Route as AdminOrgChartRouteImport } from './routes/admin.org-chart'
+import { Route as AdminPayrollRouteImport } from './routes/admin.payroll'
+import { Route as AdminPayrollSettingsRouteImport } from './routes/admin.payroll-settings'
+import { Route as AdminReassignManagersRouteImport } from './routes/admin.reassign-managers'
+import { Route as AdminReportsRouteImport } from './routes/admin.reports'
+import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
+import { Route as AdminShiftsRouteImport } from './routes/admin.shifts'
+import { Route as AdminSmsRouteImport } from './routes/admin.sms'
+import { Route as AdminStickyNotesRouteImport } from './routes/admin.sticky-notes'
+import { Route as AdminTargetsOvertimeRouteImport } from './routes/admin.targets-overtime'
+import { Route as AdminWorkLocationsRouteImport } from './routes/admin.work-locations'
+import { Route as EmployeeIndexRouteImport } from './routes/employee.index'
+import { Route as EmployeeAdvancesRouteImport } from './routes/employee.advances'
+import { Route as EmployeeAttendanceRouteImport } from './routes/employee.attendance'
+import { Route as EmployeeBiometricsRouteImport } from './routes/employee.biometrics'
+import { Route as EmployeeChatRouteImport } from './routes/employee.chat'
+import { Route as EmployeeCheckRouteImport } from './routes/employee.check'
+import { Route as EmployeeLeavesRouteImport } from './routes/employee.leaves'
+import { Route as EmployeeMessagesRouteImport } from './routes/employee.messages'
+import { Route as EmployeeNotificationsRouteImport } from './routes/employee.notifications'
+import { Route as EmployeeSettingsRouteImport } from './routes/employee.settings'
+import { Route as EmployeeTasksRouteImport } from './routes/employee.tasks'
+import { Route as EmployeeVerifyOtpRouteImport } from './routes/employee.verify-otp'
+import { Route as FinanceIndexRouteImport } from './routes/finance.index'
+import { Route as FinanceAdvancesRouteImport } from './routes/finance.advances'
+import { Route as FinancePayrollRouteImport } from './routes/finance.payroll'
+import { Route as FinancePayrollSettingsRouteImport } from './routes/finance.payroll-settings'
+import { Route as FinanceProfileRouteImport } from './routes/finance.profile'
+import { Route as FinanceStickyNotesRouteImport } from './routes/finance.sticky-notes'
+import { Route as ManagerIndexRouteImport } from './routes/manager.index'
+import { Route as ManagerAdvancesRouteImport } from './routes/manager.advances'
+import { Route as ManagerChatRouteImport } from './routes/manager.chat'
+import { Route as ManagerCheckRouteImport } from './routes/manager.check'
+import { Route as ManagerLeavesRouteImport } from './routes/manager.leaves'
+import { Route as ManagerProfileRouteImport } from './routes/manager.profile'
+import { Route as ManagerTasksRouteImport } from './routes/manager.tasks'
+import { Route as ManagerTeamRouteImport } from './routes/manager.team'
+import { Route as ManagerTripsRouteImport } from './routes/manager.trips'
+import { Route as StaffIndexRouteImport } from './routes/staff.index'
+import { Route as StaffAttendanceRouteImport } from './routes/staff.attendance'
+import { Route as StaffChatRouteImport } from './routes/staff.chat'
+import { Route as StaffLeavesRouteImport } from './routes/staff.leaves'
+import { Route as StaffNotificationsRouteImport } from './routes/staff.notifications'
+import { Route as StaffProfileRouteImport } from './routes/staff.profile'
 import { Route as AdminActivityTimelineIdRouteImport } from './routes/admin.activity-timeline.$id'
-import { Route as ApiPublicCronRunSchedulesRouteImport } from './routes/api/public/cron/run-schedules'
+import { Route as AdminContractsIndexRouteImport } from './routes/admin.contracts.index'
+import { Route as AdminContractsNotificationsRouteImport } from './routes/admin.contracts.notifications'
+import { Route as AdminEmployeesIndexRouteImport } from './routes/admin.employees.index'
+import { Route as AdminEmployeesIdRouteImport } from './routes/admin.employees.$id'
+import { Route as AdminSettingsRolesRouteImport } from './routes/admin.settings_.roles'
+import { Route as ApiPublicEmployeesRouteImport } from './routes/api/public/employees'
 import { Route as AdminSettingsRolesAllowedPagesRouteImport } from './routes/admin.settings_.roles.allowed-pages'
+import { Route as ApiPublicCronRunSchedulesRouteImport } from './routes/api/public/cron/run-schedules'
 
-const StaffRoute = StaffRouteImport.update({
-  id: '/staff',
-  path: '/staff',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ManagerRoute = ManagerRouteImport.update({
-  id: '/manager',
-  path: '/manager',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FinanceRoute = FinanceRouteImport.update({
-  id: '/finance',
-  path: '/finance',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const EmployeeRoute = EmployeeRouteImport.update({
-  id: '/employee',
-  path: '/employee',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthRoute = AuthRouteImport.update({
-  id: '/auth',
-  path: '/auth',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -124,234 +104,144 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
-const StaffIndexRoute = StaffIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => StaffRoute,
+const EmployeeRoute = EmployeeRouteImport.update({
+  id: '/employee',
+  path: '/employee',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const ManagerIndexRoute = ManagerIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => ManagerRoute,
+const FinanceRoute = FinanceRouteImport.update({
+  id: '/finance',
+  path: '/finance',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const FinanceIndexRoute = FinanceIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => FinanceRoute,
+const ManagerRoute = ManagerRouteImport.update({
+  id: '/manager',
+  path: '/manager',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const EmployeeIndexRoute = EmployeeIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => EmployeeRoute,
+const StaffRoute = StaffRouteImport.update({
+  id: '/staff',
+  path: '/staff',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AdminRoute,
 } as any)
-const StaffProfileRoute = StaffProfileRouteImport.update({
-  id: '/profile',
-  path: '/profile',
-  getParentRoute: () => StaffRoute,
+const AdminAdvancesRoute = AdminAdvancesRouteImport.update({
+  id: '/advances',
+  path: '/advances',
+  getParentRoute: () => AdminRoute,
 } as any)
-const StaffNotificationsRoute = StaffNotificationsRouteImport.update({
-  id: '/notifications',
-  path: '/notifications',
-  getParentRoute: () => StaffRoute,
+const AdminAllowancesRoute = AdminAllowancesRouteImport.update({
+  id: '/allowances',
+  path: '/allowances',
+  getParentRoute: () => AdminRoute,
 } as any)
-const StaffLeavesRoute = StaffLeavesRouteImport.update({
-  id: '/leaves',
-  path: '/leaves',
-  getParentRoute: () => StaffRoute,
-} as any)
-const StaffChatRoute = StaffChatRouteImport.update({
-  id: '/chat',
-  path: '/chat',
-  getParentRoute: () => StaffRoute,
-} as any)
-const StaffAttendanceRoute = StaffAttendanceRouteImport.update({
+const AdminAttendanceRoute = AdminAttendanceRouteImport.update({
   id: '/attendance',
   path: '/attendance',
-  getParentRoute: () => StaffRoute,
+  getParentRoute: () => AdminRoute,
 } as any)
-const ManagerTripsRoute = ManagerTripsRouteImport.update({
-  id: '/trips',
-  path: '/trips',
-  getParentRoute: () => ManagerRoute,
+const AdminAttendanceReportRoute = AdminAttendanceReportRouteImport.update({
+  id: '/attendance-report',
+  path: '/attendance-report',
+  getParentRoute: () => AdminRoute,
 } as any)
-const ManagerTeamRoute = ManagerTeamRouteImport.update({
-  id: '/team',
-  path: '/team',
-  getParentRoute: () => ManagerRoute,
+const AdminAuditRoute = AdminAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
+  getParentRoute: () => AdminRoute,
 } as any)
-const ManagerTasksRoute = ManagerTasksRouteImport.update({
-  id: '/tasks',
-  path: '/tasks',
-  getParentRoute: () => ManagerRoute,
+const AdminBiometricTerminalsRoute = AdminBiometricTerminalsRouteImport.update({
+  id: '/biometric-terminals',
+  path: '/biometric-terminals',
+  getParentRoute: () => AdminRoute,
 } as any)
-const ManagerProfileRoute = ManagerProfileRouteImport.update({
-  id: '/profile',
-  path: '/profile',
-  getParentRoute: () => ManagerRoute,
+const AdminBiometricsHealthRoute = AdminBiometricsHealthRouteImport.update({
+  id: '/biometrics-health',
+  path: '/biometrics-health',
+  getParentRoute: () => AdminRoute,
 } as any)
-const ManagerLeavesRoute = ManagerLeavesRouteImport.update({
-  id: '/leaves',
-  path: '/leaves',
-  getParentRoute: () => ManagerRoute,
-} as any)
-const ManagerCheckRoute = ManagerCheckRouteImport.update({
-  id: '/check',
-  path: '/check',
-  getParentRoute: () => ManagerRoute,
-} as any)
-const ManagerChatRoute = ManagerChatRouteImport.update({
+const AdminChatRoute = AdminChatRouteImport.update({
   id: '/chat',
   path: '/chat',
-  getParentRoute: () => ManagerRoute,
+  getParentRoute: () => AdminRoute,
 } as any)
-const ManagerAdvancesRoute = ManagerAdvancesRouteImport.update({
-  id: '/advances',
-  path: '/advances',
-  getParentRoute: () => ManagerRoute,
+const AdminContractsRoute = AdminContractsRouteImport.update({
+  id: '/contracts',
+  path: '/contracts',
+  getParentRoute: () => AdminRoute,
 } as any)
-const FinanceStickyNotesRoute = FinanceStickyNotesRouteImport.update({
-  id: '/sticky-notes',
-  path: '/sticky-notes',
-  getParentRoute: () => FinanceRoute,
+const AdminDevicesRoute = AdminDevicesRouteImport.update({
+  id: '/devices',
+  path: '/devices',
+  getParentRoute: () => AdminRoute,
 } as any)
-const FinanceProfileRoute = FinanceProfileRouteImport.update({
-  id: '/profile',
-  path: '/profile',
-  getParentRoute: () => FinanceRoute,
+const AdminDirectoryRoute = AdminDirectoryRouteImport.update({
+  id: '/directory',
+  path: '/directory',
+  getParentRoute: () => AdminRoute,
 } as any)
-const FinancePayrollSettingsRoute = FinancePayrollSettingsRouteImport.update({
-  id: '/payroll-settings',
-  path: '/payroll-settings',
-  getParentRoute: () => FinanceRoute,
+const AdminEmployeeAccessRoute = AdminEmployeeAccessRouteImport.update({
+  id: '/employee-access',
+  path: '/employee-access',
+  getParentRoute: () => AdminRoute,
 } as any)
-const FinancePayrollRoute = FinancePayrollRouteImport.update({
-  id: '/payroll',
-  path: '/payroll',
-  getParentRoute: () => FinanceRoute,
+const AdminEmployeesRoute = AdminEmployeesRouteImport.update({
+  id: '/employees',
+  path: '/employees',
+  getParentRoute: () => AdminRoute,
 } as any)
-const FinanceAdvancesRoute = FinanceAdvancesRouteImport.update({
-  id: '/advances',
-  path: '/advances',
-  getParentRoute: () => FinanceRoute,
+const AdminFaceNotificationsRoute = AdminFaceNotificationsRouteImport.update({
+  id: '/face-notifications',
+  path: '/face-notifications',
+  getParentRoute: () => AdminRoute,
 } as any)
-const EmployeeVerifyOtpRoute = EmployeeVerifyOtpRouteImport.update({
-  id: '/verify-otp',
-  path: '/verify-otp',
-  getParentRoute: () => EmployeeRoute,
+const AdminGeofencingRoute = AdminGeofencingRouteImport.update({
+  id: '/geofencing',
+  path: '/geofencing',
+  getParentRoute: () => AdminRoute,
 } as any)
-const EmployeeTasksRoute = EmployeeTasksRouteImport.update({
-  id: '/tasks',
-  path: '/tasks',
-  getParentRoute: () => EmployeeRoute,
+const AdminHolidayTypesRoute = AdminHolidayTypesRouteImport.update({
+  id: '/holiday-types',
+  path: '/holiday-types',
+  getParentRoute: () => AdminRoute,
 } as any)
-const EmployeeSettingsRoute = EmployeeSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => EmployeeRoute,
+const AdminHolidaysRoute = AdminHolidaysRouteImport.update({
+  id: '/holidays',
+  path: '/holidays',
+  getParentRoute: () => AdminRoute,
 } as any)
-const EmployeeNotificationsRoute = EmployeeNotificationsRouteImport.update({
-  id: '/notifications',
-  path: '/notifications',
-  getParentRoute: () => EmployeeRoute,
+const AdminKpisRoute = AdminKpisRouteImport.update({
+  id: '/kpis',
+  path: '/kpis',
+  getParentRoute: () => AdminRoute,
 } as any)
-const EmployeeMessagesRoute = EmployeeMessagesRouteImport.update({
-  id: '/messages',
-  path: '/messages',
-  getParentRoute: () => EmployeeRoute,
+const AdminLatePenaltiesRoute = AdminLatePenaltiesRouteImport.update({
+  id: '/late-penalties',
+  path: '/late-penalties',
+  getParentRoute: () => AdminRoute,
 } as any)
-const EmployeeLeavesRoute = EmployeeLeavesRouteImport.update({
+const AdminLeavesRoute = AdminLeavesRouteImport.update({
   id: '/leaves',
   path: '/leaves',
-  getParentRoute: () => EmployeeRoute,
-} as any)
-const EmployeeCheckRoute = EmployeeCheckRouteImport.update({
-  id: '/check',
-  path: '/check',
-  getParentRoute: () => EmployeeRoute,
-} as any)
-const EmployeeChatRoute = EmployeeChatRouteImport.update({
-  id: '/chat',
-  path: '/chat',
-  getParentRoute: () => EmployeeRoute,
-} as any)
-const EmployeeBiometricsRoute = EmployeeBiometricsRouteImport.update({
-  id: '/biometrics',
-  path: '/biometrics',
-  getParentRoute: () => EmployeeRoute,
-} as any)
-const EmployeeAttendanceRoute = EmployeeAttendanceRouteImport.update({
-  id: '/attendance',
-  path: '/attendance',
-  getParentRoute: () => EmployeeRoute,
-} as any)
-const EmployeeAdvancesRoute = EmployeeAdvancesRouteImport.update({
-  id: '/advances',
-  path: '/advances',
-  getParentRoute: () => EmployeeRoute,
-} as any)
-const AdminWorkLocationsRoute = AdminWorkLocationsRouteImport.update({
-  id: '/work-locations',
-  path: '/work-locations',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminTargetsOvertimeRoute = AdminTargetsOvertimeRouteImport.update({
-  id: '/targets-overtime',
-  path: '/targets-overtime',
+const AdminLeavesRequestsRoute = AdminLeavesRequestsRouteImport.update({
+  id: '/leaves-requests',
+  path: '/leaves-requests',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminStickyNotesRoute = AdminStickyNotesRouteImport.update({
-  id: '/sticky-notes',
-  path: '/sticky-notes',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminSmsRoute = AdminSmsRouteImport.update({
-  id: '/sms',
-  path: '/sms',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminShiftsRoute = AdminShiftsRouteImport.update({
-  id: '/shifts',
-  path: '/shifts',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminSettingsRoute = AdminSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminReportsRoute = AdminReportsRouteImport.update({
-  id: '/reports',
-  path: '/reports',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminReassignManagersRoute = AdminReassignManagersRouteImport.update({
-  id: '/reassign-managers',
-  path: '/reassign-managers',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminPayrollSettingsRoute = AdminPayrollSettingsRouteImport.update({
-  id: '/payroll-settings',
-  path: '/payroll-settings',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminPayrollRoute = AdminPayrollRouteImport.update({
-  id: '/payroll',
-  path: '/payroll',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminOrgChartRoute = AdminOrgChartRouteImport.update({
-  id: '/org-chart',
-  path: '/org-chart',
+const AdminNetworksRoute = AdminNetworksRouteImport.update({
+  id: '/networks',
+  path: '/networks',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminNotificationPreferencesRoute =
@@ -360,140 +250,235 @@ const AdminNotificationPreferencesRoute =
     path: '/notification-preferences',
     getParentRoute: () => AdminRoute,
   } as any)
-const AdminNetworksRoute = AdminNetworksRouteImport.update({
-  id: '/networks',
-  path: '/networks',
+const AdminOrgChartRoute = AdminOrgChartRouteImport.update({
+  id: '/org-chart',
+  path: '/org-chart',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminLeavesRequestsRoute = AdminLeavesRequestsRouteImport.update({
-  id: '/leaves-requests',
-  path: '/leaves-requests',
+const AdminPayrollRoute = AdminPayrollRouteImport.update({
+  id: '/payroll',
+  path: '/payroll',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminLeavesRoute = AdminLeavesRouteImport.update({
-  id: '/leaves',
-  path: '/leaves',
+const AdminPayrollSettingsRoute = AdminPayrollSettingsRouteImport.update({
+  id: '/payroll-settings',
+  path: '/payroll-settings',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminLatePenaltiesRoute = AdminLatePenaltiesRouteImport.update({
-  id: '/late-penalties',
-  path: '/late-penalties',
+const AdminReassignManagersRoute = AdminReassignManagersRouteImport.update({
+  id: '/reassign-managers',
+  path: '/reassign-managers',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminKpisRoute = AdminKpisRouteImport.update({
-  id: '/kpis',
-  path: '/kpis',
+const AdminReportsRoute = AdminReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminHolidaysRoute = AdminHolidaysRouteImport.update({
-  id: '/holidays',
-  path: '/holidays',
+const AdminSettingsRoute = AdminSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminHolidayTypesRoute = AdminHolidayTypesRouteImport.update({
-  id: '/holiday-types',
-  path: '/holiday-types',
+const AdminShiftsRoute = AdminShiftsRouteImport.update({
+  id: '/shifts',
+  path: '/shifts',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminGeofencingRoute = AdminGeofencingRouteImport.update({
-  id: '/geofencing',
-  path: '/geofencing',
+const AdminSmsRoute = AdminSmsRouteImport.update({
+  id: '/sms',
+  path: '/sms',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminFaceNotificationsRoute = AdminFaceNotificationsRouteImport.update({
-  id: '/face-notifications',
-  path: '/face-notifications',
+const AdminStickyNotesRoute = AdminStickyNotesRouteImport.update({
+  id: '/sticky-notes',
+  path: '/sticky-notes',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminEmployeesRoute = AdminEmployeesRouteImport.update({
-  id: '/employees',
-  path: '/employees',
+const AdminTargetsOvertimeRoute = AdminTargetsOvertimeRouteImport.update({
+  id: '/targets-overtime',
+  path: '/targets-overtime',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminEmployeeAccessRoute = AdminEmployeeAccessRouteImport.update({
-  id: '/employee-access',
-  path: '/employee-access',
+const AdminWorkLocationsRoute = AdminWorkLocationsRouteImport.update({
+  id: '/work-locations',
+  path: '/work-locations',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminDirectoryRoute = AdminDirectoryRouteImport.update({
-  id: '/directory',
-  path: '/directory',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminDevicesRoute = AdminDevicesRouteImport.update({
-  id: '/devices',
-  path: '/devices',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminContractsRoute = AdminContractsRouteImport.update({
-  id: '/contracts',
-  path: '/contracts',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminChatRoute = AdminChatRouteImport.update({
-  id: '/chat',
-  path: '/chat',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminBiometricsHealthRoute = AdminBiometricsHealthRouteImport.update({
-  id: '/biometrics-health',
-  path: '/biometrics-health',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminBiometricTerminalsRoute = AdminBiometricTerminalsRouteImport.update({
-  id: '/biometric-terminals',
-  path: '/biometric-terminals',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminAuditRoute = AdminAuditRouteImport.update({
-  id: '/audit',
-  path: '/audit',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminAttendanceReportRoute = AdminAttendanceReportRouteImport.update({
-  id: '/attendance-report',
-  path: '/attendance-report',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminAttendanceRoute = AdminAttendanceRouteImport.update({
-  id: '/attendance',
-  path: '/attendance',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminAllowancesRoute = AdminAllowancesRouteImport.update({
-  id: '/allowances',
-  path: '/allowances',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminAdvancesRoute = AdminAdvancesRouteImport.update({
-  id: '/advances',
-  path: '/advances',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminEmployeesIndexRoute = AdminEmployeesIndexRouteImport.update({
+const EmployeeIndexRoute = EmployeeIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => AdminEmployeesRoute,
+  getParentRoute: () => EmployeeRoute,
+} as any)
+const EmployeeAdvancesRoute = EmployeeAdvancesRouteImport.update({
+  id: '/advances',
+  path: '/advances',
+  getParentRoute: () => EmployeeRoute,
+} as any)
+const EmployeeAttendanceRoute = EmployeeAttendanceRouteImport.update({
+  id: '/attendance',
+  path: '/attendance',
+  getParentRoute: () => EmployeeRoute,
+} as any)
+const EmployeeBiometricsRoute = EmployeeBiometricsRouteImport.update({
+  id: '/biometrics',
+  path: '/biometrics',
+  getParentRoute: () => EmployeeRoute,
+} as any)
+const EmployeeChatRoute = EmployeeChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
+  getParentRoute: () => EmployeeRoute,
+} as any)
+const EmployeeCheckRoute = EmployeeCheckRouteImport.update({
+  id: '/check',
+  path: '/check',
+  getParentRoute: () => EmployeeRoute,
+} as any)
+const EmployeeLeavesRoute = EmployeeLeavesRouteImport.update({
+  id: '/leaves',
+  path: '/leaves',
+  getParentRoute: () => EmployeeRoute,
+} as any)
+const EmployeeMessagesRoute = EmployeeMessagesRouteImport.update({
+  id: '/messages',
+  path: '/messages',
+  getParentRoute: () => EmployeeRoute,
+} as any)
+const EmployeeNotificationsRoute = EmployeeNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => EmployeeRoute,
+} as any)
+const EmployeeSettingsRoute = EmployeeSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => EmployeeRoute,
+} as any)
+const EmployeeTasksRoute = EmployeeTasksRouteImport.update({
+  id: '/tasks',
+  path: '/tasks',
+  getParentRoute: () => EmployeeRoute,
+} as any)
+const EmployeeVerifyOtpRoute = EmployeeVerifyOtpRouteImport.update({
+  id: '/verify-otp',
+  path: '/verify-otp',
+  getParentRoute: () => EmployeeRoute,
+} as any)
+const FinanceIndexRoute = FinanceIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => FinanceRoute,
+} as any)
+const FinanceAdvancesRoute = FinanceAdvancesRouteImport.update({
+  id: '/advances',
+  path: '/advances',
+  getParentRoute: () => FinanceRoute,
+} as any)
+const FinancePayrollRoute = FinancePayrollRouteImport.update({
+  id: '/payroll',
+  path: '/payroll',
+  getParentRoute: () => FinanceRoute,
+} as any)
+const FinancePayrollSettingsRoute = FinancePayrollSettingsRouteImport.update({
+  id: '/payroll-settings',
+  path: '/payroll-settings',
+  getParentRoute: () => FinanceRoute,
+} as any)
+const FinanceProfileRoute = FinanceProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => FinanceRoute,
+} as any)
+const FinanceStickyNotesRoute = FinanceStickyNotesRouteImport.update({
+  id: '/sticky-notes',
+  path: '/sticky-notes',
+  getParentRoute: () => FinanceRoute,
+} as any)
+const ManagerIndexRoute = ManagerIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ManagerRoute,
+} as any)
+const ManagerAdvancesRoute = ManagerAdvancesRouteImport.update({
+  id: '/advances',
+  path: '/advances',
+  getParentRoute: () => ManagerRoute,
+} as any)
+const ManagerChatRoute = ManagerChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
+  getParentRoute: () => ManagerRoute,
+} as any)
+const ManagerCheckRoute = ManagerCheckRouteImport.update({
+  id: '/check',
+  path: '/check',
+  getParentRoute: () => ManagerRoute,
+} as any)
+const ManagerLeavesRoute = ManagerLeavesRouteImport.update({
+  id: '/leaves',
+  path: '/leaves',
+  getParentRoute: () => ManagerRoute,
+} as any)
+const ManagerProfileRoute = ManagerProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => ManagerRoute,
+} as any)
+const ManagerTasksRoute = ManagerTasksRouteImport.update({
+  id: '/tasks',
+  path: '/tasks',
+  getParentRoute: () => ManagerRoute,
+} as any)
+const ManagerTeamRoute = ManagerTeamRouteImport.update({
+  id: '/team',
+  path: '/team',
+  getParentRoute: () => ManagerRoute,
+} as any)
+const ManagerTripsRoute = ManagerTripsRouteImport.update({
+  id: '/trips',
+  path: '/trips',
+  getParentRoute: () => ManagerRoute,
+} as any)
+const StaffIndexRoute = StaffIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => StaffRoute,
+} as any)
+const StaffAttendanceRoute = StaffAttendanceRouteImport.update({
+  id: '/attendance',
+  path: '/attendance',
+  getParentRoute: () => StaffRoute,
+} as any)
+const StaffChatRoute = StaffChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
+  getParentRoute: () => StaffRoute,
+} as any)
+const StaffLeavesRoute = StaffLeavesRouteImport.update({
+  id: '/leaves',
+  path: '/leaves',
+  getParentRoute: () => StaffRoute,
+} as any)
+const StaffNotificationsRoute = StaffNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => StaffRoute,
+} as any)
+const StaffProfileRoute = StaffProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => StaffRoute,
+} as any)
+const AdminActivityTimelineIdRoute = AdminActivityTimelineIdRouteImport.update({
+  id: '/activity-timeline/$id',
+  path: '/activity-timeline/$id',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AdminContractsIndexRoute = AdminContractsIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AdminContractsRoute,
-} as any)
-const ApiPublicEmployeesRoute = ApiPublicEmployeesRouteImport.update({
-  id: '/api/public/employees',
-  path: '/api/public/employees',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminSettingsRolesRoute = AdminSettingsRolesRouteImport.update({
-  id: '/settings_/roles',
-  path: '/settings/roles',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminEmployeesIdRoute = AdminEmployeesIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => AdminEmployeesRoute,
 } as any)
 const AdminContractsNotificationsRoute =
   AdminContractsNotificationsRouteImport.update({
@@ -501,22 +486,37 @@ const AdminContractsNotificationsRoute =
     path: '/notifications',
     getParentRoute: () => AdminContractsRoute,
   } as any)
-const AdminActivityTimelineIdRoute = AdminActivityTimelineIdRouteImport.update({
-  id: '/activity-timeline/$id',
-  path: '/activity-timeline/$id',
+const AdminEmployeesIndexRoute = AdminEmployeesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminEmployeesRoute,
+} as any)
+const AdminEmployeesIdRoute = AdminEmployeesIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AdminEmployeesRoute,
+} as any)
+const AdminSettingsRolesRoute = AdminSettingsRolesRouteImport.update({
+  id: '/settings_/roles',
+  path: '/settings/roles',
   getParentRoute: () => AdminRoute,
 } as any)
-const ApiPublicCronRunSchedulesRoute =
-  ApiPublicCronRunSchedulesRouteImport.update({
-    id: '/api/public/cron/run-schedules',
-    path: '/api/public/cron/run-schedules',
-    getParentRoute: () => rootRouteImport,
-  } as any)
+const ApiPublicEmployeesRoute = ApiPublicEmployeesRouteImport.update({
+  id: '/api/public/employees',
+  path: '/api/public/employees',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminSettingsRolesAllowedPagesRoute =
   AdminSettingsRolesAllowedPagesRouteImport.update({
     id: '/allowed-pages',
     path: '/allowed-pages',
     getParentRoute: () => AdminSettingsRolesRoute,
+  } as any)
+const ApiPublicCronRunSchedulesRoute =
+  ApiPublicCronRunSchedulesRouteImport.update({
+    id: '/api/public/cron/run-schedules',
+    path: '/api/public/cron/run-schedules',
+    getParentRoute: () => rootRouteImport,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -1039,39 +1039,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/staff': {
-      id: '/staff'
-      path: '/staff'
-      fullPath: '/staff'
-      preLoaderRoute: typeof StaffRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/manager': {
-      id: '/manager'
-      path: '/manager'
-      fullPath: '/manager'
-      preLoaderRoute: typeof ManagerRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/finance': {
-      id: '/finance'
-      path: '/finance'
-      fullPath: '/finance'
-      preLoaderRoute: typeof FinanceRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/employee': {
-      id: '/employee'
-      path: '/employee'
-      fullPath: '/employee'
-      preLoaderRoute: typeof EmployeeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -1081,480 +1053,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/staff/': {
-      id: '/staff/'
-      path: '/'
-      fullPath: '/staff/'
-      preLoaderRoute: typeof StaffIndexRouteImport
-      parentRoute: typeof StaffRoute
+    '/employee': {
+      id: '/employee'
+      path: '/employee'
+      fullPath: '/employee'
+      preLoaderRoute: typeof EmployeeRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/manager/': {
-      id: '/manager/'
-      path: '/'
-      fullPath: '/manager/'
-      preLoaderRoute: typeof ManagerIndexRouteImport
-      parentRoute: typeof ManagerRoute
+    '/finance': {
+      id: '/finance'
+      path: '/finance'
+      fullPath: '/finance'
+      preLoaderRoute: typeof FinanceRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/finance/': {
-      id: '/finance/'
-      path: '/'
-      fullPath: '/finance/'
-      preLoaderRoute: typeof FinanceIndexRouteImport
-      parentRoute: typeof FinanceRoute
+    '/manager': {
+      id: '/manager'
+      path: '/manager'
+      fullPath: '/manager'
+      preLoaderRoute: typeof ManagerRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/employee/': {
-      id: '/employee/'
-      path: '/'
-      fullPath: '/employee/'
-      preLoaderRoute: typeof EmployeeIndexRouteImport
-      parentRoute: typeof EmployeeRoute
+    '/staff': {
+      id: '/staff'
+      path: '/staff'
+      fullPath: '/staff'
+      preLoaderRoute: typeof StaffRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/admin/': {
       id: '/admin/'
       path: '/'
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/staff/profile': {
-      id: '/staff/profile'
-      path: '/profile'
-      fullPath: '/staff/profile'
-      preLoaderRoute: typeof StaffProfileRouteImport
-      parentRoute: typeof StaffRoute
-    }
-    '/staff/notifications': {
-      id: '/staff/notifications'
-      path: '/notifications'
-      fullPath: '/staff/notifications'
-      preLoaderRoute: typeof StaffNotificationsRouteImport
-      parentRoute: typeof StaffRoute
-    }
-    '/staff/leaves': {
-      id: '/staff/leaves'
-      path: '/leaves'
-      fullPath: '/staff/leaves'
-      preLoaderRoute: typeof StaffLeavesRouteImport
-      parentRoute: typeof StaffRoute
-    }
-    '/staff/chat': {
-      id: '/staff/chat'
-      path: '/chat'
-      fullPath: '/staff/chat'
-      preLoaderRoute: typeof StaffChatRouteImport
-      parentRoute: typeof StaffRoute
-    }
-    '/staff/attendance': {
-      id: '/staff/attendance'
-      path: '/attendance'
-      fullPath: '/staff/attendance'
-      preLoaderRoute: typeof StaffAttendanceRouteImport
-      parentRoute: typeof StaffRoute
-    }
-    '/manager/trips': {
-      id: '/manager/trips'
-      path: '/trips'
-      fullPath: '/manager/trips'
-      preLoaderRoute: typeof ManagerTripsRouteImport
-      parentRoute: typeof ManagerRoute
-    }
-    '/manager/team': {
-      id: '/manager/team'
-      path: '/team'
-      fullPath: '/manager/team'
-      preLoaderRoute: typeof ManagerTeamRouteImport
-      parentRoute: typeof ManagerRoute
-    }
-    '/manager/tasks': {
-      id: '/manager/tasks'
-      path: '/tasks'
-      fullPath: '/manager/tasks'
-      preLoaderRoute: typeof ManagerTasksRouteImport
-      parentRoute: typeof ManagerRoute
-    }
-    '/manager/profile': {
-      id: '/manager/profile'
-      path: '/profile'
-      fullPath: '/manager/profile'
-      preLoaderRoute: typeof ManagerProfileRouteImport
-      parentRoute: typeof ManagerRoute
-    }
-    '/manager/leaves': {
-      id: '/manager/leaves'
-      path: '/leaves'
-      fullPath: '/manager/leaves'
-      preLoaderRoute: typeof ManagerLeavesRouteImport
-      parentRoute: typeof ManagerRoute
-    }
-    '/manager/check': {
-      id: '/manager/check'
-      path: '/check'
-      fullPath: '/manager/check'
-      preLoaderRoute: typeof ManagerCheckRouteImport
-      parentRoute: typeof ManagerRoute
-    }
-    '/manager/chat': {
-      id: '/manager/chat'
-      path: '/chat'
-      fullPath: '/manager/chat'
-      preLoaderRoute: typeof ManagerChatRouteImport
-      parentRoute: typeof ManagerRoute
-    }
-    '/manager/advances': {
-      id: '/manager/advances'
-      path: '/advances'
-      fullPath: '/manager/advances'
-      preLoaderRoute: typeof ManagerAdvancesRouteImport
-      parentRoute: typeof ManagerRoute
-    }
-    '/finance/sticky-notes': {
-      id: '/finance/sticky-notes'
-      path: '/sticky-notes'
-      fullPath: '/finance/sticky-notes'
-      preLoaderRoute: typeof FinanceStickyNotesRouteImport
-      parentRoute: typeof FinanceRoute
-    }
-    '/finance/profile': {
-      id: '/finance/profile'
-      path: '/profile'
-      fullPath: '/finance/profile'
-      preLoaderRoute: typeof FinanceProfileRouteImport
-      parentRoute: typeof FinanceRoute
-    }
-    '/finance/payroll-settings': {
-      id: '/finance/payroll-settings'
-      path: '/payroll-settings'
-      fullPath: '/finance/payroll-settings'
-      preLoaderRoute: typeof FinancePayrollSettingsRouteImport
-      parentRoute: typeof FinanceRoute
-    }
-    '/finance/payroll': {
-      id: '/finance/payroll'
-      path: '/payroll'
-      fullPath: '/finance/payroll'
-      preLoaderRoute: typeof FinancePayrollRouteImport
-      parentRoute: typeof FinanceRoute
-    }
-    '/finance/advances': {
-      id: '/finance/advances'
-      path: '/advances'
-      fullPath: '/finance/advances'
-      preLoaderRoute: typeof FinanceAdvancesRouteImport
-      parentRoute: typeof FinanceRoute
-    }
-    '/employee/verify-otp': {
-      id: '/employee/verify-otp'
-      path: '/verify-otp'
-      fullPath: '/employee/verify-otp'
-      preLoaderRoute: typeof EmployeeVerifyOtpRouteImport
-      parentRoute: typeof EmployeeRoute
-    }
-    '/employee/tasks': {
-      id: '/employee/tasks'
-      path: '/tasks'
-      fullPath: '/employee/tasks'
-      preLoaderRoute: typeof EmployeeTasksRouteImport
-      parentRoute: typeof EmployeeRoute
-    }
-    '/employee/settings': {
-      id: '/employee/settings'
-      path: '/settings'
-      fullPath: '/employee/settings'
-      preLoaderRoute: typeof EmployeeSettingsRouteImport
-      parentRoute: typeof EmployeeRoute
-    }
-    '/employee/notifications': {
-      id: '/employee/notifications'
-      path: '/notifications'
-      fullPath: '/employee/notifications'
-      preLoaderRoute: typeof EmployeeNotificationsRouteImport
-      parentRoute: typeof EmployeeRoute
-    }
-    '/employee/messages': {
-      id: '/employee/messages'
-      path: '/messages'
-      fullPath: '/employee/messages'
-      preLoaderRoute: typeof EmployeeMessagesRouteImport
-      parentRoute: typeof EmployeeRoute
-    }
-    '/employee/leaves': {
-      id: '/employee/leaves'
-      path: '/leaves'
-      fullPath: '/employee/leaves'
-      preLoaderRoute: typeof EmployeeLeavesRouteImport
-      parentRoute: typeof EmployeeRoute
-    }
-    '/employee/check': {
-      id: '/employee/check'
-      path: '/check'
-      fullPath: '/employee/check'
-      preLoaderRoute: typeof EmployeeCheckRouteImport
-      parentRoute: typeof EmployeeRoute
-    }
-    '/employee/chat': {
-      id: '/employee/chat'
-      path: '/chat'
-      fullPath: '/employee/chat'
-      preLoaderRoute: typeof EmployeeChatRouteImport
-      parentRoute: typeof EmployeeRoute
-    }
-    '/employee/biometrics': {
-      id: '/employee/biometrics'
-      path: '/biometrics'
-      fullPath: '/employee/biometrics'
-      preLoaderRoute: typeof EmployeeBiometricsRouteImport
-      parentRoute: typeof EmployeeRoute
-    }
-    '/employee/attendance': {
-      id: '/employee/attendance'
-      path: '/attendance'
-      fullPath: '/employee/attendance'
-      preLoaderRoute: typeof EmployeeAttendanceRouteImport
-      parentRoute: typeof EmployeeRoute
-    }
-    '/employee/advances': {
-      id: '/employee/advances'
-      path: '/advances'
-      fullPath: '/employee/advances'
-      preLoaderRoute: typeof EmployeeAdvancesRouteImport
-      parentRoute: typeof EmployeeRoute
-    }
-    '/admin/work-locations': {
-      id: '/admin/work-locations'
-      path: '/work-locations'
-      fullPath: '/admin/work-locations'
-      preLoaderRoute: typeof AdminWorkLocationsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/targets-overtime': {
-      id: '/admin/targets-overtime'
-      path: '/targets-overtime'
-      fullPath: '/admin/targets-overtime'
-      preLoaderRoute: typeof AdminTargetsOvertimeRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/sticky-notes': {
-      id: '/admin/sticky-notes'
-      path: '/sticky-notes'
-      fullPath: '/admin/sticky-notes'
-      preLoaderRoute: typeof AdminStickyNotesRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/sms': {
-      id: '/admin/sms'
-      path: '/sms'
-      fullPath: '/admin/sms'
-      preLoaderRoute: typeof AdminSmsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/shifts': {
-      id: '/admin/shifts'
-      path: '/shifts'
-      fullPath: '/admin/shifts'
-      preLoaderRoute: typeof AdminShiftsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/settings': {
-      id: '/admin/settings'
-      path: '/settings'
-      fullPath: '/admin/settings'
-      preLoaderRoute: typeof AdminSettingsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/reports': {
-      id: '/admin/reports'
-      path: '/reports'
-      fullPath: '/admin/reports'
-      preLoaderRoute: typeof AdminReportsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/reassign-managers': {
-      id: '/admin/reassign-managers'
-      path: '/reassign-managers'
-      fullPath: '/admin/reassign-managers'
-      preLoaderRoute: typeof AdminReassignManagersRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/payroll-settings': {
-      id: '/admin/payroll-settings'
-      path: '/payroll-settings'
-      fullPath: '/admin/payroll-settings'
-      preLoaderRoute: typeof AdminPayrollSettingsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/payroll': {
-      id: '/admin/payroll'
-      path: '/payroll'
-      fullPath: '/admin/payroll'
-      preLoaderRoute: typeof AdminPayrollRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/org-chart': {
-      id: '/admin/org-chart'
-      path: '/org-chart'
-      fullPath: '/admin/org-chart'
-      preLoaderRoute: typeof AdminOrgChartRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/notification-preferences': {
-      id: '/admin/notification-preferences'
-      path: '/notification-preferences'
-      fullPath: '/admin/notification-preferences'
-      preLoaderRoute: typeof AdminNotificationPreferencesRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/networks': {
-      id: '/admin/networks'
-      path: '/networks'
-      fullPath: '/admin/networks'
-      preLoaderRoute: typeof AdminNetworksRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/leaves-requests': {
-      id: '/admin/leaves-requests'
-      path: '/leaves-requests'
-      fullPath: '/admin/leaves-requests'
-      preLoaderRoute: typeof AdminLeavesRequestsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/leaves': {
-      id: '/admin/leaves'
-      path: '/leaves'
-      fullPath: '/admin/leaves'
-      preLoaderRoute: typeof AdminLeavesRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/late-penalties': {
-      id: '/admin/late-penalties'
-      path: '/late-penalties'
-      fullPath: '/admin/late-penalties'
-      preLoaderRoute: typeof AdminLatePenaltiesRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/kpis': {
-      id: '/admin/kpis'
-      path: '/kpis'
-      fullPath: '/admin/kpis'
-      preLoaderRoute: typeof AdminKpisRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/holidays': {
-      id: '/admin/holidays'
-      path: '/holidays'
-      fullPath: '/admin/holidays'
-      preLoaderRoute: typeof AdminHolidaysRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/holiday-types': {
-      id: '/admin/holiday-types'
-      path: '/holiday-types'
-      fullPath: '/admin/holiday-types'
-      preLoaderRoute: typeof AdminHolidayTypesRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/geofencing': {
-      id: '/admin/geofencing'
-      path: '/geofencing'
-      fullPath: '/admin/geofencing'
-      preLoaderRoute: typeof AdminGeofencingRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/face-notifications': {
-      id: '/admin/face-notifications'
-      path: '/face-notifications'
-      fullPath: '/admin/face-notifications'
-      preLoaderRoute: typeof AdminFaceNotificationsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/employees': {
-      id: '/admin/employees'
-      path: '/employees'
-      fullPath: '/admin/employees'
-      preLoaderRoute: typeof AdminEmployeesRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/employee-access': {
-      id: '/admin/employee-access'
-      path: '/employee-access'
-      fullPath: '/admin/employee-access'
-      preLoaderRoute: typeof AdminEmployeeAccessRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/directory': {
-      id: '/admin/directory'
-      path: '/directory'
-      fullPath: '/admin/directory'
-      preLoaderRoute: typeof AdminDirectoryRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/devices': {
-      id: '/admin/devices'
-      path: '/devices'
-      fullPath: '/admin/devices'
-      preLoaderRoute: typeof AdminDevicesRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/contracts': {
-      id: '/admin/contracts'
-      path: '/contracts'
-      fullPath: '/admin/contracts'
-      preLoaderRoute: typeof AdminContractsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/chat': {
-      id: '/admin/chat'
-      path: '/chat'
-      fullPath: '/admin/chat'
-      preLoaderRoute: typeof AdminChatRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/biometrics-health': {
-      id: '/admin/biometrics-health'
-      path: '/biometrics-health'
-      fullPath: '/admin/biometrics-health'
-      preLoaderRoute: typeof AdminBiometricsHealthRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/biometric-terminals': {
-      id: '/admin/biometric-terminals'
-      path: '/biometric-terminals'
-      fullPath: '/admin/biometric-terminals'
-      preLoaderRoute: typeof AdminBiometricTerminalsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/audit': {
-      id: '/admin/audit'
-      path: '/audit'
-      fullPath: '/admin/audit'
-      preLoaderRoute: typeof AdminAuditRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/attendance-report': {
-      id: '/admin/attendance-report'
-      path: '/attendance-report'
-      fullPath: '/admin/attendance-report'
-      preLoaderRoute: typeof AdminAttendanceReportRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/attendance': {
-      id: '/admin/attendance'
-      path: '/attendance'
-      fullPath: '/admin/attendance'
-      preLoaderRoute: typeof AdminAttendanceRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/allowances': {
-      id: '/admin/allowances'
-      path: '/allowances'
-      fullPath: '/admin/allowances'
-      preLoaderRoute: typeof AdminAllowancesRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/advances': {
@@ -1564,47 +1102,467 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAdvancesRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/employees/': {
-      id: '/admin/employees/'
-      path: '/'
-      fullPath: '/admin/employees/'
-      preLoaderRoute: typeof AdminEmployeesIndexRouteImport
-      parentRoute: typeof AdminEmployeesRoute
-    }
-    '/admin/contracts/': {
-      id: '/admin/contracts/'
-      path: '/'
-      fullPath: '/admin/contracts/'
-      preLoaderRoute: typeof AdminContractsIndexRouteImport
-      parentRoute: typeof AdminContractsRoute
-    }
-    '/api/public/employees': {
-      id: '/api/public/employees'
-      path: '/api/public/employees'
-      fullPath: '/api/public/employees'
-      preLoaderRoute: typeof ApiPublicEmployeesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin/settings_/roles': {
-      id: '/admin/settings_/roles'
-      path: '/settings/roles'
-      fullPath: '/admin/settings/roles'
-      preLoaderRoute: typeof AdminSettingsRolesRouteImport
+    '/admin/allowances': {
+      id: '/admin/allowances'
+      path: '/allowances'
+      fullPath: '/admin/allowances'
+      preLoaderRoute: typeof AdminAllowancesRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/employees/$id': {
-      id: '/admin/employees/$id'
-      path: '/$id'
-      fullPath: '/admin/employees/$id'
-      preLoaderRoute: typeof AdminEmployeesIdRouteImport
-      parentRoute: typeof AdminEmployeesRoute
+    '/admin/attendance': {
+      id: '/admin/attendance'
+      path: '/attendance'
+      fullPath: '/admin/attendance'
+      preLoaderRoute: typeof AdminAttendanceRouteImport
+      parentRoute: typeof AdminRoute
     }
-    '/admin/contracts/notifications': {
-      id: '/admin/contracts/notifications'
+    '/admin/attendance-report': {
+      id: '/admin/attendance-report'
+      path: '/attendance-report'
+      fullPath: '/admin/attendance-report'
+      preLoaderRoute: typeof AdminAttendanceReportRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/audit': {
+      id: '/admin/audit'
+      path: '/audit'
+      fullPath: '/admin/audit'
+      preLoaderRoute: typeof AdminAuditRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/biometric-terminals': {
+      id: '/admin/biometric-terminals'
+      path: '/biometric-terminals'
+      fullPath: '/admin/biometric-terminals'
+      preLoaderRoute: typeof AdminBiometricTerminalsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/biometrics-health': {
+      id: '/admin/biometrics-health'
+      path: '/biometrics-health'
+      fullPath: '/admin/biometrics-health'
+      preLoaderRoute: typeof AdminBiometricsHealthRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/chat': {
+      id: '/admin/chat'
+      path: '/chat'
+      fullPath: '/admin/chat'
+      preLoaderRoute: typeof AdminChatRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/contracts': {
+      id: '/admin/contracts'
+      path: '/contracts'
+      fullPath: '/admin/contracts'
+      preLoaderRoute: typeof AdminContractsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/devices': {
+      id: '/admin/devices'
+      path: '/devices'
+      fullPath: '/admin/devices'
+      preLoaderRoute: typeof AdminDevicesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/directory': {
+      id: '/admin/directory'
+      path: '/directory'
+      fullPath: '/admin/directory'
+      preLoaderRoute: typeof AdminDirectoryRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/employee-access': {
+      id: '/admin/employee-access'
+      path: '/employee-access'
+      fullPath: '/admin/employee-access'
+      preLoaderRoute: typeof AdminEmployeeAccessRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/employees': {
+      id: '/admin/employees'
+      path: '/employees'
+      fullPath: '/admin/employees'
+      preLoaderRoute: typeof AdminEmployeesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/face-notifications': {
+      id: '/admin/face-notifications'
+      path: '/face-notifications'
+      fullPath: '/admin/face-notifications'
+      preLoaderRoute: typeof AdminFaceNotificationsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/geofencing': {
+      id: '/admin/geofencing'
+      path: '/geofencing'
+      fullPath: '/admin/geofencing'
+      preLoaderRoute: typeof AdminGeofencingRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/holiday-types': {
+      id: '/admin/holiday-types'
+      path: '/holiday-types'
+      fullPath: '/admin/holiday-types'
+      preLoaderRoute: typeof AdminHolidayTypesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/holidays': {
+      id: '/admin/holidays'
+      path: '/holidays'
+      fullPath: '/admin/holidays'
+      preLoaderRoute: typeof AdminHolidaysRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/kpis': {
+      id: '/admin/kpis'
+      path: '/kpis'
+      fullPath: '/admin/kpis'
+      preLoaderRoute: typeof AdminKpisRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/late-penalties': {
+      id: '/admin/late-penalties'
+      path: '/late-penalties'
+      fullPath: '/admin/late-penalties'
+      preLoaderRoute: typeof AdminLatePenaltiesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/leaves': {
+      id: '/admin/leaves'
+      path: '/leaves'
+      fullPath: '/admin/leaves'
+      preLoaderRoute: typeof AdminLeavesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/leaves-requests': {
+      id: '/admin/leaves-requests'
+      path: '/leaves-requests'
+      fullPath: '/admin/leaves-requests'
+      preLoaderRoute: typeof AdminLeavesRequestsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/networks': {
+      id: '/admin/networks'
+      path: '/networks'
+      fullPath: '/admin/networks'
+      preLoaderRoute: typeof AdminNetworksRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/notification-preferences': {
+      id: '/admin/notification-preferences'
+      path: '/notification-preferences'
+      fullPath: '/admin/notification-preferences'
+      preLoaderRoute: typeof AdminNotificationPreferencesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/org-chart': {
+      id: '/admin/org-chart'
+      path: '/org-chart'
+      fullPath: '/admin/org-chart'
+      preLoaderRoute: typeof AdminOrgChartRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/payroll': {
+      id: '/admin/payroll'
+      path: '/payroll'
+      fullPath: '/admin/payroll'
+      preLoaderRoute: typeof AdminPayrollRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/payroll-settings': {
+      id: '/admin/payroll-settings'
+      path: '/payroll-settings'
+      fullPath: '/admin/payroll-settings'
+      preLoaderRoute: typeof AdminPayrollSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/reassign-managers': {
+      id: '/admin/reassign-managers'
+      path: '/reassign-managers'
+      fullPath: '/admin/reassign-managers'
+      preLoaderRoute: typeof AdminReassignManagersRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/reports': {
+      id: '/admin/reports'
+      path: '/reports'
+      fullPath: '/admin/reports'
+      preLoaderRoute: typeof AdminReportsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/settings': {
+      id: '/admin/settings'
+      path: '/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/shifts': {
+      id: '/admin/shifts'
+      path: '/shifts'
+      fullPath: '/admin/shifts'
+      preLoaderRoute: typeof AdminShiftsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/sms': {
+      id: '/admin/sms'
+      path: '/sms'
+      fullPath: '/admin/sms'
+      preLoaderRoute: typeof AdminSmsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/sticky-notes': {
+      id: '/admin/sticky-notes'
+      path: '/sticky-notes'
+      fullPath: '/admin/sticky-notes'
+      preLoaderRoute: typeof AdminStickyNotesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/targets-overtime': {
+      id: '/admin/targets-overtime'
+      path: '/targets-overtime'
+      fullPath: '/admin/targets-overtime'
+      preLoaderRoute: typeof AdminTargetsOvertimeRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/work-locations': {
+      id: '/admin/work-locations'
+      path: '/work-locations'
+      fullPath: '/admin/work-locations'
+      preLoaderRoute: typeof AdminWorkLocationsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/employee/': {
+      id: '/employee/'
+      path: '/'
+      fullPath: '/employee/'
+      preLoaderRoute: typeof EmployeeIndexRouteImport
+      parentRoute: typeof EmployeeRoute
+    }
+    '/employee/advances': {
+      id: '/employee/advances'
+      path: '/advances'
+      fullPath: '/employee/advances'
+      preLoaderRoute: typeof EmployeeAdvancesRouteImport
+      parentRoute: typeof EmployeeRoute
+    }
+    '/employee/attendance': {
+      id: '/employee/attendance'
+      path: '/attendance'
+      fullPath: '/employee/attendance'
+      preLoaderRoute: typeof EmployeeAttendanceRouteImport
+      parentRoute: typeof EmployeeRoute
+    }
+    '/employee/biometrics': {
+      id: '/employee/biometrics'
+      path: '/biometrics'
+      fullPath: '/employee/biometrics'
+      preLoaderRoute: typeof EmployeeBiometricsRouteImport
+      parentRoute: typeof EmployeeRoute
+    }
+    '/employee/chat': {
+      id: '/employee/chat'
+      path: '/chat'
+      fullPath: '/employee/chat'
+      preLoaderRoute: typeof EmployeeChatRouteImport
+      parentRoute: typeof EmployeeRoute
+    }
+    '/employee/check': {
+      id: '/employee/check'
+      path: '/check'
+      fullPath: '/employee/check'
+      preLoaderRoute: typeof EmployeeCheckRouteImport
+      parentRoute: typeof EmployeeRoute
+    }
+    '/employee/leaves': {
+      id: '/employee/leaves'
+      path: '/leaves'
+      fullPath: '/employee/leaves'
+      preLoaderRoute: typeof EmployeeLeavesRouteImport
+      parentRoute: typeof EmployeeRoute
+    }
+    '/employee/messages': {
+      id: '/employee/messages'
+      path: '/messages'
+      fullPath: '/employee/messages'
+      preLoaderRoute: typeof EmployeeMessagesRouteImport
+      parentRoute: typeof EmployeeRoute
+    }
+    '/employee/notifications': {
+      id: '/employee/notifications'
       path: '/notifications'
-      fullPath: '/admin/contracts/notifications'
-      preLoaderRoute: typeof AdminContractsNotificationsRouteImport
-      parentRoute: typeof AdminContractsRoute
+      fullPath: '/employee/notifications'
+      preLoaderRoute: typeof EmployeeNotificationsRouteImport
+      parentRoute: typeof EmployeeRoute
+    }
+    '/employee/settings': {
+      id: '/employee/settings'
+      path: '/settings'
+      fullPath: '/employee/settings'
+      preLoaderRoute: typeof EmployeeSettingsRouteImport
+      parentRoute: typeof EmployeeRoute
+    }
+    '/employee/tasks': {
+      id: '/employee/tasks'
+      path: '/tasks'
+      fullPath: '/employee/tasks'
+      preLoaderRoute: typeof EmployeeTasksRouteImport
+      parentRoute: typeof EmployeeRoute
+    }
+    '/employee/verify-otp': {
+      id: '/employee/verify-otp'
+      path: '/verify-otp'
+      fullPath: '/employee/verify-otp'
+      preLoaderRoute: typeof EmployeeVerifyOtpRouteImport
+      parentRoute: typeof EmployeeRoute
+    }
+    '/finance/': {
+      id: '/finance/'
+      path: '/'
+      fullPath: '/finance/'
+      preLoaderRoute: typeof FinanceIndexRouteImport
+      parentRoute: typeof FinanceRoute
+    }
+    '/finance/advances': {
+      id: '/finance/advances'
+      path: '/advances'
+      fullPath: '/finance/advances'
+      preLoaderRoute: typeof FinanceAdvancesRouteImport
+      parentRoute: typeof FinanceRoute
+    }
+    '/finance/payroll': {
+      id: '/finance/payroll'
+      path: '/payroll'
+      fullPath: '/finance/payroll'
+      preLoaderRoute: typeof FinancePayrollRouteImport
+      parentRoute: typeof FinanceRoute
+    }
+    '/finance/payroll-settings': {
+      id: '/finance/payroll-settings'
+      path: '/payroll-settings'
+      fullPath: '/finance/payroll-settings'
+      preLoaderRoute: typeof FinancePayrollSettingsRouteImport
+      parentRoute: typeof FinanceRoute
+    }
+    '/finance/profile': {
+      id: '/finance/profile'
+      path: '/profile'
+      fullPath: '/finance/profile'
+      preLoaderRoute: typeof FinanceProfileRouteImport
+      parentRoute: typeof FinanceRoute
+    }
+    '/finance/sticky-notes': {
+      id: '/finance/sticky-notes'
+      path: '/sticky-notes'
+      fullPath: '/finance/sticky-notes'
+      preLoaderRoute: typeof FinanceStickyNotesRouteImport
+      parentRoute: typeof FinanceRoute
+    }
+    '/manager/': {
+      id: '/manager/'
+      path: '/'
+      fullPath: '/manager/'
+      preLoaderRoute: typeof ManagerIndexRouteImport
+      parentRoute: typeof ManagerRoute
+    }
+    '/manager/advances': {
+      id: '/manager/advances'
+      path: '/advances'
+      fullPath: '/manager/advances'
+      preLoaderRoute: typeof ManagerAdvancesRouteImport
+      parentRoute: typeof ManagerRoute
+    }
+    '/manager/chat': {
+      id: '/manager/chat'
+      path: '/chat'
+      fullPath: '/manager/chat'
+      preLoaderRoute: typeof ManagerChatRouteImport
+      parentRoute: typeof ManagerRoute
+    }
+    '/manager/check': {
+      id: '/manager/check'
+      path: '/check'
+      fullPath: '/manager/check'
+      preLoaderRoute: typeof ManagerCheckRouteImport
+      parentRoute: typeof ManagerRoute
+    }
+    '/manager/leaves': {
+      id: '/manager/leaves'
+      path: '/leaves'
+      fullPath: '/manager/leaves'
+      preLoaderRoute: typeof ManagerLeavesRouteImport
+      parentRoute: typeof ManagerRoute
+    }
+    '/manager/profile': {
+      id: '/manager/profile'
+      path: '/profile'
+      fullPath: '/manager/profile'
+      preLoaderRoute: typeof ManagerProfileRouteImport
+      parentRoute: typeof ManagerRoute
+    }
+    '/manager/tasks': {
+      id: '/manager/tasks'
+      path: '/tasks'
+      fullPath: '/manager/tasks'
+      preLoaderRoute: typeof ManagerTasksRouteImport
+      parentRoute: typeof ManagerRoute
+    }
+    '/manager/team': {
+      id: '/manager/team'
+      path: '/team'
+      fullPath: '/manager/team'
+      preLoaderRoute: typeof ManagerTeamRouteImport
+      parentRoute: typeof ManagerRoute
+    }
+    '/manager/trips': {
+      id: '/manager/trips'
+      path: '/trips'
+      fullPath: '/manager/trips'
+      preLoaderRoute: typeof ManagerTripsRouteImport
+      parentRoute: typeof ManagerRoute
+    }
+    '/staff/': {
+      id: '/staff/'
+      path: '/'
+      fullPath: '/staff/'
+      preLoaderRoute: typeof StaffIndexRouteImport
+      parentRoute: typeof StaffRoute
+    }
+    '/staff/attendance': {
+      id: '/staff/attendance'
+      path: '/attendance'
+      fullPath: '/staff/attendance'
+      preLoaderRoute: typeof StaffAttendanceRouteImport
+      parentRoute: typeof StaffRoute
+    }
+    '/staff/chat': {
+      id: '/staff/chat'
+      path: '/chat'
+      fullPath: '/staff/chat'
+      preLoaderRoute: typeof StaffChatRouteImport
+      parentRoute: typeof StaffRoute
+    }
+    '/staff/leaves': {
+      id: '/staff/leaves'
+      path: '/leaves'
+      fullPath: '/staff/leaves'
+      preLoaderRoute: typeof StaffLeavesRouteImport
+      parentRoute: typeof StaffRoute
+    }
+    '/staff/notifications': {
+      id: '/staff/notifications'
+      path: '/notifications'
+      fullPath: '/staff/notifications'
+      preLoaderRoute: typeof StaffNotificationsRouteImport
+      parentRoute: typeof StaffRoute
+    }
+    '/staff/profile': {
+      id: '/staff/profile'
+      path: '/profile'
+      fullPath: '/staff/profile'
+      preLoaderRoute: typeof StaffProfileRouteImport
+      parentRoute: typeof StaffRoute
     }
     '/admin/activity-timeline/$id': {
       id: '/admin/activity-timeline/$id'
@@ -1613,11 +1571,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminActivityTimelineIdRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/api/public/cron/run-schedules': {
-      id: '/api/public/cron/run-schedules'
-      path: '/api/public/cron/run-schedules'
-      fullPath: '/api/public/cron/run-schedules'
-      preLoaderRoute: typeof ApiPublicCronRunSchedulesRouteImport
+    '/admin/contracts/': {
+      id: '/admin/contracts/'
+      path: '/'
+      fullPath: '/admin/contracts/'
+      preLoaderRoute: typeof AdminContractsIndexRouteImport
+      parentRoute: typeof AdminContractsRoute
+    }
+    '/admin/contracts/notifications': {
+      id: '/admin/contracts/notifications'
+      path: '/notifications'
+      fullPath: '/admin/contracts/notifications'
+      preLoaderRoute: typeof AdminContractsNotificationsRouteImport
+      parentRoute: typeof AdminContractsRoute
+    }
+    '/admin/employees/': {
+      id: '/admin/employees/'
+      path: '/'
+      fullPath: '/admin/employees/'
+      preLoaderRoute: typeof AdminEmployeesIndexRouteImport
+      parentRoute: typeof AdminEmployeesRoute
+    }
+    '/admin/employees/$id': {
+      id: '/admin/employees/$id'
+      path: '/$id'
+      fullPath: '/admin/employees/$id'
+      preLoaderRoute: typeof AdminEmployeesIdRouteImport
+      parentRoute: typeof AdminEmployeesRoute
+    }
+    '/admin/settings_/roles': {
+      id: '/admin/settings_/roles'
+      path: '/settings/roles'
+      fullPath: '/admin/settings/roles'
+      preLoaderRoute: typeof AdminSettingsRolesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/api/public/employees': {
+      id: '/api/public/employees'
+      path: '/api/public/employees'
+      fullPath: '/api/public/employees'
+      preLoaderRoute: typeof ApiPublicEmployeesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/settings_/roles/allowed-pages': {
@@ -1626,6 +1619,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/settings/roles/allowed-pages'
       preLoaderRoute: typeof AdminSettingsRolesAllowedPagesRouteImport
       parentRoute: typeof AdminSettingsRolesRoute
+    }
+    '/api/public/cron/run-schedules': {
+      id: '/api/public/cron/run-schedules'
+      path: '/api/public/cron/run-schedules'
+      fullPath: '/api/public/cron/run-schedules'
+      preLoaderRoute: typeof ApiPublicCronRunSchedulesRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
