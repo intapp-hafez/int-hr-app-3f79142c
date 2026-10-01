@@ -23,6 +23,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { getAdminAlerts, type AdminAlert } from "@/backend/functions/admin-dashboard-extras.functions";
 import { dispatchAdminAlerts } from "@/backend/functions/alert-dispatch.functions";
 import { useNotificationPrefs } from "@/lib/notification-prefs";
+import { listMyDeliveries, markMyNotificationsRead } from "@/backend/functions/notifications.functions";
+import { useNavigate } from "@tanstack/react-router";
 
 const ICONS: Record<AdminAlert["kind"], typeof Bell> = {
   pending_leave: CalendarClock,
@@ -38,10 +40,11 @@ const ICONS: Record<AdminAlert["kind"], typeof Bell> = {
   probation_end: Timer,
   advance_payment: DollarSign,
 };
-const TONES: Record<AdminAlert["severity"], string> = {
-  info: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
-  warning: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-  danger: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
+const TONES: Record<string, string> = {
+  info: "bg-info/10 text-info",
+  success: "bg-success/10 text-success",
+  warning: "bg-warning/20 text-warning-foreground",
+  danger: "bg-destructive/10 text-destructive",
 };
 
 function timeAgo(iso: string) {
@@ -67,6 +70,30 @@ export function NotificationsBell() {
   const fn = useServerFn(getAdminAlerts);
   const dispatchFn = useServerFn(dispatchAdminAlerts);
   const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<"alerts" | "inbox">("alerts");
+  const navigate = useNavigate();
+  const inboxFn = useServerFn(listMyDeliveries);
+  const markFn = useServerFn(markMyNotificationsRead);
+  const inboxQ = useQuery({ queryKey: ["my-notifications"], queryFn: () => inboxFn(), refetchInterval: 30_000 });
+  const inbox = ((inboxQ.data ?? []) as any[]).map((n) => {
+    const p = (n.payload ?? {}) as any;
+    return { id: n.id as string, title: p.title ?? n.subject ?? "Notification", body: (p.body ?? "") as string,
+      url: (p.url ?? p.link) as string | undefined, severity: (p.severity ?? "info") as string, unread: !p.read_at, ts: n.created_at as string };
+  });
+  const inboxUnread = inbox.filter((i) => i.unread).length;
+  const go = (url?: string) => {
+    setOpen(false);
+    if (url && url.startsWith("/")) navigate({ to: url as any });
+    else if (url) window.location.href = url;
+  };
+  const openInbox = async (i: (typeof inbox)[number]) => {
+    if (i.unread) { await markFn({ data: { ids: [i.id] } }).catch(() => null); qc.invalidateQueries({ queryKey: ["my-notifications"] }); }
+    go(i.url ?? "/admin");
+  };
+  const markInboxAll = async () => {
+    await markFn({ data: {} }).catch(() => null);
+    qc.invalidateQueries({ queryKey: ["my-notifications"] });
+  };
   const [seen, setSeen] = useState<Set<string>>(() => loadSeen());
   const { isEnabled } = useNotificationPrefs();
   const { data } = useQuery({
@@ -112,7 +139,8 @@ export function NotificationsBell() {
   const allAlerts = data?.alerts ?? [];
   const alerts = allAlerts.filter((a) => isEnabled(a.kind, "inapp"));
   const unread = alerts.filter((a) => !seen.has(a.id));
-  const unreadCount = unread.length;
+  const alertUnread = unread.length;
+  const unreadCount = alertUnread + inboxUnread;
 
   const markAll = () => {
     const next = new Set(seen);
@@ -123,7 +151,7 @@ export function NotificationsBell() {
 
   const onOpenChange = (v: boolean) => {
     setOpen(v);
-    if (v && unreadCount > 0) {
+    if (!v && tab === "alerts" && alertUnread > 0) {
       // mark seen once panel is opened
       const next = new Set(seen);
       alerts.forEach((a) => next.add(a.id));
@@ -154,12 +182,12 @@ export function NotificationsBell() {
           <div>
             <p className="font-display text-sm font-semibold">Notifications</p>
             <p className="text-[11px] text-muted-foreground">
-              {alerts.length === 0 ? "All clear" : `${unreadCount} new • ${alerts.length} total`}
+              {unreadCount === 0 ? "All caught up" : `${unreadCount} new`}
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {unreadCount > 0 && (
-              <button onClick={markAll} className="inline-flex items-center gap-1 text-[11px] font-medium text-brand">
+            {(tab === "alerts" ? alertUnread : inboxUnread) > 0 && (
+              <button onClick={tab === "alerts" ? markAll : markInboxAll} className="inline-flex items-center gap-1 text-[11px] font-medium text-brand">
                 <CheckCheck className="h-3 w-3" /> Mark all read
               </button>
             )}
@@ -173,7 +201,46 @@ export function NotificationsBell() {
           </div>
         </div>
 
-        {alerts.length === 0 ? (
+        <div className="grid grid-cols-2 gap-1 border-b border-border p-1">
+          {(["alerts", "inbox"] as const).map((k) => {
+            const c = k === "alerts" ? alertUnread : inboxUnread;
+            return (
+              <button key={k} onClick={() => setTab(k)}
+                className={`rounded-md px-2 py-1.5 text-xs font-medium transition ${tab === k ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/60"}`}>
+                {k === "alerts" ? "HR alerts" : "My inbox"}{c > 0 ? ` (${c > 99 ? "99+" : c})` : ""}
+              </button>
+            );
+          })}
+        </div>
+
+        {tab === "inbox" ? (
+          inbox.length === 0 ? (
+            <div className="px-4 py-10 text-center text-xs text-muted-foreground">
+              {inboxQ.isLoading ? "Loading…" : inboxQ.isError ? "Couldn't load your notifications." : "Nothing in your inbox."}
+            </div>
+          ) : (
+            <ul className="max-h-[420px] divide-y divide-border overflow-y-auto">
+              {inbox.map((i) => (
+                <li key={i.id}>
+                  <button onClick={() => openInbox(i)}
+                    className={`flex w-full items-start gap-3 px-4 py-3 text-left transition hover:bg-muted/60 ${i.unread ? "bg-primary/5" : ""}`}>
+                    <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${TONES[i.severity] ?? TONES.info}`}>
+                      <Bell className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className={`truncate text-sm ${i.unread ? "font-semibold" : "font-medium"}`}>{i.title}</p>
+                        {i.unread && <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />}
+                      </div>
+                      {i.body && <p className="line-clamp-2 text-[11px] text-muted-foreground">{i.body}</p>}
+                    </div>
+                    <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{timeAgo(i.ts)}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )
+        ) : alerts.length === 0 ? (
           <div className="px-4 py-10 text-center text-xs text-muted-foreground">No notifications right now.</div>
         ) : (
           <ul className="max-h-[420px] divide-y divide-border overflow-y-auto">
@@ -182,9 +249,9 @@ export function NotificationsBell() {
               const isNew = !seen.has(a.id);
               return (
                 <li key={a.id}>
-                  <a
-                    href={a.link ?? "/admin"}
-                    className={`flex items-start gap-3 px-4 py-3 transition hover:bg-muted/60 ${isNew ? "bg-brand/[0.04]" : ""}`}
+                  <button
+                    onClick={() => { const n = new Set(seen); n.add(a.id); setSeen(n); saveSeen(n); go(a.link ?? "/admin"); }}
+                    className={`flex w-full items-start gap-3 px-4 py-3 text-left transition hover:bg-muted/60 ${isNew ? "bg-primary/5" : ""}`}
                   >
                     <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${TONES[a.severity]}`}>
                       <Icon className="h-4 w-4" />
@@ -197,7 +264,7 @@ export function NotificationsBell() {
                       <p className="truncate text-[11px] text-muted-foreground">{a.description}</p>
                     </div>
                     <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{timeAgo(a.ts)}</span>
-                  </a>
+                  </button>
                 </li>
               );
             })}
