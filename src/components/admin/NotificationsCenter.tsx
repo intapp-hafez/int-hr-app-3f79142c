@@ -162,7 +162,7 @@ export function NotificationsCenter() {
       ) : (
         <ul className="max-h-[420px] space-y-2 overflow-y-auto pe-1">
           {filtered.map((a) => {
-            const Icon = ICONS[a.kind];
+            const Icon = ICONS[a.kind] ?? Bell;
             return (
               <li key={a.id}>
                 <a

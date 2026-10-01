@@ -245,7 +245,7 @@ export function NotificationsBell() {
         ) : (
           <ul className="max-h-[420px] divide-y divide-border overflow-y-auto">
             {alerts.map((a) => {
-              const Icon = ICONS[a.kind];
+              const Icon = ICONS[a.kind] ?? Bell;
               const isNew = !seen.has(a.id);
               return (
                 <li key={a.id}>
