@@ -39,6 +39,7 @@ import { Route as AdminLatePenaltiesRouteImport } from './routes/admin.late-pena
 import { Route as AdminLeavesRouteImport } from './routes/admin.leaves'
 import { Route as AdminLeavesRequestsRouteImport } from './routes/admin.leaves-requests'
 import { Route as AdminNetworksRouteImport } from './routes/admin.networks'
+import { Route as AdminNotificationActivityRouteImport } from './routes/admin.notification-activity'
 import { Route as AdminNotificationPreferencesRouteImport } from './routes/admin.notification-preferences'
 import { Route as AdminOrgChartRouteImport } from './routes/admin.org-chart'
 import { Route as AdminPayrollRouteImport } from './routes/admin.payroll'
@@ -244,6 +245,12 @@ const AdminNetworksRoute = AdminNetworksRouteImport.update({
   path: '/networks',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminNotificationActivityRoute =
+  AdminNotificationActivityRouteImport.update({
+    id: '/notification-activity',
+    path: '/notification-activity',
+    getParentRoute: () => AdminRoute,
+  } as any)
 const AdminNotificationPreferencesRoute =
   AdminNotificationPreferencesRouteImport.update({
     id: '/notification-preferences',
@@ -549,6 +556,7 @@ export interface FileRoutesByFullPath {
   '/admin/leaves': typeof AdminLeavesRoute
   '/admin/leaves-requests': typeof AdminLeavesRequestsRoute
   '/admin/networks': typeof AdminNetworksRoute
+  '/admin/notification-activity': typeof AdminNotificationActivityRoute
   '/admin/notification-preferences': typeof AdminNotificationPreferencesRoute
   '/admin/org-chart': typeof AdminOrgChartRoute
   '/admin/payroll': typeof AdminPayrollRoute
@@ -628,6 +636,7 @@ export interface FileRoutesByTo {
   '/admin/leaves': typeof AdminLeavesRoute
   '/admin/leaves-requests': typeof AdminLeavesRequestsRoute
   '/admin/networks': typeof AdminNetworksRoute
+  '/admin/notification-activity': typeof AdminNotificationActivityRoute
   '/admin/notification-preferences': typeof AdminNotificationPreferencesRoute
   '/admin/org-chart': typeof AdminOrgChartRoute
   '/admin/payroll': typeof AdminPayrollRoute
@@ -715,6 +724,7 @@ export interface FileRoutesById {
   '/admin/leaves': typeof AdminLeavesRoute
   '/admin/leaves-requests': typeof AdminLeavesRequestsRoute
   '/admin/networks': typeof AdminNetworksRoute
+  '/admin/notification-activity': typeof AdminNotificationActivityRoute
   '/admin/notification-preferences': typeof AdminNotificationPreferencesRoute
   '/admin/org-chart': typeof AdminOrgChartRoute
   '/admin/payroll': typeof AdminPayrollRoute
@@ -803,6 +813,7 @@ export interface FileRouteTypes {
     | '/admin/leaves'
     | '/admin/leaves-requests'
     | '/admin/networks'
+    | '/admin/notification-activity'
     | '/admin/notification-preferences'
     | '/admin/org-chart'
     | '/admin/payroll'
@@ -882,6 +893,7 @@ export interface FileRouteTypes {
     | '/admin/leaves'
     | '/admin/leaves-requests'
     | '/admin/networks'
+    | '/admin/notification-activity'
     | '/admin/notification-preferences'
     | '/admin/org-chart'
     | '/admin/payroll'
@@ -968,6 +980,7 @@ export interface FileRouteTypes {
     | '/admin/leaves'
     | '/admin/leaves-requests'
     | '/admin/networks'
+    | '/admin/notification-activity'
     | '/admin/notification-preferences'
     | '/admin/org-chart'
     | '/admin/payroll'
@@ -1247,6 +1260,13 @@ declare module '@tanstack/react-router' {
       path: '/networks'
       fullPath: '/admin/networks'
       preLoaderRoute: typeof AdminNetworksRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/notification-activity': {
+      id: '/admin/notification-activity'
+      path: '/notification-activity'
+      fullPath: '/admin/notification-activity'
+      preLoaderRoute: typeof AdminNotificationActivityRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/notification-preferences': {
@@ -1692,6 +1712,7 @@ interface AdminRouteChildren {
   AdminLeavesRoute: typeof AdminLeavesRoute
   AdminLeavesRequestsRoute: typeof AdminLeavesRequestsRoute
   AdminNetworksRoute: typeof AdminNetworksRoute
+  AdminNotificationActivityRoute: typeof AdminNotificationActivityRoute
   AdminNotificationPreferencesRoute: typeof AdminNotificationPreferencesRoute
   AdminOrgChartRoute: typeof AdminOrgChartRoute
   AdminPayrollRoute: typeof AdminPayrollRoute
@@ -1732,6 +1753,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminLeavesRoute: AdminLeavesRoute,
   AdminLeavesRequestsRoute: AdminLeavesRequestsRoute,
   AdminNetworksRoute: AdminNetworksRoute,
+  AdminNotificationActivityRoute: AdminNotificationActivityRoute,
   AdminNotificationPreferencesRoute: AdminNotificationPreferencesRoute,
   AdminOrgChartRoute: AdminOrgChartRoute,
   AdminPayrollRoute: AdminPayrollRoute,
