@@ -16,6 +16,7 @@ import {
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { Switch } from "@/components/ui/switch";
+import { DeliverySettingsCard } from "@/components/admin/DeliverySettingsCard";
 import { enablePush, disablePush, isPushSubscribed, getPushSupport } from "@/lib/push-client";
 import {
   useNotificationPrefs,
@@ -240,8 +241,10 @@ function NotificationPreferencesPage() {
         })}
       </div>
 
+      <DeliverySettingsCard />
+
       <p className="text-[11px] text-muted-foreground">
-        In-app alerts appear in the bell and notifications center immediately. Email and push delivery require those channels to be configured for your account.
+        The In-app column controls which HR alert categories appear in your notification bell. Email and push delivery require those channels to be configured for your account.
       </p>
     </div>
   );
