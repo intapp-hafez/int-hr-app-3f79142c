@@ -14,6 +14,7 @@ import {
 import { toast } from "sonner";
 import { useI18n, useTranslators } from "@/lib/i18n";
 import { formatDate } from "@/lib/date-format";
+import { LeaveAiDraft } from "./LeaveAiDraft";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -493,6 +494,14 @@ function LeaveModal({ onClose }: { onClose: () => void }) {
             <X className="h-4 w-4" />
           </button>
         </div>
+        <LeaveAiDraft
+          onApply={(d) => {
+            if (d.leave_type_name) setType(d.leave_type_name);
+            if (d.start_date) setStart(d.start_date);
+            if (d.end_date) setEnd(d.end_date);
+            if (d.reason) setReason(d.reason);
+          }}
+        />
         <form className="space-y-3" onSubmit={submit}>
           <Field label={t("type")}>
             <select
