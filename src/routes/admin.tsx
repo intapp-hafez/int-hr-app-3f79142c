@@ -67,6 +67,7 @@ function AdminLayout() {
     { to: "/admin/advances", icon: Banknote, label: t("advancesTitle"), page: "advances" },
     { to: "/admin/reports", icon: FileBarChart2, label: t("reports"), page: "reports" },
     { to: "/admin/audit", icon: ScrollText, label: t("audit"), page: "audit" },
+    { to: "/admin/notification-activity", icon: ScrollText, label: "Notification log", page: "audit" },
     { to: "/admin/directory", icon: Building2, label: t("directory"), page: "directory" },
     { to: "/admin/org-chart", icon: Network, label: t("orgChart"), page: "employees" },
     { to: "/admin/settings", icon: Settings, label: t("settings") || "Settings", page: "settings" },
@@ -213,7 +214,7 @@ function getPageSlugForPath(path: string): string | null {
   if (path.startsWith("/admin/targets-overtime")) return "targets-overtime";
   if (path.startsWith("/admin/directory")) return "directory";
   if (path.startsWith("/admin/employee-access")) return "employee-access";
-  if (path.startsWith("/admin/audit") || path.startsWith("/admin/biometrics-health") || path.startsWith("/admin/face-notifications") || path.startsWith("/admin/biometric-terminals")) return "audit";
+  if (path.startsWith("/admin/audit") || path.startsWith("/admin/biometrics-health") || path.startsWith("/admin/face-notifications") || path.startsWith("/admin/biometric-terminals") || path.startsWith("/admin/notification-activity")) return "audit";
   if (path.startsWith("/admin/reports")) return "reports";
   if (path.startsWith("/admin/settings/roles")) return "roles";
   if (path.startsWith("/admin/settings")) return "settings";
