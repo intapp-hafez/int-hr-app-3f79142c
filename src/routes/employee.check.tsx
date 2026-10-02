@@ -24,6 +24,8 @@ import { DateRangeField } from "@/components/ui/date-input";
 import { formatDate, validateDateRange } from "@/lib/date-format";
 import { reverseGeocodeCoords } from "@/lib/reverse-geocode";
 
+import { CheckReadiness } from "@/components/employee/CheckReadiness";
+
 export const Route = createFileRoute("/employee/check")({ component: CheckPage });
 
 function CheckPage() {
@@ -269,12 +271,12 @@ function CheckInOutCard() {
         {online ? <span className="inline-flex items-center gap-1 text-success"><Wifi className="h-3.5 w-3.5" /> Online</span>
                 : <span className="inline-flex items-center gap-1 text-destructive"><WifiOff className="h-3.5 w-3.5" /> Offline</span>}
       </div>
-      {nearest && (
-        <div className={`rounded-xl px-3 py-2 text-xs ${nearest.inside ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}`}>
-          <span className="font-semibold">{nearest.inside ? "Inside fence" : "Outside fence"}:</span>{" "}
-          {nearest.name} · {Math.round(nearest.distance)} m {nearest.inside ? "from center" : "away"} (allowed {nearest.radius} m)
-        </div>
-      )}
+      <CheckReadiness
+        nearest={nearest}
+        hasLocations={((accessQ.data as any)?.locations ?? []).length > 0}
+        networks={(accessQ.data as any)?.networks ?? []}
+        shift={(accessQ.data as any)?.shift ?? null}
+      />
 
       <div className="flex gap-2">
         {!deviceApproved ? (

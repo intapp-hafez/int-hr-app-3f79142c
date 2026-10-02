@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { MapPin, Wifi, WifiOff, CalendarDays, Clock } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { formatDate } from "@/lib/date-format";
@@ -45,13 +45,30 @@ export function AttendancePage() {
     [lvQ.data],
   );
 
+  const [preset, setPreset] = useState<"7" | "30" | "month" | "all" | "custom">("30");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const range = useMemo(() => {
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    const now = new Date();
+    if (preset === "7") return { s: iso(new Date(now.getTime() - 6 * 86400000)), e: iso(now) };
+    if (preset === "30") return { s: iso(new Date(now.getTime() - 29 * 86400000)), e: iso(now) };
+    if (preset === "month") return { s: iso(new Date(now.getFullYear(), now.getMonth(), 1)), e: iso(now) };
+    if (preset === "custom") return { s: from || "0000-01-01", e: to || "9999-12-31" };
+    return { s: "0000-01-01", e: "9999-12-31" };
+  }, [preset, from, to]);
+  const rowsF = useMemo(
+    () => ((attQ.data ?? []) as any[]).filter((r) => r.date >= range.s && r.date <= range.e),
+    [attQ.data, range],
+  );
+
   const stats = useMemo(() => {
-    const rows = attQ.data ?? [];
+    const rows = rowsF;
     const present = rows.filter((r: any) => r.status === "present").length;
     const late = rows.filter((r: any) => r.status === "late").length;
     const absent = rows.filter((r: any) => r.status === "absent").length;
     return { total: rows.length, present, late, absent };
-  }, [attQ.data]);
+  }, [rowsF]);
 
   return (
     <div className="space-y-5">
@@ -67,6 +84,21 @@ export function AttendancePage() {
         <Stat label={t("total")} value={stats.total} tone="text-foreground" />
       </section>
 
+      <section className="space-y-2">
+        <div className="grid grid-cols-5 gap-1 rounded-xl bg-muted p-1 text-xs font-semibold">
+          {([["7", "7 days"], ["30", "30 days"], ["month", "Month"], ["all", "All"], ["custom", "Custom"]] as const).map(([k, l]) => (
+            <button key={k} type="button" onClick={() => setPreset(k)} className={`rounded-lg py-2 ${preset === k ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"}`}>{l}</button>
+          ))}
+        </div>
+        {preset === "custom" && (
+          <div className="grid grid-cols-2 gap-2">
+            <label className="text-[11px] text-muted-foreground">From<input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground" /></label>
+            <label className="text-[11px] text-muted-foreground">To<input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground" /></label>
+          </div>
+        )}
+        <p className="text-[11px] text-muted-foreground">{rowsF.length} day{rowsF.length === 1 ? "" : "s"} shown{preset === "custom" && from ? ` · from ${formatDate(from)}` : ""}{preset === "custom" && to ? ` to ${formatDate(to)}` : ""}</p>
+      </section>
+
       {(attQ.error || lvQ.error) && (
         <p className="rounded-xl bg-destructive/10 p-3 text-xs text-destructive">
           {(attQ.error as Error)?.message ?? (lvQ.error as Error)?.message}
@@ -77,10 +109,10 @@ export function AttendancePage() {
         {attQ.isLoading && (
           <div className="rounded-2xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground">{t("loading")}</div>
         )}
-        {!attQ.isLoading && (attQ.data ?? []).length === 0 && (
+        {!attQ.isLoading && rowsF.length === 0 && (
           <div className="rounded-2xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground">{t("noAttendanceRecordsYet")}</div>
         )}
-        {(attQ.data ?? []).map((a: any) => {
+        {rowsF.map((a: any) => {
           const overlapping = approvedLeaves.filter((l: any) => dateInRange(a.date, l.start_date, l.end_date));
           const hasGeo = a.lat != null && a.lng != null;
           const hours = hoursBetween(a.in_time, a.out_time);
@@ -90,13 +122,23 @@ export function AttendancePage() {
                 <div>
                   <p className="text-sm font-semibold">{formatDate(a.date)}</p>
                   <p className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
-                    <Clock className="h-3 w-3" /> {fmtTime(a.in_time)} → {fmtTime(a.out_time)}
-                    {hours && <span className="ml-1 font-mono tabular-nums">· {hours}</span>}
+                    <Clock className="h-3 w-3" /> {hours ?? "—"}
                   </p>
                 </div>
                 <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${statusStyle[a.status] ?? "bg-muted text-muted-foreground"}`}>
                   {a.status}
                 </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-xl bg-muted/50 px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Check in</p>
+                  <p className="font-display text-lg font-semibold tabular-nums">{fmtTime(a.in_time)}</p>
+                </div>
+                <div className="rounded-xl bg-muted/50 px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Check out</p>
+                  <p className="font-display text-lg font-semibold tabular-nums">{fmtTime(a.out_time)}</p>
+                </div>
               </div>
 
               <div className="flex flex-wrap items-center gap-2 text-[11px]">

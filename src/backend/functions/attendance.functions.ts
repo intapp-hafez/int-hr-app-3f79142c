@@ -493,7 +493,16 @@ export const listMyAccess = createServerFn({ method: "GET" })
         ssid: (n.ssid ?? null) as string | null,
         bssid: (n.bssid ?? null) as string | null,
       }));
-    return { locations, networks };
+    const { data: sh } = await (supabase
+      .from("employee_shifts")
+      .select("shifts(name, start_time, end_time, grace_minutes, is_overnight, is_active)")
+      .eq("employee_id", userId)
+      .limit(1) as any);
+    const s0: any = (sh ?? [])[0]?.shifts;
+    const shift = s0 && s0.is_active !== false
+      ? { name: String(s0.name), start_time: String(s0.start_time).slice(0, 5), end_time: String(s0.end_time).slice(0, 5), grace_minutes: Number(s0.grace_minutes ?? 0), is_overnight: !!s0.is_overnight }
+      : null;
+    return { locations, networks, shift };
   });
 
 export const listMyAttendance = createServerFn({ method: "GET" })
