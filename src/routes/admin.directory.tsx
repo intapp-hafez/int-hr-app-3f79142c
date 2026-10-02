@@ -31,9 +31,13 @@ const InvestigationForm = lazy(() => import("@/components/admin/HrDocuments").th
 const FirstWarningForm = lazy(() => import("@/components/admin/HrDocuments").then((mod) => ({ default: mod.FirstWarningForm })));
 const SecondWarningForm = lazy(() => import("@/components/admin/HrDocuments").then((mod) => ({ default: mod.SecondWarningForm })));
 const SocialInsuranceForm1 = lazy(() => import("@/components/admin/HrDocuments").then((mod) => ({ default: mod.SocialInsuranceForm1 })));
+const SocialInsuranceForm6 = lazy(() => import("@/components/admin/HrDocuments").then((mod) => ({ default: mod.SocialInsuranceForm6 })));
+const ExitInterviewReport = lazy(() => import("@/components/admin/ExitInterviewReport").then((mod) => ({ default: mod.ExitInterviewReport })));
+const ResignationForm = lazy(() => import("@/components/admin/ResignationForm").then((mod) => ({ default: mod.ResignationForm })));
+const FinalSettlementReport = lazy(() => import("@/components/admin/FinalSettlementReport").then((mod) => ({ default: mod.FinalSettlementReport })));
 
-type Tab = "departments" | "sections" | "positions" | "job_grades" | "graduations" | "majors" | "cities" | "cost_centers" | "networks" | "devices" | "contractTemplates" | "sms" | "experienceCertificate" | "salaryDetails" | "advancesAck" | "custodyAck" | "loanRequest" | "investigation" | "warning1" | "warning2" | "socialIns1";
-const validTabs: Tab[] = ["departments", "sections", "positions", "job_grades", "graduations", "majors", "cities", "cost_centers", "networks", "devices", "contractTemplates", "sms", "experienceCertificate", "salaryDetails", "advancesAck", "custodyAck", "loanRequest", "investigation", "warning1", "warning2", "socialIns1"];
+type Tab = "departments" | "sections" | "positions" | "job_grades" | "graduations" | "majors" | "cities" | "cost_centers" | "networks" | "devices" | "contractTemplates" | "sms" | "experienceCertificate" | "salaryDetails" | "advancesAck" | "custodyAck" | "loanRequest" | "investigation" | "warning1" | "warning2" | "socialIns1" | "socialIns6" | "exitInterview" | "resignation" | "finalSettlement";
+const validTabs: Tab[] = ["departments", "sections", "positions", "job_grades", "graduations", "majors", "cities", "cost_centers", "networks", "devices", "contractTemplates", "sms", "experienceCertificate", "salaryDetails", "advancesAck", "custodyAck", "loanRequest", "investigation", "warning1", "warning2", "socialIns1", "socialIns6", "exitInterview", "resignation", "finalSettlement"];
 
 export const Route = createFileRoute("/admin/directory")({
   component: DirectoryPage,
@@ -67,6 +71,10 @@ const tabs: { id: Tab; label: string }[] = [
   { id: "warning1", label: "First Warning" },
   { id: "warning2", label: "Second Warning" },
   { id: "socialIns1", label: "Form 1 (س1)" },
+  { id: "socialIns6", label: "Form 6 (س6)" },
+  { id: "exitInterview", label: "Exit Interview (مقابلة نهاية الخدمة)" },
+  { id: "resignation", label: "Resignation Form (طلب استقالة)" },
+  { id: "finalSettlement", label: "Final Settlement & Clearance (مخالصة وإخلاء طرف)" },
 ];
 
 const PAGE_SIZE = 10;
@@ -184,6 +192,26 @@ function DirectoryPage() {
         {tab === "socialIns1" && (
           <Suspense fallback={<div className="h-40 rounded-2xl bg-muted/30" />}>
             <SocialInsuranceForm1 />
+          </Suspense>
+        )}
+        {tab === "socialIns6" && (
+          <Suspense fallback={<div className="h-40 rounded-2xl bg-muted/30" />}>
+            <SocialInsuranceForm6 />
+          </Suspense>
+        )}
+        {tab === "exitInterview" && (
+          <Suspense fallback={<div className="h-40 rounded-2xl bg-muted/30" />}>
+            <ExitInterviewReport />
+          </Suspense>
+        )}
+        {tab === "resignation" && (
+          <Suspense fallback={<div className="h-40 rounded-2xl bg-muted/30" />}>
+            <ResignationForm />
+          </Suspense>
+        )}
+        {tab === "finalSettlement" && (
+          <Suspense fallback={<div className="h-40 rounded-2xl bg-muted/30" />}>
+            <FinalSettlementReport />
           </Suspense>
         )}
       </div>

@@ -67,7 +67,6 @@ function AdminLayout() {
     { to: "/admin/advances", icon: Banknote, label: t("advancesTitle"), page: "advances" },
     { to: "/admin/reports", icon: FileBarChart2, label: t("reports"), page: "reports" },
     { to: "/admin/audit", icon: ScrollText, label: t("audit"), page: "audit" },
-    { to: "/admin/notification-activity", icon: ScrollText, label: "Notification log", page: "audit" },
     { to: "/admin/directory", icon: Building2, label: t("directory"), page: "directory" },
     { to: "/admin/org-chart", icon: Network, label: t("orgChart"), page: "employees" },
     { to: "/admin/settings", icon: Settings, label: t("settings") || "Settings", page: "settings" },

@@ -46,6 +46,7 @@ export const ui: Record<UiKey, string> = {
   audit: "سجل العمليات",
   attendanceAudit: "تدقيق الحضور",
   biometricsAudit: "تدقيق القياسات الحيوية والهوية",
+  notificationAudit: "سجل نشاط الإشعارات",
   biometricHealth: "صحة النظام البيومتري",
   auditSubtitle: "سجلات شاملة للحضور، النطاقات الجغرافية، والتحقق البيومتري",
   totalEvents: "إجمالي العمليات",

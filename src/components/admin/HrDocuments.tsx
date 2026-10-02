@@ -16,7 +16,7 @@ function fmtMoney(v?: number | null) {
   return new Intl.NumberFormat("en-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
 }
 
-function useEmployeePicker() {
+export function useEmployeePicker() {
   const [q, setQ] = useState("");
   const [employeeId, setEmployeeId] = useState("");
   const listFn = useServerFn(listEmployeesAdmin);
@@ -34,7 +34,7 @@ function useEmployeePicker() {
   return { q, setQ, employeeId, setEmployeeId, employees, detail: detailQ.data, loading: detailQ.isFetching, listLoading: listQ.isFetching };
 }
 
-function EmployeePicker({ picker, label = "Employee" }: { picker: ReturnType<typeof useEmployeePicker>; label?: string }) {
+export function EmployeePicker({ picker, label = "Employee" }: { picker: ReturnType<typeof useEmployeePicker>; label?: string }) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -223,7 +223,7 @@ function InfoRow({ label, value }: { label: string; value?: string | number | nu
   );
 }
 
-function EmployeeDocName({ e }: { e: any }) {
+export function EmployeeDocName({ e }: { e: any }) {
   if (e.full_name_ar && e.full_name) {
     return (
       <span className="inline-flex flex-col items-center align-middle mx-1 leading-tight">
@@ -894,7 +894,25 @@ export function SecondWarningForm() {
 }
 
 
-function EditableText({ value, className }: { value?: string, className?: string }) {
+function formatLocalPhone(rawPhone?: string | null): string {
+  if (!rawPhone) return "";
+  let cleaned = rawPhone.trim();
+  if (cleaned.startsWith("+20")) {
+    cleaned = "0" + cleaned.slice(3).replace(/\D/g, "");
+  } else if (cleaned.startsWith("0020")) {
+    cleaned = "0" + cleaned.slice(4).replace(/\D/g, "");
+  } else if (cleaned.startsWith("20") && cleaned.length > 10) {
+    cleaned = "0" + cleaned.slice(2).replace(/\D/g, "");
+  } else {
+    cleaned = cleaned.replace(/\D/g, "");
+    if (cleaned.length === 10 && cleaned.startsWith("1")) {
+      cleaned = "0" + cleaned;
+    }
+  }
+  return cleaned;
+}
+
+export function EditableText({ value, className }: { value?: string, className?: string }) {
   const [key, setKey] = useState(value);
   useEffect(() => setKey(value), [value]);
   return (
@@ -1270,3 +1288,361 @@ export function SocialInsuranceForm1() {
     </div>
   );
 }
+
+export function SocialInsuranceForm6() {
+  const picker = useEmployeePicker();
+  const e = picker.detail as any;
+
+  const endDateStr = e?.contract_end_date || e?.last_action_date || new Date().toISOString().split("T")[0];
+  const [endY, endM, endD] = endDateStr.split("-");
+
+  return (
+    <div className="space-y-4">
+      <EmployeePicker picker={picker} label="Select Employee for Form 6 (س6)" />
+      {!picker.employeeId ? (
+        <p className="py-10 text-center text-sm text-muted-foreground">Select an employee to generate Form 6</p>
+      ) : picker.loading || !e ? (
+        <p className="py-10 text-center text-sm text-muted-foreground">Loading…</p>
+      ) : (
+        <div
+          id="hr-doc-print-area"
+          dir="rtl"
+          className="mx-auto w-full max-w-4xl bg-white p-8 text-black shadow-sm print:max-w-none print:p-0 print:shadow-none font-bold text-[14px]"
+          style={{ fontFamily: "'Traditional Arabic', 'Amiri', 'Segoe UI', serif", lineHeight: 1.5 }}
+        >
+          {/* Page 1 */}
+          <div className="min-h-[1050px]">
+            {/* Header */}
+            <div className="flex justify-between items-start border-b-[3px] border-black pb-2 mb-3">
+              <div className="text-right flex flex-col gap-0.5 w-1/3">
+                <h1 className="text-xl font-bold">الهيئة القومية للتأمين الإجتماعي</h1>
+                <div className="flex items-center gap-1 text-base font-bold">
+                  <span>مكتب :</span>
+                  <EditableText value="اكتوبر" className="font-bold text-base" />
+                </div>
+              </div>
+              <div className="text-center w-1/3 flex flex-col items-center">
+                <img
+                  src="/images/social-insurance-logo.png"
+                  alt="الهيئة القومية للتأمين الاجتماعي"
+                  className="h-16 object-contain mb-1 mix-blend-multiply"
+                />
+              </div>
+              <div className="text-left w-1/3 flex flex-col items-end">
+                <div className="font-bold text-lg">نموذج رقم (٦)</div>
+                <div className="text-xs text-gray-700">مطابع المخابرات العامة</div>
+              </div>
+            </div>
+
+            {/* Main Title */}
+            <div className="text-center my-3">
+              <span className="text-2xl font-bold border-b-2 border-black pb-1 px-8 inline-block">
+                إخطار بإنتهاء اشتراك مؤمن عليه
+              </span>
+            </div>
+
+            {/* Establishment Data */}
+            <div className="flex items-center justify-between gap-4 my-4 p-2 border border-black rounded-lg">
+              <div className="flex items-center gap-2 flex-1">
+                <span className="font-bold text-base whitespace-nowrap">اسم المنشأة :</span>
+                <EditableText value="التقنيات المتكاملة" className="font-bold text-base flex-1" />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-base whitespace-nowrap">رقم المنشأة :</span>
+                <DigitBox count={9} value="002966716" />
+              </div>
+            </div>
+
+            {/* Insured Data Section */}
+            <div className="relative mt-6 mb-4 border-t-[2px] border-black">
+              <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-white px-6 border-[2px] border-[#4a9bd4] text-[#4a9bd4] rounded-lg text-base font-bold">
+                بيانات المؤمن عليه
+              </div>
+            </div>
+
+            <div className="space-y-3 mt-4">
+              <div className="flex items-center gap-2">
+                <span className="w-28 font-bold text-base">الرقم التأميني :</span>
+                <DigitBox count={9} value={e.insurance_number || ""} />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-28 font-bold text-base">الرقم القومــــي :</span>
+                <DigitBox count={14} value={e.national_id || ""} />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-28 font-bold text-base">الإســـــــــــــــــم :</span>
+                <span className="font-bold text-base flex-1">
+                  <EmployeeDocName e={e} />
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-4 pt-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-base">تاريخ إنتهاء الإشتراك :</span>
+                  <div className="flex items-center gap-1" dir="ltr">
+                    <DigitBox count={4} value={endY || "2026"} />
+                    <span className="font-bold">/</span>
+                    <DigitBox count={2} value={endM || "01"} />
+                    <span className="font-bold">/</span>
+                    <DigitBox count={2} value={endD || "01"} />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-base">سبب انتهاء الإشتراك :</span>
+                  <DigitBox count={2} value="01" />
+                  <EditableText value={e.inactive_reason || "استقالة"} className="font-bold text-base min-w-[120px]" />
+                </div>
+              </div>
+            </div>
+
+            {/* Residence Address Section */}
+            <div className="relative mt-6 mb-4 border-t-[2px] border-black">
+              <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-white px-6 border-[2px] border-[#4a9bd4] text-[#4a9bd4] rounded-lg text-base font-bold">
+                بيانات محل إقامة المؤمن عليه
+              </div>
+            </div>
+
+            <div className="space-y-3 mt-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-base">عقــــــــار رقــــــــم :</span>
+                  <DigitBox count={4} value="9" />
+                </div>
+                <div className="flex items-center gap-2 flex-1 mr-4">
+                  <span className="font-bold text-base whitespace-nowrap">شـــارع / حـــــارة :</span>
+                  <EditableText value={e.district || "ابراج سما المعادي"} className="font-bold text-base flex-1" />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-base">شياخة / قرية :</span>
+                  <EditableText value={e.city || "المعادي"} className="font-bold text-base min-w-[70px]" />
+                  <DigitBox count={2} value="01" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-base">قسم / مركز :</span>
+                  <EditableText value="المعادي" className="font-bold text-base min-w-[70px]" />
+                  <DigitBox count={2} value="02" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-base">محافظــــة :</span>
+                  <EditableText value="القاهرة" className="font-bold text-base min-w-[70px]" />
+                  <DigitBox count={2} value="01" />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-4 pt-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-base">رقم المحمول أو التليفون الأرضي :</span>
+                  <span dir="ltr" className="inline-block">
+                    <EditableText
+                      value={formatLocalPhone(e.phone) || "01000000000"}
+                      className="font-bold text-base font-mono tracking-wider text-left"
+                    />
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-base">البريد الإلكتروني :</span>
+                  <span dir="ltr" className="inline-block">
+                    <EditableText value={e.email || ""} className="font-bold text-base font-mono text-left" />
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Acknowledgment Section */}
+            <div className="relative mt-6 mb-4 border-t-[2px] border-black">
+              <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-white px-6 border-[2px] border-[#4a9bd4] text-[#4a9bd4] rounded-lg text-base font-bold">
+                إقرار المؤمن عليه والمدير المسئول
+              </div>
+            </div>
+
+            <div className="space-y-3 mt-4">
+              <p className="text-base font-bold">
+                أقر أن البيانات بعاليه صحيحة وأن المؤمن عليه تسلم صورة من هذا الإخطار .
+              </p>
+              <div className="flex justify-between items-center pt-2">
+                <div className="flex items-center gap-2">
+                  <span>توقيع المؤمن عليه :</span>
+                  <span className="border-b-[2px] border-dotted border-black w-44 inline-block"></span>
+                  <span className="mr-2">٢٠ &nbsp;&nbsp; / &nbsp;&nbsp; /</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span>توقيع المدير المسئول :</span>
+                  <span className="border-b-[2px] border-dotted border-black w-44 inline-block"></span>
+                  <span className="mr-2">٢٠ &nbsp;&nbsp; / &nbsp;&nbsp; /</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 pt-1 text-sm text-gray-800">
+                <span>تم مطابقة التوقيع بمعرفتي /</span>
+                <span className="border-b border-dotted border-black flex-1"></span>
+              </div>
+            </div>
+
+            {/* Dispute Acknowledgment Section */}
+            <div className="relative mt-6 mb-4 border-t-[2px] border-black">
+              <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-white px-6 border-[2px] border-[#4a9bd4] text-[#4a9bd4] rounded-lg text-base font-bold">
+                إقرار المدير المسئول فى حالة وجود نزاع
+              </div>
+            </div>
+
+            <div className="space-y-3 mt-4">
+              <p className="text-base font-bold">
+                أقر أن البيانات بعاليه صحيحة وأننى أرسلت صورة من هذا الإخطار إلى المؤمن عليه بخطاب موصى عليه بعلم الوصول
+              </p>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span>برقم :</span>
+                  <span className="border-b-[2px] border-dotted border-black w-40 inline-block"></span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span>بتاريخ :</span>
+                  <span className="mr-2">/ &nbsp;&nbsp; / &nbsp;&nbsp; ٢٠</span>
+                </div>
+              </div>
+              <div className="flex justify-between items-center pt-2">
+                <div className="flex items-center gap-2">
+                  <span>توقيع المدير المسئول :</span>
+                  <span className="border-b-[2px] border-dotted border-black w-48 inline-block"></span>
+                  <span className="mr-2">٢٠ &nbsp;&nbsp; / &nbsp;&nbsp; /</span>
+                </div>
+                <div className="border-2 border-black rounded-full px-8 py-3 text-center text-xs font-bold">
+                  خاتم الجهة
+                </div>
+              </div>
+            </div>
+
+            {/* Official Review Table */}
+            <div className="mt-5">
+              <table className="w-full border-2 border-black text-center text-xs">
+                <thead>
+                  <tr className="border-b-2 border-black bg-gray-100 font-bold">
+                    <th className="border-l border-black p-1.5 w-24">البيان</th>
+                    <th className="border-l border-black p-1.5">مستلم الإخطار</th>
+                    <th className="border-l border-black p-1.5">المراجـــــع</th>
+                    <th className="border-l border-black p-1.5">مسجـــل آلـــي</th>
+                    <th className="p-1.5">مراجـــع آلـــي</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-b border-black">
+                    <td className="border-l border-black p-2 font-bold bg-gray-50">الإسـم</td>
+                    <td className="border-l border-black p-2"></td>
+                    <td className="border-l border-black p-2"></td>
+                    <td className="border-l border-black p-2"></td>
+                    <td className="p-2"></td>
+                  </tr>
+                  <tr className="border-b border-black">
+                    <td className="border-l border-black p-2 font-bold bg-gray-50">التوقيع</td>
+                    <td className="border-l border-black p-2"></td>
+                    <td className="border-l border-black p-2"></td>
+                    <td className="border-l border-black p-2"></td>
+                    <td className="p-2"></td>
+                  </tr>
+                  <tr>
+                    <td className="border-l border-black p-2 font-bold bg-gray-50">التاريخ</td>
+                    <td className="border-l border-black p-2"></td>
+                    <td className="border-l border-black p-2"></td>
+                    <td className="border-l border-black p-2"></td>
+                    <td className="p-2"></td>
+                  </tr>
+                </tbody>
+              </table>
+              <div className="text-center font-bold text-xs mt-2">
+                ملحوظة : يلزم التأكد من توقيع كل من العامل وصاحب العمل على الإقرار الموضح خلف النموذج . (أنظر خلفه)
+              </div>
+            </div>
+          </div>
+
+          {/* Page 2 */}
+          <div className="break-before-page min-h-[1050px] pt-8">
+            <h2 className="text-center font-bold text-2xl mb-6 border-b-2 border-black pb-2 inline-block mx-auto px-12 block w-fit">
+              إرشـــــــادات
+            </h2>
+
+            <div className="space-y-4 text-base font-bold leading-[2] text-justify px-2">
+              <p>
+                ١- يحرر هذا النموذج من أصل وصورتين يرسل الأصل لمكتب الهيئة المختص خلال أسبوع من تاريخ تحقق إحدى الوقائع الآتية :
+              </p>
+              <div className="pr-6 space-y-1">
+                <p>أ- إنتهاء خدمة المؤمن عليه .</p>
+                <p>ب- إنتهاء مدة التلمذة الصناعية أو التدرج .</p>
+                <p>ج- إنتهاء العمل بالمشروع الصيفي للطلبة .</p>
+              </div>
+              <p>
+                ويحتفظ صاحب العمل بصورة ويسلم صورة للعامل بعد توقيعه أو يرسل له بخطاب مسجل بعلم الوصول خلال 24 ساعة من إرساله لمكتب الهيئة المختص فى حالة رفضه التوقيع .
+              </p>
+              <p>
+                ٢- في حالة إخلال صاحب العمل بالإخطار فى الموعد المشار إليه بالنسبة للمؤمن عليهم فى البند (أ) من رقم (1) يلتزم بأداء مبلغ إضافي يقدر بنسبة (20%) من قيمة الاشتراك المستحق عن الشهر الأخير وذلك عن كل شهر تأخير عن المدة من تاريخ إنتهاء الخدمة حتى تاريخ إرسال النموذج لمكتب الهيئة المختص وفى حساب مدة التأخير يحذف كسر الشهر .
+              </p>
+            </div>
+
+            <div className="mt-8 mb-4">
+              <h2 className="text-center font-bold text-2xl border-b-2 border-black pb-2 inline-block mx-auto px-12 block w-fit">
+                إقـــــــــرار
+              </h2>
+            </div>
+
+            <div className="p-4 border-2 border-black rounded-lg space-y-3 mb-6">
+              <div className="flex justify-between items-center text-base font-bold">
+                <div className="flex items-center gap-2">
+                  <span>اسم المنشأة :</span>
+                  <EditableText value="التقنيات المتكاملة" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span>رقمها التأميني :</span>
+                  <DigitBox count={9} value="002966716" />
+                </div>
+              </div>
+              <div className="flex items-center gap-2 text-base font-bold">
+                <span>العنوان :</span>
+                <EditableText value="9و أبراج سما المعادي - القاهرة" className="flex-1" />
+              </div>
+              <div className="flex justify-between items-center text-base font-bold">
+                <div className="flex items-center gap-2">
+                  <span>اسم المؤمن عليه :</span>
+                  <EmployeeDocName e={e} />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span>رقمه التأميني :</span>
+                  <DigitBox count={9} value={e.insurance_number || ""} />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-6 text-base font-bold leading-[2] text-justify px-2">
+              <p>
+                ٣- أقر أنا الموقع أدناه بأننى قد قمت بسحب البطاقة العلاجية من المؤمن عليه وتم تسليمها لفرع الهيئة المعنية بالتأمين الصحي وفي حالة ظهور ما يخالف ذلك أكون مسئولاً بالتضامن مع العامل فى مواجهة الهيئة المعنية بالتأمين الصحي عن كافة مصاريف العلاج والرعاية الطبية تعويضاً عن الانتفاع بدون وجه حق بمزايا العلاج والرعاية الطبية بعد إنتهاء الخدمة .
+              </p>
+
+              <div className="flex justify-between items-center pt-2 px-8">
+                <div className="text-center">
+                  <div className="mb-8">توقيع صاحب العمل</div>
+                  <div>( &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; )</div>
+                </div>
+                <div className="text-center">
+                  <div className="mb-8">توقيع المؤمن عليه</div>
+                  <div>( &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; )</div>
+                </div>
+              </div>
+
+              <div className="border-t-2 border-black pt-6 mt-6">
+                <p>
+                  ٤- أقر أنا الموقع أدناه بأن المؤمن عليه محل هذا النموذج قد رفض تسليم البطاقات العلاجية وقمت بإخطار الهيئة المعنية بالتأمين الصحي ببيانات المؤمن عليه لإيقاف التعامل معه .
+                </p>
+
+                <div className="flex justify-start items-center pt-4 px-8">
+                  <div className="text-center">
+                    <div className="mb-8">توقيع صاحب العمل</div>
+                    <div>( &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; )</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+

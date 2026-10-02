@@ -43,7 +43,7 @@ export function DeliverySettingsCard() {
     <div className="rounded-2xl border border-border bg-card p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-display text-base font-semibold">Delivery settings</h2>
-        <Link to="/admin/notification-activity" className="text-xs text-brand hover:underline">View notification activity log →</Link>
+        <Link to="/admin/audit" search={{ tab: "notifications" }} className="text-xs text-brand hover:underline">View notification activity log →</Link>
       </div>
       <p className="mt-1 text-xs text-muted-foreground">Master switches for each channel, plus quiet hours when email and push are held back.</p>
       <div className="mt-3 divide-y divide-border">

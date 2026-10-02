@@ -1,17 +1,26 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { CheckCircle2, ShieldAlert, MapPin, Wifi, Filter, Download, Clock, Fingerprint, Activity } from "lucide-react";
+import { CheckCircle2, ShieldAlert, MapPin, Wifi, Filter, Download, Clock, Fingerprint, Activity, Bell } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getAuditEvents } from "@/backend/functions/audit.functions";
 import { BiometricAuditViewer } from "@/components/admin/BiometricAuditViewer";
+import { NotificationAuditViewer } from "@/components/admin/NotificationAuditViewer";
+
+type TabKey = "attendance" | "biometrics" | "notifications";
 
 export const Route = createFileRoute("/admin/audit")({
+  validateSearch: (search: Record<string, unknown>): { tab?: TabKey } => {
+    const tab = search.tab as TabKey;
+    if (tab === "attendance" || tab === "biometrics" || tab === "notifications") {
+      return { tab };
+    }
+    return {};
+  },
   component: AuditPage,
 });
 
-type TabKey = "attendance" | "biometrics";
 type ResultFilter = "all" | "success" | "blocked";
 type RangeKey = "all" | "today" | "week" | "month" | "custom";
 
@@ -29,7 +38,12 @@ function startOfMonth(d: Date) { const x = startOfDay(d); x.setDate(1); return x
 
 function AuditPage() {
   const { t } = useI18n();
-  const [activeTab, setActiveTab] = useState<TabKey>("attendance");
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const activeTab: TabKey = search.tab ?? "attendance";
+  const setActiveTab = (tab: TabKey) => {
+    navigate({ search: { tab }, replace: true });
+  };
   const fetchAudit = useServerFn(getAuditEvents);
   const { data: events = [], isLoading } = useQuery({
     queryKey: ["audit-events"],
@@ -149,6 +163,18 @@ function AuditPage() {
           <Fingerprint className="h-3.5 w-3.5" />
           <span>{t("biometricsAudit")}</span>
         </button>
+
+        <button
+          onClick={() => setActiveTab("notifications")}
+          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition ${
+            activeTab === "notifications"
+              ? "bg-gradient-brand text-brand-foreground shadow-brand"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted"
+          }`}
+        >
+          <Bell className="h-3.5 w-3.5" />
+          <span>{t("notificationAudit")}</span>
+        </button>
         <a href="/admin/face-notifications" className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground">
           Face alert history
         </a>
@@ -159,6 +185,8 @@ function AuditPage() {
 
       {activeTab === "biometrics" ? (
         <BiometricAuditViewer />
+      ) : activeTab === "notifications" ? (
+        <NotificationAuditViewer />
       ) : (
         <>
 
@@ -260,7 +288,7 @@ function AuditPage() {
           </span>
           <div className="inline-flex items-center gap-1">
             <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              onClick={() => setPage((p: number) => Math.max(1, p - 1))}
               disabled={currentPage <= 1}
               className="rounded-full border border-border bg-card px-3 py-1.5 disabled:opacity-40"
             >
@@ -268,7 +296,7 @@ function AuditPage() {
             </button>
             <span className="px-2">Page {currentPage} of {totalPages}</span>
             <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              onClick={() => setPage((p: number) => Math.min(totalPages, p + 1))}
               disabled={currentPage >= totalPages}
               className="rounded-full border border-border bg-card px-3 py-1.5 disabled:opacity-40"
             >

@@ -46,6 +46,7 @@ export const ui = {
   audit: "Audit Log",
   attendanceAudit: "Attendance Audit",
   biometricsAudit: "Biometrics & Identity Audit",
+  notificationAudit: "Notification Activity Log",
   biometricHealth: "Biometric Health",
   auditSubtitle: "Comprehensive logs for attendance, geofences, and biometric authentication",
   totalEvents: "Total Events",
