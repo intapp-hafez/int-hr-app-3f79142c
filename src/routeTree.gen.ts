@@ -21,6 +21,7 @@ import { Route as AdminAdvancesRouteImport } from './routes/admin.advances'
 import { Route as AdminAllowancesRouteImport } from './routes/admin.allowances'
 import { Route as AdminAttendanceRouteImport } from './routes/admin.attendance'
 import { Route as AdminAttendanceReportRouteImport } from './routes/admin.attendance-report'
+import { Route as AdminAttendanceRulesRouteImport } from './routes/admin.attendance-rules'
 import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 import { Route as AdminBiometricTerminalsRouteImport } from './routes/admin.biometric-terminals'
 import { Route as AdminBiometricsHealthRouteImport } from './routes/admin.biometrics-health'
@@ -153,6 +154,11 @@ const AdminAttendanceRoute = AdminAttendanceRouteImport.update({
 const AdminAttendanceReportRoute = AdminAttendanceReportRouteImport.update({
   id: '/attendance-report',
   path: '/attendance-report',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAttendanceRulesRoute = AdminAttendanceRulesRouteImport.update({
+  id: '/attendance-rules',
+  path: '/attendance-rules',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminAuditRoute = AdminAuditRouteImport.update({
@@ -538,6 +544,7 @@ export interface FileRoutesByFullPath {
   '/admin/allowances': typeof AdminAllowancesRoute
   '/admin/attendance': typeof AdminAttendanceRoute
   '/admin/attendance-report': typeof AdminAttendanceReportRoute
+  '/admin/attendance-rules': typeof AdminAttendanceRulesRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/biometric-terminals': typeof AdminBiometricTerminalsRoute
   '/admin/biometrics-health': typeof AdminBiometricsHealthRoute
@@ -620,6 +627,7 @@ export interface FileRoutesByTo {
   '/admin/allowances': typeof AdminAllowancesRoute
   '/admin/attendance': typeof AdminAttendanceRoute
   '/admin/attendance-report': typeof AdminAttendanceReportRoute
+  '/admin/attendance-rules': typeof AdminAttendanceRulesRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/biometric-terminals': typeof AdminBiometricTerminalsRoute
   '/admin/biometrics-health': typeof AdminBiometricsHealthRoute
@@ -706,6 +714,7 @@ export interface FileRoutesById {
   '/admin/allowances': typeof AdminAllowancesRoute
   '/admin/attendance': typeof AdminAttendanceRoute
   '/admin/attendance-report': typeof AdminAttendanceReportRoute
+  '/admin/attendance-rules': typeof AdminAttendanceRulesRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/biometric-terminals': typeof AdminBiometricTerminalsRoute
   '/admin/biometrics-health': typeof AdminBiometricsHealthRoute
@@ -795,6 +804,7 @@ export interface FileRouteTypes {
     | '/admin/allowances'
     | '/admin/attendance'
     | '/admin/attendance-report'
+    | '/admin/attendance-rules'
     | '/admin/audit'
     | '/admin/biometric-terminals'
     | '/admin/biometrics-health'
@@ -877,6 +887,7 @@ export interface FileRouteTypes {
     | '/admin/allowances'
     | '/admin/attendance'
     | '/admin/attendance-report'
+    | '/admin/attendance-rules'
     | '/admin/audit'
     | '/admin/biometric-terminals'
     | '/admin/biometrics-health'
@@ -962,6 +973,7 @@ export interface FileRouteTypes {
     | '/admin/allowances'
     | '/admin/attendance'
     | '/admin/attendance-report'
+    | '/admin/attendance-rules'
     | '/admin/audit'
     | '/admin/biometric-terminals'
     | '/admin/biometrics-health'
@@ -1134,6 +1146,13 @@ declare module '@tanstack/react-router' {
       path: '/attendance-report'
       fullPath: '/admin/attendance-report'
       preLoaderRoute: typeof AdminAttendanceReportRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/attendance-rules': {
+      id: '/admin/attendance-rules'
+      path: '/attendance-rules'
+      fullPath: '/admin/attendance-rules'
+      preLoaderRoute: typeof AdminAttendanceRulesRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/audit': {
@@ -1694,6 +1713,7 @@ interface AdminRouteChildren {
   AdminAllowancesRoute: typeof AdminAllowancesRoute
   AdminAttendanceRoute: typeof AdminAttendanceRoute
   AdminAttendanceReportRoute: typeof AdminAttendanceReportRoute
+  AdminAttendanceRulesRoute: typeof AdminAttendanceRulesRoute
   AdminAuditRoute: typeof AdminAuditRoute
   AdminBiometricTerminalsRoute: typeof AdminBiometricTerminalsRoute
   AdminBiometricsHealthRoute: typeof AdminBiometricsHealthRoute
@@ -1735,6 +1755,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminAllowancesRoute: AdminAllowancesRoute,
   AdminAttendanceRoute: AdminAttendanceRoute,
   AdminAttendanceReportRoute: AdminAttendanceReportRoute,
+  AdminAttendanceRulesRoute: AdminAttendanceRulesRoute,
   AdminAuditRoute: AdminAuditRoute,
   AdminBiometricTerminalsRoute: AdminBiometricTerminalsRoute,
   AdminBiometricsHealthRoute: AdminBiometricsHealthRoute,
