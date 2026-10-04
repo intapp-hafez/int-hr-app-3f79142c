@@ -362,6 +362,12 @@ export const updateEmployeeAdmin = createServerFn({ method: "POST" })
         position_id: z.string().uuid().nullable().optional(),
         city_id: z.string().uuid().nullable().optional(),
         district_id: z.string().uuid().nullable().optional(),
+        city: z.string().max(120).nullable().optional(),
+        district: z.string().max(120).nullable().optional(),
+        country: z.string().max(120).nullable().optional(),
+        street: z.string().max(200).nullable().optional(),
+        building: z.string().max(120).nullable().optional(),
+        flat: z.string().max(120).nullable().optional(),
         manager_id: z.string().uuid().nullable().optional(),
         cost_center_id: z.string().uuid().nullable().optional().or(z.literal("")),
         shift_id: z.string().uuid().nullable().optional().or(z.literal("")),
@@ -425,6 +431,12 @@ export const updateEmployeeAdmin = createServerFn({ method: "POST" })
     if (data.position_id !== undefined) patch.position_id = data.position_id;
     if (data.city_id !== undefined) patch.city_id = data.city_id;
     if (data.district_id !== undefined) patch.district_id = data.district_id;
+    if (data.city !== undefined) patch.city = data.city;
+    if (data.district !== undefined) patch.district = data.district;
+    if (data.country !== undefined) patch.country = data.country;
+    if (data.street !== undefined) patch.street = data.street;
+    if (data.building !== undefined) patch.building = data.building;
+    if (data.flat !== undefined) patch.flat = data.flat;
     if (data.manager_id !== undefined) patch.manager_id = data.manager_id;
     if (data.cost_center_id !== undefined) patch.cost_center_id = data.cost_center_id === "" ? null : data.cost_center_id;
     if (data.locale !== undefined) patch.locale = data.locale;
