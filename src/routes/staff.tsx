@@ -25,7 +25,7 @@ function StaffLayout() {
     queryFn: () => listFn(),
     enabled: !!session,
   });
-  const unreadCount = deliveries.length;
+  const unreadCount = (deliveries as any[]).filter((n) => !(n.payload as any)?.read_at).length;
 
   const unreadChatFn = useServerFn(getChatUnreadTotal);
   const { data: chatUnreadData } = useQuery({

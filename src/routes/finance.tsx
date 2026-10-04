@@ -4,6 +4,7 @@ import { AppLogo } from "@/components/AppLogo";
 import { LanguageToggle, useI18n } from "@/lib/i18n";
 import { useSession, useAuthReady, signOut } from "@/lib/auth";
 import { UserMenu } from "@/components/UserMenu";
+import { PanelNotificationsBell } from "@/components/PanelNotificationsBell";
 
 export const Route = createFileRoute("/finance")({
   component: FinanceLayout,
@@ -83,6 +84,7 @@ function FinanceLayout() {
             <div className="flex items-center gap-2">
               <span className="hidden text-xs text-muted-foreground sm:inline lg:hidden">{session.name}</span>
               <LanguageToggle />
+              <PanelNotificationsBell to="/finance/notifications" />
               <UserMenu size="sm" />
             </div>
           </header>
