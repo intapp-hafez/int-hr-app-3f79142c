@@ -67,8 +67,6 @@ function AdminLayout() {
     { to: "/admin/advances", icon: Banknote, label: t("advancesTitle"), page: "advances" },
     { to: "/admin/reports", icon: FileBarChart2, label: t("reports"), page: "reports" },
     { to: "/admin/audit", icon: ScrollText, label: t("audit"), page: "audit" },
-    { to: "/admin/attendance-rules", icon: ScrollText, label: "Attendance rules", page: "geofencing" },
-    { to: "/admin/notification-activity", icon: ScrollText, label: "Notification log", page: "audit" },
     { to: "/admin/directory", icon: Building2, label: t("directory"), page: "directory" },
     { to: "/admin/org-chart", icon: Network, label: t("orgChart"), page: "employees" },
     { to: "/admin/settings", icon: Settings, label: t("settings") || "Settings", page: "settings" },
@@ -204,7 +202,7 @@ function getPageSlugForPath(path: string): string | null {
   if (path.startsWith("/admin/leaves")) return "leaves";
   if (path.startsWith("/admin/payroll")) return "payroll";
   if (path.startsWith("/admin/advances")) return "advances";
-  if (path.startsWith("/admin/geofencing") || path.startsWith("/admin/work-locations") || path.startsWith("/admin/attendance-rules")) return "geofencing";
+  if (path.startsWith("/admin/geofencing") || path.startsWith("/admin/work-locations")) return "geofencing";
   if (path.startsWith("/admin/networks") || path.startsWith("/admin/devices")) return "networks";
   if (path.startsWith("/admin/shifts")) return "shifts";
   if (path.startsWith("/admin/holiday-types")) return "holiday-types";

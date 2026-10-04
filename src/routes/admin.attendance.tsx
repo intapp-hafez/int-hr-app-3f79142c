@@ -29,11 +29,12 @@ import { EmployeeAvatar } from "@/components/EmployeeAvatar";
 
 import { AttendanceReportView } from "@/components/admin/AttendanceReportView";
 import { AdminTimeManagementView } from "@/components/admin/AdminTimeManagementView";
+import { AttendanceRulesView } from "@/components/admin/AttendanceRulesView";
 
 const LeafletMap = lazy(() => import("@/components/LeafletMap").then((mod) => ({ default: mod.LeafletMap })));
 const EgyptMap = lazy(() => import("@/components/admin/EgyptMap").then((mod) => ({ default: mod.EgyptMap })));
 
-const ATTENDANCE_TABS = ["overview", "records", "report", "map", "tasks"] as const;
+const ATTENDANCE_TABS = ["overview", "records", "report", "map", "tasks", "rules"] as const;
 type AttendanceTab = (typeof ATTENDANCE_TABS)[number];
 
 export const Route = createFileRoute("/admin/attendance")({
@@ -571,18 +572,20 @@ function AdminAttendance() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3 print:hidden">
         <div>
-          <h1 className="font-display text-2xl font-semibold tracking-tight md:text-3xl">{t("attendance")} log</h1>
-          <p className="text-sm text-muted-foreground">DB-backed check-in & check-out records</p>
+          <h1 className="font-display text-2xl font-semibold tracking-tight md:text-3xl">{t("attendance")}</h1>
+          <p className="text-sm text-muted-foreground">Check-in & check-out records, live map, reports, and attendance rules</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button onClick={downloadTemplate} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 text-sm"><FileDown className="h-4 w-4" /> {t("downloadTemplate")}</button>
-          <button onClick={() => fileRef.current?.click()} className="inline-flex items-center gap-1.5 rounded-full border border-brand/50 bg-brand/10 px-3.5 py-2 text-sm font-semibold text-brand"><Upload className="h-4 w-4" /> {t("import")}</button>
-          <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} className="hidden" />
-          <button onClick={exportXlsx} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 text-sm"><Download className="h-4 w-4" /> {t("export")} XLSX</button>
-          <button onClick={() => exportAttendanceCsv(rows)} disabled={!rows.length} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 text-sm disabled:opacity-50"><FileText className="h-4 w-4" /> CSV</button>
-          <button onClick={() => printAttendancePdf(rows, "Attendance")} disabled={!rows.length} className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-3.5 py-2 text-sm font-semibold text-background disabled:opacity-50"><Printer className="h-4 w-4" /> PDF</button>
-          <Button onClick={openAdd} className="rounded-full"><Plus className="h-4 w-4" /> Add</Button>
-        </div>
+        {currentTab === "records" && (
+          <div className="flex flex-wrap gap-2">
+            <button onClick={downloadTemplate} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 text-sm"><FileDown className="h-4 w-4" /> {t("downloadTemplate")}</button>
+            <button onClick={() => fileRef.current?.click()} className="inline-flex items-center gap-1.5 rounded-full border border-brand/50 bg-brand/10 px-3.5 py-2 text-sm font-semibold text-brand"><Upload className="h-4 w-4" /> {t("import")}</button>
+            <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} className="hidden" />
+            <button onClick={exportXlsx} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 text-sm"><Download className="h-4 w-4" /> {t("export")} XLSX</button>
+            <button onClick={() => exportAttendanceCsv(rows)} disabled={!rows.length} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 text-sm disabled:opacity-50"><FileText className="h-4 w-4" /> CSV</button>
+            <button onClick={() => printAttendancePdf(rows, "Attendance")} disabled={!rows.length} className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-3.5 py-2 text-sm font-semibold text-background disabled:opacity-50"><Printer className="h-4 w-4" /> PDF</button>
+            <Button onClick={openAdd} className="rounded-full"><Plus className="h-4 w-4" /> Add</Button>
+          </div>
+        )}
       </div>
 
       <Tabs value={currentTab} onValueChange={handleTabChange} className="space-y-5">
@@ -592,6 +595,7 @@ function AdminAttendance() {
           <TabsTrigger value="report">Attendance Report</TabsTrigger>
           <TabsTrigger value="map">Live map</TabsTrigger>
           <TabsTrigger value="tasks">{t("tasks") || "Tasks"}</TabsTrigger>
+          <TabsTrigger value="rules">{t("attendanceRules") || "Attendance rules"}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-5">
@@ -808,6 +812,10 @@ function AdminAttendance() {
 
         <TabsContent value="tasks" className="space-y-5">
           <AdminTimeManagementView />
+        </TabsContent>
+
+        <TabsContent value="rules" className="space-y-5">
+          <AttendanceRulesView />
         </TabsContent>
       </Tabs>
 
