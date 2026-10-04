@@ -5,6 +5,7 @@ import { AppLogo } from "@/components/AppLogo";
 import { LanguageToggle, useI18n } from "@/lib/i18n";
 import { useSession, useAuthReady, signOut } from "@/lib/auth";
 import { UserMenu } from "@/components/UserMenu";
+import { PanelNotificationsBell } from "@/components/PanelNotificationsBell";
 import { InstallButton } from "@/components/InstallButton";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -153,6 +154,7 @@ function ManagerLayout() {
               <span className="hidden text-xs text-muted-foreground sm:inline lg:hidden">{session.name}</span>
               <InstallButton variant="outline" className="hidden sm:inline-flex" />
               <LanguageToggle />
+              <PanelNotificationsBell to="/manager/notifications" />
               <UserMenu size="sm" />
             </div>
           </header>

@@ -1,6 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Wallet, Banknote, StickyNote, Bell, CheckCheck } from "lucide-react";
-import { useStore, markNotificationRead, markAllNotificationsRead } from "@/lib/store";
+import { Wallet, Banknote, StickyNote, Bell } from "lucide-react";
 import { useSession } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 
@@ -12,11 +11,6 @@ function FinanceDashboard() {
   const { t } = useI18n();
   const session = useSession();
 
-  // We reuse manager/admin notification logic but scoped to finance if we ever have finance-specific notifications
-  const notifications = useStore((s) => s.notifications).filter(
-    (n) => n.audience === "hr"
-  );
-  const unread = notifications.filter((n) => !n.read).length;
 
   const cards = [
     { to: "/finance/payroll", icon: Wallet, label: t("payrollRun") || "Run Payroll", value: t("manage") || "Manage" },
@@ -46,37 +40,10 @@ function FinanceDashboard() {
         ))}
       </div>
 
-      <section className="rounded-2xl border border-border bg-card p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="flex items-center gap-2 font-display text-sm font-semibold">
-            <Bell className="h-4 w-4 text-brand" /> {t("recentNotifications")}
-            {unread > 0 && <span className="rounded-full bg-brand px-1.5 text-[10px] font-semibold text-brand-foreground">{unread}</span>}
-          </h2>
-          {unread > 0 && (
-            <button
-              onClick={() => markAllNotificationsRead((n) => n.audience === "hr")}
-              className="inline-flex items-center gap-1 text-xs font-medium text-brand"
-            >
-              <CheckCheck className="h-3 w-3" /> {t("markAllRead")}
-            </button>
-          )}
-        </div>
-        {notifications.length === 0 ? (
-          <p className="py-4 text-center text-sm text-muted-foreground">{t("noNotifications")}</p>
-        ) : (
-          <ul className="divide-y divide-border">
-            {notifications.slice(0, 8).map((n) => (
-              <li key={n.id} onClick={() => markNotificationRead(n.id)} className={`cursor-pointer py-2.5 ${n.read ? "opacity-60" : ""}`}>
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-sm font-medium">{n.title}</p>
-                  <span className="shrink-0 text-[10px] text-muted-foreground">{new Date(n.ts).toLocaleTimeString()}</span>
-                </div>
-                <p className="text-xs text-muted-foreground">{n.body}</p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <Link to="/finance/notifications" className="flex items-center justify-between rounded-2xl border border-border bg-card p-4 hover:bg-muted">
+        <span className="flex items-center gap-2 font-display text-sm font-semibold"><Bell className="h-4 w-4 text-brand" /> {t("recentNotifications")}</span>
+        <span className="text-xs text-brand">{t("view") || "View"}</span>
+      </Link>
     </div>
   );
 }
