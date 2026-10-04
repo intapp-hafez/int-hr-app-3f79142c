@@ -2912,7 +2912,7 @@ function InfoTab({ employee }: { employee: Employee }) {
 
   const upd = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
-  function save() {
+  async function save() {
     setErr(null);
     const trimmed = form.phone.trim();
     if (trimmed && !isValidEgPhone(trimmed)) {
@@ -2934,18 +2934,56 @@ function InfoTab({ employee }: { employee: Employee }) {
     const sal = form.salary ? Number(form.salary) : undefined;
     const salaryGross = sal == null ? undefined : (form.salaryMode === "gross" ? sal : Math.round(sal / 0.9));
     const salaryNet = sal == null ? undefined : (form.salaryMode === "net" ? sal : Math.round(sal * 0.9));
-    updateEmployee(employee.id, {
-      ...form,
-      phone: normalized,
-      salary: sal,
-      salaryGross,
-      salaryNet,
-      allowance: form.allowance ? Number(form.allowance) : undefined,
-      target: form.target ? Number(form.target) : undefined,
-      documents: docs,
-    } as Partial<Employee>);
-    setForm((f) => ({ ...f, phone: normalized }));
-    toast.success(t("save"));
+    setSaving(true);
+    try {
+      // Persist to the database — previously this only updated the local store.
+      await updateFn({
+        data: {
+          id: employee.id,
+          phone: normalized || null,
+          gender: (form.gender || null) as any,
+          national_id: form.nationalId.trim() || null,
+          id_expiry_date: exp || null,
+          allow_past_expiry: true,
+          country: form.country.trim() || null,
+          city: form.city.trim() || null,
+          district: form.district.trim() || null,
+          street: form.street.trim() || null,
+          building: form.building.trim() || null,
+          flat: form.flat.trim() || null,
+          status: form.status as any,
+          manager_id: form.manager || null,
+          job_grade: form.job_grade || null,
+          contract_type: (form.contractType || null) as any,
+          salary_mode: form.salaryMode,
+          salary_gross: salaryGross ?? 0,
+          salary_net: salaryNet ?? 0,
+          allowance: form.allowance ? Number(form.allowance) : 0,
+          target_value: form.target ? Number(form.target) : 0,
+          target_duration: form.targetDuration as any,
+          bank_name: form.bankName.trim() || null,
+          bank_account_number: form.bankAccountNumber.trim() || null,
+        },
+      });
+      // Keep the local store in sync so open screens reflect the change.
+      updateEmployee(employee.id, {
+        ...form,
+        phone: normalized,
+        salary: sal,
+        salaryGross,
+        salaryNet,
+        allowance: form.allowance ? Number(form.allowance) : undefined,
+        target: form.target ? Number(form.target) : undefined,
+        documents: docs,
+      } as Partial<Employee>);
+      setForm((f) => ({ ...f, phone: normalized }));
+      qc.invalidateQueries({ queryKey: ["employee", "detail", employee.id] });
+      toast.success(t("save"));
+    } catch (e: any) {
+      setErr(e?.message ?? "Save failed");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
