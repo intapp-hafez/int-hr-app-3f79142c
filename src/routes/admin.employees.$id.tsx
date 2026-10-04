@@ -2866,6 +2866,9 @@ function InfoTab({ employee }: { employee: Employee }) {
   const allowedToSeeSensitive = canViewSensitive(viewerRole);
   const allEmployees = useStore((s) => s.employees);
   const gradesFn = useServerFn(listJobGrades);
+  const updateFn = useServerFn(updateEmployeeAdmin);
+  const qc = useQueryClient();
+  const [saving, setSaving] = useState(false);
   const { data: grades } = useQuery({ queryKey: ["job-grades"], queryFn: () => gradesFn(), staleTime: 5 * 60_000 });
   const departments = useMemo(
     () => Array.from(new Set(allEmployees.map((x) => x.dept).filter(Boolean))),
