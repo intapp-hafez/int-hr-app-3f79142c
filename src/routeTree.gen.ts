@@ -67,6 +67,7 @@ import { Route as EmployeeTasksRouteImport } from './routes/employee.tasks'
 import { Route as EmployeeVerifyOtpRouteImport } from './routes/employee.verify-otp'
 import { Route as FinanceIndexRouteImport } from './routes/finance.index'
 import { Route as FinanceAdvancesRouteImport } from './routes/finance.advances'
+import { Route as FinanceNotificationsRouteImport } from './routes/finance.notifications'
 import { Route as FinancePayrollRouteImport } from './routes/finance.payroll'
 import { Route as FinancePayrollSettingsRouteImport } from './routes/finance.payroll-settings'
 import { Route as FinanceProfileRouteImport } from './routes/finance.profile'
@@ -76,6 +77,7 @@ import { Route as ManagerAdvancesRouteImport } from './routes/manager.advances'
 import { Route as ManagerChatRouteImport } from './routes/manager.chat'
 import { Route as ManagerCheckRouteImport } from './routes/manager.check'
 import { Route as ManagerLeavesRouteImport } from './routes/manager.leaves'
+import { Route as ManagerNotificationsRouteImport } from './routes/manager.notifications'
 import { Route as ManagerProfileRouteImport } from './routes/manager.profile'
 import { Route as ManagerTasksRouteImport } from './routes/manager.tasks'
 import { Route as ManagerTeamRouteImport } from './routes/manager.team'
@@ -388,6 +390,11 @@ const FinanceAdvancesRoute = FinanceAdvancesRouteImport.update({
   path: '/advances',
   getParentRoute: () => FinanceRoute,
 } as any)
+const FinanceNotificationsRoute = FinanceNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => FinanceRoute,
+} as any)
 const FinancePayrollRoute = FinancePayrollRouteImport.update({
   id: '/payroll',
   path: '/payroll',
@@ -431,6 +438,11 @@ const ManagerCheckRoute = ManagerCheckRouteImport.update({
 const ManagerLeavesRoute = ManagerLeavesRouteImport.update({
   id: '/leaves',
   path: '/leaves',
+  getParentRoute: () => ManagerRoute,
+} as any)
+const ManagerNotificationsRoute = ManagerNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
   getParentRoute: () => ManagerRoute,
 } as any)
 const ManagerProfileRoute = ManagerProfileRouteImport.update({
@@ -588,6 +600,7 @@ export interface FileRoutesByFullPath {
   '/employee/tasks': typeof EmployeeTasksRoute
   '/employee/verify-otp': typeof EmployeeVerifyOtpRoute
   '/finance/advances': typeof FinanceAdvancesRoute
+  '/finance/notifications': typeof FinanceNotificationsRoute
   '/finance/payroll': typeof FinancePayrollRoute
   '/finance/payroll-settings': typeof FinancePayrollSettingsRoute
   '/finance/profile': typeof FinanceProfileRoute
@@ -596,6 +609,7 @@ export interface FileRoutesByFullPath {
   '/manager/chat': typeof ManagerChatRoute
   '/manager/check': typeof ManagerCheckRoute
   '/manager/leaves': typeof ManagerLeavesRoute
+  '/manager/notifications': typeof ManagerNotificationsRoute
   '/manager/profile': typeof ManagerProfileRoute
   '/manager/tasks': typeof ManagerTasksRoute
   '/manager/team': typeof ManagerTeamRoute
@@ -669,6 +683,7 @@ export interface FileRoutesByTo {
   '/employee/tasks': typeof EmployeeTasksRoute
   '/employee/verify-otp': typeof EmployeeVerifyOtpRoute
   '/finance/advances': typeof FinanceAdvancesRoute
+  '/finance/notifications': typeof FinanceNotificationsRoute
   '/finance/payroll': typeof FinancePayrollRoute
   '/finance/payroll-settings': typeof FinancePayrollSettingsRoute
   '/finance/profile': typeof FinanceProfileRoute
@@ -677,6 +692,7 @@ export interface FileRoutesByTo {
   '/manager/chat': typeof ManagerChatRoute
   '/manager/check': typeof ManagerCheckRoute
   '/manager/leaves': typeof ManagerLeavesRoute
+  '/manager/notifications': typeof ManagerNotificationsRoute
   '/manager/profile': typeof ManagerProfileRoute
   '/manager/tasks': typeof ManagerTasksRoute
   '/manager/team': typeof ManagerTeamRoute
@@ -758,6 +774,7 @@ export interface FileRoutesById {
   '/employee/tasks': typeof EmployeeTasksRoute
   '/employee/verify-otp': typeof EmployeeVerifyOtpRoute
   '/finance/advances': typeof FinanceAdvancesRoute
+  '/finance/notifications': typeof FinanceNotificationsRoute
   '/finance/payroll': typeof FinancePayrollRoute
   '/finance/payroll-settings': typeof FinancePayrollSettingsRoute
   '/finance/profile': typeof FinanceProfileRoute
@@ -766,6 +783,7 @@ export interface FileRoutesById {
   '/manager/chat': typeof ManagerChatRoute
   '/manager/check': typeof ManagerCheckRoute
   '/manager/leaves': typeof ManagerLeavesRoute
+  '/manager/notifications': typeof ManagerNotificationsRoute
   '/manager/profile': typeof ManagerProfileRoute
   '/manager/tasks': typeof ManagerTasksRoute
   '/manager/team': typeof ManagerTeamRoute
@@ -848,6 +866,7 @@ export interface FileRouteTypes {
     | '/employee/tasks'
     | '/employee/verify-otp'
     | '/finance/advances'
+    | '/finance/notifications'
     | '/finance/payroll'
     | '/finance/payroll-settings'
     | '/finance/profile'
@@ -856,6 +875,7 @@ export interface FileRouteTypes {
     | '/manager/chat'
     | '/manager/check'
     | '/manager/leaves'
+    | '/manager/notifications'
     | '/manager/profile'
     | '/manager/tasks'
     | '/manager/team'
@@ -929,6 +949,7 @@ export interface FileRouteTypes {
     | '/employee/tasks'
     | '/employee/verify-otp'
     | '/finance/advances'
+    | '/finance/notifications'
     | '/finance/payroll'
     | '/finance/payroll-settings'
     | '/finance/profile'
@@ -937,6 +958,7 @@ export interface FileRouteTypes {
     | '/manager/chat'
     | '/manager/check'
     | '/manager/leaves'
+    | '/manager/notifications'
     | '/manager/profile'
     | '/manager/tasks'
     | '/manager/team'
@@ -1017,6 +1039,7 @@ export interface FileRouteTypes {
     | '/employee/tasks'
     | '/employee/verify-otp'
     | '/finance/advances'
+    | '/finance/notifications'
     | '/finance/payroll'
     | '/finance/payroll-settings'
     | '/finance/profile'
@@ -1025,6 +1048,7 @@ export interface FileRouteTypes {
     | '/manager/chat'
     | '/manager/check'
     | '/manager/leaves'
+    | '/manager/notifications'
     | '/manager/profile'
     | '/manager/tasks'
     | '/manager/team'
@@ -1470,6 +1494,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FinanceAdvancesRouteImport
       parentRoute: typeof FinanceRoute
     }
+    '/finance/notifications': {
+      id: '/finance/notifications'
+      path: '/notifications'
+      fullPath: '/finance/notifications'
+      preLoaderRoute: typeof FinanceNotificationsRouteImport
+      parentRoute: typeof FinanceRoute
+    }
     '/finance/payroll': {
       id: '/finance/payroll'
       path: '/payroll'
@@ -1531,6 +1562,13 @@ declare module '@tanstack/react-router' {
       path: '/leaves'
       fullPath: '/manager/leaves'
       preLoaderRoute: typeof ManagerLeavesRouteImport
+      parentRoute: typeof ManagerRoute
+    }
+    '/manager/notifications': {
+      id: '/manager/notifications'
+      path: '/notifications'
+      fullPath: '/manager/notifications'
+      preLoaderRoute: typeof ManagerNotificationsRouteImport
       parentRoute: typeof ManagerRoute
     }
     '/manager/profile': {
@@ -1830,6 +1868,7 @@ const EmployeeRouteWithChildren = EmployeeRoute._addFileChildren(
 
 interface FinanceRouteChildren {
   FinanceAdvancesRoute: typeof FinanceAdvancesRoute
+  FinanceNotificationsRoute: typeof FinanceNotificationsRoute
   FinancePayrollRoute: typeof FinancePayrollRoute
   FinancePayrollSettingsRoute: typeof FinancePayrollSettingsRoute
   FinanceProfileRoute: typeof FinanceProfileRoute
@@ -1839,6 +1878,7 @@ interface FinanceRouteChildren {
 
 const FinanceRouteChildren: FinanceRouteChildren = {
   FinanceAdvancesRoute: FinanceAdvancesRoute,
+  FinanceNotificationsRoute: FinanceNotificationsRoute,
   FinancePayrollRoute: FinancePayrollRoute,
   FinancePayrollSettingsRoute: FinancePayrollSettingsRoute,
   FinanceProfileRoute: FinanceProfileRoute,
@@ -1854,6 +1894,7 @@ interface ManagerRouteChildren {
   ManagerChatRoute: typeof ManagerChatRoute
   ManagerCheckRoute: typeof ManagerCheckRoute
   ManagerLeavesRoute: typeof ManagerLeavesRoute
+  ManagerNotificationsRoute: typeof ManagerNotificationsRoute
   ManagerProfileRoute: typeof ManagerProfileRoute
   ManagerTasksRoute: typeof ManagerTasksRoute
   ManagerTeamRoute: typeof ManagerTeamRoute
@@ -1866,6 +1907,7 @@ const ManagerRouteChildren: ManagerRouteChildren = {
   ManagerChatRoute: ManagerChatRoute,
   ManagerCheckRoute: ManagerCheckRoute,
   ManagerLeavesRoute: ManagerLeavesRoute,
+  ManagerNotificationsRoute: ManagerNotificationsRoute,
   ManagerProfileRoute: ManagerProfileRoute,
   ManagerTasksRoute: ManagerTasksRoute,
   ManagerTeamRoute: ManagerTeamRoute,
