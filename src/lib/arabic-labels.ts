@@ -1,0 +1,165 @@
+const POSITION_AR_MAP: Record<string, string> = {
+  "crm specialist": "أخصائي إدارة علاقات العملاء (CRM)",
+  "crm": "أخصائي إدارة علاقات العملاء (CRM)",
+  "accountant": "محاسب",
+  "senior accountant": "محاسب أول",
+  "junior accountant": "محاسب مبتدئ",
+  "chief accountant": "رئيس حسابات",
+  "financial manager": "مدير مالي",
+  "finance manager": "مدير مالي",
+  "finance specialist": "أخصائي مالي",
+  "financial analyst": "محلل مالي",
+  "hr specialist": "أخصائي موارد بشرية",
+  "hr manager": "مدير موارد بشرية",
+  "hr generalist": "مسؤول موارد بشرية",
+  "hr coordinator": "منسق موارد بشرية",
+  "talent acquisition specialist": "أخصائي توظيف",
+  "recruiter": "مسؤول توظيف",
+  "software engineer": "مهندس برمجيات",
+  "senior software engineer": "مهندس برمجيات أول",
+  "frontend developer": "مطور واجهات أمامية",
+  "backend developer": "مطور واجهات خلفية",
+  "full stack developer": "مطور شامل",
+  "mobile developer": "مطور تطبيقات جوال",
+  "qa engineer": "مهندس جودة واختبارات",
+  "devops engineer": "مهندس تشغيل وتطوير (DevOps)",
+  "system administrator": "مسؤول أنظمة",
+  "network engineer": "مهندس شبكات",
+  "telecom engineer": "مهندس اتصالات",
+  "technical support": "أخصائي دعم فني",
+  "it specialist": "أخصائي تكنولوجيا المعلومات",
+  "it manager": "مدير تكنولوجيا المعلومات",
+  "sales specialist": "أخصائي مبيعات",
+  "sales executive": "مسؤول مبيعات",
+  "sales manager": "مدير مبيعات",
+  "sales representative": "مندوب مبيعات",
+  "account manager": "مدير حسابات عملاء",
+  "business development": "أخصائي تطوير أعمال",
+  "business development manager": "مدير تطوير أعمال",
+  "marketing specialist": "أخصائي تسويق",
+  "marketing manager": "مدير تسويق",
+  "digital marketing specialist": "أخصائي تسويق رقمي",
+  "graphic designer": "مصمم جرافيك",
+  "operations manager": "مدير عمليات",
+  "operations specialist": "أخصائي عمليات",
+  "project manager": "مدير مشاريع",
+  "product manager": "مدير منتج",
+  "customer service": "أخصائي خدمة عملاء",
+  "customer support": "أخصائي دعم عملاء",
+  "administrative assistant": "مساعد إداري",
+  "admin assistant": "مساعد إداري",
+  "secretary": "سكرتير",
+  "executive secretary": "سكرتير تنفيذي",
+  "office manager": "مدير مكتب",
+  "driver": "سائق",
+  "security": "مسؤول أمن",
+  "security guard": "حارس أمن",
+  "legal counsel": "مستشار قانوني",
+  "legal advisor": "مستشار قانوني",
+  "lawyer": "محامي",
+  "procurement specialist": "أخصائي مشتريات",
+  "purchasing specialist": "أخصائي مشتريات",
+  "purchasing manager": "مدير مشتريات",
+  "logistics specialist": "أخصائي لوجستيات",
+  "warehouse keeper": "أمين مستودع",
+  "storekeeper": "أمين مخزن",
+};
+
+const DEPARTMENT_AR_MAP: Record<string, string> = {
+  "crm": "إدارة علاقات العملاء",
+  "crm department": "إدارة علاقات العملاء",
+  "crm & customer care": "إدارة علاقات وخدمة العملاء",
+  "customer relationship management": "إدارة علاقات العملاء",
+  "customer care": "خدمة العملاء",
+  "customer support": "دعم العملاء",
+  "customer service": "خدمة العملاء",
+  "call center": "مركز الاتصال",
+  "customer experience": "تجربة العملاء",
+  "technical": "الإدارة الفنية",
+  "technical department": "الإدارة الفنية",
+  "technical administration": "الإدارة الفنية",
+  "technical support": "الدعم الفني",
+  "technical office": "المكتب الفني",
+  "engineering": "الإدارة الهندسية",
+  "engineering department": "الإدارة الهندسية",
+  "networks": "الشبكات والاتصالات",
+  "networking": "الشبكات والاتصالات",
+  "telecom": "الاتصالات",
+  "telecommunications": "الاتصالات",
+  "it": "تكنولوجيا المعلومات",
+  "it department": "تكنولوجيا المعلومات",
+  "information technology": "تكنولوجيا المعلومات",
+  "software development": "تطوير البرمجيات",
+  "development": "التطوير البرمجي",
+  "hr": "الموارد البشرية",
+  "human resources": "الموارد البشرية",
+  "personnel": "شؤون العاملين",
+  "public relations": "العلاقات العامة",
+  "pr": "العلاقات العامة",
+  "finance": "الإدارة المالية",
+  "financial": "الإدارة المالية",
+  "finance & accounting": "الإدارة المالية والحسابات",
+  "accounting": "الحسابات",
+  "accounts": "الحسابات",
+  "sales": "إدارة المبيعات",
+  "sales department": "إدارة المبيعات",
+  "commercial": "القطاع التجاري",
+  "commercial sector": "القطاع التجاري",
+  "marketing": "إدارة التسويق",
+  "marketing department": "إدارة التسويق",
+  "digital marketing": "التسويق الرقمي",
+  "operations": "إدارة العمليات والتشغيل",
+  "operation": "إدارة العمليات",
+  "operations & maintenance": "التشغيل والصيانة",
+  "maintenance": "إدارة الصيانة",
+  "legal": "الشؤون القانونية",
+  "legal affairs": "الشؤون القانونية",
+  "procurement": "المشتريات",
+  "purchasing": "المشتريات",
+  "logistics": "اللوجستيات والإمداد",
+  "supply chain": "سلاسل الإمداد",
+  "warehouse": "المخازن والمستودعات",
+  "stores": "المخازن",
+  "administration": "الشؤون الإدارية",
+  "administrative": "الشؤون الإدارية",
+  "admin": "الشؤون الإدارية",
+  "management": "الإدارة العامة",
+  "general management": "الإدارة العامة",
+  "executive management": "الإدارة التنفيذية",
+  "ceo office": "مكتب الإدارة التنفيذية",
+  "board": "مجلس الإدارة",
+  "audit": "المراجعة الداخلية",
+  "internal audit": "المراجعة الداخلية",
+  "quality": "إدارة الجودة",
+  "quality control": "مراقبة الجودة",
+  "qc": "مراقبة الجودة",
+  "qa": "تأكيد الجودة",
+  "security": "إدارة الأمن والحراسة",
+};
+
+function hasArabic(str?: string | null): boolean {
+  if (!str) return false;
+  return /[\u0600-\u06FF]/.test(str);
+}
+
+export function getArabicPosition(e?: { position?: string | null; position_ar?: string | null } | null): string {
+  if (!e) return "—";
+  if (hasArabic(e.position_ar)) return e.position_ar!.trim();
+  if (hasArabic(e.position)) return e.position!.trim();
+  const raw = (e.position_ar || e.position || "").trim().toLowerCase();
+  if (POSITION_AR_MAP[raw]) return POSITION_AR_MAP[raw];
+  const clean = raw.replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim();
+  if (POSITION_AR_MAP[clean]) return POSITION_AR_MAP[clean];
+  return e.position_ar?.trim() || e.position?.trim() || "—";
+}
+
+export function getArabicDepartment(e?: { department?: string | null; department_ar?: string | null } | null): string {
+  if (!e) return "—";
+  if (hasArabic(e.department_ar)) return e.department_ar!.trim();
+  if (hasArabic(e.department)) return e.department!.trim();
+  const raw = (e.department_ar || e.department || "").trim().toLowerCase();
+  if (DEPARTMENT_AR_MAP[raw]) return DEPARTMENT_AR_MAP[raw];
+  const clean = raw.replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim();
+  if (DEPARTMENT_AR_MAP[clean]) return DEPARTMENT_AR_MAP[clean];
+  return e.department_ar?.trim() || e.department?.trim() || "—";
+}

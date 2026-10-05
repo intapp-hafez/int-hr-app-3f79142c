@@ -7,6 +7,7 @@ import { listEmployeeCustody } from "@/backend/functions/custody.functions";
 import { listAdvancesForHR } from "@/backend/functions/advances.functions";
 import { formatDate, todayISO } from "@/lib/date-format";
 import { AppLogo } from "@/components/AppLogo";
+import { getArabicPosition, getArabicDepartment } from "@/lib/arabic-labels";
 
 const inputCls =
   "w-full rounded-xl border border-input bg-card px-3 py-2 text-sm outline-none focus:border-ring";
@@ -59,131 +60,163 @@ export function EmployeePicker({ picker, label = "Employee" }: { picker: ReturnT
   const selectedEmp = picker.employees.find((e: any) => e.id === picker.employeeId) || (picker.detail as any);
 
   return (
-    <div className="print:hidden flex flex-col gap-3 sm:flex-row sm:items-end">
-      <div className="relative flex-1 max-w-lg" ref={containerRef}>
-        <label className="mb-1 block text-xs font-semibold text-muted-foreground">{label}</label>
+    <div className="print:hidden space-y-2.5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="relative flex-1 max-w-xl" ref={containerRef}>
+          <label className="mb-1 block text-xs font-semibold text-muted-foreground">{label}</label>
 
-        {/* Trigger button */}
-        <button
-          type="button"
-          onClick={() => setIsOpen((prev) => !prev)}
-          className={`flex h-10 w-full items-center justify-between rounded-xl border bg-card px-3 text-sm text-left transition focus:outline-none focus:ring-2 focus:ring-ring ${
-            isOpen ? "border-brand ring-2 ring-brand/20" : "border-input hover:border-muted-foreground/40"
-          }`}
-        >
-          <div className="flex items-center gap-2 truncate">
-            <User className="h-4 w-4 shrink-0 text-muted-foreground" />
-            {selectedEmp ? (
-              <span className="font-medium text-foreground truncate">
-                {selectedEmp.full_name}
-                {selectedEmp.emp_code ? (
-                  <span className="ms-1.5 rounded bg-muted px-1.5 py-0.5 text-xs font-normal text-muted-foreground">
-                    {selectedEmp.emp_code}
-                  </span>
-                ) : null}
-              </span>
-            ) : (
-              <span className="text-muted-foreground">Select employee…</span>
-            )}
-          </div>
-          <div className="flex items-center gap-1">
-            {picker.employeeId && (
-              <span
-                role="button"
-                tabIndex={0}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  picker.setEmployeeId("");
-                }}
-                className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                title="Clear"
-              >
-                <X className="h-3.5 w-3.5" />
-              </span>
-            )}
-            <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
-          </div>
-        </button>
-
-        {/* Dropdown Menu with Search Option Inside List */}
-        {isOpen && (
-          <div className="absolute start-0 top-full z-50 mt-1.5 w-full rounded-xl border border-border bg-popover p-2 text-popover-foreground shadow-lg animate-in fade-in-50 zoom-in-95">
-            {/* Search option inside list */}
-            <div className="relative mb-2">
-              <Search className="pointer-events-none absolute start-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <input
-                ref={searchInputRef}
-                className="w-full rounded-lg border border-input bg-card py-1.5 pe-8 ps-8 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
-                placeholder="Search employee by name or code…"
-                value={picker.q}
-                onChange={(e) => picker.setQ(e.target.value)}
-              />
-              {picker.q && (
-                <button
-                  type="button"
-                  onClick={() => picker.setQ("")}
-                  className="absolute end-2 top-2 rounded p-0.5 text-muted-foreground hover:text-foreground"
-                  title="Clear search"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </div>
-
-            {/* List options */}
-            <div className="max-h-60 overflow-y-auto space-y-0.5">
-              {picker.listLoading && picker.employees.length === 0 ? (
-                <div className="flex items-center justify-center py-6 text-xs text-muted-foreground gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-brand" />
-                  <span>Searching employees…</span>
-                </div>
-              ) : picker.employees.length === 0 ? (
-                <div className="py-6 text-center text-xs text-muted-foreground">
-                  No employees found matching "{picker.q}"
+          {/* Trigger button */}
+          <button
+            type="button"
+            onClick={() => setIsOpen((prev) => !prev)}
+            className={`flex min-h-[46px] w-full items-center justify-between rounded-xl border bg-card px-3 py-1.5 text-sm text-left transition focus:outline-none focus:ring-2 focus:ring-ring ${
+              isOpen ? "border-brand ring-2 ring-brand/20" : "border-input hover:border-muted-foreground/40"
+            }`}
+          >
+            <div className="flex items-center gap-2.5 truncate">
+              <User className="h-4 w-4 shrink-0 text-muted-foreground" />
+              {selectedEmp ? (
+                <div className="flex flex-col text-start truncate leading-tight">
+                  <div className="flex items-center gap-2 truncate">
+                    <span className="font-semibold text-foreground truncate">
+                      {selectedEmp.full_name_ar || selectedEmp.full_name}
+                    </span>
+                    {selectedEmp.full_name_ar && selectedEmp.full_name && selectedEmp.full_name !== selectedEmp.full_name_ar && (
+                      <span className="text-xs text-muted-foreground truncate hidden sm:inline">
+                        ({selectedEmp.full_name})
+                      </span>
+                    )}
+                    {selectedEmp.emp_code ? (
+                      <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] font-mono font-medium text-muted-foreground">
+                        {selectedEmp.emp_code}
+                      </span>
+                    ) : null}
+                  </div>
+                  {(selectedEmp.position || selectedEmp.department) && (
+                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground truncate mt-0.5">
+                      {selectedEmp.position && <span className="font-medium text-foreground/80">{selectedEmp.position}</span>}
+                      {selectedEmp.position && selectedEmp.department && <span>·</span>}
+                      {selectedEmp.department && <span>{selectedEmp.department}</span>}
+                    </div>
+                  )}
                 </div>
               ) : (
-                picker.employees.map((e: any) => {
-                  const isSelected = e.id === picker.employeeId;
-                  return (
-                    <button
-                      key={e.id}
-                      type="button"
-                      onClick={() => {
-                        picker.setEmployeeId(e.id);
-                        setIsOpen(false);
-                      }}
-                      className={`flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-sm transition text-left ${
-                        isSelected
-                          ? "bg-brand/10 text-brand font-medium"
-                          : "hover:bg-muted text-foreground"
-                      }`}
-                    >
-                      <div className="flex flex-col truncate">
-                        <span className="truncate">{e.full_name}</span>
-                        {(e.emp_code || e.department || e.position) && (
-                          <span className="text-[11px] text-muted-foreground truncate">
-                            {[e.emp_code && `Code: ${e.emp_code}`, e.position, e.department].filter(Boolean).join(" · ")}
-                          </span>
-                        )}
-                      </div>
-                      {isSelected && <Check className="h-4 w-4 shrink-0 text-brand ms-2" />}
-                    </button>
-                  );
-                })
+                <span className="text-muted-foreground">Select employee…</span>
               )}
             </div>
-          </div>
-        )}
-      </div>
+            <div className="flex items-center gap-1 shrink-0 ms-2">
+              {picker.employeeId && (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    picker.setEmployeeId("");
+                  }}
+                  className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  title="Clear"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </span>
+              )}
+              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+            </div>
+          </button>
 
-      {/* Print Button */}
-      <button
-        disabled={!picker.employeeId}
-        onClick={() => window.print()}
-        className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-gradient-brand px-5 text-sm font-semibold text-brand-foreground shadow-brand disabled:opacity-40"
-      >
-        <Printer className="h-4 w-4" /> Print
-      </button>
+          {/* Dropdown Menu with Search Option Inside List */}
+          {isOpen && (
+            <div className="absolute start-0 top-full z-50 mt-1.5 w-full rounded-xl border border-border bg-popover p-2 text-popover-foreground shadow-lg animate-in fade-in-50 zoom-in-95">
+              {/* Search option inside list */}
+              <div className="relative mb-2">
+                <Search className="pointer-events-none absolute start-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <input
+                  ref={searchInputRef}
+                  className="w-full rounded-lg border border-input bg-card py-1.5 pe-8 ps-8 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+                  placeholder="Search employee by Arabic name, English name, or code…"
+                  value={picker.q}
+                  onChange={(e) => picker.setQ(e.target.value)}
+                />
+                {picker.q && (
+                  <button
+                    type="button"
+                    onClick={() => picker.setQ("")}
+                    className="absolute end-2 top-2 rounded p-0.5 text-muted-foreground hover:text-foreground"
+                    title="Clear search"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* List options */}
+              <div className="max-h-60 overflow-y-auto space-y-0.5">
+                {picker.listLoading && picker.employees.length === 0 ? (
+                  <div className="flex items-center justify-center py-6 text-xs text-muted-foreground gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin text-brand" />
+                    <span>Searching employees…</span>
+                  </div>
+                ) : picker.employees.length === 0 ? (
+                  <div className="py-6 text-center text-xs text-muted-foreground">
+                    No employees found matching "{picker.q}"
+                  </div>
+                ) : (
+                  picker.employees.map((e: any) => {
+                    const isSelected = e.id === picker.employeeId;
+                    return (
+                      <button
+                        key={e.id}
+                        type="button"
+                        onClick={() => {
+                          picker.setEmployeeId(e.id);
+                          setIsOpen(false);
+                        }}
+                        className={`flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-sm transition text-left ${
+                          isSelected
+                            ? "bg-brand/10 text-brand font-medium"
+                            : "hover:bg-muted text-foreground"
+                        }`}
+                      >
+                        <div className="flex flex-col truncate">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold truncate">
+                              {e.full_name_ar || e.full_name}
+                            </span>
+                            {e.full_name_ar && e.full_name && e.full_name !== e.full_name_ar && (
+                              <span className="text-xs text-muted-foreground truncate font-normal">
+                                ({e.full_name})
+                              </span>
+                            )}
+                            {e.emp_code && (
+                              <span className="rounded bg-muted px-1.5 py-0.2 text-[10px] font-mono text-muted-foreground">
+                                {e.emp_code}
+                              </span>
+                            )}
+                          </div>
+                          {(e.position || e.department) && (
+                            <div className="text-[11px] text-muted-foreground truncate mt-0.5">
+                              {[e.position, e.department].filter(Boolean).join(" · ")}
+                            </div>
+                          )}
+                        </div>
+                        {isSelected && <Check className="h-4 w-4 shrink-0 text-brand ms-2" />}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Print Button */}
+        <button
+          disabled={!picker.employeeId}
+          onClick={() => window.print()}
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-gradient-brand px-5 text-sm font-semibold text-brand-foreground shadow-brand disabled:opacity-40"
+        >
+          <Printer className="h-4 w-4" /> Print
+        </button>
+      </div>
     </div>
   );
 }
@@ -224,14 +257,6 @@ function InfoRow({ label, value }: { label: string; value?: string | number | nu
 }
 
 export function EmployeeDocName({ e }: { e: any }) {
-  if (e.full_name_ar && e.full_name) {
-    return (
-      <span className="inline-flex flex-col items-center align-middle mx-1 leading-tight">
-        <span>{e.full_name_ar}</span>
-        <span className="text-xs font-normal text-gray-500 font-sans tracking-wide mt-1">{e.full_name}</span>
-      </span>
-    );
-  }
   return <span className="mx-1">{e.full_name_ar || e.full_name}</span>;
 }
 
@@ -274,7 +299,7 @@ export function ExperienceCertificate() {
           <p className="mb-4 text-sm leading-8 text-justify">
             تشهد إدارة الشركة بأن {e.gender === "female" ? "السيدة" : "السيد"}/ <strong className="inline-flex items-center"><EmployeeDocName e={e} /></strong>
             {e.national_id ? <> (بطاقة رقم قومي: <strong>{e.national_id}</strong>)</> : ""}
-            ، قد {e.gender === "female" ? "عملت / تعمل" : "عمل / يعمل"} لدينا بوظيفة <strong>{e.position ?? "—"}</strong> بقسم <strong>{e.department ?? "—"}</strong>
+            ، قد {e.gender === "female" ? "عملت / تعمل" : "عمل / يعمل"} لدينا بوظيفة <strong><EditableText value={getArabicPosition(e) !== "—" ? getArabicPosition(e) : "أخصائي"} /></strong> بقسم <strong><EditableText value={getArabicDepartment(e) !== "—" ? getArabicDepartment(e) : "الإدارة العامة"} /></strong>
             {e.contract_start_date ? (
               <> اعتباراً من تاريخ <strong>{formatDate(e.contract_start_date)}</strong></>
             ) : null}
@@ -296,8 +321,8 @@ export function ExperienceCertificate() {
           <InfoRow label="كود الموظف" value={e.emp_code} />
           <InfoRow label="الاسم بالكامل" value={e.full_name_ar || e.full_name} />
           <InfoRow label="الرقم القومي" value={e.national_id} />
-          <InfoRow label="المسمى الوظيفي" value={e.position} />
-          <InfoRow label="القسم / الإدارة" value={e.department} />
+          <InfoRow label="المسمى الوظيفي" value={getArabicPosition(e) !== "—" ? getArabicPosition(e) : "أخصائي"} />
+          <InfoRow label="القسم / الإدارة" value={getArabicDepartment(e) !== "—" ? getArabicDepartment(e) : "الإدارة العامة"} />
           <InfoRow label="نوع التعاقد" value={e.contract_type} />
           <InfoRow label="تاريخ بداية العمل" value={formatDate(e.contract_start_date)} />
           {e.contract_end_date && <InfoRow label="تاريخ نهاية العمل" value={formatDate(e.contract_end_date)} />}
@@ -366,7 +391,7 @@ export function SalaryCertificate() {
               </div>
 
               <p className="text-justify text-gray-800">
-                وأن {e.gender === "female" ? "الموظفة تعمل" : "الموظف يعمل"} بالهيكل الادارى بوظيفة <strong className="text-xl">{e.position ?? "................................"}</strong> ، وذلك فى الفترة من تاريخ <strong>{e.contract_start_date ? formatDate(e.contract_start_date) : "................................"}</strong> وحتى الان بعقد يجدد تلقائياً كل سنه ، وان صافي راتب{e.gender === "female" ? "ها" : "ه"} الشهرى <strong className="text-brand print:text-black font-bold text-xl px-1">{fmtMoney(e.salary_net)}</strong>
+                وأن {e.gender === "female" ? "الموظفة تعمل" : "الموظف يعمل"} بالهيكل الادارى بإدارة / قسم <strong className="text-xl"><EditableText value={getArabicDepartment(e) !== "—" ? getArabicDepartment(e) : "الإدارة العامة"} /></strong> بوظيفة <strong className="text-xl"><EditableText value={getArabicPosition(e) !== "—" ? getArabicPosition(e) : "أخصائي"} /></strong> ، وذلك فى الفترة من تاريخ <strong>{e.contract_start_date ? formatDate(e.contract_start_date) : "................................"}</strong> وحتى الان بعقد يجدد تلقائياً كل سنه ، وان صافي راتب{e.gender === "female" ? "ها" : "ه"} الشهرى <strong className="text-brand print:text-black font-bold text-xl px-1">{fmtMoney(e.salary_net)}</strong>
                 <br />
                 <span className="text-gray-600">(فقط لاغير).</span>
               </p>
@@ -432,11 +457,41 @@ export function AdvancesAcknowledgment() {
           <p className="mb-4 text-sm leading-8 text-justify">
             أقر أنا الموقع أدناه <strong className="inline-flex items-center"><EmployeeDocName e={e} /></strong>
             {e.national_id ? <> (بطاقة رقم قومي: <strong>{e.national_id}</strong>)</> : null}،
-            {e.gender === "female" ? "الموظفة" : "الموظف"} بوظيفة <strong>{e.position ?? "—"}</strong> بقسم <strong>{e.department ?? "—"}</strong>،
+            {e.gender === "female" ? "الموظفة" : "الموظف"} بوظيفة <strong><EditableText value={getArabicPosition(e) !== "—" ? getArabicPosition(e) : "أخصائي"} /></strong> بقسم <strong><EditableText value={getArabicDepartment(e) !== "—" ? getArabicDepartment(e) : "الإدارة العامة"} /></strong>،
             بأنني مدين{e.gender === "female" ? "ة" : ""} للشركة بالسلف المالية الموضحة في الجدول أدناه بإجمالي مبلغ متبقي قدره (<strong>{fmtMoney(totalAdvance)} ج.م</strong>)،
             وأتعهد بسداد هذا المبلغ طبقاً للأقساط المحددة، وفي حالة تركي للعمل أو انتهاء خدمتي بالشركة لأي سبب من الأسباب
             تصبح كافة المبالغ المتبقية مستحقة السداد فوراً، وأوافق دون قيد أو شرط على خصمها من مستحقاتي أو مكافآتي طرف الشركة.
           </p>
+
+          <div className="mb-6 rounded-xl border border-gray-300 p-4 bg-gray-50/50">
+            <h3 className="mb-3 font-bold text-gray-800 text-base border-b pb-1.5">بيانات الموظف المقر</h3>
+            <div className="grid grid-cols-2 gap-y-2.5 gap-x-6 text-sm">
+              <div className="flex justify-between border-b border-gray-200 pb-1">
+                <span className="font-semibold text-gray-600">الاسم:</span>
+                <span className="font-bold text-gray-900">{e.full_name_ar || e.full_name || "—"}</span>
+              </div>
+              <div className="flex justify-between border-b border-gray-200 pb-1">
+                <span className="font-semibold text-gray-600">الرقم الوظيفي (الكود):</span>
+                <span className="font-mono font-bold">{e.emp_code || "—"}</span>
+              </div>
+              <div className="flex justify-between border-b border-gray-200 pb-1">
+                <span className="font-semibold text-gray-600">القسم / الإدارة:</span>
+                <EditableText value={getArabicDepartment(e) !== "—" ? getArabicDepartment(e) : "الإدارة العامة"} className="font-bold" />
+              </div>
+              <div className="flex justify-between border-b border-gray-200 pb-1">
+                <span className="font-semibold text-gray-600">الوظيفة:</span>
+                <EditableText value={getArabicPosition(e) !== "—" ? getArabicPosition(e) : "أخصائي"} className="font-bold" />
+              </div>
+              <div className="flex justify-between border-b border-gray-200 pb-1">
+                <span className="font-semibold text-gray-600">الرقم القومي:</span>
+                <span className="font-mono font-bold">{e.national_id || "—"}</span>
+              </div>
+              <div className="flex justify-between border-b border-gray-200 pb-1">
+                <span className="font-semibold text-gray-600">تاريخ التعيين:</span>
+                <span className="font-bold">{e.contract_start_date ? formatDate(e.contract_start_date) : "—"}</span>
+              </div>
+            </div>
+          </div>
 
           <h3 className="mb-2 mt-6 font-bold text-gray-800">بيان السلف المالية القائمة</h3>
           {advances.length === 0 ? (
@@ -526,12 +581,42 @@ export function CustodyAcknowledgment() {
           <p className="mb-4 text-sm leading-8 text-justify">
             أقر أنا الموقع أدناه <strong className="inline-flex items-center"><EmployeeDocName e={e} /></strong>
             {e.national_id ? <> (بطاقة رقم قومي: <strong>{e.national_id}</strong>)</> : null}،
-            {e.gender === "female" ? "الموظفة" : "الموظف"} بوظيفة <strong>{e.position ?? "—"}</strong> بقسم <strong>{e.department ?? "—"}</strong>،
+            {e.gender === "female" ? "الموظفة" : "الموظف"} بوظيفة <strong><EditableText value={getArabicPosition(e) !== "—" ? getArabicPosition(e) : "أخصائي"} /></strong> بقسم <strong><EditableText value={getArabicDepartment(e) !== "—" ? getArabicDepartment(e) : "الإدارة العامة"} /></strong>،
             بأنني استلمت العهد والأجهزة والأدوات الموضحة أدناه بحالة جيدة وصالحة للاستعمال، وأتعهد بالمحافظة عليها
             واستخدامها فقط في أغراض العمل الموكلة إليّ، كما أتعهد بردها بالحالة التي استلمتها بها فور طلبها أو عند
             انتهاء علاقة العمل بالشركة، وفي حالة فقدها أو تلفها نتيجة الإهمال أو التقصير أتحمل قيمتها كاملة دون أدنى اعتراض،
             وللشركة الحق في خصم قيمتها من مستحقاتي.
           </p>
+
+          <div className="mb-6 rounded-xl border border-gray-300 p-4 bg-gray-50/50">
+            <h3 className="mb-3 font-bold text-gray-800 text-base border-b pb-1.5">بيانات الموظف المستلم للعهدة</h3>
+            <div className="grid grid-cols-2 gap-y-2.5 gap-x-6 text-sm">
+              <div className="flex justify-between border-b border-gray-200 pb-1">
+                <span className="font-semibold text-gray-600">الاسم:</span>
+                <span className="font-bold text-gray-900">{e.full_name_ar || e.full_name || "—"}</span>
+              </div>
+              <div className="flex justify-between border-b border-gray-200 pb-1">
+                <span className="font-semibold text-gray-600">الرقم الوظيفي (الكود):</span>
+                <span className="font-mono font-bold">{e.emp_code || "—"}</span>
+              </div>
+              <div className="flex justify-between border-b border-gray-200 pb-1">
+                <span className="font-semibold text-gray-600">القسم / الإدارة:</span>
+                <EditableText value={getArabicDepartment(e) !== "—" ? getArabicDepartment(e) : "الإدارة العامة"} className="font-bold" />
+              </div>
+              <div className="flex justify-between border-b border-gray-200 pb-1">
+                <span className="font-semibold text-gray-600">الوظيفة:</span>
+                <EditableText value={getArabicPosition(e) !== "—" ? getArabicPosition(e) : "أخصائي"} className="font-bold" />
+              </div>
+              <div className="flex justify-between border-b border-gray-200 pb-1">
+                <span className="font-semibold text-gray-600">الرقم القومي:</span>
+                <span className="font-mono font-bold">{e.national_id || "—"}</span>
+              </div>
+              <div className="flex justify-between border-b border-gray-200 pb-1">
+                <span className="font-semibold text-gray-600">تاريخ التعيين:</span>
+                <span className="font-bold">{e.contract_start_date ? formatDate(e.contract_start_date) : "—"}</span>
+              </div>
+            </div>
+          </div>
 
           <h3 className="mb-2 mt-6 font-bold text-gray-800">بيان العهد المستلمة</h3>
           {custody.length === 0 ? (
@@ -615,104 +700,421 @@ export function LoanRequestForm() {
       ) : loading || !e ? (
         <p className="py-10 text-center text-sm text-muted-foreground">Loading…</p>
       ) : (
-        <DocShell>
-          <div className="mb-6 flex justify-between items-end border-b-2 border-gray-800 pb-2">
-            <div>
-              <h2 className="text-2xl font-black text-gray-900">طلب سلفة مالية</h2>
-              <p className="text-sm font-semibold text-gray-600 mt-1">Loan / Advance Request Form</p>
-            </div>
-            <div className="text-left text-sm font-medium">
-              <p>التاريخ: {formatDate(todayISO())}</p>
-            </div>
-          </div>
-
-          <div className="mb-6 rounded-lg border border-gray-300 p-4 shadow-sm bg-gray-50/50">
-            <h3 className="mb-3 font-bold text-gray-800 text-lg border-b pb-1">بيانات الموظف / Employee Details</h3>
-            <div className="grid grid-cols-2 gap-y-3 gap-x-6 text-sm">
-              <div className="flex justify-between border-b border-gray-200 pb-1">
-                <span className="font-semibold text-gray-600">الاسم:</span>
-                <span className="font-bold inline-flex items-center"><EmployeeDocName e={e} /></span>
-              </div>
-              <div className="flex justify-between border-b border-gray-200 pb-1">
-                <span className="font-semibold text-gray-600">الرقم الوظيفي:</span>
-                <span className="font-bold">{e.emp_code || "—"}</span>
-              </div>
-              <div className="flex justify-between border-b border-gray-200 pb-1">
-                <span className="font-semibold text-gray-600">الوظيفة:</span>
-                <span className="font-bold">{e.position || "—"}</span>
-              </div>
-              <div className="flex justify-between border-b border-gray-200 pb-1">
-                <span className="font-semibold text-gray-600">الإدارة/القسم:</span>
-                <span className="font-bold">{e.department || "—"}</span>
-              </div>
-              <div className="flex justify-between border-b border-gray-200 pb-1">
-                <span className="font-semibold text-gray-600">تاريخ التعيين:</span>
-                <span className="font-bold">{e.contract_start_date ? formatDate(e.contract_start_date) : "—"}</span>
-              </div>
-              <div className="flex justify-between border-b border-gray-200 pb-1">
-                <span className="font-semibold text-gray-600">الراتب الأساسي:</span>
-                <span className="font-bold">{fmtMoney(e.salary_net ?? e.salary_gross)} ج.م</span>
-              </div>
+        <DocShell formCode="21 Loan طلب سلفة">
+          {/* Header matching PDF 21 Loan طلب سلفة */}
+          <div className="flex justify-between items-center pb-2 mb-3 border-b-2 border-black">
+            <AppLogo className="h-10 w-auto" />
+            <div className="text-center flex-1 pr-6">
+              <h1 className="text-2xl font-black tracking-wide text-black inline-flex items-center gap-3">
+                <span>طلب سـلـفـــــة</span>
+                <span className="text-gray-400 font-normal">/</span>
+                <span className="font-sans text-xl font-bold tracking-normal">Loan request</span>
+              </h1>
             </div>
           </div>
 
-          <div className="mb-6 rounded-lg border border-gray-300 p-4 shadow-sm">
-            <h3 className="mb-3 font-bold text-gray-800 text-lg border-b pb-1">بيانات السلفة المطلوبة / Requested Loan Details</h3>
-            <div className="grid grid-cols-1 gap-4 text-sm mt-2">
-              <div className="flex items-center gap-4">
-                <span className="font-semibold w-40">قيمة السلفة المطلوبة:</span>
-                <div className="flex-1 border-b-2 border-dotted border-gray-400 h-6"></div>
-                <span>ج.م</span>
+          {/* Form Box with 5 Numbered Sections */}
+          <div className="border-[2px] border-black text-xs text-black bg-white">
+            {/* Section 1: بيانات الموظف / Emp. Data */}
+            <div className="flex border-b-2 border-black">
+              {/* Right vertical badge */}
+              <div className="w-8 shrink-0 border-l-2 border-black bg-gray-100 flex flex-col items-center justify-between py-1 font-bold text-[11px] select-none text-black">
+                <span>1</span>
+                <span className="[writing-mode:vertical-rl] rotate-180 py-1 tracking-wider whitespace-nowrap text-[10px]">بيانات الموظف</span>
+                <span>1</span>
               </div>
-              <div className="flex items-center gap-4">
-                <span className="font-semibold w-40">أسباب الطلب:</span>
-                <div className="flex-1 border-b-2 border-dotted border-gray-400 h-6"></div>
-              </div>
-              <div className="flex items-center gap-4 mt-2">
-                <div className="flex-1 border-b-2 border-dotted border-gray-400 h-6"></div>
-              </div>
-              <div className="flex items-center gap-4 mt-2">
-                <span className="font-semibold w-40">طريقة السداد المقترحة:</span>
-                <div className="flex-1 border-b-2 border-dotted border-gray-400 h-6 flex items-end pb-1 justify-center text-gray-500">
-                  (تخصم على عدد ........ أقساط شهرية)
+
+              {/* Section 1 Content */}
+              <div className="flex-1 p-2 space-y-2">
+                <div className="grid grid-cols-12 gap-2 items-center">
+                  <div className="col-span-5 flex items-center gap-1">
+                    <span className="font-bold whitespace-nowrap">الاسم : Name :</span>
+                    <strong className="flex-1 border-b border-dotted border-black px-1 font-bold truncate">
+                      {e.full_name_ar || e.full_name}
+                    </strong>
+                  </div>
+                  <div className="col-span-3 flex items-center gap-1">
+                    <span className="font-bold whitespace-nowrap">الرقـــــــم : . No :</span>
+                    <strong className="flex-1 border-b border-dotted border-black px-1 font-mono font-bold text-center">
+                      {e.emp_code || "—"}
+                    </strong>
+                  </div>
+                  <div className="col-span-4 flex items-center gap-1">
+                    <span className="font-bold whitespace-nowrap">المسمى الوظيفي : Job title :</span>
+                    <span className="flex-1 border-b border-dotted border-black px-1 font-bold truncate">
+                      <EditableText value={getArabicPosition(e) !== "—" ? getArabicPosition(e) : "أخصائي"} />
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 items-center">
+                  <div className="flex items-center gap-1">
+                    <span className="font-bold whitespace-nowrap">القسم : Section :</span>
+                    <span className="flex-1 border-b border-dotted border-black px-1">
+                      <EditableText value={e.section || getArabicDepartment(e) || "—"} />
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="font-bold whitespace-nowrap">الإدارة : Department :</span>
+                    <span className="flex-1 border-b border-dotted border-black px-1 font-bold">
+                      <EditableText value={getArabicDepartment(e) !== "—" ? getArabicDepartment(e) : "الإدارة العامة"} />
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 items-center">
+                  <div className="flex items-center gap-1">
+                    <span className="font-bold whitespace-nowrap">بداية العمل : going date :</span>
+                    <span className="flex-1 border-b border-dotted border-black px-1 font-mono font-bold">
+                      <EditableText value={e.contract_start_date ? formatDate(e.contract_start_date) : "—"} />
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="font-bold whitespace-nowrap">التوقيع : Signature :</span>
+                    <span className="flex-1 border-b border-dotted border-black h-4"></span>
+                  </div>
                 </div>
               </div>
+
+              {/* Left vertical badge */}
+              <div className="w-8 shrink-0 border-r-2 border-black bg-gray-100 flex flex-col items-center justify-between py-1 font-bold text-[11px] select-none font-sans text-black">
+                <span>1</span>
+                <span className="[writing-mode:vertical-rl] rotate-180 py-1 tracking-wider whitespace-nowrap text-[10px]">Emp. Data</span>
+                <span>1</span>
+              </div>
+            </div>
+
+            {/* Section 2: معلومات السلفة / loan info */}
+            <div className="flex border-b-2 border-black">
+              {/* Right vertical badge */}
+              <div className="w-8 shrink-0 border-l-2 border-black bg-gray-100 flex flex-col items-center justify-between py-1 font-bold text-[11px] select-none text-black">
+                <span>2</span>
+                <span className="[writing-mode:vertical-rl] rotate-180 py-1 tracking-wider whitespace-nowrap text-[10px]">معلومات السلفة</span>
+                <span>2</span>
+              </div>
+
+              {/* Section 2 Content */}
+              <div className="flex-1 p-2 space-y-2">
+                <div className="grid grid-cols-2 gap-4 items-center">
+                  <div className="flex items-center gap-1">
+                    <span className="font-bold whitespace-nowrap">الراتب الأساسي : Basic salary :</span>
+                    <strong className="flex-1 border-b border-dotted border-black px-1 font-mono font-bold">
+                      <EditableText value={`${fmtMoney(e.salary_net ?? e.salary_gross)} ج.م`} />
+                    </strong>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="font-bold whitespace-nowrap">قيمة السلفة : Loan explication :</span>
+                    <span className="flex-1 border-b border-dotted border-black px-1 font-mono">
+                      <EditableText value="........................ ج.م" />
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <span className="font-bold whitespace-nowrap">فترة التسديد : payment period :</span>
+                  <span className="flex-1 border-b border-dotted border-black px-1">
+                    <EditableText value="تخصم على عدد ( ...... ) أقساط شهرية متتالية" />
+                  </span>
+                </div>
+              </div>
+
+              {/* Left vertical badge */}
+              <div className="w-8 shrink-0 border-r-2 border-black bg-gray-100 flex flex-col items-center justify-between py-1 font-bold text-[11px] select-none font-sans text-black">
+                <span>2</span>
+                <span className="[writing-mode:vertical-rl] rotate-180 py-1 tracking-wider whitespace-nowrap text-[10px]">loan info.</span>
+                <span>2</span>
+              </div>
+            </div>
+
+            {/* Section 3: الموافقات / Recommend diction' s (Includes الضامن) */}
+            <div className="flex border-b-2 border-black">
+              {/* Right vertical badge */}
+              <div className="w-8 shrink-0 border-l-2 border-black bg-gray-100 flex flex-col items-center justify-between py-1 font-bold text-[11px] select-none text-black">
+                <span>3</span>
+                <span className="[writing-mode:vertical-rl] rotate-180 py-1 tracking-wider whitespace-nowrap text-[10px]">الموافقات</span>
+                <span>3</span>
+              </div>
+
+              {/* Section 3 Content */}
+              <div className="flex-1 divide-y-2 divide-black">
+                {/* 3.1 المدير المباشر */}
+                <div className="p-2 space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-xs">المدير المباشر : Responsible Manager:</span>
+                    <div className="flex items-center gap-6 font-bold text-xs">
+                      <label className="inline-flex items-center gap-1 cursor-pointer">
+                        <input type="checkbox" className="h-3.5 w-3.5 rounded border-black" />
+                        <span>أوافق Approved</span>
+                      </label>
+                      <label className="inline-flex items-center gap-1 cursor-pointer">
+                        <input type="checkbox" className="h-3.5 w-3.5 rounded border-black" />
+                        <span>لا أوافق Not Approved</span>
+                      </label>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs">
+                    <span className="font-bold whitespace-nowrap">ملاحظات : Note’s :</span>
+                    <span className="flex-1 border-b border-dotted border-black h-4"></span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-xs pt-1">
+                    <div className="flex items-center gap-1">
+                      <span className="font-bold whitespace-nowrap">الاسم : name :</span>
+                      <span className="flex-1 border-b border-dotted border-black px-1">
+                        <EditableText value={e.manager_name || "........................"} />
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="font-bold whitespace-nowrap">التوقيع : signature :</span>
+                      <span className="flex-1 border-b border-dotted border-black h-4"></span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="font-bold whitespace-nowrap">التاريخ : Date :</span>
+                      <span className="flex-1 border-b border-dotted border-black px-1 font-mono text-center">
+                        <EditableText value="    /   / 202 " />
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3.2 الضامن (مدير المباشر او رئيس قسم او زميل) - GUARANTOR */}
+                <div className="p-2 space-y-1.5 bg-yellow-50/20 print:bg-transparent">
+                  <div className="flex justify-between items-center">
+                    <div className="font-bold text-xs flex items-center gap-2">
+                      <span className="text-black">الضامن (مدير المباشر او رئيس قسم او زميل) :</span>
+                      <span className="font-sans font-normal text-[11px] text-gray-700">Personnel Dept.:</span>
+                    </div>
+                    <div className="flex items-center gap-4 font-bold text-xs">
+                      <label className="inline-flex items-center gap-1 cursor-pointer">
+                        <input type="checkbox" className="h-3.5 w-3.5 rounded border-black" />
+                        <span>أوافق</span>
+                      </label>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs">
+                    <span className="font-bold whitespace-nowrap">ملاحظات : Note’s :</span>
+                    <span className="flex-1 border-b border-dotted border-black h-4"></span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-xs pt-1">
+                    <div className="flex items-center gap-1">
+                      <span className="font-bold whitespace-nowrap">الاسم : name :</span>
+                      <span className="flex-1 border-b border-dotted border-black px-1">
+                        <EditableText value="................................" />
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="font-bold whitespace-nowrap">التوقيع : signature :</span>
+                      <span className="flex-1 border-b border-dotted border-black h-4"></span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="font-bold whitespace-nowrap">التاريخ : Date :</span>
+                      <span className="flex-1 border-b border-dotted border-black px-1 font-mono text-center">
+                        <EditableText value="    /   / 202 " />
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3.3 قسم المحاسبة */}
+                <div className="p-2 space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-xs">قسم المحـاسبة : Account Section:</span>
+                    <div className="flex items-center gap-6 font-bold text-xs">
+                      <label className="inline-flex items-center gap-1 cursor-pointer">
+                        <input type="checkbox" className="h-3.5 w-3.5 rounded border-black" />
+                        <span>أوافق Approved</span>
+                      </label>
+                      <label className="inline-flex items-center gap-1 cursor-pointer">
+                        <input type="checkbox" className="h-3.5 w-3.5 rounded border-black" />
+                        <span>لا أوافق Not Approved</span>
+                      </label>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs">
+                    <span className="font-bold whitespace-nowrap">ملاحظات : Note’s :</span>
+                    <span className="flex-1 border-b border-dotted border-black h-4"></span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-xs pt-1">
+                    <div className="flex items-center gap-1">
+                      <span className="font-bold whitespace-nowrap">الاسم : name :</span>
+                      <span className="flex-1 border-b border-dotted border-black px-1">
+                        <EditableText value="................................" />
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="font-bold whitespace-nowrap">التوقيع : signature :</span>
+                      <span className="flex-1 border-b border-dotted border-black h-4"></span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="font-bold whitespace-nowrap">التاريخ : Date :</span>
+                      <span className="flex-1 border-b border-dotted border-black px-1 font-mono text-center">
+                        <EditableText value="    /   / 202 " />
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Left vertical badge */}
+              <div className="w-8 shrink-0 border-r-2 border-black bg-gray-100 flex flex-col items-center justify-between py-1 font-bold text-[11px] select-none font-sans text-black">
+                <span>3</span>
+                <span className="[writing-mode:vertical-rl] rotate-180 py-1 tracking-wider whitespace-nowrap text-[9px]">Recommend diction' s</span>
+                <span>3</span>
+              </div>
+            </div>
+
+            {/* Section 4: الاعتماد / Approval */}
+            <div className="flex border-b-2 border-black">
+              {/* Right vertical badge */}
+              <div className="w-8 shrink-0 border-l-2 border-black bg-gray-100 flex flex-col items-center justify-between py-1 font-bold text-[11px] select-none text-black">
+                <span>4</span>
+                <span className="[writing-mode:vertical-rl] rotate-180 py-1 tracking-wider whitespace-nowrap text-[10px]">الاعتماد</span>
+                <span>4</span>
+              </div>
+
+              {/* Section 4 Content */}
+              <div className="flex-1 p-2 space-y-2">
+                <div className="space-y-1 text-xs">
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" className="h-3.5 w-3.5 rounded border-black" />
+                    <span className="font-bold whitespace-nowrap">أوافق على السلفة على أن تسدد خلال :</span>
+                    <span className="flex-1 border-b border-dotted border-black px-1 font-sans text-left text-gray-700" dir="ltr">
+                      I Approve this loan to be paid during:
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" className="h-3.5 w-3.5 rounded border-black" />
+                    <span className="font-bold whitespace-nowrap">غير موافق بسبب :</span>
+                    <span className="flex-1 border-b border-dotted border-black px-1 font-sans text-left text-gray-700" dir="ltr">
+                      I don't approve:
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" className="h-3.5 w-3.5 rounded border-black" />
+                    <span className="font-bold whitespace-nowrap">تؤجل السلفة لمدة :</span>
+                    <span className="flex-1 border-b border-dotted border-black px-1 font-sans text-left text-gray-700" dir="ltr">
+                      Adjourning to:
+                    </span>
+                  </div>
+                </div>
+
+                <div className="pt-2 text-center">
+                  <p className="font-bold text-sm">مدير الموارد البشرية</p>
+                  <p className="font-sans text-xs text-gray-600 font-bold">HR Manager</p>
+                  <div className="grid grid-cols-2 gap-4 text-xs mt-3 max-w-md mx-auto">
+                    <div className="flex items-center gap-1">
+                      <span className="font-bold whitespace-nowrap">التوقيع : signature :</span>
+                      <span className="flex-1 border-b border-dotted border-black h-4"></span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="font-bold whitespace-nowrap">التاريخ : Date :</span>
+                      <span className="flex-1 border-b border-dotted border-black px-1 font-mono text-center">
+                        <EditableText value="    /   / 202 " />
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Left vertical badge */}
+              <div className="w-8 shrink-0 border-r-2 border-black bg-gray-100 flex flex-col items-center justify-between py-1 font-bold text-[11px] select-none font-sans text-black">
+                <span>4</span>
+                <span className="[writing-mode:vertical-rl] rotate-180 py-1 tracking-wider whitespace-nowrap text-[10px]">Approval</span>
+                <span>4</span>
+              </div>
+            </div>
+
+            {/* Section 5: إقرار الموظف / Emp. affirmance */}
+            <div className="flex">
+              {/* Right vertical badge */}
+              <div className="w-8 shrink-0 border-l-2 border-black bg-gray-100 flex flex-col items-center justify-between py-1 font-bold text-[11px] select-none text-black">
+                <span>5</span>
+                <span className="[writing-mode:vertical-rl] rotate-180 py-1 tracking-wider whitespace-nowrap text-[10px]">إقرار الموظف</span>
+                <span>5</span>
+              </div>
+
+              {/* Section 5 Content: Two columns */}
+              <div className="flex-1 p-2 grid grid-cols-2 gap-4">
+                {/* Arabic Column */}
+                <div className="space-y-2 text-justify text-[11px] leading-relaxed">
+                  <p>
+                    أقر أنا الموقع أدناه بأنني استلمت مبلغاً وقدره{" "}
+                    <strong className="border-b border-dotted border-black px-1">
+                      <EditableText value="........................" />
+                    </strong>{" "}
+                    فقط لا غير كسلفة يتم تسديدها حسب التعهد أعلاه أو حسب النظام الداخلي للشركة وتعميد صاحب الصلاحية .
+                  </p>
+                  <div className="space-y-1.5 pt-1 text-xs">
+                    <div className="flex items-center gap-1">
+                      <span className="font-bold whitespace-nowrap">الاسم :</span>
+                      <strong className="flex-1 border-b border-dotted border-black px-1 truncate">
+                        {e.full_name_ar || e.full_name}
+                      </strong>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="font-bold whitespace-nowrap">التوقيع :</span>
+                      <span className="flex-1 border-b border-dotted border-black h-4"></span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="font-bold whitespace-nowrap">التاريخ :</span>
+                      <span className="flex-1 border-b border-dotted border-black px-1 font-mono text-center">
+                        <EditableText value={formatDate(todayISO())} />
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* English Column */}
+                <div className="space-y-2 text-justify text-[10px] leading-relaxed border-r border-gray-300 pr-3 font-sans" dir="ltr">
+                  <p>
+                    I am the under signed affirm that I have received the amount of{" "}
+                    <strong className="border-b border-dotted border-black px-1">
+                      <EditableText value="........................" />
+                    </strong>{" "}
+                    EL. as a loan to be paid as a.m. info or as the internal company procedure's or as baptizing.
+                  </p>
+                  <div className="space-y-1.5 pt-1 text-xs">
+                    <div className="flex items-center gap-1">
+                      <span className="font-bold whitespace-nowrap">Name :</span>
+                      <strong className="flex-1 border-b border-dotted border-black px-1 truncate">
+                        {e.full_name || e.full_name_ar}
+                      </strong>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="font-bold whitespace-nowrap">Signature :</span>
+                      <span className="flex-1 border-b border-dotted border-black h-4"></span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="font-bold whitespace-nowrap">Date :</span>
+                      <span className="flex-1 border-b border-dotted border-black px-1 font-mono text-center">
+                        <EditableText value={formatDate(todayISO())} />
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Left vertical badge */}
+              <div className="w-8 shrink-0 border-r-2 border-black bg-gray-100 flex flex-col items-center justify-between py-1 font-bold text-[11px] select-none font-sans text-black">
+                <span>5</span>
+                <span className="[writing-mode:vertical-rl] rotate-180 py-1 tracking-wider whitespace-nowrap text-[10px]">Emp. affirmance</span>
+                <span>5</span>
+              </div>
             </div>
           </div>
 
-          <div className="mb-6 rounded-lg border border-gray-300 p-4 shadow-sm bg-gray-50/50">
-            <h3 className="mb-3 font-bold text-gray-800 text-lg border-b pb-1">السلف السابقة / Existing Advances</h3>
-            {advances.length === 0 ? (
-              <p className="text-center text-sm text-gray-500 py-2">لا توجد سلف قائمة حالياً / No active advances</p>
-            ) : (
-              <div className="flex justify-between items-center bg-white p-3 rounded border border-gray-200">
-                <span className="font-semibold">إجمالي السلف القائمة غير المسددة:</span>
-                <span className="font-bold text-lg text-rose-600">{fmtMoney(totalAdvance)} ج.م</span>
-              </div>
-            )}
+          {/* Footer note */}
+          <div className="mt-3 flex justify-between text-[11px] font-bold text-gray-700">
+            <span>* الأصل + صورة لشؤون الموظفين</span>
+            <span>* صورة الرواتب – الإدارة المالية</span>
           </div>
 
-          <div className="mt-12 rounded-lg border-2 border-gray-800 p-4">
-            <h3 className="mb-6 font-bold text-gray-800 text-center text-lg bg-gray-100 p-2 rounded">الاعتمادات والموافقات / Approvals</h3>
-            <div className="grid grid-cols-4 gap-4 text-center text-sm">
-              <div className="flex flex-col h-32 justify-between">
-                <p className="font-bold text-gray-700">توقيع الموظف</p>
-                <div className="border-t border-gray-400 pt-2 text-xs text-gray-500">الاسم والتوقيع</div>
-              </div>
-              <div className="flex flex-col h-32 justify-between">
-                <p className="font-bold text-gray-700">المدير المباشر</p>
-                <div className="border-t border-gray-400 pt-2 text-xs text-gray-500">يعتمد / لا يعتمد</div>
-              </div>
-              <div className="flex flex-col h-32 justify-between">
-                <p className="font-bold text-gray-700">الموارد البشرية</p>
-                <div className="border-t border-gray-400 pt-2 text-xs text-gray-500">الاعتماد</div>
-              </div>
-              <div className="flex flex-col h-32 justify-between">
-                <p className="font-bold text-gray-700">المدير العام / المالي</p>
-                <div className="border-t border-gray-400 pt-2 text-xs text-gray-500">التصديق النهائي</div>
-              </div>
+          {/* Existing advances notice (only shown when viewing if advances exist) */}
+          {advances.length > 0 && (
+            <div className="print:hidden mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 flex justify-between items-center">
+              <span>تنبيه: يوجد لدى الموظف سلف قائمة بإجمالي:</span>
+              <strong className="text-sm font-bold text-amber-900">{fmtMoney(totalAdvance)} ج.م</strong>
             </div>
-          </div>
+          )}
         </DocShell>
       )}
     </div>
@@ -753,11 +1155,11 @@ export function InvestigationForm() {
                 </tr>
                 <tr>
                   <td className="border-b border-l border-gray-800 p-2 font-semibold w-32 bg-gray-100">الوظيفة:</td>
-                  <td className="border-b border-gray-800 p-2 font-bold">{e.position || "—"}</td>
+                  <td className="border-b border-gray-800 p-2 font-bold"><EditableText value={getArabicPosition(e) !== "—" ? getArabicPosition(e) : "أخصائي"} /></td>
                 </tr>
                 <tr>
                   <td className="border-l border-gray-800 p-2 font-semibold w-32 bg-gray-100">موقع العمل:</td>
-                  <td className="p-2 font-bold">{e.department || "—"}</td>
+                  <td className="p-2 font-bold"><EditableText value={getArabicDepartment(e) !== "—" ? getArabicDepartment(e) : "الإدارة العامة"} /></td>
                 </tr>
               </tbody>
             </table>
@@ -853,7 +1255,7 @@ function AbsenceWarningForm({ type }: { type: "first" | "second" }) {
               </div>
               <div className="flex">
                 <span className="w-24">{isFirst ? "الوظيفة" : "القسم"}</span>
-                <span className="mr-2">: {isFirst ? (e.position || "................................") : (e.department || "................................")}</span>
+                <span className="mr-2">: {isFirst ? (getArabicPosition(e) !== "—" ? getArabicPosition(e) : "................................") : (getArabicDepartment(e) !== "—" ? getArabicDepartment(e) : "................................")}</span>
               </div>
             </div>
 
@@ -1064,20 +1466,20 @@ export function SocialInsuranceForm1() {
               <div className="flex items-center gap-2">
                  <span className="w-28 font-bold text-lg">الرقم التأمينى :</span>
                  <DigitBox count={9} value={e.insurance_number || ""} />
-                 <span className="w-36 font-bold text-lg text-left pl-2">اسم المؤمن عليه :</span>
-                 <span className="font-bold text-lg flex-1"><EmployeeDocName e={e} /></span>
+                 <span className="w-40 font-bold text-lg text-left pl-2">اسم المؤمن عليه (عربي) :</span>
+                 <span className="font-bold text-lg flex-1 text-black">{e.full_name_ar || e.full_name}</span>
               </div>
               <div className="flex items-center gap-2">
                  <span className="w-28 font-bold text-lg">الرقم القومى :</span>
                  <DigitBox count={14} value={e.national_id || ""} />
-                 <span className="w-36 font-bold text-lg text-left pl-2">الجنسية :</span>
+                 <span className="w-40 font-bold text-lg text-left pl-2">الجنسية :</span>
                  <EditableText value="مصرى" className="font-bold text-lg" />
               </div>
               <div className="flex items-center gap-2 mt-4">
-                 <span className="w-24 font-bold text-lg">المؤهل :</span>
-                 <EditableText value="بكالوريوس هندسه" className="font-bold text-lg flex-1" />
-                 <span className="w-24 font-bold text-lg">المهنة :</span>
-                 <EditableText value={e.position || "مهندسه شبكات"} className="font-bold text-lg flex-1" />
+                 <span className="w-28 font-bold text-lg">القسم / الإدارة :</span>
+                 <EditableText value={getArabicDepartment(e) !== "—" ? getArabicDepartment(e) : "الإدارة الفنية"} className="font-bold text-lg flex-1" />
+                 <span className="w-28 font-bold text-lg mr-4">المهنة / الوظيفة :</span>
+                 <EditableText value={getArabicPosition(e) !== "—" ? getArabicPosition(e) : "مهندس شبكات"} className="font-bold text-lg flex-1" />
               </div>
               <div className="flex items-center gap-2 mt-4">
                  <span className="w-36 font-bold text-lg">تاريخ بدء الإشتراك :</span>
@@ -1362,18 +1764,24 @@ export function SocialInsuranceForm6() {
 
             <div className="space-y-3 mt-4">
               <div className="flex items-center gap-2">
-                <span className="w-28 font-bold text-base">الرقم التأميني :</span>
+                <span className="w-32 font-bold text-base">الرقم التأميني :</span>
                 <DigitBox count={9} value={e.insurance_number || ""} />
               </div>
               <div className="flex items-center gap-2">
-                <span className="w-28 font-bold text-base">الرقم القومــــي :</span>
+                <span className="w-32 font-bold text-base">الرقم القومــــي :</span>
                 <DigitBox count={14} value={e.national_id || ""} />
               </div>
               <div className="flex items-center gap-2">
-                <span className="w-28 font-bold text-base">الإســـــــــــــــــم :</span>
-                <span className="font-bold text-base flex-1">
-                  <EmployeeDocName e={e} />
+                <span className="w-32 font-bold text-base">الإســـم :</span>
+                <span className="font-bold text-base flex-1 text-black">
+                  {e.full_name_ar || e.full_name}
                 </span>
+              </div>
+              <div className="flex items-center gap-2 pt-1">
+                <span className="w-32 font-bold text-base">القسم / الإدارة :</span>
+                <EditableText value={getArabicDepartment(e)} className="font-bold text-base flex-1" />
+                <span className="w-28 font-bold text-base mr-4">الوظيفة / المهنة :</span>
+                <EditableText value={getArabicPosition(e)} className="font-bold text-base flex-1" />
               </div>
               <div className="flex flex-wrap items-center justify-between gap-4 pt-1">
                 <div className="flex items-center gap-2">

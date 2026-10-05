@@ -1,3 +1,4 @@
+import { getArabicPosition, getArabicDepartment } from "@/lib/arabic-labels";
 import { useState } from "react";
 import {
   useEmployeePicker,
@@ -36,22 +37,20 @@ export function FinalSettlementReport() {
             <button
               type="button"
               onClick={() => setDocType("certificate")}
-              className={`rounded-lg px-3 py-1.5 transition ${
-                docType === "certificate"
-                  ? "bg-gradient-brand text-brand-foreground shadow-brand"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+              className={`rounded-lg px-3 py-1.5 transition ${docType === "certificate"
+                ? "bg-gradient-brand text-brand-foreground shadow-brand"
+                : "text-muted-foreground hover:text-foreground"
+                }`}
             >
               مخالصة نهائية وإخلاء طرف
             </button>
             <button
               type="button"
               onClick={() => setDocType("internalClearance")}
-              className={`rounded-lg px-3 py-1.5 transition ${
-                docType === "internalClearance"
-                  ? "bg-gradient-brand text-brand-foreground shadow-brand"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+              className={`rounded-lg px-3 py-1.5 transition ${docType === "internalClearance"
+                ? "bg-gradient-brand text-brand-foreground shadow-brand"
+                : "text-muted-foreground hover:text-foreground"
+                }`}
             >
               إخلاء طرف داخلي وتسليم العهد
             </button>
@@ -99,10 +98,10 @@ export function FinalSettlementReport() {
             />
             <div className="text-left text-xs text-gray-600 font-sans">
               <p className="font-bold text-gray-900">
-                شركة التقنيات المتكاملة للتجارة والتوكيلات (ش.م.م)
+                شركة التقنيات المتكاملة ذات مسؤلية محدودة
               </p>
               <p className="mt-0.5">
-                Integrated Technics for Trading & Agencies
+                Integrated Technics
               </p>
               <p className="mt-1 font-semibold text-gray-700">
                 تاريخ الإصدار: {formatDate(today)}
@@ -126,40 +125,40 @@ export function FinalSettlementReport() {
               <div className="rounded-xl border border-gray-800 p-4 bg-gray-50/70 text-sm leading-relaxed mb-6">
                 <div className="grid grid-cols-2 gap-x-6 gap-y-2">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-gray-800 w-24">الاسم:</span>
-                    <span className="font-bold text-base flex-1">
-                      <EmployeeDocName e={e} />
+                    <span className="font-bold text-gray-800 w-28">الاسم:</span>
+                    <span className="font-bold text-base flex-1 text-black">
+                      {e.full_name_ar || e.full_name || "—"}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-gray-800 w-24">الكود:</span>
+                    <span className="font-bold text-gray-800 w-28">الكود:</span>
                     <span className="font-mono font-bold">
                       {e.emp_code || "—"}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-gray-800 w-24">الوظيفة:</span>
+                    <span className="font-bold text-gray-800 w-28">القسم / الإدارة:</span>
                     <EditableText
-                      value={e.position || "مهندس"}
+                      value={getArabicDepartment(e) !== "—" ? getArabicDepartment(e) : "الإدارة الفنية"}
                       className="font-bold"
                     />
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-gray-800 w-24">الرقم القومي:</span>
+                    <span className="font-bold text-gray-800 w-28">الوظيفة:</span>
+                    <EditableText
+                      value={getArabicPosition(e) !== "—" ? getArabicPosition(e) : "مهندس"}
+                      className="font-bold"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-gray-800 w-28">الرقم القومي:</span>
                     <EditableText
                       value={e.national_id || "—"}
                       className="font-mono font-bold"
                     />
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-gray-800 w-24">الإدارة:</span>
-                    <EditableText
-                      value={e.department || "الإدارة الفنية"}
-                      className="font-bold"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-gray-800 w-24">تاريخ انتهاء العمل:</span>
+                    <span className="font-bold text-gray-800 w-28">تاريخ انتهاء العمل:</span>
                     <EditableText
                       value={formatDate(lastWorkDate)}
                       className="font-mono font-bold"
@@ -231,7 +230,7 @@ export function FinalSettlementReport() {
                     <p>
                       الوظيفة:{" "}
                       <span className="font-normal">
-                        <EditableText value={e.position || "مهندس"} />
+                        <EditableText value={getArabicPosition(e) !== "—" ? getArabicPosition(e) : "مهندس"} />
                       </span>
                     </p>
                     <p>
@@ -296,33 +295,33 @@ export function FinalSettlementReport() {
               <div className="rounded-xl border border-gray-800 p-4 bg-gray-50/70 text-sm leading-relaxed mb-4">
                 <div className="grid grid-cols-2 gap-x-6 gap-y-2">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-gray-800 w-24">الاسم:</span>
-                    <span className="font-bold text-base flex-1">
-                      <EmployeeDocName e={e} />
+                    <span className="font-bold text-gray-800 w-28">الاسم:</span>
+                    <span className="font-bold text-base flex-1 text-black">
+                      {e.full_name_ar || e.full_name || "—"}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-gray-800 w-24">الكود:</span>
+                    <span className="font-bold text-gray-800 w-28">الكود:</span>
                     <span className="font-mono font-bold">
                       {e.emp_code || "—"}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-gray-800 w-24">الوظيفة:</span>
+                    <span className="font-bold text-gray-800 w-28">القسم / الإدارة:</span>
                     <EditableText
-                      value={e.position || "مهندس"}
+                      value={getArabicDepartment(e) !== "—" ? getArabicDepartment(e) : "الإدارة الفنية"}
                       className="font-bold"
                     />
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-gray-800 w-24">الإدارة:</span>
+                    <span className="font-bold text-gray-800 w-28">الوظيفة:</span>
                     <EditableText
-                      value={e.department || "الإدارة الفنية"}
+                      value={getArabicPosition(e) !== "—" ? getArabicPosition(e) : "مهندس"}
                       className="font-bold"
                     />
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-gray-800 w-24">تاريخ التعيين:</span>
+                    <span className="font-bold text-gray-800 w-28">تاريخ التعيين:</span>
                     <EditableText
                       value={
                         e.contract_start_date
@@ -333,7 +332,7 @@ export function FinalSettlementReport() {
                     />
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-gray-800 w-24">تاريخ نهاية الخدمة:</span>
+                    <span className="font-bold text-gray-800 w-28">تاريخ نهاية الخدمة:</span>
                     <EditableText
                       value={formatDate(lastWorkDate)}
                       className="font-mono font-bold"

@@ -1,3 +1,4 @@
+import { getArabicPosition, getArabicDepartment } from "@/lib/arabic-labels";
 import { useState, useMemo } from "react";
 import {
   useEmployeePicker,
@@ -189,10 +190,10 @@ export function ExitInterviewReport() {
               />
               <div className="text-right">
                 <div className="font-bold text-base text-gray-900">
-                  شركة التقنيات المتكاملة للتجارة والتوكيلات (ش.م.م)
+                  شركة التقنيات المتكاملة ذات مسؤلية محدودة
                 </div>
                 <div className="text-xs text-gray-600 font-sans tracking-wide">
-                  Integrated Technics for Trading & Agencies
+                  Integrated Technics
                 </div>
               </div>
             </div>
@@ -223,35 +224,35 @@ export function ExitInterviewReport() {
 
             <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-sm">
               <div className="flex items-center gap-2">
-                <span className="font-bold text-gray-800 w-28">اسم الموظف:</span>
-                <span className="font-bold text-base flex-1">
-                  <EmployeeDocName e={e} />
+                <span className="font-bold text-gray-800 w-32">الاسم:</span>
+                <span className="font-bold text-base flex-1 text-black">
+                  {e.full_name_ar || e.full_name || "—"}
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="font-bold text-gray-800 w-28">الرقم الوظيفي:</span>
+                <span className="font-bold text-gray-800 w-32">الرقم الوظيفي:</span>
                 <span className="font-mono font-bold text-sm bg-white px-2 py-0.5 border border-gray-300 rounded">
                   {e.emp_code || "—"}
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="font-bold text-gray-800 w-28">القطاع / الإدارة:</span>
+                <span className="font-bold text-gray-800 w-32">القطاع / الإدارة:</span>
                 <EditableText
-                  value={e.department || "الإدارة الفنية والتشغيل"}
+                  value={getArabicDepartment(e) !== "—" ? getArabicDepartment(e) : "الإدارة الفنية والتشغيل"}
                   className="font-bold flex-1"
                 />
               </div>
               <div className="flex items-center gap-2">
-                <span className="font-bold text-gray-800 w-28">القسم:</span>
+                <span className="font-bold text-gray-800 w-32">المسمى الوظيفي:</span>
+                <EditableText
+                  value={getArabicPosition(e) !== "—" ? getArabicPosition(e) : "مهندس اتصالات"}
+                  className="font-bold flex-1"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-gray-800 w-32">القسم:</span>
                 <EditableText
                   value={e.section || "الاتصالات والشبكات"}
-                  className="font-bold flex-1"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-gray-800 w-28">المسمى الوظيفي:</span>
-                <EditableText
-                  value={e.position || "مهندس اتصالات"}
                   className="font-bold flex-1"
                 />
               </div>
@@ -297,9 +298,8 @@ export function ExitInterviewReport() {
                   onClick={() => setPrimaryReason(reason)}
                 >
                   <span
-                    className={`w-4 h-4 rounded border border-black flex items-center justify-center text-xs font-bold ${
-                      primaryReason === reason ? "bg-black text-white" : "bg-white"
-                    }`}
+                    className={`w-4 h-4 rounded border border-black flex items-center justify-center text-xs font-bold ${primaryReason === reason ? "bg-black text-white" : "bg-white"
+                      }`}
                   >
                     {primaryReason === reason ? "✓" : ""}
                   </span>
@@ -334,9 +334,8 @@ export function ExitInterviewReport() {
                         onClick={() => toggleResignationReason(sub)}
                       >
                         <span
-                          className={`w-3.5 h-3.5 rounded border border-black flex items-center justify-center text-[10px] font-bold ${
-                            isChecked ? "bg-black text-white" : "bg-white"
-                          }`}
+                          className={`w-3.5 h-3.5 rounded border border-black flex items-center justify-center text-[10px] font-bold ${isChecked ? "bg-black text-white" : "bg-white"
+                            }`}
                         >
                           {isChecked ? "✓" : ""}
                         </span>
@@ -401,9 +400,8 @@ export function ExitInterviewReport() {
                         onClick={() => toggleLike(item)}
                       >
                         <span
-                          className={`w-3.5 h-3.5 rounded border border-black flex items-center justify-center text-[10px] font-bold ${
-                            checked ? "bg-black text-white" : "bg-white"
-                          }`}
+                          className={`w-3.5 h-3.5 rounded border border-black flex items-center justify-center text-[10px] font-bold ${checked ? "bg-black text-white" : "bg-white"
+                            }`}
                         >
                           {checked ? "✓" : ""}
                         </span>
@@ -436,9 +434,8 @@ export function ExitInterviewReport() {
                         onClick={() => toggleDislike(item)}
                       >
                         <span
-                          className={`w-3.5 h-3.5 rounded border border-black flex items-center justify-center text-[10px] font-bold ${
-                            checked ? "bg-black text-white" : "bg-white"
-                          }`}
+                          className={`w-3.5 h-3.5 rounded border border-black flex items-center justify-center text-[10px] font-bold ${checked ? "bg-black text-white" : "bg-white"
+                            }`}
                         >
                           {checked ? "✓" : ""}
                         </span>
@@ -462,11 +459,10 @@ export function ExitInterviewReport() {
                         onClick={() => setMatchedExpectations(ans)}
                       >
                         <span
-                          className={`w-3.5 h-3.5 rounded border border-black flex items-center justify-center text-[10px] font-bold ${
-                            matchedExpectations === ans
-                              ? "bg-black text-white"
-                              : "bg-white"
-                          }`}
+                          className={`w-3.5 h-3.5 rounded border border-black flex items-center justify-center text-[10px] font-bold ${matchedExpectations === ans
+                            ? "bg-black text-white"
+                            : "bg-white"
+                            }`}
                         >
                           {matchedExpectations === ans ? "✓" : ""}
                         </span>
@@ -567,9 +563,8 @@ export function ExitInterviewReport() {
                           className="border-l border-gray-300 p-1 cursor-pointer hover:bg-gray-200 transition"
                         >
                           <span
-                            className={`w-4 h-4 mx-auto rounded-full border border-black flex items-center justify-center text-[10px] font-bold ${
-                              selected ? "bg-black text-white" : "bg-transparent"
-                            }`}
+                            className={`w-4 h-4 mx-auto rounded-full border border-black flex items-center justify-center text-[10px] font-bold ${selected ? "bg-black text-white" : "bg-transparent"
+                              }`}
                           >
                             {selected ? "✓" : ""}
                           </span>
@@ -622,9 +617,8 @@ export function ExitInterviewReport() {
                           className="border-l border-gray-300 p-1 cursor-pointer hover:bg-gray-200 transition"
                         >
                           <span
-                            className={`w-4 h-4 mx-auto rounded-full border border-black flex items-center justify-center text-[10px] font-bold ${
-                              selected ? "bg-black text-white" : "bg-transparent"
-                            }`}
+                            className={`w-4 h-4 mx-auto rounded-full border border-black flex items-center justify-center text-[10px] font-bold ${selected ? "bg-black text-white" : "bg-transparent"
+                              }`}
                           >
                             {selected ? "✓" : ""}
                           </span>
@@ -650,9 +644,8 @@ export function ExitInterviewReport() {
                         onClick={() => setPerfFreq(f)}
                       >
                         <span
-                          className={`w-3.5 h-3.5 rounded border border-black flex items-center justify-center text-[10px] font-bold ${
-                            perfFreq === f ? "bg-black text-white" : "bg-white"
-                          }`}
+                          className={`w-3.5 h-3.5 rounded border border-black flex items-center justify-center text-[10px] font-bold ${perfFreq === f ? "bg-black text-white" : "bg-white"
+                            }`}
                         >
                           {perfFreq === f ? "✓" : ""}
                         </span>
@@ -675,9 +668,8 @@ export function ExitInterviewReport() {
                       onClick={() => setCanTalkToMgr(ans)}
                     >
                       <span
-                        className={`w-3.5 h-3.5 rounded border border-black flex items-center justify-center text-[10px] font-bold ${
-                          canTalkToMgr === ans ? "bg-black text-white" : "bg-white"
-                        }`}
+                        className={`w-3.5 h-3.5 rounded border border-black flex items-center justify-center text-[10px] font-bold ${canTalkToMgr === ans ? "bg-black text-white" : "bg-white"
+                          }`}
                       >
                         {canTalkToMgr === ans ? "✓" : ""}
                       </span>
@@ -734,9 +726,8 @@ export function ExitInterviewReport() {
                         onClick={() => setWouldReturn(ans)}
                       >
                         <span
-                          className={`w-3.5 h-3.5 rounded border border-black flex items-center justify-center text-[10px] font-bold ${
-                            wouldReturn === ans ? "bg-black text-white" : "bg-white"
-                          }`}
+                          className={`w-3.5 h-3.5 rounded border border-black flex items-center justify-center text-[10px] font-bold ${wouldReturn === ans ? "bg-black text-white" : "bg-white"
+                            }`}
                         >
                           {wouldReturn === ans ? "✓" : ""}
                         </span>
@@ -764,11 +755,10 @@ export function ExitInterviewReport() {
                         onClick={() => setWouldRecommend(ans)}
                       >
                         <span
-                          className={`w-3.5 h-3.5 rounded border border-black flex items-center justify-center text-[10px] font-bold ${
-                            wouldRecommend === ans
-                              ? "bg-black text-white"
-                              : "bg-white"
-                          }`}
+                          className={`w-3.5 h-3.5 rounded border border-black flex items-center justify-center text-[10px] font-bold ${wouldRecommend === ans
+                            ? "bg-black text-white"
+                            : "bg-white"
+                            }`}
                         >
                           {wouldRecommend === ans ? "✓" : ""}
                         </span>
@@ -807,9 +797,8 @@ export function ExitInterviewReport() {
                       onClick={() => setHandoverDone(ans)}
                     >
                       <span
-                        className={`w-3.5 h-3.5 rounded border border-black flex items-center justify-center text-[10px] font-bold ${
-                          handoverDone === ans ? "bg-black text-white" : "bg-white"
-                        }`}
+                        className={`w-3.5 h-3.5 rounded border border-black flex items-center justify-center text-[10px] font-bold ${handoverDone === ans ? "bg-black text-white" : "bg-white"
+                          }`}
                       >
                         {handoverDone === ans ? "✓" : ""}
                       </span>

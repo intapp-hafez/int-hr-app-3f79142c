@@ -1058,6 +1058,9 @@ export const ui: Record<UiKey, string> = {
   medicalInsuranceType: "نوع التأمين الطبي",
   insurancePrivate: "خاص",
   insuranceGovernmental: "حكومي",
+  insuranceBoth: "كلاهما",
+  socialInsuranceNumber: "الرقم التأميني",
+  socialInsuranceDate: "تاريخ التأمين الاجتماعي",
 
   loading: "جارٍ التحميل…",
   attendanceSubtitle: "سجل الحضور والانصراف مع فحص الموقع والشبكة وتداخل الإجازات.",

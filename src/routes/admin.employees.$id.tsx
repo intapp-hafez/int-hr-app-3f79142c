@@ -20,6 +20,7 @@ import {
   getEmployeeLeavesHistory,
   INACTIVE_REASONS,
   listEmployeeStatusAudit,
+  sendEmployeeWelcomeEmail,
 } from "@/backend/functions/employees.functions";
 import { getEmployeeWorkingDays } from "@/backend/functions/employee-working-days.functions";
 import { listHolidays } from "@/backend/functions/holidays.functions";
@@ -69,7 +70,7 @@ import {
   Lock,
   Printer,
 } from "lucide-react";
-import { User as UserIcon, ShieldCheck, IdCard, Briefcase, CalendarDays, Plane, AlertCircle, StickyNote as StickyNoteIcon, Plus, Banknote, CreditCard, Loader2, ExternalLink, ArrowRight } from "lucide-react";
+import { User as UserIcon, ShieldCheck, IdCard, Briefcase, CalendarDays, Plane, AlertCircle, StickyNote as StickyNoteIcon, Plus, Banknote, CreditCard, Loader2, ExternalLink, ArrowRight, HeartPulse } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -246,6 +247,137 @@ function EmployeeDetail() {
 import type { EmployeeDetail as EmployeeDetailRow } from "@/backend/functions/employees.functions";
 import { adminTransferEmployee } from "@/backend/functions/employees.functions";
 
+function ResendWelcomeEmailModal({ detail, close }: { detail: EmployeeDetailRow; close: () => void }) {
+  const { isAr } = useI18n();
+  const sendEmailFn = useServerFn(sendEmployeeWelcomeEmail);
+  const [password, setPassword] = useState(() => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
+    let res = "";
+    for (let i = 0; i < 10; i++) res += chars.charAt(Math.floor(Math.random() * chars.length));
+    return res;
+  });
+  const [sending, setSending] = useState(false);
+
+  function generateNew() {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
+    let res = "";
+    for (let i = 0; i < 10; i++) res += chars.charAt(Math.floor(Math.random() * chars.length));
+    setPassword(res);
+  }
+
+  async function handleSend() {
+    if (!password.trim()) {
+      toast.error("Password is required");
+      return;
+    }
+    if (!detail.email) {
+      toast.error("Employee has no email address");
+      return;
+    }
+    setSending(true);
+    try {
+      const res = await sendEmailFn({
+        data: {
+          userId: detail.id,
+          to: detail.email,
+          employeeName: detail.full_name || detail.email,
+          username: detail.email,
+          password: password.trim(),
+          loginUrl: window.location.origin,
+          appName: document.title || "INT-HR App",
+        },
+      });
+      if ((res as any)?.ok) {
+        toast.success(isAr ? "تم إرسال بريد الترحيب بنجاح!" : "Welcome email sent successfully!");
+        close();
+      } else {
+        toast.error((res as any)?.error || "Failed to send welcome email");
+      }
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to send welcome email");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+      <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl space-y-4">
+        <div className="flex items-center justify-between border-b border-border pb-3">
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand/10 text-brand">
+              <Mail className="h-4 w-4" />
+            </span>
+            <h3 className="font-semibold text-foreground text-base">
+              {isAr ? "إعادة إرسال بريد الترحيب" : "Resend Welcome Email"}
+            </h3>
+          </div>
+          <button onClick={close} className="rounded-md p-1 text-muted-foreground hover:bg-muted">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="space-y-3 text-sm">
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground">{isAr ? "الموظف" : "Employee"}</label>
+            <p className="font-medium text-foreground">{detail.full_name ?? detail.email}</p>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground">{isAr ? "البريد الإلكتروني" : "Recipient Email"}</label>
+            <p className="font-mono text-xs text-foreground font-semibold bg-muted/40 p-2 rounded-lg border border-border">
+              {detail.email}
+            </p>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-semibold text-muted-foreground">
+                {isAr ? "كلمة المرور المرسلة للموظف" : "Password to send to employee"}
+              </label>
+              <button
+                type="button"
+                onClick={generateNew}
+                className="text-xs font-semibold text-brand hover:underline"
+              >
+                {isAr ? "توليد كلمة سر جديدة" : "Generate New"}
+              </button>
+            </div>
+            <input
+              type="text"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full rounded-xl border border-border bg-background px-3 py-2 font-mono text-sm text-foreground focus:outline-hidden focus:ring-2 focus:ring-brand"
+            />
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {isAr
+                ? "سيتم تعيين هذه الكلمة لحساب الموظف وإرسالها له بالبريد بتصميم INT-HR الرسمي."
+                : "This password will be updated in the employee's account and emailed in the official template."}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-3 border-t border-border">
+          <button
+            onClick={close}
+            disabled={sending}
+            className="rounded-xl border border-border px-4 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted"
+          >
+            {isAr ? "إلغاء" : "Cancel"}
+          </button>
+          <button
+            onClick={handleSend}
+            disabled={sending}
+            className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-brand-foreground hover:opacity-90 disabled:opacity-50"
+          >
+            <Mail className="h-3.5 w-3.5" />
+            {sending ? (isAr ? "جاري الإرسال…" : "Sending…") : (isAr ? "إرسال البريد الآن" : "Send Welcome Email")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EmployeeTransferModal({ detail, close }: { detail: EmployeeDetailRow, close: () => void }) {
   const qc = useQueryClient();
   const transferFn = useServerFn(adminTransferEmployee);
@@ -335,10 +467,11 @@ function EmployeeTransferModal({ detail, close }: { detail: EmployeeDetailRow, c
 }
 
 function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canEdit: boolean }) {
-  const { t } = useI18n();
+  const { t, isAr } = useI18n();
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [resendModalOpen, setResendModalOpen] = useState(false);
   const cityFn = useServerFn(listCitiesAndDistricts);
   const gradesFn = useServerFn(listJobGrades);
   const { data: locs } = useQuery({ queryKey: ["cities-districts"], queryFn: () => cityFn(), enabled: editing, staleTime: 5 * 60_000 });
@@ -612,6 +745,13 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
             {canEdit && !editing && (
               <>
                 <button
+                  onClick={() => setResendModalOpen(true)}
+                  title={isAr ? "إعادة إرسال بيانات الدخول وبريد الترحيب للموظف" : "Resend login credentials & welcome email"}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold backdrop-blur hover:bg-white/25 transition-colors"
+                >
+                  <Mail className="h-3 w-3" /> {isAr ? "إرسال الترحيب" : "Resend Welcome Email"}
+                </button>
+                <button
                   onClick={() => setTransferModalOpen(true)}
                   className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold backdrop-blur hover:bg-white/25"
                 >
@@ -630,6 +770,7 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
       </div>
 
       {transferModalOpen && <EmployeeTransferModal detail={detail} close={() => setTransferModalOpen(false)} />}
+      {resendModalOpen && <ResendWelcomeEmailModal detail={detail} close={() => setResendModalOpen(false)} />}
 
       {editing ? (
         <div className="overflow-hidden rounded-3xl border border-border bg-card">
@@ -768,6 +909,7 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
               }
             }} /></EditField>
             <EditField label="ID Expiry Date"><input type="date" className={editInputCls + " font-mono"} value={form.id_expiry_date} onChange={(e) => upd("id_expiry_date", e.target.value)} /></EditField>
+            <EditField label="Military Expire Date"><input type="date" className={editInputCls + " font-mono"} value={form.military_expire_date} onChange={(e) => upd("military_expire_date", e.target.value)} /></EditField>
             <EditField label="Contract Type">
               <select className={editInputCls} value={form.contract_type} onChange={(e) => upd("contract_type", e.target.value as any)}>
                 <option value="FullTime">Full-time</option>
@@ -793,17 +935,6 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
               Contract cancelled
             </label>
 
-            <EditField label={t("medicalInsuranceType")}>
-              <select className={editInputCls} value={form.medical_insurance_type} onChange={(e) => upd("medical_insurance_type", e.target.value)}>
-                <option value="">—</option>
-                <option value="Private">{t("insurancePrivate")}</option>
-                <option value="Governmental">{t("insuranceGovernmental")}</option>
-              </select>
-            </EditField>
-            <EditField label={t("medicalInsuranceNumber")}>
-              <input className={editInputCls} value={form.medical_insurance_number} onChange={(e) => upd("medical_insurance_number", e.target.value)} placeholder="e.g. MED-123456" />
-            </EditField>
-            <EditField label="Medical Insurance Details"><input className={editInputCls} value={form.medical_insurance_details} onChange={(e) => upd("medical_insurance_details", e.target.value)} /></EditField>
             <EditField label={t("bankName" as any) || "Bank Name"}>
               <input className={editInputCls} value={form.bank_name} onChange={(e) => upd("bank_name", e.target.value)} placeholder="e.g. CIB, QNB, NBE..." />
             </EditField>
@@ -811,7 +942,38 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
               <input className={editInputCls + " font-mono"} value={form.bank_account_number} onChange={(e) => upd("bank_account_number", e.target.value)} placeholder="e.g. 100023456789 or IBAN" />
             </EditField>
 
-            <EditField label="Social Insurance Number">
+            {/* Medical Insurance Group */}
+            <div className="md:col-span-3 pt-3 pb-1 border-t border-border flex items-center gap-2">
+              <span className="flex h-5 w-5 items-center justify-center rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                <HeartPulse className="h-3.5 w-3.5" />
+              </span>
+              <span className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                {isAr ? "التأمين الطبي" : "Medical Insurance"}
+              </span>
+            </div>
+            <EditField label={t("medicalInsuranceType")}>
+              <select className={editInputCls} value={form.medical_insurance_type} onChange={(e) => upd("medical_insurance_type", e.target.value)}>
+                <option value="">—</option>
+                <option value="Private">{t("insurancePrivate")}</option>
+                <option value="Governmental">{t("insuranceGovernmental")}</option>
+                <option value="Both">{t("insuranceBoth") || "Both"}</option>
+              </select>
+            </EditField>
+            <EditField label={t("medicalInsuranceNumber")}>
+              <input className={editInputCls} value={form.medical_insurance_number} onChange={(e) => upd("medical_insurance_number", e.target.value)} placeholder="e.g. MED-123456" />
+            </EditField>
+            <EditField label="Medical Insurance Details"><input className={editInputCls} value={form.medical_insurance_details} onChange={(e) => upd("medical_insurance_details", e.target.value)} /></EditField>
+
+            {/* Social Insurance Group */}
+            <div className="md:col-span-3 pt-3 pb-1 border-t border-border flex items-center gap-2">
+              <span className="flex h-5 w-5 items-center justify-center rounded-md bg-purple-500/15 text-purple-600 dark:text-purple-400">
+                <ShieldCheck className="h-3.5 w-3.5" />
+              </span>
+              <span className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                {isAr ? "التأمينات الاجتماعية" : "Social Insurance"}
+              </span>
+            </div>
+            <EditField label={t("socialInsuranceNumber") || "Social Insurance Number"}>
               <input 
                 className={editInputCls + " font-mono"} 
                 value={form.insurance_number} 
@@ -820,13 +982,20 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
                   upd("insurance_number", val);
                   if (val.trim()) upd("is_insured", true);
                 }} 
+                placeholder="e.g. 123456789"
               />
             </EditField>
-            <EditField label="Social Insurance Date">
-              <input type="date" className={editInputCls + " font-mono"} value={form.social_insurance_date} onChange={(e) => upd("social_insurance_date", e.target.value)} />
-            </EditField>
-            <EditField label="Military Expire Date">
-              <input type="date" className={editInputCls + " font-mono"} value={form.military_expire_date} onChange={(e) => upd("military_expire_date", e.target.value)} />
+            <EditField label={t("socialInsuranceDate") || "Social Insurance Date"}>
+              <input 
+                type="date" 
+                className={editInputCls + " font-mono"} 
+                value={form.social_insurance_date} 
+                onChange={(e) => {
+                  const val = e.target.value;
+                  upd("social_insurance_date", val);
+                  if (val.trim()) upd("is_insured", true);
+                }} 
+              />
             </EditField>
             <div className="md:col-span-3 space-y-3">
               <div className="flex items-center justify-between">
@@ -1026,6 +1195,7 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
                       <Info icon={FileText} label="National ID" value={detail.national_id ?? "—"} mono />
                       <Info icon={Calendar} label="ID Issue Date" value={detail.id_issue_date ?? "—"} />
                       <Info icon={Calendar} label="ID Expiry Date" value={detail.id_expiry_date ?? "—"} />
+                      <Info icon={Calendar} label="Military Expire Date" value={(detail as any).military_expire_date ?? "—"} />
                       <Info icon={UserIcon} label="5% Quota (Disability)" value={(detail as any).is_five_percent ? "Yes" : "No"} />
                     </div>
                   </section>
@@ -1071,11 +1241,20 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
                       <Info icon={Clock} label="Target Duration" value={d.target_duration ?? "—"} />
                       <Info icon={CreditCard} label="Bank Name" value={d.bank_name ?? "—"} />
                       <Info icon={CreditCard} label="Bank Account" value={d.bank_account_number ?? "—"} mono />
+                      <div className="col-span-2 md:col-span-3 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                        <HeartPulse className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                        <span>{isAr ? "التأمين الطبي" : "Medical Insurance"}</span>
+                      </div>
                       <Info icon={ShieldCheck} label="Medical Insurance Type" value={d.medical_insurance_type ?? "—"} />
                       <Info icon={ShieldCheck} label="Medical Insurance No." value={d.medical_insurance_number ?? "—"} mono />
                       <Info icon={ShieldCheck} label="Medical Insurance Details" value={d.medical_insurance_details ?? "—"} />
+                      <div className="col-span-2 md:col-span-3 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                        <ShieldCheck className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                        <span>{isAr ? "التأمينات الاجتماعية" : "Social Insurance"}</span>
+                      </div>
+                      <Info icon={ShieldCheck} label="Social Insurance No." value={d.insurance_number ?? "—"} mono />
                       <Info icon={Calendar} label="Social Insurance Date" value={d.social_insurance_date ?? "—"} />
-                      <Info icon={Calendar} label="Military Expire Date" value={d.military_expire_date ?? "—"} />
+                      <Info icon={ShieldCheck} label="Is Insured" value={d.is_insured ? (isAr ? "نعم" : "Yes") : (isAr ? "لا" : "No")} />
                       </>); })()}
                     </div>
                   </section>
@@ -1162,9 +1341,12 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
                   <Info icon={Calendar} label={t("allowance") || "Allowance"} value={detail.allowance != null ? `${detail.allowance.toLocaleString()} EGP` : "—"} mono />
                   <Info icon={Plane} label={t("job_grade") || "Job Grade (Trips)"} value={detail.job_grade ?? "—"} />
                   <Info icon={Calendar} label={t("targetValue") || "Target"} value={detail.target_value != null ? `${detail.target_value} / ${detail.target_duration ?? "—"}` : "—"} />
-                  <Info icon={ShieldCheck} label={t("medicalInsuranceType")} value={detail.medical_insurance_type ? (detail.medical_insurance_type === "Governmental" ? t("insuranceGovernmental") : t("insurancePrivate")) : "—"} />
+                  <Info icon={ShieldCheck} label={t("medicalInsuranceType")} value={detail.medical_insurance_type ? (detail.medical_insurance_type === "Governmental" ? t("insuranceGovernmental") : detail.medical_insurance_type === "Both" ? (t("insuranceBoth") || "Both") : t("insurancePrivate")) : "—"} />
                   <Info icon={FileText} label={t("medicalInsuranceNumber")} value={detail.medical_insurance_number ?? "—"} mono />
                   <Info icon={FileText} label={t("medicalInsuranceDetails") || "Medical Insurance Details"} value={detail.medical_insurance_details ?? "—"} />
+                  <Info icon={ShieldCheck} label={t("socialInsuranceNumber") || "Social Insurance Number"} value={detail.insurance_number ?? "—"} mono />
+                  <Info icon={Calendar} label={t("socialInsuranceDate") || "Social Insurance Date"} value={detail.social_insurance_date ?? "—"} />
+                  <Info icon={ShieldCheck} label={isAr ? "مؤمّن عليه" : "Is Insured"} value={detail.is_insured ? (isAr ? "نعم" : "Yes") : (isAr ? "لا" : "No")} />
                   <Info icon={Banknote} label={t("bankName" as any) || "Bank Name"} value={(detail as any).bank_name ?? "—"} />
                   <Info icon={CreditCard} label={t("bankAccountNumber" as any) || "Bank Account Number"} value={(detail as any).bank_account_number ?? "—"} mono />
                 </div>
@@ -2866,14 +3048,17 @@ function InfoTab({ employee }: { employee: Employee }) {
   const allowedToSeeSensitive = canViewSensitive(viewerRole);
   const allEmployees = useStore((s) => s.employees);
   const gradesFn = useServerFn(listJobGrades);
+  const cityFn = useServerFn(listCitiesAndDistricts);
   const updateFn = useServerFn(updateEmployeeAdmin);
   const qc = useQueryClient();
   const [saving, setSaving] = useState(false);
   const { data: grades } = useQuery({ queryKey: ["job-grades"], queryFn: () => gradesFn(), staleTime: 5 * 60_000 });
-  const departments = useMemo(
-    () => Array.from(new Set(allEmployees.map((x) => x.dept).filter(Boolean))),
-    [allEmployees],
-  );
+  const { data: locs } = useQuery({ queryKey: ["admin", "cities-districts"], queryFn: () => cityFn(), staleTime: 5 * 60_000 });
+  const departments = useMemo(() => {
+    const fromStore = allEmployees.map((x) => x.dept).filter(Boolean);
+    const fromDb = (locs?.departments ?? []).map((d: any) => d.name_en).filter(Boolean);
+    return Array.from(new Set([...fromStore, ...fromDb]));
+  }, [allEmployees, locs]);
   const managerOptions = useMemo(
     () => allEmployees.filter((x) => x.id !== employee.id),
     [allEmployees, employee.id],

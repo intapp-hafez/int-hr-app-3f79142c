@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Search, Filter, X, ChevronRight, Upload, FileText, ArrowUp, ArrowDown, ArrowUpDown, Pencil, Trash2, Eye, AlertCircle, AlertTriangle, Ban, CheckCircle2, User, Building2, IdCard, Banknote, ShieldCheck, Sparkles, GraduationCap } from "lucide-react";
+import { Plus, Search, Filter, X, ChevronRight, Upload, FileText, ArrowUp, ArrowDown, ArrowUpDown, Pencil, Trash2, Eye, AlertCircle, AlertTriangle, Ban, CheckCircle2, User, Building2, IdCard, Banknote, ShieldCheck, Sparkles, GraduationCap, HeartPulse, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { Download } from "lucide-react";
@@ -14,6 +14,7 @@ import { BulkAssignModal } from "@/components/BulkAssignModal";
 import { Layers } from "lucide-react";
 import { locations } from "@/lib/mock-data";
 import { formatEgPhone, isValidEgPhone } from "@/lib/phone";
+import { normalizeExcelDate } from "@/lib/date-format";
 import { validateAndStoreDocument } from "@/lib/documents.functions";
 import { validateEmployeesBatch } from "@/lib/employees.functions";
 import { getMe } from "@/backend/functions/auth.functions";
@@ -27,6 +28,7 @@ import {
   bulkDeleteEmployeesAdmin,
   bulkAssignEmployeeRole,
   listCitiesAndDistricts,
+  sendEmployeeWelcomeEmail,
   type AdminEmployeeRow,
   type ListEmployeesResult,
   INACTIVE_REASONS,
@@ -49,7 +51,7 @@ export const Route = createFileRoute("/admin/employees/")({
 });
 
 function EmployeesPage() {
-  const { t } = useI18n();
+  const { t, isAr } = useI18n();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -75,6 +77,7 @@ function EmployeesPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
   const [editing, setEditing] = useState<AdminEmployeeRow | null>(null);
+  const [resendTarget, setResendTarget] = useState<{ id: string; full_name?: string | null; email?: string | null } | null>(null);
 
   const listFn = useServerFn(listEmployeesAdmin);
   const citiesFn = useServerFn(listCitiesAndDistricts);
@@ -346,7 +349,7 @@ function EmployeesPage() {
               </th>
               <SortableTh label={t("name")} col="full_name" sort={sort} dir={dir} onSort={toggleSort} />
               <Th>ID</Th>
-
+              <Th>{t("department") || "Department"}</Th>
               <Th>{t("position")}</Th>
               <Th>{t("phone")}</Th>
               <SortableTh label="Status" col="status" sort={sort} dir={dir} onSort={toggleSort} />
@@ -410,8 +413,14 @@ function EmployeesPage() {
                   ) : (
                     <span className="text-[11px] text-muted-foreground">—</span>
                   )}
+                  {e.insurance_number && (
+                    <div className="mt-1 flex items-center gap-1 font-mono text-[10px] text-muted-foreground" title={t("socialInsuranceNumber") || "Social Insurance Number"}>
+                      <span className="text-[9px] uppercase tracking-wider text-muted-foreground/70">SIN:</span>
+                      <span>{e.insurance_number}</span>
+                    </div>
+                  )}
                 </td>
-
+                <Td>{e.department ?? "—"}</Td>
                 <Td>{e.position ?? "—"}</Td>
                 <Td mono>{e.phone ?? "—"}</Td>
                 <Td>
@@ -451,6 +460,13 @@ function EmployeesPage() {
                 <Td>
                   <div className="flex items-center gap-1" onClick={(ev) => ev.stopPropagation()}>
                     <button
+                      onClick={() => setResendTarget({ id: e.id, full_name: e.full_name, email: e.email })}
+                      title={isAr ? "إعادة إرسال بريد الترحيب وبيانات الدخول" : "Resend Welcome Email"}
+                      className="inline-flex items-center rounded-full border border-brand/30 bg-brand/10 p-1.5 text-xs font-semibold text-brand hover:bg-brand/20 transition-colors"
+                    >
+                      <Mail className="h-3.5 w-3.5" />
+                    </button>
+                    <button
                       onClick={() => setEditing(e)}
                       title="Edit"
                       className="inline-flex items-center rounded-full border border-border bg-card p-1.5 text-xs font-semibold hover:bg-muted"
@@ -476,7 +492,7 @@ function EmployeesPage() {
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={10} className="p-8 text-center text-sm text-muted-foreground">{isLoading ? "Loading…" : "—"}</td></tr>
+              <tr><td colSpan={11} className="p-8 text-center text-sm text-muted-foreground">{isLoading ? "Loading…" : "—"}</td></tr>
             )}
           </tbody>
         </table>
@@ -537,6 +553,149 @@ function EmployeesPage() {
           }}
         />
       )}
+      {resendTarget && (
+        <ResendWelcomeEmailModal
+          target={resendTarget}
+          onClose={() => setResendTarget(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function ResendWelcomeEmailModal({
+  target,
+  onClose,
+}: {
+  target: { id: string; full_name?: string | null; email?: string | null };
+  onClose: () => void;
+}) {
+  const { isAr } = useI18n();
+  const sendEmailFn = useServerFn(sendEmployeeWelcomeEmail);
+  const [password, setPassword] = useState(() => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
+    let res = "";
+    for (let i = 0; i < 10; i++) res += chars.charAt(Math.floor(Math.random() * chars.length));
+    return res;
+  });
+  const [sending, setSending] = useState(false);
+
+  function generateNew() {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
+    let res = "";
+    for (let i = 0; i < 10; i++) res += chars.charAt(Math.floor(Math.random() * chars.length));
+    setPassword(res);
+  }
+
+  async function handleSend() {
+    if (!password.trim()) {
+      toast.error("Password is required");
+      return;
+    }
+    if (!target.email) {
+      toast.error("Employee has no email address");
+      return;
+    }
+    setSending(true);
+    try {
+      const res = await sendEmailFn({
+        data: {
+          userId: target.id,
+          to: target.email,
+          employeeName: target.full_name || target.email,
+          username: target.email,
+          password: password.trim(),
+          loginUrl: window.location.origin,
+          appName: document.title || "INT-HR App",
+        },
+      });
+      if ((res as any)?.ok) {
+        toast.success(isAr ? "تم إرسال بريد الترحيب بنجاح!" : "Welcome email sent successfully!");
+        onClose();
+      } else {
+        toast.error((res as any)?.error || "Failed to send welcome email");
+      }
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to send welcome email");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-200" onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl space-y-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-border pb-3">
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand/10 text-brand">
+              <Mail className="h-4 w-4" />
+            </span>
+            <h3 className="font-semibold text-foreground text-base">
+              {isAr ? "إعادة إرسال بريد الترحيب" : "Resend Welcome Email"}
+            </h3>
+          </div>
+          <button onClick={onClose} className="rounded-md p-1 text-muted-foreground hover:bg-muted">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="space-y-3 text-sm">
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground">{isAr ? "الموظف" : "Employee"}</label>
+            <p className="font-medium text-foreground">{target.full_name ?? target.email}</p>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground">{isAr ? "البريد الإلكتروني" : "Recipient Email"}</label>
+            <p className="font-mono text-xs text-foreground font-semibold bg-muted/40 p-2 rounded-lg border border-border">
+              {target.email}
+            </p>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-semibold text-muted-foreground">
+                {isAr ? "كلمة المرور الجديدة المرسلة" : "New password to send"}
+              </label>
+              <button
+                type="button"
+                onClick={generateNew}
+                className="text-xs font-semibold text-brand hover:underline"
+              >
+                {isAr ? "توليد كلمة سر جديدة" : "Generate New"}
+              </button>
+            </div>
+            <input
+              type="text"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full rounded-xl border border-border bg-background px-3 py-2 font-mono text-sm text-foreground focus:outline-hidden focus:ring-2 focus:ring-brand"
+            />
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {isAr
+                ? "سيتم تعيين هذه الكلمة لحساب الموظف وإرسالها له بالبريد بتصميم INT-HR الرسمي."
+                : "This password will be updated in the employee's account and emailed in the official template."}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-3 border-t border-border">
+          <button
+            onClick={onClose}
+            disabled={sending}
+            className="rounded-xl border border-border px-4 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted"
+          >
+            {isAr ? "إلغاء" : "Cancel"}
+          </button>
+          <button
+            onClick={handleSend}
+            disabled={sending}
+            className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-brand-foreground hover:opacity-90 disabled:opacity-50"
+          >
+            <Mail className="h-3.5 w-3.5" />
+            {sending ? (isAr ? "جاري الإرسال…" : "Sending…") : (isAr ? "إرسال البريد الآن" : "Send Welcome Email")}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -569,7 +728,7 @@ function EditEmployeeDrawer({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { t } = useI18n();
+  const { t, isAr } = useI18n();
   const [fullName, setFullName] = useState<string>(row.full_name ?? "");
   const [fullNameAr, setFullNameAr] = useState<string>(row.full_name_ar ?? "");
   const [departmentId, setDepartmentId] = useState<string>(row.department_id ?? "");
@@ -746,41 +905,61 @@ function EditEmployeeDrawer({
               ))}
             </select>
           </label>
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-muted-foreground">{t("medicalInsuranceType")}</span>
-            <select value={medicalInsuranceType} onChange={(e) => setMedicalInsuranceType(e.target.value)}
-              className="w-full rounded-xl border border-input bg-card px-3 py-2 text-sm">
-              <option value="">—</option>
-              <option value="Private">{t("insurancePrivate")}</option>
-              <option value="Governmental">{t("insuranceGovernmental")}</option>
-            </select>
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-muted-foreground">Social Insurance Number</span>
-            <input 
-              value={insuranceNumber} 
-              onChange={(e) => {
-                const val = e.target.value;
-                setInsuranceNumber(val);
-                if (val.trim()) setIsInsured(true);
-              }} 
-              className="w-full rounded-xl border border-input bg-card px-3 py-2 text-sm font-mono" 
-            />
-          </label>
-          <label className="block flex items-center gap-2 mt-6">
-            <input 
-              type="checkbox" 
-              checked={isInsured} 
-              onChange={(e) => setIsInsured(e.target.checked)} 
-              className="h-4 w-4 accent-brand" 
-            />
-            <span className="text-sm font-medium text-muted-foreground">Is Insured</span>
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-muted-foreground">{t("medicalInsuranceNumber")}</span>
-            <input value={medicalInsuranceNumber} onChange={(e) => setMedicalInsuranceNumber(e.target.value)} placeholder="e.g. MED-123456"
-              className="w-full rounded-xl border border-input bg-card px-3 py-2 text-sm" />
-          </label>
+          {/* Social Insurance Group */}
+          <div className="rounded-2xl border border-border/80 bg-muted/20 p-3.5 space-y-3">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-foreground">
+              <span className="flex h-5 w-5 items-center justify-center rounded-md bg-purple-500/15 text-purple-600 dark:text-purple-400">
+                <ShieldCheck className="h-3.5 w-3.5" />
+              </span>
+              <span>{isAr ? "التأمينات الاجتماعية" : "Social Insurance"}</span>
+            </div>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-muted-foreground">{t("socialInsuranceNumber") || "Social Insurance Number"}</span>
+              <input 
+                value={insuranceNumber} 
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setInsuranceNumber(val);
+                  if (val.trim()) setIsInsured(true);
+                }} 
+                className="w-full rounded-xl border border-input bg-card px-3 py-2 text-sm font-mono" 
+              />
+            </label>
+            <label className="flex items-center gap-2 pt-1 cursor-pointer">
+              <input 
+                type="checkbox" 
+                checked={isInsured} 
+                onChange={(e) => setIsInsured(e.target.checked)} 
+                className="h-4 w-4 accent-brand rounded" 
+              />
+              <span className="text-xs font-medium text-foreground">{isAr ? "مسجل تأمينياً" : "Is Insured"}</span>
+            </label>
+          </div>
+
+          {/* Medical Insurance Group */}
+          <div className="rounded-2xl border border-border/80 bg-muted/20 p-3.5 space-y-3">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-foreground">
+              <span className="flex h-5 w-5 items-center justify-center rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                <HeartPulse className="h-3.5 w-3.5" />
+              </span>
+              <span>{isAr ? "التأمين الطبي" : "Medical Insurance"}</span>
+            </div>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-muted-foreground">{t("medicalInsuranceType")}</span>
+              <select value={medicalInsuranceType} onChange={(e) => setMedicalInsuranceType(e.target.value)}
+                className="w-full rounded-xl border border-input bg-card px-3 py-2 text-sm">
+                <option value="">—</option>
+                <option value="Private">{t("insurancePrivate")}</option>
+                <option value="Governmental">{t("insuranceGovernmental")}</option>
+                <option value="Both">{t("insuranceBoth") || "Both"}</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-muted-foreground">{t("medicalInsuranceNumber")}</span>
+              <input value={medicalInsuranceNumber} onChange={(e) => setMedicalInsuranceNumber(e.target.value)} placeholder="e.g. MED-123456"
+                className="w-full rounded-xl border border-input bg-card px-3 py-2 text-sm" />
+            </label>
+          </div>
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-muted-foreground">{t("bankName" as any) || "Bank Name"}</span>
             <input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="e.g. CIB, QNB, NBE..."
@@ -977,7 +1156,7 @@ function FormSection({
 }
 
 function AddEmployeeModal({ departments, positions, cities, districts, managers, costCenters = [], shifts = [], sections = [], jobGrades = [], graduations = [], majors = [], onClose }: { departments: { id: string; name: string }[]; positions: { id: string; name: string }[]; cities: CityOpt[]; districts: DistrictOpt[]; managers: { id: string; name: string }[]; costCenters?: { id: string; code: string; name_en: string; name_ar: string; status: string }[]; shifts?: { id: string; name: string; start_time: string; end_time: string; is_active: boolean }[]; sections?: { id: string; department_id: string; name_en: string }[]; jobGrades?: { id: string; name_en: string; name_ar: string; active: boolean }[]; graduations?: { id: string; name_en: string; name_ar: string; active: boolean }[]; majors?: { id: string; name_en: string; name_ar: string; active: boolean }[]; onClose: () => void }) {
-  const { t } = useI18n();
+  const { t, isAr } = useI18n();
   const qc = useQueryClient();
   const validateBatch = useServerFn(validateEmployeesBatch);
   const createEmployee = useServerFn(createEmployeeAdmin);
@@ -1019,7 +1198,8 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
     extraEmail: "",
     medicalInsuranceDetails: "",
     medicalInsuranceNumber: "",
-    medicalInsuranceType: "" as "" | "Private" | "Governmental",
+    medicalInsuranceType: "" as "" | "Private" | "Governmental" | "Both",
+    insuranceNumber: "",
     isInsured: false,
     militaryExpireDate: "",
     isFivePercent: false,
@@ -1184,6 +1364,7 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
             medicalInsuranceDetails: form.medicalInsuranceDetails.trim(),
             medicalInsuranceNumber: form.medicalInsuranceNumber.trim() || undefined,
             medicalInsuranceType: (form.medicalInsuranceType || undefined) as any,
+            insuranceNumber: form.insuranceNumber.trim() || undefined,
             isInsured: form.isInsured,
             militaryExpireDate: form.militaryExpireDate,
             isFivePercent: form.isFivePercent,
@@ -1383,7 +1564,7 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Field label="Full name *" error={fieldErrors.name}><input value={form.name} onChange={(e) => upd("name", e.target.value)} onBlur={() => handleBlur("name")} maxLength={80} placeholder="e.g. John Doe" className={inputCls} /></Field>
+              <Field label="Full name *" error={fieldErrors.name}><input value={form.name} onChange={(e) => upd("name", e.target.value)} onBlur={() => handleBlur("name")} maxLength={80} placeholder="e.g. Hafez Rahim" className={inputCls} /></Field>
               <Field label={t("fullNameAr" as any) ?? "Full name (Arabic)"}>
                 <input dir="rtl" value={form.nameAr} onChange={(e) => upd("nameAr", e.target.value)} maxLength={80} placeholder="الاسم بالكامل بالعربية" className={inputCls} />
               </Field>
@@ -1464,6 +1645,13 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
                   value={form.nationalIdExpiry}
                   onChange={(d) => upd("nationalIdExpiry", d)}
                   onBlur={() => handleBlur("nationalIdExpiry")}
+                  className={inputCls + " font-mono"}
+                />
+              </Field>
+              <Field label="Military Expire Date">
+                <DateInput
+                  value={form.militaryExpireDate}
+                  onChange={(d) => upd("militaryExpireDate", d)}
                   className={inputCls + " font-mono"}
                 />
               </Field>
@@ -1688,45 +1876,81 @@ function AddEmployeeModal({ departments, positions, cities, districts, managers,
             icon={ShieldCheck}
             iconBg="bg-purple-500/10 text-purple-600 dark:text-purple-400"
             title="Insurance & Compliance"
-            subtitle="Medical coverage, social insurance registration, military status, and quotas"
+            subtitle="Social insurance, compliance status, and medical insurance coverage"
           >
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <Field label={t("medicalInsuranceType")}>
-                <select value={form.medicalInsuranceType} onChange={(e) => upd("medicalInsuranceType", e.target.value as any)} className={inputCls}>
-                  <option value="">—</option>
-                  <option value="Private">{t("insurancePrivate")}</option>
-                  <option value="Governmental">{t("insuranceGovernmental")}</option>
-                </select>
-              </Field>
-              <Field label={t("medicalInsuranceNumber")}>
-                <input value={form.medicalInsuranceNumber} onChange={(e) => upd("medicalInsuranceNumber", e.target.value)} className={inputCls} placeholder="e.g. MED-123456" />
-              </Field>
-              <Field label="Medical Insurance Details">
-                <input value={form.medicalInsuranceDetails} onChange={(e) => upd("medicalInsuranceDetails", e.target.value)} placeholder="Coverage level, network, etc." className={inputCls} />
-              </Field>
-              <Field label="Social Insurance Date">
-                <DateInput
-                  value={form.socialInsuranceDate}
-                  onChange={(d) => upd("socialInsuranceDate", d)}
-                  className={inputCls + " font-mono"}
-                />
-              </Field>
-              <Field label="Military Expire Date">
-                <DateInput
-                  value={form.militaryExpireDate}
-                  onChange={(d) => upd("militaryExpireDate", d)}
-                  className={inputCls + " font-mono"}
-                />
-              </Field>
-              <div className="sm:col-span-2 lg:col-span-3 flex flex-wrap items-center gap-3 pt-2">
-                <label className="inline-flex cursor-pointer items-center gap-2.5 rounded-xl border border-border/80 bg-muted/20 px-3.5 py-2.5 text-xs font-medium text-foreground hover:bg-muted/40 transition-colors">
-                  <input type="checkbox" className="h-4 w-4 accent-brand rounded" checked={form.isInsured} onChange={(e) => upd("isInsured", e.target.checked)} />
-                  <span>Is Insured (مسجل تأمينياً)</span>
-                </label>
-                <label className="inline-flex cursor-pointer items-center gap-2.5 rounded-xl border border-border/80 bg-muted/20 px-3.5 py-2.5 text-xs font-medium text-foreground hover:bg-muted/40 transition-colors">
-                  <input type="checkbox" className="h-4 w-4 accent-brand rounded" checked={form.isFivePercent} onChange={(e) => upd("isFivePercent", e.target.checked)} />
-                  <span>5% Quota Disability (نسبة الـ 5% ذوي الاحتياجات)</span>
-                </label>
+            <div className="space-y-4">
+              {/* Group 1: Social Insurance */}
+              <div className="rounded-2xl border border-border/80 bg-muted/20 p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-md bg-purple-500/15 text-purple-600 dark:text-purple-400">
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                  </span>
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                    {isAr ? "التأمينات الاجتماعية" : "Social Insurance"}
+                  </h4>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <Field label={t("socialInsuranceNumber") || "Social Insurance Number"}>
+                    <input
+                      value={form.insuranceNumber}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        upd("insuranceNumber", val);
+                        if (val.trim()) upd("isInsured", true);
+                      }}
+                      className={inputCls + " font-mono"}
+                      placeholder="e.g. 123456789"
+                    />
+                  </Field>
+                  <Field label={t("socialInsuranceDate") || "Social Insurance Date"}>
+                    <DateInput
+                      value={form.socialInsuranceDate}
+                      onChange={(d) => {
+                        upd("socialInsuranceDate", d);
+                        if (d && d.trim()) upd("isInsured", true);
+                      }}
+                      className={inputCls + " font-mono"}
+                    />
+                  </Field>
+                  <div className="sm:col-span-2 lg:col-span-3 flex flex-wrap items-center gap-3 pt-2">
+                    <label className="inline-flex cursor-pointer items-center gap-2.5 rounded-xl border border-border/80 bg-background/60 px-3.5 py-2.5 text-xs font-medium text-foreground hover:bg-muted/40 transition-colors shadow-2xs">
+                      <input type="checkbox" className="h-4 w-4 accent-brand rounded" checked={form.isInsured} onChange={(e) => upd("isInsured", e.target.checked)} />
+                      <span>Is Insured (مسجل تأمينياً)</span>
+                    </label>
+                    <label className="inline-flex cursor-pointer items-center gap-2.5 rounded-xl border border-border/80 bg-background/60 px-3.5 py-2.5 text-xs font-medium text-foreground hover:bg-muted/40 transition-colors shadow-2xs">
+                      <input type="checkbox" className="h-4 w-4 accent-brand rounded" checked={form.isFivePercent} onChange={(e) => upd("isFivePercent", e.target.checked)} />
+                      <span>5% Quota Disability (نسبة الـ 5% ذوي الاحتياجات)</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Group 2: Medical Insurance */}
+              <div className="rounded-2xl border border-border/80 bg-muted/20 p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                    <HeartPulse className="h-3.5 w-3.5" />
+                  </span>
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                    {isAr ? "التأمين الطبي" : "Medical Insurance"}
+                  </h4>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <Field label={t("medicalInsuranceType")}>
+                    <select value={form.medicalInsuranceType} onChange={(e) => upd("medicalInsuranceType", e.target.value as any)} className={inputCls}>
+                      <option value="">—</option>
+                      <option value="Private">{t("insurancePrivate")}</option>
+                      <option value="Governmental">{t("insuranceGovernmental")}</option>
+                      <option value="Both">{t("insuranceBoth") || "Both"}</option>
+                    </select>
+                  </Field>
+                  <Field label={t("medicalInsuranceNumber")}>
+                    <input value={form.medicalInsuranceNumber} onChange={(e) => upd("medicalInsuranceNumber", e.target.value)} className={inputCls} placeholder="e.g. MED-123456" />
+                  </Field>
+                  <Field label="Medical Insurance Details">
+                    <input value={form.medicalInsuranceDetails} onChange={(e) => upd("medicalInsuranceDetails", e.target.value)} placeholder="Coverage level, network, etc." className={inputCls} />
+                  </Field>
+                </div>
               </div>
             </div>
           </FormSection>
@@ -1949,14 +2173,16 @@ function isStrictIsoDate(value: string) {
 function validateOptionalImportDate(value: string, label: string): string | null {
   const v = value.trim();
   if (!v) return null;
-  return isStrictIsoDate(v) ? null : `${label} must be YYYY-MM-DD`;
+  const normalized = normalizeExcelDate(v);
+  return normalized ? null : `${label} must be YYYY-MM-DD`;
 }
 
 function validateIdExpiry(nationalId: string, exp: string): "ok" | "idExpiryRequired" | "idExpiryInvalid" | "idExpiryInPast" {
   if (!nationalId.trim()) return "ok";
-  if (!exp) return "idExpiryRequired";
-  if (!isStrictIsoDate(exp)) return "idExpiryInvalid";
-  const [year, month, day] = exp.split("-").map(Number);
+  if (!exp.trim()) return "idExpiryRequired";
+  const normalized = normalizeExcelDate(exp);
+  if (!normalized) return "idExpiryInvalid";
+  const [year, month, day] = normalized.split("-").map(Number);
   const d = new Date(Date.UTC(year, month - 1, day));
   const today = new Date(); today.setHours(0, 0, 0, 0);
   if (d.getTime() < today.getTime()) return "idExpiryInPast";
@@ -1976,7 +2202,8 @@ type ExtraHr = {
   salaryMode: "gross" | "net"; salaryGross: number; salaryNet: number;
   empCode: string; idIssueDate: string; idCardAddress: string; avatarUrl: string;
   extraEmail: string; medicalInsuranceDetails: string;
-  medicalInsuranceNumber: string; medicalInsuranceType: "" | "Private" | "Governmental";
+  medicalInsuranceNumber: string; medicalInsuranceType: "" | "Private" | "Governmental" | "Both";
+  insuranceNumber: string;
   isInsured: boolean;
   militaryExpireDate: string; isFivePercent: boolean; socialInsuranceDate: string;
   customField: string;
@@ -2289,7 +2516,15 @@ function ImportExcelButtonsOnly() {
   const qc = useQueryClient();
   const ref = useRef<HTMLInputElement>(null);
   const importEmployees = useServerFn(importEmployeesAdmin);
-  const [errors, setErrors] = useState<ImportErrors | null>(null);
+  const [errors, setErrors] = useState<ImportErrors | null>(() => {
+    try {
+      const saved = typeof window !== "undefined" ? localStorage.getItem("hr_last_import_errors") : null;
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [showModal, setShowModal] = useState(false);
 
   async function downloadTemplate() {
     const XLSX = await import("xlsx");
@@ -2354,37 +2589,89 @@ function ImportExcelButtonsOnly() {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
       const ws = wb.Sheets[wb.SheetNames[0]];
-      // Strict header validation: must contain every TEMPLATE_COLS header (case-sensitive),
-      // reject the whole file if any required header is missing.
-      const headerRows = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1, blankrows: false }) as any[];
-      const headers: string[] = Array.isArray(headerRows[0])
-        ? (headerRows[0] as any[]).map((h) => String(h ?? "").trim())
-        : [];
-      const required = [...TEMPLATE_COLS];
-      const missing = required.filter((c) => !headers.includes(c));
-      const unknown = headers.filter((h) => h && !required.includes(h as any));
-      const mismatched = required
-        .map((expected, i) => ({ column: i + 1, expected, found: headers[i] ?? "(blank)" }))
-        .filter((m) => m.expected !== m.found);
-      const exactHeaders = headers.length === required.length && required.every((h, i) => headers[i] === h);
-      if (!exactHeaders) {
+      const rawRows = XLSX.utils.sheet_to_json<Record<string, any>>(ws, { defval: "", raw: false });
+      if (!rawRows || rawRows.length === 0) {
+        setErrors({ fatal: "No data rows found in the file.", missing: [], unknown: [], mismatched: [], rowIssues: [], totalRows: 0, importedCount: 0 });
+        toast.error("File is empty or has no data rows");
+        return;
+      }
+
+      const HEADER_MAP: Record<string, string> = {
+        empcode: "empCode", "emp_code": "empCode", code: "empCode", "كود": "empCode", "كود الموظف": "empCode",
+        name: "name", fullname: "name", "full_name": "name", "اسم": "name", "الاسم": "name", "اسم الموظف": "name",
+        namear: "nameAr", "name_ar": "nameAr", "الاسم بالعربي": "nameAr", "الاسم بالعربية": "nameAr",
+        email: "email", "e-mail": "email", "البريد": "email", "البريد الإلكتروني": "email", "الايميل": "email",
+        phone: "phone", mobile: "phone", "الهاتف": "phone", "الموبايل": "phone", "رقم الهاتف": "phone",
+        dept: "dept", department: "dept", "القسم": "dept", "الإدارة": "dept", "الادارة": "dept",
+        position: "position", title: "position", job_title: "position", "الوظيفة": "position", "المسمى الوظيفي": "position",
+        jobgrade: "jobGrade", "job_grade": "jobGrade", grade: "jobGrade", "الدرجة": "jobGrade", "الدرجة الوظيفية": "jobGrade",
+        graduation: "graduation", "المؤهل": "graduation", "المؤهل الدراسي": "graduation",
+        major: "major", "التخصص": "major",
+        role: "role", "الدور": "role", "الصلاحية": "role",
+        branch: "branch", "الفرع": "branch",
+        status: "status", "الحالة": "status",
+        salary: "salary", "الراتب": "salary", "المرتب": "salary",
+        salarymode: "salaryMode", "salary_mode": "salaryMode", "نوع الراتب": "salaryMode",
+        allowance: "allowance", "بدل": "allowance", "البدلات": "allowance",
+        target: "target", "التارجت": "target", "الهدف": "target",
+        targetduration: "targetDuration", "target_duration": "targetDuration",
+        bankname: "bankName", "bank_name": "bankName", "اسم البنك": "bankName", "البنك": "bankName",
+        bankaccountnumber: "bankAccountNumber", "bank_account_number": "bankAccountNumber", "رقم الحساب": "bankAccountNumber", "رقم الحساب البنكي": "bankAccountNumber",
+        password: "password", "كلمة المرور": "password", "الباسورد": "password",
+        personalphone: "personalPhone", "personal_phone": "personalPhone", "هاتف شخصي": "personalPhone",
+        gender: "gender", "النوع": "gender", "الجنس": "gender",
+        nationalid: "nationalId", "national_id": "nationalId", "الرقم القومي": "nationalId", "بطاقة الرقم القومي": "nationalId",
+        idissuedate: "idIssueDate", "id_issue_date": "idIssueDate", "تاريخ إصدار البطاقة": "idIssueDate", "تاريخ اصدار البطاقة": "idIssueDate", "تاريخ الاصدار": "idIssueDate", "تاريخ الإصدار": "idIssueDate", idissue: "idIssueDate", "id_issue": "idIssueDate", issuedate: "idIssueDate", "issue_date": "idIssueDate", "تاريخ صدور البطاقة": "idIssueDate", "تاريخ الصدور": "idIssueDate",
+        nationalidexpiry: "nationalIdExpiry", "national_id_expiry": "nationalIdExpiry", "idexpirydate": "nationalIdExpiry", "id_expiry_date": "nationalIdExpiry", "تاريخ انتهاء البطاقة": "nationalIdExpiry", "تاريخ انتهاء الرقم القومي": "nationalIdExpiry", "تاريخ الانتهاء": "nationalIdExpiry", "تاريخ الإنتهاء": "nationalIdExpiry", idexp: "nationalIdExpiry", "id_exp": "nationalIdExpiry", expirydate: "nationalIdExpiry", "expiry_date": "nationalIdExpiry", nationalidexp: "nationalIdExpiry", "تاريخ نهاية البطاقة": "nationalIdExpiry",
+        contractstartdate: "contractStartDate", "contract_start_date": "contractStartDate", startdate: "contractStartDate", "start_date": "contractStartDate", "تاريخ بداية العقد": "contractStartDate", "تاريخ التعيين": "contractStartDate", "تاريخ الالتحاق": "contractStartDate", "تاريخ بداية العمل": "contractStartDate",
+        contractenddate: "contractEndDate", "contract_end_date": "contractEndDate", enddate: "contractEndDate", "end_date": "contractEndDate", "تاريخ نهاية العقد": "contractEndDate", "تاريخ انتهاء العقد": "contractEndDate",
+        socialinsurancedate: "socialInsuranceDate", "social_insurance_date": "socialInsuranceDate", "تاريخ التأمين": "socialInsuranceDate", "تاريخ التأمين الاجتماعي": "socialInsuranceDate",
+        militaryexpiredate: "militaryExpireDate", "military_expire_date": "militaryExpireDate", "تاريخ انتهاء التجنيد": "militaryExpireDate", "تاريخ التجنيد": "militaryExpireDate",
+        idcardaddress: "idCardAddress", "id_card_address": "idCardAddress", "عنوان البطاقة": "idCardAddress",
+        country: "country", "الدولة": "country",
+        city: "city", "المدينة": "city", "المحافظة": "city",
+        district: "district", "المنطقة": "district", "الحي": "district",
+        street: "street", "الشارع": "street",
+        building: "building", "المبنى": "building", "رقم العقار": "building",
+        flat: "flat", "الشقة": "flat",
+        contracttype: "contractType", "contract_type": "contractType", "نوع العقد": "contractType", "العقد": "contractType",
+        medicalinsurancetype: "medicalInsuranceType", "medical_insurance_type": "medicalInsuranceType", "نوع التأمين الطبي": "medicalInsuranceType",
+        medicalinsurancenumber: "medicalInsuranceNumber", "medical_insurance_number": "medicalInsuranceNumber", "رقم التأمين الطبي": "medicalInsuranceNumber",
+        manager: "manager", "المدير": "manager", "المدير المباشر": "manager",
+        avatarurl: "avatarUrl", "avatar_url": "avatarUrl",
+        notes: "notes", "ملاحظات": "notes",
+      };
+
+      // Normalize row keys according to the alias mapping
+      const rows = rawRows.map((raw) => {
+        const norm: Record<string, any> = {};
+        for (const [k, v] of Object.entries(raw)) {
+          const clean = k.trim().toLowerCase().replace(/[\s_-]+/g, "");
+          const mappedKey = HEADER_MAP[clean] || HEADER_MAP[k.trim().toLowerCase()] || k.trim();
+          norm[mappedKey] = v;
+        }
+        return norm;
+      });
+
+      // Require at least name and email to be present
+      const hasName = rows.some((r) => String(r.name ?? "").trim().length > 0);
+      const hasEmail = rows.some((r) => String(r.email ?? "").trim().length > 0);
+      if (!hasName || !hasEmail) {
         setErrors({
-          fatal: "Template mismatch: headers must exactly match the downloaded employee template.",
-          missing, unknown, mismatched, rowIssues: [], totalRows: 0, importedCount: 0,
+          fatal: "Template mismatch: file must contain at least 'name' and 'email' columns.",
+          missing: [!hasName ? "name" : "", !hasEmail ? "email" : ""].filter(Boolean),
+          unknown: [], mismatched: [], rowIssues: [], totalRows: 0, importedCount: 0,
         });
-        toast.error("Import rejected: template headers do not match");
+        toast.error("Import rejected: 'name' and 'email' columns are required");
         return;
       }
-      const rows = XLSX.utils.sheet_to_json<Record<string, any>>(ws, { defval: "", raw: false });
-      if (rows.length === 0) {
-        setErrors({ fatal: "No data rows found in the file.", missing: [], unknown, mismatched: [], rowIssues: [], totalRows: 0, importedCount: 0 });
-        return;
-      }
+
       const allowedRoles = new Set(["admin", "hr", "manager", "employee", "finance"]);
       const rowIssues: { row: number; name?: string; email?: string; reasons: string[] }[] = [];
       const validRows: Record<string, any>[] = [];
       const validRowNumbers: number[] = [];
-      const seenEmpCodes = new Map<string, number>(); // empCode -> first row number
+      const seenEmpCodes = new Map<string, number>();
+
       for (let i = 0; i < rows.length; i++) {
         const r = rows[i];
         const name = String(r.name ?? "").trim();
@@ -2392,6 +2679,7 @@ function ImportExcelButtonsOnly() {
         const phoneRaw = String(r.phone ?? "").trim();
         const empCode = String(r.empCode ?? "").trim();
         const reasons: string[] = [];
+
         if (!name || name.length < 2) reasons.push("Name is required (min 2 chars)");
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) reasons.push("Valid email required");
         if (phoneRaw && !isValidEgPhone(phoneRaw)) reasons.push("Invalid Egyptian phone");
@@ -2408,19 +2696,52 @@ function ImportExcelButtonsOnly() {
         if (avatarUrl && !/^https?:\/\//i.test(avatarUrl) && !/^data:image\/(png|jpe?g|webp);base64,/i.test(avatarUrl)) {
           reasons.push("Avatar must be a WEBP, PNG, JPEG data URL or http(s) URL");
         }
-        const issueDateError = validateOptionalImportDate(String(r.idIssueDate ?? ""), "ID issue date");
-        if (issueDateError) reasons.push(issueDateError);
-        const expCheck = validateIdExpiry(String(r.nationalId ?? ""), String(r.nationalIdExpiry ?? ""));
-        if (expCheck === "idExpiryInvalid") reasons.push("ID expiry date must be YYYY-MM-DD");
-        else if (expCheck !== "ok") reasons.push(t(expCheck as any));
+
+        const rawIssueDate = r.idIssueDate !== null && r.idIssueDate !== undefined ? String(r.idIssueDate).trim() : "";
+        const idIssueDate = rawIssueDate ? normalizeExcelDate(r.idIssueDate) : "";
+        if (rawIssueDate && !idIssueDate) {
+          reasons.push("ID issue date must be YYYY-MM-DD");
+        }
+
+        const rawExpiry = r.nationalIdExpiry !== null && r.nationalIdExpiry !== undefined ? String(r.nationalIdExpiry).trim() : "";
+        const nationalIdExpiry = rawExpiry ? normalizeExcelDate(r.nationalIdExpiry) : "";
+        if (rawExpiry && !nationalIdExpiry) {
+          reasons.push("ID expiry date must be YYYY-MM-DD");
+        } else {
+          const expCheck = validateIdExpiry(String(r.nationalId ?? ""), nationalIdExpiry);
+          if (expCheck === "idExpiryRequired") {
+            reasons.push("ID expiry date is required when National ID is provided");
+          }
+        }
+
+        const contractStartDate = normalizeExcelDate(r.contractStartDate);
+        const contractEndDate = normalizeExcelDate(r.contractEndDate);
+        const socialInsuranceDate = normalizeExcelDate(r.socialInsuranceDate);
+        const militaryExpireDate = normalizeExcelDate(r.militaryExpireDate);
+
         if (reasons.length > 0) {
           rowIssues.push({ row: i + 2, name, email, reasons });
           continue;
         }
+
         if (empCode) seenEmpCodes.set(empCode, i + 2);
-        validRows.push({ ...r, name, email, phone: phoneRaw ? formatEgPhone(phoneRaw) : "", role, avatarUrl });
+        validRows.push({
+          ...r,
+          idIssueDate,
+          nationalIdExpiry,
+          contractStartDate,
+          contractEndDate,
+          socialInsuranceDate,
+          militaryExpireDate,
+          name,
+          email,
+          phone: phoneRaw ? formatEgPhone(phoneRaw) : "",
+          role,
+          avatarUrl,
+        });
         validRowNumbers.push(i + 2);
       }
+
       let added = 0;
       if (validRows.length > 0) {
         const res = await importEmployees({
@@ -2443,20 +2764,52 @@ function ImportExcelButtonsOnly() {
           }
         });
       }
+
       const invalid = rowIssues.length;
       if (invalid > 0) {
-        setErrors({
+        const errorData: ImportErrors = {
           fatal: null, missing: [], unknown: [], mismatched: [], rowIssues,
           totalRows: rows.length, importedCount: added,
-        });
+        };
+        setErrors(errorData);
+        setShowModal(true);
+        try {
+          localStorage.setItem("hr_last_import_errors", JSON.stringify(errorData));
+        } catch {}
+      } else {
+        setErrors(null);
+        setShowModal(false);
+        try {
+          localStorage.removeItem("hr_last_import_errors");
+        } catch {}
       }
+
       if (added > 0) {
         qc.invalidateQueries({ queryKey: ["admin", "employees", "list"] });
-        toast.success(t("importedCount").replace("{n}", String(added)) + (invalid ? ` · ${invalid} invalid` : ""));
+        if (invalid > 0) {
+          toast.warning(t("importedCount").replace("{n}", String(added)) + ` · ${invalid} invalid`, {
+            action: {
+              label: `View ${invalid} Errors`,
+              onClick: () => setShowModal(true),
+            },
+            duration: 15000,
+          });
+        } else {
+          toast.success(t("importedCount").replace("{n}", String(added)));
+        }
       } else if (invalid > 0) {
-        toast.error(`${invalid} row${invalid > 1 ? "s" : ""} rejected — see error panel`);
+        toast.error(`${invalid} row${invalid > 1 ? "s" : ""} rejected — see error panel`, {
+          action: {
+            label: "View Errors",
+            onClick: () => setShowModal(true),
+          },
+          duration: 15000,
+        });
       }
-    } catch { toast.error(t("importFailed")); }
+    } catch (e: any) {
+      console.error("[handleFile error]", e);
+      toast.error(e?.message || t("importFailed"));
+    }
   }
 
   return (
@@ -2467,9 +2820,19 @@ function ImportExcelButtonsOnly() {
       <button onClick={() => ref.current?.click()} className="inline-flex items-center gap-1.5 rounded-full bg-gradient-brand px-3 py-2 text-sm font-semibold text-brand-foreground shadow-brand">
         <Upload className="h-4 w-4" /> {t("importExcel")}
       </button>
+      {errors && (errors.rowIssues.length > 0 || errors.fatal) && (
+        <button
+          onClick={() => setShowModal(true)}
+          className="inline-flex items-center gap-1.5 rounded-full border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-semibold text-destructive hover:bg-destructive/20 shadow-sm"
+          title="View rejected rows and errors from the last Excel import"
+        >
+          <AlertCircle className="h-4 w-4" />
+          Errors ({errors.rowIssues.length})
+        </button>
+      )}
       <input ref={ref} type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden"
         onChange={(e) => { handleFile(e.target.files?.[0]); e.target.value = ""; }} />
-      {errors && <ImportErrorPanel errors={errors} onClose={() => setErrors(null)} />}
+      {showModal && errors && <ImportErrorPanel errors={errors} onClose={() => setShowModal(false)} />}
     </>
   );
 }

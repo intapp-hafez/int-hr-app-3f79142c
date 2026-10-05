@@ -17,15 +17,37 @@ type DepartmentUpsert = {
 export const listDepartments = createServerFn({ method: "GET" })
   .middleware([requireAdminAccess])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
+    const { data: rawDepts, error } = await context.supabase
       .from("departments")
-      .select("*, responsible:profiles!departments_responsible_person_id_fkey(id, full_name, email), parent:departments!departments_parent_id_fkey(name_en)")
+      .select("*")
       .order("name_en");
     if (error) throw new Error(error.message);
-    return (data ?? []).map((d: any) => ({
+
+    const deptMap = new Map((rawDepts ?? []).map((d: any) => [d.id, d.name_en?.trim() || d.name_ar?.trim() || ""]));
+
+    const responsibleIds = (rawDepts ?? [])
+      .map((d: any) => d.responsible_person_id)
+      .filter((id): id is string => typeof id === "string" && id.length > 0);
+
+    const nameMap = new Map<string, string>();
+    if (responsibleIds.length > 0) {
+      try {
+        const { data: profs } = await context.supabase
+          .from("profiles")
+          .select("id, full_name, full_name_ar, email")
+          .in("id", responsibleIds);
+        for (const p of profs ?? []) {
+          nameMap.set(p.id, p.full_name?.trim() || p.full_name_ar?.trim() || p.email || "");
+        }
+      } catch (err) {
+        console.warn("[listDepartments] profiles lookup error:", err);
+      }
+    }
+
+    return (rawDepts ?? []).map((d: any) => ({
       ...d,
-      responsible_person_name: d.responsible?.full_name ?? d.responsible?.email ?? null,
-      parent_name: d.parent?.name_en ?? null,
+      responsible_person_name: d.responsible_person_id ? nameMap.get(d.responsible_person_id) ?? null : null,
+      parent_name: d.parent_id ? deptMap.get(d.parent_id) ?? null : null,
     }));
   });
 
@@ -93,7 +115,15 @@ export const listSections = createServerFn({ method: "GET" })
     
     const { data: records, error } = await query;
     if (error) throw new Error(error.message);
-    return records ?? [];
+
+    const sectionMap = new Map<string, string>(
+      (records ?? []).map((s: any) => [s.id, s.name_en?.trim() || s.name_ar?.trim() || ""])
+    );
+
+    return (records ?? []).map((s: any) => ({
+      ...s,
+      parent_name: s.parent_id ? sectionMap.get(s.parent_id) ?? null : null,
+    }));
   });
 
 export const upsertSection = createServerFn({ method: "POST" })
@@ -101,18 +131,21 @@ export const upsertSection = createServerFn({ method: "POST" })
   .inputValidator((i) => z.object({
     id: z.string().uuid().optional(),
     department_id: z.string().uuid(),
+    parent_id: z.string().uuid().nullable().optional(),
     name_en: z.string().min(1),
     name_ar: z.string().min(1),
     active: z.boolean().default(true),
   }).parse(i))
   .handler(async ({ data, context }) => {
-    const { error } = await (context.supabase as any).from("sections").upsert({
+    const payload: Record<string, any> = {
       id: data.id,
       department_id: data.department_id,
       name_en: data.name_en,
       name_ar: data.name_ar,
-      active: data.active
-    });
+      active: data.active,
+      parent_id: data.parent_id || null,
+    };
+    const { error } = await (context.supabase as any).from("sections").upsert(payload);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -162,14 +195,17 @@ export const deleteDepartmentPosition = createServerFn({ method: "POST" })
 export const listPositions = createServerFn({ method: "GET" })
   .middleware([requireAdminAccess])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
+    const { data: rawPositions, error } = await context.supabase
       .from("positions")
-      .select("*, reports_to:positions!positions_reports_to_position_id_fkey(name_en)")
+      .select("*")
       .order("name_en");
     if (error) throw new Error(error.message);
-    return (data ?? []).map((p: any) => ({
+
+    const posMap = new Map((rawPositions ?? []).map((p: any) => [p.id, p.name_en?.trim() || p.name_ar?.trim() || ""]));
+
+    return (rawPositions ?? []).map((p: any) => ({
       ...p,
-      reports_to_name: p.reports_to?.name_en ?? null,
+      reports_to_name: p.reports_to_position_id ? posMap.get(p.reports_to_position_id) ?? null : null,
     }));
   });
 export const upsertPosition = createServerFn({ method: "POST" })

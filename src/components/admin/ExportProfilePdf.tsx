@@ -13,7 +13,7 @@ const SECTIONS: { key: string; title: string; sensitive?: boolean; rows: (d: D) 
   { key: "identity", title: "Identity & ID", rows: (d) => [
     ["Full name", v(d.full_name)], ["Employee code", v(d.emp_code)], ["Email", v(d.email)], ["Extra email", v(d.extra_email)],
     ["Phone", v(d.phone)], ["Gender", v(d.gender)], ["National ID / Passport", v(d.national_id)],
-    ["ID issue date", v(d.id_issue_date)], ["ID expiry date", v(d.id_expiry_date)], ["5% quota", yn(d.is_five_percent)],
+    ["ID issue date", v(d.id_issue_date)], ["ID expiry date", v(d.id_expiry_date)], ["Military expire date", v(d.military_expire_date)], ["5% quota", yn(d.is_five_percent)],
   ] },
   { key: "education", title: "Education", rows: (d) => [["Graduation", v(d.graduation)], ["Major", v(d.major)]] },
   { key: "work", title: "Work & reporting", rows: (d) => [
@@ -26,8 +26,9 @@ const SECTIONS: { key: string; title: string; sensitive?: boolean; rows: (d: D) 
   ] },
   { key: "location", title: "Location", rows: (d) => [["City", v(d.city)], ["District", v(d.district)]] },
   { key: "insurance", title: "Insurance", rows: (d) => [
-    ["Insured", yn(d.is_insured)], ["Medical insurance type", v(d.medical_insurance_type)], ["Medical insurance no.", v(d.medical_insurance_number)],
-    ["Medical insurance details", v(d.medical_insurance_details)], ["Social insurance date", v(d.social_insurance_date)], ["Military expire date", v(d.military_expire_date)],
+    ["Insured", yn(d.is_insured)], ["Social insurance no.", v(d.insurance_number)], ["Social insurance date", v(d.social_insurance_date)],
+    ["Medical insurance type", v(d.medical_insurance_type)], ["Medical insurance no.", v(d.medical_insurance_number)],
+    ["Medical insurance details", v(d.medical_insurance_details)],
   ] },
   { key: "compensation", title: "Compensation & bank (sensitive)", sensitive: true, rows: (d) => [
     ["Salary basis", v(d.salary_mode)], ["Gross salary", num(d.salary_gross)], ["Net salary", num(d.salary_net)], ["Allowance", num(d.allowance)],

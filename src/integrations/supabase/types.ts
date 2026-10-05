@@ -3384,6 +3384,7 @@ export type Database = {
           id: string
           name_ar: string
           name_en: string
+          parent_id: string | null
           updated_at: string
         }
         Insert: {
@@ -3393,6 +3394,7 @@ export type Database = {
           id?: string
           name_ar: string
           name_en: string
+          parent_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -3402,6 +3404,7 @@ export type Database = {
           id?: string
           name_ar?: string
           name_en?: string
+          parent_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -3410,6 +3413,13 @@ export type Database = {
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sections_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "sections"
             referencedColumns: ["id"]
           },
         ]

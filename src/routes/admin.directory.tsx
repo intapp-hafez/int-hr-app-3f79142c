@@ -489,6 +489,27 @@ function NamedSection({ kind }: { kind: "departments" | "positions" | "job_grade
             </td>
           </tr>
         ))}
+        {q.isLoading && (
+          <tr>
+            <td colSpan={isDept ? 7 : 6} className="p-8 text-center text-sm text-muted-foreground">
+              Loading…
+            </td>
+          </tr>
+        )}
+        {q.isError && (
+          <tr>
+            <td colSpan={isDept ? 7 : 6} className="p-8 text-center text-sm text-destructive">
+              Failed to load: {(q.error as Error)?.message || "Unknown error"}
+            </td>
+          </tr>
+        )}
+        {!q.isLoading && !q.isError && paged.slice.length === 0 && (
+          <tr>
+            <td colSpan={isDept ? 7 : 6} className="p-8 text-center text-sm text-muted-foreground">
+              No {kind.replace(/_/g, " ")} found.
+            </td>
+          </tr>
+        )}
       </Table>
       <Pagination page={paged.page} pageCount={paged.pageCount} onChange={paged.setPage} />
       {structureDept && (

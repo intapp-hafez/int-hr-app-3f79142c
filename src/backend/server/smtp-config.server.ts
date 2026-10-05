@@ -15,7 +15,8 @@ export type LoadedSmtp = {
 };
 
 function key(): string {
-  return process.env.SMTP_ENCRYPTION_KEY || "dev-fallback-key-change-me";
+  const env = typeof process !== "undefined" && process?.env ? process.env : (import.meta as any)?.env;
+  return env?.SMTP_ENCRYPTION_KEY || env?.VITE_SMTP_ENCRYPTION_KEY || "dev-fallback-key-change-me";
 }
 
 export async function loadSmtpConfig(): Promise<LoadedSmtp | null> {

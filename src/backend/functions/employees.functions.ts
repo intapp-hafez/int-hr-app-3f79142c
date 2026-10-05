@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireAdminAccess } from "@/integrations/supabase/admin-auth-middleware";
 import { formatEgPhone } from "@/lib/phone";
+import { normalizeExcelDate } from "@/lib/date-format";
 import { z } from "zod";
 
 export type AdminEmployeeRow = {
@@ -12,6 +13,8 @@ export type AdminEmployeeRow = {
   phone: string | null;
   department: string | null;
   position: string | null;
+  department_ar?: string | null;
+  position_ar?: string | null;
   department_id: string | null;
   position_id: string | null;
   city: string | null;
@@ -59,46 +62,48 @@ function isStrictIsoDate(value: string) {
   return d.getUTCFullYear() === year && d.getUTCMonth() === month - 1 && d.getUTCDate() === day;
 }
 
+const str = z.union([z.string(), z.number()]).transform((v) => String(v ?? "").trim()).optional().default("");
+
 const ImportEmployeeRowSchema = z.object({
-  empCode: z.string().max(40).optional().default(""),
-  name: z.string().max(120).optional().default(""),
-  nameAr: z.string().max(120).optional().default(""),
-  email: z.string().max(160).optional().default(""),
-  phone: z.string().max(40).optional().default(""),
-  dept: z.string().max(120).optional().default(""),
-  role: z.string().max(40).optional().default("employee"),
-  branch: z.string().max(120).optional().default(""),
-  status: z.string().max(20).optional().default("Active"),
+  empCode: str,
+  name: str,
+  nameAr: str,
+  email: str,
+  phone: str,
+  dept: str,
+  role: str,
+  branch: str,
+  status: str,
   salary: z.union([z.number(), z.string()]).optional().default(0),
-  salaryMode: z.string().max(20).optional().default("gross"),
+  salaryMode: str,
   allowance: z.union([z.number(), z.string()]).optional().default(0),
   target: z.union([z.number(), z.string()]).optional().default(20),
-  targetDuration: z.string().max(20).optional().default("Monthly"),
-  bankName: z.string().max(120).optional().default(""),
-  bankAccountNumber: z.string().max(120).optional().default(""),
-  password: z.string().max(128).optional().default(""),
-  personalPhone: z.string().max(40).optional().default(""),
-  gender: z.string().max(20).optional().default(""),
-  nationalId: z.string().max(40).optional().default(""),
-  idIssueDate: z.string().max(20).optional().default(""),
-  nationalIdExpiry: z.string().max(20).optional().default(""),
-  idCardAddress: z.string().max(255).optional().default(""),
-  country: z.string().max(80).optional().default("Egypt"),
-  city: z.string().max(120).optional().default(""),
-  district: z.string().max(120).optional().default(""),
-  street: z.string().max(120).optional().default(""),
-  building: z.string().max(40).optional().default(""),
-  flat: z.string().max(40).optional().default(""),
-  position: z.string().max(120).optional().default(""),
-  jobGrade: z.string().max(100).optional().default(""),
-  graduation: z.string().max(120).optional().default(""),
-  major: z.string().max(120).optional().default(""),
-  contractType: z.string().max(40).optional().default("FullTime"),
-  medicalInsuranceType: z.string().max(40).optional().default(""),
-  medicalInsuranceNumber: z.string().max(80).optional().default(""),
-  manager: z.string().max(120).optional().default(""),
-  avatarUrl: z.string().max(800_000).optional().default(""),
-  notes: z.string().max(1000).optional().default(""),
+  targetDuration: str,
+  bankName: str,
+  bankAccountNumber: str,
+  password: str,
+  personalPhone: str,
+  gender: str,
+  nationalId: str,
+  idIssueDate: str,
+  nationalIdExpiry: str,
+  idCardAddress: str,
+  country: str,
+  city: str,
+  district: str,
+  street: str,
+  building: str,
+  flat: str,
+  position: str,
+  jobGrade: str,
+  graduation: str,
+  major: str,
+  contractType: str,
+  medicalInsuranceType: str,
+  medicalInsuranceNumber: str,
+  manager: str,
+  avatarUrl: str,
+  notes: str,
 });
 
 export type ImportEmployeeResult = {
@@ -145,7 +150,8 @@ const CreateEmployeeSchema = z.object({
   extraEmail: z.string().email().max(255).optional().or(z.literal("")).default(""),
   medicalInsuranceDetails: z.string().max(1000).optional().default(""),
   medicalInsuranceNumber: z.string().max(100).optional().default(""),
-  medicalInsuranceType: z.enum(["Private", "Governmental"]).optional().or(z.literal("")).default(""),
+  medicalInsuranceType: z.enum(["Private", "Governmental", "Both"]).optional().or(z.literal("")).default(""),
+  insuranceNumber: z.string().max(100).optional().default(""),
   isInsured: z.boolean().optional().default(false),
   militaryExpireDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal("")).default(""),
   isFivePercent: z.boolean().optional().default(false),
@@ -199,8 +205,8 @@ export const listEmployeesAdmin = createServerFn({ method: "POST" })
   .handler(async ({ context, data }): Promise<ListEmployeesResult> => {
     const { supabase } = context;
     const [{ data: depts }, { data: poss }, { data: allRoles }] = await Promise.all([
-      supabase.from("departments").select("id, name_en").order("name_en"),
-      supabase.from("positions").select("id, name_en").order("name_en"),
+      supabase.from("departments").select("id, name_en, name_ar").order("name_en"),
+      supabase.from("positions").select("id, name_en, name_ar").order("name_en"),
       supabase.from("user_roles").select("role"),
     ]);
 
@@ -216,8 +222,8 @@ export const listEmployeesAdmin = createServerFn({ method: "POST" })
         return {
           rows: [],
           total: 0,
-          departments: (depts ?? []).map((d: any) => ({ id: d.id, name: d.name_en })),
-          positions: (poss ?? []).map((p: any) => ({ id: p.id, name: p.name_en })),
+          departments: (depts ?? []).map((d: any) => ({ id: d.id, name: d.name_en?.trim() || d.name_ar?.trim() || "" })),
+          positions: (poss ?? []).map((p: any) => ({ id: p.id, name: p.name_en?.trim() || p.name_ar?.trim() || "" })),
           roles: Array.from(new Set((allRoles ?? []).map((r: any) => String(r.role)))),
         };
       }
@@ -302,8 +308,10 @@ export const listEmployeesAdmin = createServerFn({ method: "POST" })
     ]);
     const shiftMap = new Map<string, string>((shiftsRows ?? []).map((s: any) => [String(s.employee_id), String(s.shift_id)]));
 
-    const dMap = new Map((depts ?? []).map((d: any) => [d.id, d.name_en]));
-    const pMap = new Map((poss ?? []).map((p: any) => [p.id, p.name_en]));
+    const dMap = new Map((depts ?? []).map((d: any) => [d.id, d.name_en?.trim() || d.name_ar?.trim() || ""]));
+    const pMap = new Map((poss ?? []).map((p: any) => [p.id, p.name_en?.trim() || p.name_ar?.trim() || ""]));
+    const dArMap = new Map((depts ?? []).map((d: any) => [d.id, d.name_ar?.trim() || d.name_en?.trim() || ""]));
+    const pArMap = new Map((poss ?? []).map((p: any) => [p.id, p.name_ar?.trim() || p.name_en?.trim() || ""]));
     const rows: AdminEmployeeRow[] = (profiles ?? []).map((p: any) => ({
       id: p.id,
       emp_code: p.emp_code ?? null,
@@ -313,8 +321,10 @@ export const listEmployeesAdmin = createServerFn({ method: "POST" })
       phone: p.phone,
       department_id: p.department_id ?? null,
       position_id: p.position_id ?? null,
-      department: p.department_id ? (dMap.get(p.department_id) ?? null) : null,
-      position: p.position_id ? (pMap.get(p.position_id) ?? null) : null,
+      department: p.department_id ? (dMap.get(p.department_id) || null) : null,
+      position: p.position_id ? (pMap.get(p.position_id) || null) : null,
+      department_ar: p.department_id ? (dArMap.get(p.department_id) || null) : null,
+      position_ar: p.position_id ? (pArMap.get(p.position_id) || null) : null,
       gender: p.gender ?? null,
       city: p.city,
       district: p.district,
@@ -341,8 +351,8 @@ export const listEmployeesAdmin = createServerFn({ method: "POST" })
     return {
       rows,
       total: count ?? rows.length,
-      departments: (depts ?? []).map((d: any) => ({ id: d.id, name: d.name_en })),
-      positions: (poss ?? []).map((p: any) => ({ id: p.id, name: p.name_en })),
+      departments: (depts ?? []).map((d: any) => ({ id: d.id, name: d.name_en?.trim() || d.name_ar?.trim() || "" })),
+      positions: (poss ?? []).map((p: any) => ({ id: p.id, name: p.name_en?.trim() || p.name_ar?.trim() || "" })),
       roles: Array.from(new Set((allRoles ?? []).map((r: any) => String(r.role)))),
     };
   });
@@ -397,7 +407,7 @@ export const updateEmployeeAdmin = createServerFn({ method: "POST" })
         medical_insurance_details: z.string().max(1000).nullable().optional(),
         medical_insurance_number: z.string().max(100).nullable().optional().or(z.literal("")),
         insurance_number: z.string().max(100).nullable().optional().or(z.literal("")),
-        medical_insurance_type: z.enum(["Private", "Governmental"]).nullable().optional().or(z.literal("")),
+        medical_insurance_type: z.enum(["Private", "Governmental", "Both"]).nullable().optional().or(z.literal("")),
         is_insured: z.boolean().optional(),
         military_expire_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional().or(z.literal("")),
         is_five_percent: z.boolean().optional(),
@@ -482,10 +492,14 @@ export const updateEmployeeAdmin = createServerFn({ method: "POST" })
     if (data.medical_insurance_number !== undefined) patch.medical_insurance_number = data.medical_insurance_number === "" ? null : data.medical_insurance_number;
     if (data.insurance_number !== undefined) patch.insurance_number = data.insurance_number === "" ? null : data.insurance_number;
     if (data.medical_insurance_type !== undefined) patch.medical_insurance_type = data.medical_insurance_type === "" ? null : data.medical_insurance_type;
-    if (data.is_insured !== undefined) patch.is_insured = data.is_insured;
+    if (data.social_insurance_date !== undefined) patch.social_insurance_date = data.social_insurance_date === "" ? null : data.social_insurance_date;
+    if (data.is_insured !== undefined) {
+      patch.is_insured = data.is_insured;
+    } else if (patch.insurance_number || patch.social_insurance_date) {
+      patch.is_insured = true;
+    }
     if (data.military_expire_date !== undefined) patch.military_expire_date = data.military_expire_date === "" ? null : data.military_expire_date;
     if (data.is_five_percent !== undefined) patch.is_five_percent = data.is_five_percent;
-    if (data.social_insurance_date !== undefined) patch.social_insurance_date = data.social_insurance_date === "" ? null : data.social_insurance_date;
     if (data.custom_field !== undefined) patch.custom_field = data.custom_field;
     if (data.bank_name !== undefined) patch.bank_name = data.bank_name === "" ? null : data.bank_name;
     if (data.bank_account_number !== undefined) patch.bank_account_number = data.bank_account_number === "" ? null : data.bank_account_number;
@@ -692,7 +706,6 @@ export const importEmployeesAdmin = createServerFn({ method: "POST" })
   )
   .handler(async ({ context, data }): Promise<ImportEmployeeResult> => {
     const { supabase } = context;
-    const { supabaseAdmin } = await import("@/backend/server/admin-client.server");
     const { sendWelcomeEmail } = await import("@/backend/server/welcome-email.server");
 
     const [{ data: departments }, { data: positions }, { data: graduations }, { data: majors }] = await Promise.all([
@@ -722,7 +735,7 @@ export const importEmployeesAdmin = createServerFn({ method: "POST" })
       .filter((c) => c.length > 0);
     const existingCodeOwner = new Map<string, string>(); // emp_code -> profile id
     if (incomingCodes.length > 0) {
-      const { data: existing } = await supabaseAdmin
+      const { data: existing } = await supabase
         .from("profiles")
         .select("id, emp_code")
         .in("emp_code", incomingCodes);
@@ -742,7 +755,7 @@ export const importEmployeesAdmin = createServerFn({ method: "POST" })
     );
     const existingByEmail = new Map<string, any>();
     if (incomingEmails.length > 0) {
-      const { data: existingProfiles } = await supabaseAdmin
+      const { data: existingProfiles } = await supabase
         .from("profiles")
         .select("id, emp_code, full_name, email, phone, role, city, district, department_id, position_id, status, avatar_url")
         .in("email", incomingEmails);
@@ -763,10 +776,12 @@ export const importEmployeesAdmin = createServerFn({ method: "POST" })
         if (!fullName || fullName.length < 2) throw new Error("Name is required");
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Valid email required");
         if (!IMPORT_ROLES.includes(role as any)) throw new Error(`Invalid role: ${role}`);
-        if (row.idIssueDate.trim() && !isStrictIsoDate(row.idIssueDate.trim())) {
+        const normalizedIssueDate = normalizeExcelDate(row.idIssueDate);
+        if (row.idIssueDate.trim() && !normalizedIssueDate) {
           throw new Error("ID issue date must be YYYY-MM-DD");
         }
-        if (row.nationalIdExpiry.trim() && !isStrictIsoDate(row.nationalIdExpiry.trim())) {
+        const normalizedExpiryDate = normalizeExcelDate(row.nationalIdExpiry);
+        if (row.nationalIdExpiry.trim() && !normalizedExpiryDate) {
           throw new Error("ID expiry date must be YYYY-MM-DD");
         }
 
@@ -811,8 +826,8 @@ export const importEmployeesAdmin = createServerFn({ method: "POST" })
           fillIfEmpty("position_id", position_id);
           fillIfEmpty("avatar_url", row.avatarUrl.trim() || null);
           fillIfEmpty("national_id", row.nationalId.trim() || null);
-          fillIfEmpty("id_issue_date", row.idIssueDate.trim() || null);
-          fillIfEmpty("id_expiry_date", row.nationalIdExpiry.trim() || null);
+          fillIfEmpty("id_issue_date", normalizedIssueDate || null);
+          fillIfEmpty("id_expiry_date", normalizedExpiryDate || null);
           fillIfEmpty("bank_name", row.bankName.trim() || null);
           fillIfEmpty("bank_account_number", row.bankAccountNumber.trim() || null);
           fillIfEmpty("job_grade", row.jobGrade.trim() || null);
@@ -837,7 +852,7 @@ export const importEmployeesAdmin = createServerFn({ method: "POST" })
           }
 
           if (Object.keys(patch).length > 0) {
-            const { error: updErr } = await (supabaseAdmin.from("profiles") as any)
+            const { error: updErr } = await (supabase.from("profiles") as any)
               .update(patch)
               .eq("id", existing.id);
             if (updErr) throw new Error(updErr.message);
@@ -848,61 +863,79 @@ export const importEmployeesAdmin = createServerFn({ method: "POST" })
           }
 
           // Ensure the role exists (no-op if already present).
-          await supabaseAdmin
-            .from("user_roles")
-            .upsert({ user_id: existing.id, role: role as any } as any);
+          await (supabase.from("user_roles") as any)
+            .upsert({ user_id: existing.id, role: role as any } as any, { onConflict: "user_id,role", ignoreDuplicates: true });
 
           if (empCode) seenCodes.add(empCode);
           results.push({ index, ok: true, id: String(existing.id), email });
           continue;
         }
 
-        const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
-          email,
-          password: row.password.trim() || undefined,
-          email_confirm: true,
-          user_metadata: { full_name: fullName },
+        // New employee: create via edge function which runs with service-role privileges
+        const passwordToUse = row.password.trim() || `Int@${Math.floor(100000 + Math.random() * 900000)}`;
+        const { data: invokeResult, error: invokeErr } = await supabase.functions.invoke("create-employee-account", {
+          body: {
+            email,
+            name: fullName,
+            nameAr: row.nameAr.trim() || undefined,
+            password: passwordToUse,
+            role,
+            empCode: empCode || undefined,
+            dept: row.dept.trim() || undefined,
+            position: row.position.trim() || undefined,
+            phone: row.phone.trim() || undefined,
+            city: row.city.trim() || undefined,
+            district: row.district.trim() || undefined,
+            status: row.status === "Inactive" ? "Inactive" : "Active",
+            salaryMode: sMode,
+            salaryGross: rawSal > 0 ? salaryGross : undefined,
+            salaryNet: rawSal > 0 ? salaryNet : undefined,
+            allowance: Number(row.allowance) || 0,
+            targetValue: Number(row.target) || 0,
+            targetDuration: row.targetDuration || "Monthly",
+            contractType: row.contractType.trim() || "FullTime",
+            nationalId: row.nationalId.trim() || undefined,
+            idIssueDate: normalizedIssueDate || undefined,
+            nationalIdExpiry: normalizedExpiryDate || undefined,
+            medicalInsuranceType: row.medicalInsuranceType.trim() || undefined,
+            medicalInsuranceNumber: row.medicalInsuranceNumber.trim() || undefined,
+            jobGrade: row.jobGrade.trim() || undefined,
+            loginUrl: data.loginUrl,
+            appName: data.appName,
+          },
         });
-        if (createError) throw new Error(createError.message);
-        const newId = created.user?.id;
-        if (!newId) throw new Error("Auth user was not created");
 
-        const { error: profileError } = await supabaseAdmin.from("profiles").upsert({
-          id: newId,
-          emp_code: empCode || null,
-          full_name: fullName,
-          full_name_ar: row.nameAr.trim() || null,
-          email,
-          phone: row.phone.trim() || null,
-          role: role as any,
-          city: row.city.trim() || null,
-          district: row.district.trim() || null,
-          department_id,
-          position_id,
-          status: row.status === "Inactive" ? "Inactive" : "Active",
-          avatar_url: row.avatarUrl.trim() || null,
-          national_id: row.nationalId.trim() || null,
-          id_issue_date: row.idIssueDate.trim() || null,
-          id_expiry_date: row.nationalIdExpiry.trim() || null,
-          bank_name: row.bankName.trim() || null,
-          bank_account_number: row.bankAccountNumber.trim() || null,
-          job_grade: row.jobGrade.trim() || null,
-          graduation_id,
-          major_id,
-          medical_insurance_type: (row.medicalInsuranceType.trim() || null) as any,
-          medical_insurance_number: row.medicalInsuranceNumber.trim() || null,
-          salary_mode: sMode as any,
-          salary_gross: rawSal > 0 ? salaryGross : null,
-          salary_net: rawSal > 0 ? salaryNet : null,
-          allowance: Number(row.allowance) || 0,
-          target_value: Number(row.target) || 0,
-          target_duration: row.targetDuration || "Monthly",
-          contract_type: (row.contractType.trim() || "FullTime") as any,
-        } as any);
-        if (profileError) throw new Error(profileError.message);
+        if (invokeErr) {
+          let msg = invokeErr.message || "Account creation failed";
+          try {
+            if ("context" in invokeErr && invokeErr.context) {
+              const res = invokeErr.context as Response;
+              const cloned = typeof res.clone === "function" ? res.clone() : res;
+              const body = await cloned.json();
+              if (body?.error) msg = body.error;
+              else if (body?.message) msg = body.message;
+            }
+          } catch {}
+          throw new Error(msg);
+        }
 
-        const { error: roleError } = await supabaseAdmin.from("user_roles").upsert({ user_id: newId, role: role as any } as any);
-        if (roleError) throw new Error(roleError.message);
+        const created = invokeResult as { ok?: boolean; accountCreated?: boolean; profileCreated?: boolean; id?: string; error?: string; warning?: string };
+        if (!created?.accountCreated && !created?.id) {
+          throw new Error(created?.error || created?.warning || "Account creation failed");
+        }
+        const newId = created.id!;
+
+        // Update any extra fields not handled by create-employee-account
+        const extraPatch: Record<string, any> = {};
+        if (graduation_id) extraPatch.graduation_id = graduation_id;
+        if (major_id) extraPatch.major_id = major_id;
+        if (row.bankName.trim()) extraPatch.bank_name = row.bankName.trim();
+        if (row.bankAccountNumber.trim()) extraPatch.bank_account_number = row.bankAccountNumber.trim();
+        if (row.avatarUrl.trim()) extraPatch.avatar_url = row.avatarUrl.trim();
+        if (row.notes.trim()) extraPatch.custom_field = row.notes.trim();
+        if (Object.keys(extraPatch).length > 0) {
+          await (supabase.from("profiles") as any).update(extraPatch).eq("id", newId);
+        }
 
         if (empCode) {
           seenCodes.add(empCode);
@@ -981,11 +1014,49 @@ export const createEmployeeAdmin = createServerFn({ method: "POST" })
     }
 
     const { data: result, error } = await supabase.functions.invoke("create-employee-account", { body: data });
-    if (error) throw new Error(error.message ?? "Employee account creation failed");
+    if (error) {
+      let msg = error.message ?? "Employee account creation failed";
+      try {
+        if ("context" in error && error.context) {
+          const res = error.context as Response;
+          const cloned = typeof res.clone === "function" ? res.clone() : res;
+          const body = await cloned.json();
+          if (body?.error) msg = body.error;
+          else if (body?.message) msg = body.message;
+        }
+      } catch {
+        try {
+          if ("context" in error && error.context) {
+            const res = error.context as Response;
+            const text = await res.text();
+            if (text) msg = text;
+          }
+        } catch {}
+      }
+      throw new Error(msg);
+    }
     const created = result as CreateEmployeeResult & { error?: string };
     if (!created?.accountCreated || !created?.profileCreated) {
       throw new Error(created?.error || created?.warning || "Employee account creation failed");
     }
+
+    // Ensure Welcome Email is sent with the professional template
+    if (!created?.emailSent && data.email && data.password) {
+      try {
+        const { sendWelcomeEmail } = await import("@/backend/server/welcome-email.server");
+        await sendWelcomeEmail({
+          to: data.email,
+          employeeName: data.name,
+          username: data.email,
+          password: data.password,
+          loginUrl: data.loginUrl || (typeof window !== "undefined" ? window.location.origin : ""),
+          appName: data.appName || undefined,
+        });
+      } catch (mailErr) {
+        console.warn("Fallback welcome email failed:", mailErr);
+      }
+    }
+
 
     // Automatically send Welcome SMS with email & password provided in Add Employee form
     if (data.phone && data.password) {
@@ -1016,20 +1087,28 @@ export const createEmployeeAdmin = createServerFn({ method: "POST" })
       }
     }
 
-    if (created?.id && (data.sectionId || data.jobGrade || data.medicalInsuranceNumber || data.medicalInsuranceType || data.graduationId || data.majorId || data.bankName || data.bankAccountNumber)) {
+    if (created?.id && (data.sectionId || data.jobGrade || data.medicalInsuranceNumber || data.medicalInsuranceType || data.insuranceNumber || data.socialInsuranceDate || data.graduationId || data.majorId || data.bankName || data.bankAccountNumber)) {
       try {
         const p: Record<string, any> = {};
         if (data.sectionId) p.section_id = data.sectionId;
         if (data.jobGrade) p.job_grade = data.jobGrade;
         if (data.medicalInsuranceNumber) p.medical_insurance_number = data.medicalInsuranceNumber;
         if (data.medicalInsuranceType) p.medical_insurance_type = data.medicalInsuranceType;
+        if (data.insuranceNumber) {
+          p.insurance_number = data.insuranceNumber;
+          p.is_insured = true;
+        }
+        if (data.socialInsuranceDate) {
+          p.social_insurance_date = data.socialInsuranceDate;
+          p.is_insured = true;
+        }
         if (data.graduationId) p.graduation_id = data.graduationId;
         if (data.majorId) p.major_id = data.majorId;
         if (data.bankName) p.bank_name = data.bankName;
         if (data.bankAccountNumber) p.bank_account_number = data.bankAccountNumber;
         await (supabase.from("profiles") as any).update(p).eq("id", created.id);
       } catch (err) {
-        console.warn("Failed to set sectionId / jobGrade / medical insurance / graduation / major / bank on profile:", err);
+        console.warn("Failed to set sectionId / jobGrade / medical insurance / social insurance / graduation / major / bank on profile:", err);
       }
     }
 
@@ -1058,6 +1137,7 @@ export const sendEmployeeWelcomeEmail = createServerFn({ method: "POST" })
   .inputValidator((input) =>
     z
       .object({
+        userId: z.string().uuid().optional(),
         to: z.string().email(),
         employeeName: z.string().min(1).max(160),
         username: z.string().min(1).max(160),
@@ -1068,6 +1148,14 @@ export const sendEmployeeWelcomeEmail = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data }) => {
+    if (data.userId && data.password) {
+      try {
+        const { supabaseAdmin } = await import("@/backend/server/admin-client.server");
+        await supabaseAdmin.auth.admin.updateUserById(data.userId, { password: data.password });
+      } catch (err) {
+        console.warn("Could not update auth password:", err);
+      }
+    }
     const { sendWelcomeEmail } = await import("@/backend/server/welcome-email.server");
     const res = await sendWelcomeEmail({
       to: data.to,
@@ -1154,9 +1242,9 @@ export const listCitiesAndDistricts = createServerFn({ method: "GET" })
     const [{ data: cities }, { data: districts }, { data: depts }, { data: secs }, { data: poss }, { data: mgrs }, { data: mgrRoles }, costCentersRes, shiftsRes, jobGradesRes, graduationsRes, majorsRes] = await Promise.all([
       supabase.from("cities").select("id, name_en").order("name_en"),
       supabase.from("districts").select("id, city_id, name_en").order("name_en"),
-      supabase.from("departments").select("id, name_en").order("name_en"),
+      supabase.from("departments").select("id, name_en, name_ar").order("name_en"),
       (supabase as any).from("sections").select("id, department_id, name_en").order("name_en"),
-      supabase.from("positions").select("id, name_en").order("name_en"),
+      supabase.from("positions").select("id, name_en, name_ar").order("name_en"),
       supabase.from("profiles").select("id, full_name, email").eq("status", "Active").order("full_name"),
       supabase.from("user_roles").select("user_id, role").in("role", ["admin", "manager"]),
       (supabase as any).from("cost_centers").select("id, code, name_en, name_ar, status").order("code").then((r: any) => r.data ?? []).catch(() => []),
@@ -1170,9 +1258,9 @@ export const listCitiesAndDistricts = createServerFn({ method: "GET" })
     return {
       cities: (cities ?? []).map((c: any) => ({ id: c.id, name_en: c.name_en })),
       districts: (districts ?? []).map((d: any) => ({ id: d.id, city_id: d.city_id, name_en: d.name_en })),
-      departments: (depts ?? []).map((d: any) => ({ id: d.id, name_en: d.name_en })),
+      departments: (depts ?? []).map((d: any) => ({ id: d.id, name_en: d.name_en?.trim() || d.name_ar?.trim() || "" })),
       sections: (secs ?? []).map((s: any) => ({ id: s.id, department_id: s.department_id, name_en: s.name_en })),
-      positions: (poss ?? []).map((p: any) => ({ id: p.id, name_en: p.name_en })),
+      positions: (poss ?? []).map((p: any) => ({ id: p.id, name_en: p.name_en?.trim() || p.name_ar?.trim() || "" })),
       managers: filteredMgrs.map((m: any) => ({ id: m.id, name: m.full_name ?? m.email ?? "—" })),
       costCenters: (Array.isArray(costCentersRes) ? costCentersRes : []).map((c: any) => ({
         id: c.id,
@@ -1288,6 +1376,8 @@ export type EmployeeDetail = {
   gender: string | null;
   department: string | null;
   position: string | null;
+  department_ar?: string | null;
+  position_ar?: string | null;
   department_id: string | null;
   position_id: string | null;
   city_id: string | null;
@@ -1386,10 +1476,10 @@ export const getEmployeeDetail = createServerFn({ method: "POST" })
     ]);
     const [{ data: dept }, { data: pos }, { data: roles }, { data: mgr }, { data: cityRow }, { data: distRow }, ccRow, shiftRow] = await Promise.all([
       (p as any).department_id
-        ? supabase.from("departments").select("name_en").eq("id", (p as any).department_id).maybeSingle()
+        ? supabase.from("departments").select("name_en, name_ar").eq("id", (p as any).department_id).maybeSingle()
         : Promise.resolve({ data: null }),
       (p as any).position_id
-        ? supabase.from("positions").select("name_en").eq("id", (p as any).position_id).maybeSingle()
+        ? supabase.from("positions").select("name_en, name_ar").eq("id", (p as any).position_id).maybeSingle()
         : Promise.resolve({ data: null }),
       supabase.from("user_roles").select("role").eq("user_id", data.id),
       (p as any).manager_id
@@ -1414,8 +1504,10 @@ export const getEmployeeDetail = createServerFn({ method: "POST" })
       email: (p as any).email,
       phone: (p as any).phone,
       gender: (p as any).gender ?? null,
-      department: (dept as any)?.name_en ?? null,
-      position: (pos as any)?.name_en ?? null,
+      department: (dept as any)?.name_en?.trim() || (dept as any)?.name_ar?.trim() || null,
+      position: (pos as any)?.name_en?.trim() || (pos as any)?.name_ar?.trim() || null,
+      department_ar: (dept as any)?.name_ar?.trim() || (dept as any)?.name_en?.trim() || null,
+      position_ar: (pos as any)?.name_ar?.trim() || (pos as any)?.name_en?.trim() || null,
       department_id: (p as any).department_id ?? null,
       position_id: (p as any).position_id ?? null,
       city_id: (p as any).city_id ?? null,

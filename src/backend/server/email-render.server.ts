@@ -60,7 +60,7 @@ export function renderWelcomeEmail(opts: {
     `Password: ${opts.password}\n\n` +
     `For your security, please sign in and change your password as soon as possible.\n\n` +
     `If you did not expect this email, please contact your HR administrator.\n`;
-  const html = `<div style="font-family:system-ui,Segoe UI,Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#111">
+  const html = `<div style="font-family:system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#111">
     <h2 style="margin:0 0 8px;color:#111">Welcome to ${escapeHtml(appName)}</h2>
     <p style="margin:0 0 16px;color:#444">Hello <b>${escapeHtml(opts.employeeName)}</b>, your account has been created. You can now sign in with the credentials below.</p>
     <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:#f6f8fb;border:1px solid #e5e7eb;border-radius:10px;padding:16px;margin:8px 0 16px;width:100%">
@@ -72,4 +72,4 @@ export function renderWelcomeEmail(opts: {
     <p style="margin:16px 0 0;color:#666;font-size:12px">For your security, please change your password after your first sign-in. If you did not expect this email, contact your HR administrator.</p>
   </div>`;
   return { subject, html, text };
-}
+}

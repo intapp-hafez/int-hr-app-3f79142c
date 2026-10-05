@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, Link, useRouterState, Navigate, useNavigate } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
-import { LayoutDashboard, Users, MapPin, Clock, CalendarDays, FileBarChart2, ScrollText, Menu, X, Bell, Search, Wallet, Settings, FileSignature, Shield, Building2, KeyRound, Calculator, UserCog, Network, StickyNote, Banknote, Plane, BarChart3, MessageSquare , Smartphone, Printer, ShieldAlert, ArrowLeft, Navigation } from "lucide-react";
+import { LayoutDashboard, Users, MapPin, Clock, CalendarDays, FileBarChart2, ScrollText, Menu, X, Bell, Search, Wallet, Settings, FileSignature, Shield, Building2, KeyRound, Calculator, UserCog, Network, StickyNote, Banknote, Plane, BarChart3, MessageSquare , Smartphone, Printer, ShieldAlert, ArrowLeft, Navigation, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { NotificationsBell } from "@/components/admin/NotificationsBell";
 import { AppLogo } from "@/components/AppLogo";
 import { UserMenu } from "@/components/UserMenu";
@@ -22,6 +22,23 @@ function AdminLayout() {
   const { t, dir } = useI18n();
   const path = useRouterState({ select: (s) => s.location.pathname });
   const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("admin_sidebar_collapsed") === "true";
+    }
+    return false;
+  });
+
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      if (typeof window !== "undefined") {
+        localStorage.setItem("admin_sidebar_collapsed", String(next));
+      }
+      return next;
+    });
+  };
+
   const session = useSession();
   const ready = useAuthReady();
   const navigate = useNavigate();
@@ -86,38 +103,69 @@ function AdminLayout() {
   return (
     <div dir={dir} className="min-h-screen bg-muted/40">
       {/* Sidebar (desktop) */}
-      <aside className="fixed inset-y-0 start-0 z-30 hidden w-64 flex-col bg-sidebar text-sidebar-foreground lg:flex">
-        <div className="px-4 py-3.5 border-b border-sidebar-border/60">
-          <Link to="/"><AppLogo size={24} tone="light" /></Link>
+      <aside
+        className={`fixed inset-y-0 start-0 z-30 hidden flex-col bg-sidebar text-sidebar-foreground lg:flex transition-all duration-300 ease-in-out ${
+          collapsed ? "w-20" : "w-64"
+        }`}
+      >
+        <div
+          className={`px-3.5 py-3.5 border-b border-sidebar-border/60 flex items-center ${
+            collapsed ? "justify-center" : "justify-between"
+          }`}
+        >
+          <Link to="/" className="flex items-center gap-2 overflow-hidden" title="INT-HR">
+            <AppLogo size={24} tone="light" withWordmark={!collapsed} />
+          </Link>
+          {!collapsed && (
+            <button
+              type="button"
+              onClick={toggleCollapsed}
+              className="rounded-lg p-1.5 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+              title={dir === "rtl" ? "طي الشريط الجانبي" : "Collapse sidebar"}
+            >
+              <PanelLeftClose className="h-4 w-4" />
+            </button>
+          )}
         </div>
-        <nav className="flex-1 space-y-1.5 px-3 py-3 overflow-y-auto">
+        <nav className="flex-1 space-y-1.5 px-3 py-3 overflow-y-auto overflow-x-hidden">
           {nav.map((n) => {
             const active = isActive(n.to, "exact" in n ? n.exact : false);
             return (
               <Link
                 key={n.to}
                 to={n.to}
-                className={`group flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs sm:text-[13px] font-semibold leading-snug transition-colors ${
+                title={collapsed ? n.label : undefined}
+                className={`group relative flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs sm:text-[13px] font-semibold leading-snug transition-all ${
+                  collapsed ? "justify-center px-2" : ""
+                } ${
                   active
                     ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-brand"
                     : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                 }`}
               >
                 <n.icon className="h-4 w-4 shrink-0" />
-                <span className="truncate">{n.label}</span>
+                {!collapsed && <span className="truncate">{n.label}</span>}
                 {n.to === "/admin/chat" && unreadMessagesCount > 0 && (
-                  <span className="ms-auto grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 text-[10px] font-bold text-brand-foreground shadow-sm">
-                    {unreadMessagesCount}
-                  </span>
+                  collapsed ? (
+                    <span className="absolute top-1.5 end-1.5 h-2 w-2 rounded-full bg-brand ring-2 ring-sidebar" />
+                  ) : (
+                    <span className="ms-auto grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 text-[10px] font-bold text-brand-foreground shadow-sm">
+                      {unreadMessagesCount}
+                    </span>
+                  )
                 )}
               </Link>
             );
           })}
         </nav>
-        <div className="m-2.5 rounded-xl bg-sidebar-accent/80 p-3">
+        <div className={`m-2.5 rounded-xl bg-sidebar-accent/80 p-2.5 transition-all ${collapsed ? "flex justify-center" : ""}`}>
           <div className="flex items-center gap-2.5">
             <UserMenu size="md" align="start" />
-            <p className="font-display text-xs sm:text-sm font-semibold truncate">{session.name}</p>
+            {!collapsed && (
+              <p className="font-display text-xs sm:text-sm font-semibold truncate text-sidebar-foreground">
+                {session.name}
+              </p>
+            )}
           </div>
         </div>
       </aside>
@@ -151,10 +199,18 @@ function AdminLayout() {
       )}
 
       {/* Main */}
-      <div className="lg:ps-64">
+      <div className={`transition-all duration-300 ease-in-out ${collapsed ? "lg:ps-20" : "lg:ps-64"}`}>
         <header className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-background/80 px-4 py-3 backdrop-blur lg:px-8">
           <div className="flex items-center gap-3">
             <button onClick={() => setOpen(true)} className="rounded-lg p-1.5 hover:bg-muted lg:hidden"><Menu className="h-5 w-5" /></button>
+            <button
+              type="button"
+              onClick={toggleCollapsed}
+              className="hidden lg:inline-flex rounded-lg p-1.5 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              title={collapsed ? (dir === "rtl" ? "توسيع الشريط الجانبي" : "Expand sidebar") : (dir === "rtl" ? "طي الشريط الجانبي" : "Collapse sidebar")}
+            >
+              {collapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+            </button>
             <GlobalSearch />
           </div>
           <div className="flex items-center gap-2">

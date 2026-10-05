@@ -83,7 +83,7 @@ export function DepartmentStructureModal({
   });
 
   const [draft, setDraft] = useState({ position_id: "", job_grade_id: "", section_id: "", headcount: 1 });
-  const [secDraft, setSecDraft] = useState({ name_en: "", name_ar: "" });
+  const [secDraft, setSecDraft] = useState({ name_en: "", name_ar: "", parent_id: "" });
 
   const inputCls = "rounded-lg border border-border bg-card px-3 py-1.5 text-sm outline-none focus:border-brand";
 
@@ -235,7 +235,7 @@ export function DepartmentStructureModal({
             </>
           ) : (
             <>
-              <div className="mb-6 grid grid-cols-3 gap-3">
+              <div className="mb-6 grid grid-cols-1 sm:grid-cols-4 gap-3">
                 <input
                   type="text"
                   placeholder="Level Name (EN)"
@@ -250,16 +250,29 @@ export function DepartmentStructureModal({
                   value={secDraft.name_ar}
                   onChange={(e) => setSecDraft({ ...secDraft, name_ar: e.target.value })}
                 />
+                <select
+                  className={inputCls}
+                  value={secDraft.parent_id}
+                  onChange={(e) => setSecDraft({ ...secDraft, parent_id: e.target.value })}
+                >
+                  <option value="">— Parent Level (Optional) —</option>
+                  {(sections ?? []).map((s: any) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name_en} {s.name_ar ? `(${s.name_ar})` : ""}
+                    </option>
+                  ))}
+                </select>
                 <button
                   onClick={() => {
                     if (!secDraft.name_en || !secDraft.name_ar) return toast.error("Fill both names");
                     mSecUpsert.mutate({
                       department_id: departmentId,
+                      parent_id: secDraft.parent_id || null,
                       name_en: secDraft.name_en,
                       name_ar: secDraft.name_ar,
                       active: true
                     });
-                    setSecDraft({ name_en: "", name_ar: "" });
+                    setSecDraft({ name_en: "", name_ar: "", parent_id: "" });
                   }}
                   disabled={mSecUpsert.isPending}
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-4 py-2 text-sm font-medium text-brand-foreground hover:bg-brand/90 disabled:opacity-50"
@@ -274,18 +287,30 @@ export function DepartmentStructureModal({
                     <tr>
                       <th className="p-4">Name (EN)</th>
                       <th className="p-4">Name (AR)</th>
+                      <th className="p-4">Parent Level</th>
                       <th className="p-4">Status</th>
                       <th className="p-4 w-16"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {!sections || sections.length === 0 ? (
-                      <tr><td colSpan={4} className="p-8 text-center text-muted-foreground">No levels created yet.</td></tr>
+                      <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">No levels created yet.</td></tr>
                     ) : (
                       sections.map((s: any) => (
                         <tr key={s.id} className="hover:bg-muted/20">
-                          <td className="p-4 font-medium">{s.name_en}</td>
+                          <td className="p-4 font-medium">
+                            {s.parent_name ? (
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-muted-foreground text-xs font-mono">↳</span>
+                                <span>{s.name_en}</span>
+                                <span className="rounded-md bg-brand/10 text-brand px-1.5 py-0.5 text-[10px] font-medium">Sub-level</span>
+                              </div>
+                            ) : (
+                              s.name_en
+                            )}
+                          </td>
                           <td className="p-4 text-muted-foreground">{s.name_ar}</td>
+                          <td className="p-4 text-xs text-muted-foreground">{s.parent_name || "— (Main Level)"}</td>
                           <td className="p-4">
                             <button onClick={() => mSecUpsert.mutate({ ...s, active: !s.active })}
                               className={`rounded-full px-2 py-1 text-xs ${s.active ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}>

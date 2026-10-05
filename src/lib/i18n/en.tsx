@@ -1067,6 +1067,9 @@ export const ui = {
   medicalInsuranceType: "Medical Insurance Type",
   insurancePrivate: "Private",
   insuranceGovernmental: "Governmental",
+  insuranceBoth: "Both",
+  socialInsuranceNumber: "Social Insurance Number",
+  socialInsuranceDate: "Social Insurance Date",
 
   loading: "Loading…",
   attendanceSubtitle: "My attendance history with check-in/out, location & network checks, and leave overlaps.",

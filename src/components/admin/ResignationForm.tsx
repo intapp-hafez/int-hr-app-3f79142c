@@ -1,3 +1,4 @@
+import { getArabicPosition, getArabicDepartment } from "@/lib/arabic-labels";
 import { useState } from "react";
 import {
   useEmployeePicker,
@@ -36,22 +37,20 @@ export function ResignationForm() {
             <button
               type="button"
               onClick={() => setDocType("request")}
-              className={`rounded-lg px-3 py-1.5 transition ${
-                docType === "request"
+              className={`rounded-lg px-3 py-1.5 transition ${docType === "request"
                   ? "bg-gradient-brand text-brand-foreground shadow-brand"
                   : "text-muted-foreground hover:text-foreground"
-              }`}
+                }`}
             >
               طلب استقالة (Request)
             </button>
             <button
               type="button"
               onClick={() => setDocType("acceptance")}
-              className={`rounded-lg px-3 py-1.5 transition ${
-                docType === "acceptance"
+              className={`rounded-lg px-3 py-1.5 transition ${docType === "acceptance"
                   ? "bg-gradient-brand text-brand-foreground shadow-brand"
                   : "text-muted-foreground hover:text-foreground"
-              }`}
+                }`}
             >
               إخطار قبول استقالة (Acceptance)
             </button>
@@ -99,7 +98,7 @@ export function ResignationForm() {
             />
             <div className="text-left text-xs text-gray-500 font-sans">
               <p className="font-bold text-gray-800">
-                شركة التقنيات المتكاملة للتجارة والتوكيلات (ش.م.م)
+                شركة التقنيات المتكاملة ذات مسؤلية محدودة
               </p>
               <p className="mt-1 font-semibold text-gray-700">
                 تاريخ الإصدار: {formatDate(today)}
@@ -138,11 +137,11 @@ export function ResignationForm() {
                 )}
                 ، الوظيفة:{" "}
                 <strong>
-                  <EditableText value={e.position || "مهندس"} />
+                  <EditableText value={getArabicPosition(e) !== "—" ? getArabicPosition(e) : "مهندس"} />
                 </strong>{" "}
                 بإدارة{" "}
                 <strong>
-                  <EditableText value={e.department || "الإدارة الفنية"} />
+                  <EditableText value={getArabicDepartment(e) !== "—" ? getArabicDepartment(e) : "الإدارة الفنية"} />
                 </strong>{" "}
                 لدى شركة التقنيات المتكاملة.
               </p>
@@ -172,14 +171,20 @@ export function ResignationForm() {
                 <div className="pr-4 space-y-2">
                   <p>
                     الاسم:{" "}
-                    <span className="font-normal">
-                      <EmployeeDocName e={e} />
+                    <strong className="text-gray-900">
+                      {e.full_name_ar || e.full_name || "—"}
+                    </strong>
+                  </p>
+                  <p>
+                    القسم / الإدارة:{" "}
+                    <span className="font-semibold text-gray-800">
+                      <EditableText value={getArabicDepartment(e) !== "—" ? getArabicDepartment(e) : "الإدارة الفنية"} />
                     </span>
                   </p>
                   <p>
                     الوظيفة:{" "}
-                    <span className="font-normal">
-                      <EditableText value={e.position || "مهندس"} />
+                    <span className="font-semibold text-gray-800">
+                      <EditableText value={getArabicPosition(e) !== "—" ? getArabicPosition(e) : "مهندس"} />
                     </span>
                   </p>
                   <div className="flex items-center gap-3 pt-4">
@@ -211,14 +216,20 @@ export function ResignationForm() {
                 <p>
                   السيد /{" "}
                   <strong className="inline-flex items-center text-lg">
-                    <EmployeeDocName e={e} />
+                    {e.full_name_ar || e.full_name}
                   </strong>{" "}
                   المحترم
                 </p>
                 <p>
+                  القسم / الإدارة:{" "}
+                  <strong>
+                    <EditableText value={getArabicDepartment(e) !== "—" ? getArabicDepartment(e) : "الإدارة الفنية"} />
+                  </strong>
+                </p>
+                <p>
                   الوظيفة:{" "}
                   <strong>
-                    <EditableText value={e.position || "مهندس"} />
+                    <EditableText value={getArabicPosition(e) !== "—" ? getArabicPosition(e) : "مهندس"} />
                   </strong>
                 </p>
                 <p className="text-gray-700 pt-1">تحية طيبة وبعد،،،</p>
