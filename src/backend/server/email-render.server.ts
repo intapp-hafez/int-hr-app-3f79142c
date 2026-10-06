@@ -69,7 +69,7 @@ export function renderWelcomeEmail(opts: {
       <tr><td style="padding:6px 12px;color:#555"><b>Password</b></td><td style="padding:6px 12px;font-family:Consolas,Menlo,monospace">${escapeHtml(opts.password)}</td></tr>
     </table>
     <p style="margin:0 0 8px"><a href="${escapeHtml(opts.loginUrl)}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600">Sign in now</a></p>
-    <p style="margin:16px 0 0;color:#666;font-size:12px">For your security, please change your password after your first sign-in. If you did not expect this email, contact your HR administrator.</p>
+    <p style="margin:16px 0 0;color:#666;font-size:12px">For your security, please change your password after your first sign-in. For more information, please contact your HR administrator. Developer Mr.Hafez Rahim</p>
   </div>`;
   return { subject, html, text };
-}
+}

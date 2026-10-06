@@ -1,10 +1,11 @@
+import { supabase } from "@/integrations/supabase/client";
+
 /**
- * Thin ePush (epusheg.com) HTTP client. Runs server-side so credentials
- * never reach the browser.
+ * Thin ePush (epusheg.com) client.
  *
- * Endpoint: GET https://api.epusheg.com/api/v2/send_bulk
- * Required query params: username, password, api_key, from, to, message
- * Mobile format: 201XXXXXXXXX or 01XXXXXXXXX (comma-separated for bulk)
+ * This app runs as an SPA, so server functions execute in the browser. Direct
+ * browser requests to api.epusheg.com are blocked by CORS. Instead we delegate
+ * the call to the Supabase Edge Function `send-sms`.
  */
 export type SmsAuth = {
   environment: "1" | "2";
@@ -75,32 +76,37 @@ export async function sendSmsEpush(auth: SmsAuth, msg: SmsSendInput): Promise<Sm
   if (!rec.mobile) return { ok: false, error: "No recipient specified" };
   if (!msg.message?.trim()) return { ok: false, error: "Message body is empty" };
 
-  const url = new URL("https://api.epusheg.com/api/v2/send_bulk");
-  url.searchParams.set("username", auth.username);
-  url.searchParams.set("password", auth.password);
-  url.searchParams.set("api_key", auth.apiKey);
-  url.searchParams.set("from", auth.sender);
-  url.searchParams.set("to", rec.mobile);
-  url.searchParams.set("message", msg.message);
-
   try {
-    const res = await fetch(url.toString(), { method: "GET" });
-    const text = await res.text();
-    let parsed: any = null;
-    try { parsed = JSON.parse(text); } catch { /* keep as text */ }
-    if (!res.ok) return { ok: false, error: `HTTP ${res.status}: ${text.slice(0, 200)}`, raw: parsed ?? text };
-    const status = String(parsed?.status ?? parsed?.code ?? "").toLowerCase();
-    const ok = status === "success" || status === "ok" || status === "1" || parsed?.success === true;
-    const smsId = parsed?.message_id ?? parsed?.SMSID ?? parsed?.id ?? null;
-    const cost = parsed?.cost ?? parsed?.Cost ?? null;
-    const providerCode = parsed?.code ?? parsed?.status ?? null;
+    const { data, error } = await supabase.functions.invoke("send-sms", {
+      body: {
+        auth,
+        msg: {
+          mobile: rec.mobile,
+          message: msg.message,
+        },
+      },
+    });
+
+    if (error) {
+      let msg = error.message ?? "SMS send failed";
+      try {
+        if ("context" in error && (error as any).context) {
+          const res = (error as any).context as Response;
+          const body = await res.json();
+          if (body?.error) msg = body.error;
+        }
+      } catch {}
+      return { ok: false, error: msg };
+    }
+
+    const res = (data ?? {}) as SmsSendResult;
     return {
-      ok,
-      code: providerCode ? String(providerCode) : undefined,
-      smsId: smsId ? String(smsId) : undefined,
-      cost: cost != null ? String(cost) : undefined,
-      raw: parsed ?? text,
-      error: ok ? undefined : (parsed?.message ?? parsed?.error ?? `Provider status ${status || "unknown"}`),
+      ok: Boolean(res.ok),
+      code: res.code,
+      smsId: res.smsId,
+      cost: res.cost,
+      raw: res.raw,
+      error: res.error,
     };
   } catch (e: any) {
     return { ok: false, error: e?.message || "Network error" };

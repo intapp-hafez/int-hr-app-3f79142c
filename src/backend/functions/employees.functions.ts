@@ -1058,18 +1058,38 @@ export const createEmployeeAdmin = createServerFn({ method: "POST" })
     }
 
 
-    // Automatically send Welcome SMS with email & password provided in Add Employee form
+    // Automatically send Welcome SMS — call business logic directly (cannot call a
+    // TanStack server function from inside another server function).
     if (data.phone && data.password) {
       try {
-        const { sendEmployeeWelcomeSms } = await import("./sms.functions");
-        await sendEmployeeWelcomeSms({
-          data: {
-            mobile: data.phone,
-            email: data.email,
-            password: data.password,
-            loginUrl: data.loginUrl,
-          },
-        });
+        const { loadSmsConfig } = await import("../server/sms-config.server");
+        const { sendSmsEpush, validateSmsAuth, normalizeRecipients } = await import("../server/sms-client.server");
+        const { logSmsAudit } = await import("../server/sms-audit.server");
+        const cfg = await loadSmsConfig();
+        if (cfg && cfg.enabled) {
+          const authErr = validateSmsAuth({ username: cfg.username, password: cfg.password, apiKey: cfg.api_key, sender: cfg.sender });
+          if (!authErr) {
+            const rec = normalizeRecipients(data.phone);
+            if (rec.ok) {
+              const welcomeMsg = `welcome to Integrated technics your user name is ${data.email} and password ${data.password} and ${data.loginUrl || ""} , thanks\nHR department`;
+              const smsRes = await sendSmsEpush(
+                { environment: cfg.environment, username: cfg.username, password: cfg.password, apiKey: cfg.api_key, sender: cfg.sender },
+                { mobile: rec.mobile, message: welcomeMsg, language: cfg.language },
+              );
+              await logSmsAudit({
+                sent_by: context.userId,
+                mobile: rec.mobile,
+                message: welcomeMsg,
+                kind: "welcome",
+                ok: smsRes.ok,
+                provider_code: smsRes.code ?? null,
+                sms_id: smsRes.smsId ?? null,
+                cost: smsRes.cost ?? null,
+                error: smsRes.error ?? null,
+              });
+            }
+          }
+        }
       } catch (smsErr) {
         console.warn("Automatic welcome SMS failed:", smsErr);
       }
@@ -1144,10 +1164,12 @@ export const sendEmployeeWelcomeEmail = createServerFn({ method: "POST" })
         password: z.string().min(1).max(256),
         loginUrl: z.string().min(1).max(500),
         appName: z.string().max(120).optional().default(""),
+        /** Optional Egyptian mobile number — when present a welcome SMS is also sent. */
+        phone: z.string().max(20).optional().default(""),
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     if (data.userId && data.password) {
       try {
         const { supabaseAdmin } = await import("@/backend/server/admin-client.server");
@@ -1156,6 +1178,8 @@ export const sendEmployeeWelcomeEmail = createServerFn({ method: "POST" })
         console.warn("Could not update auth password:", err);
       }
     }
+
+    // Send welcome email.
     const { sendWelcomeEmail } = await import("@/backend/server/welcome-email.server");
     const res = await sendWelcomeEmail({
       to: data.to,
@@ -1165,7 +1189,51 @@ export const sendEmployeeWelcomeEmail = createServerFn({ method: "POST" })
       loginUrl: data.loginUrl,
       appName: data.appName || undefined,
     });
-    return res;
+
+    // Optionally send welcome SMS when a phone number is supplied.
+    let smsSent = false;
+    let smsError: string | null = null;
+    if (data.phone) {
+      try {
+        const { loadSmsConfig } = await import("../server/sms-config.server");
+        const { sendSmsEpush, validateSmsAuth, normalizeRecipients } = await import("../server/sms-client.server");
+        const { logSmsAudit } = await import("../server/sms-audit.server");
+        const cfg = await loadSmsConfig();
+        if (cfg && cfg.enabled) {
+          const authErr = validateSmsAuth({ username: cfg.username, password: cfg.password, apiKey: cfg.api_key, sender: cfg.sender });
+          if (!authErr) {
+            const rec = normalizeRecipients(data.phone);
+            if (rec.ok) {
+              const welcomeMsg = `welcome to Integrated technics your user name is ${data.username} and password ${data.password} and ${data.loginUrl} , thanks\nHR department`;
+              const smsRes = await sendSmsEpush(
+                { environment: cfg.environment, username: cfg.username, password: cfg.password, apiKey: cfg.api_key, sender: cfg.sender },
+                { mobile: rec.mobile, message: welcomeMsg, language: cfg.language },
+              );
+              await logSmsAudit({
+                sent_by: context.userId,
+                mobile: rec.mobile,
+                message: welcomeMsg,
+                kind: "welcome",
+                ok: smsRes.ok,
+                provider_code: smsRes.code ?? null,
+                sms_id: smsRes.smsId ?? null,
+                cost: smsRes.cost ?? null,
+                error: smsRes.error ?? null,
+              });
+              smsSent = smsRes.ok;
+              if (!smsRes.ok) smsError = smsRes.error ?? "SMS send failed";
+            } else if (rec.invalid.length > 0) {
+              smsError = `Invalid phone: ${rec.invalid.join(", ")}`;
+            }
+          }
+        }
+      } catch (smsErr: any) {
+        console.warn("Welcome SMS send failed:", smsErr);
+        smsError = smsErr?.message ?? "SMS send failed";
+      }
+    }
+
+    return { ...res, smsSent, smsError };
   });
 
 export const bulkDeleteEmployeesAdmin = createServerFn({ method: "POST" })

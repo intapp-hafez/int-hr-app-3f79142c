@@ -285,10 +285,14 @@ function ResendWelcomeEmailModal({ detail, close }: { detail: EmployeeDetailRow;
           password: password.trim(),
           loginUrl: window.location.origin,
           appName: document.title || "INT-HR App",
+          phone: detail.phone || "",
         },
       });
       if ((res as any)?.ok) {
-        toast.success(isAr ? "تم إرسال بريد الترحيب بنجاح!" : "Welcome email sent successfully!");
+        const smsNote = detail.phone
+          ? ((res as any)?.smsSent ? " + SMS sent." : ` (SMS: ${(res as any)?.smsError || "not sent"})`)
+          : "";
+        toast.success((isAr ? "تم إرسال بريد الترحيب بنجاح!" : "Welcome email sent successfully!") + smsNote);
         close();
       } else {
         toast.error((res as any)?.error || "Failed to send welcome email");

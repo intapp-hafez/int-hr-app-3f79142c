@@ -460,7 +460,7 @@ function EmployeesPage() {
                 <Td>
                   <div className="flex items-center gap-1" onClick={(ev) => ev.stopPropagation()}>
                     <button
-                      onClick={() => setResendTarget({ id: e.id, full_name: e.full_name, email: e.email })}
+                      onClick={() => setResendTarget({ id: e.id, full_name: e.full_name, email: e.email, phone: e.phone ?? "" })}
                       title={isAr ? "إعادة إرسال بريد الترحيب وبيانات الدخول" : "Resend Welcome Email"}
                       className="inline-flex items-center rounded-full border border-brand/30 bg-brand/10 p-1.5 text-xs font-semibold text-brand hover:bg-brand/20 transition-colors"
                     >
@@ -567,7 +567,7 @@ function ResendWelcomeEmailModal({
   target,
   onClose,
 }: {
-  target: { id: string; full_name?: string | null; email?: string | null };
+  target: { id: string; full_name?: string | null; email?: string | null; phone?: string | null };
   onClose: () => void;
 }) {
   const { isAr } = useI18n();
@@ -607,10 +607,14 @@ function ResendWelcomeEmailModal({
           password: password.trim(),
           loginUrl: window.location.origin,
           appName: document.title || "INT-HR App",
+          phone: target.phone || "",
         },
       });
       if ((res as any)?.ok) {
-        toast.success(isAr ? "تم إرسال بريد الترحيب بنجاح!" : "Welcome email sent successfully!");
+        const smsNote = target.phone
+          ? ((res as any)?.smsSent ? " + SMS sent." : ` (SMS: ${(res as any)?.smsError || "not sent"})`)
+          : "";
+        toast.success((isAr ? "تم إرسال بريد الترحيب بنجاح!" : "Welcome email sent successfully!") + smsNote);
         onClose();
       } else {
         toast.error((res as any)?.error || "Failed to send welcome email");
