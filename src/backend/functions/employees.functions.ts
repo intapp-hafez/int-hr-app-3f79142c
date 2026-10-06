@@ -40,7 +40,7 @@ export type AdminEmployeeRow = {
   bank_account_number?: string | null;
 };
 
-const SORT_COLS = ["full_name", "email", "created_at", "status", "contract_end_date", "contract_remaining"] as const;
+const SORT_COLS = ["emp_code", "id", "full_name", "email", "created_at", "status", "contract_end_date", "contract_remaining"] as const;
 const IMPORT_ROLES = ["admin", "hr", "manager", "employee", "finance"] as const;
 export const INACTIVE_REASONS = [
   "Resigned",
@@ -190,8 +190,8 @@ export const listEmployeesAdmin = createServerFn({ method: "POST" })
       .object({
         page: z.number().int().min(1).default(1),
         pageSize: z.number().int().min(1).max(200).default(25),
-        sort: z.enum(SORT_COLS).default("created_at"),
-        dir: z.enum(["asc", "desc"]).default("desc"),
+        sort: z.enum(SORT_COLS).default("emp_code"),
+        dir: z.enum(["asc", "desc"]).default("asc"),
         q: z.string().max(120).optional().default(""),
         departmentId: z.string().optional().default(""),
         positionId: z.string().optional().default(""),
@@ -255,8 +255,10 @@ export const listEmployeesAdmin = createServerFn({ method: "POST" })
     if (data.inactiveReason) q = q.eq("inactive_reason", data.inactiveReason);
     if (roleUserIds) q = q.in("id", roleUserIds);
 
-    const sortCol = data.sort === "contract_remaining" ? "contract_end_date" : data.sort;
-    q = q.order(sortCol, { ascending: data.dir === "asc" }).range(from, to);
+    const sortCol = data.sort === "contract_remaining" ? "contract_end_date" : data.sort === "id" ? "emp_code" : data.sort;
+    q = q.order(sortCol, { ascending: data.dir === "asc", nullsFirst: false });
+    q = q.order("id", { ascending: true });
+    q = q.range(from, to);
 
     let { data: profiles, error: pe, count } = await q;
     if (pe && (
@@ -286,7 +288,9 @@ export const listEmployeesAdmin = createServerFn({ method: "POST" })
       if (data.status) qFallback = qFallback.eq("status", data.status);
       if (data.inactiveReason) qFallback = qFallback.eq("inactive_reason", data.inactiveReason);
       if (roleUserIds) qFallback = qFallback.in("id", roleUserIds);
-      qFallback = qFallback.order(sortCol, { ascending: data.dir === "asc" }).range(from, to);
+      qFallback = qFallback.order(sortCol, { ascending: data.dir === "asc", nullsFirst: false });
+      qFallback = qFallback.order("id", { ascending: true });
+      qFallback = qFallback.range(from, to);
 
       const fallbackRes = await qFallback;
       profiles = fallbackRes.data as any;
@@ -1734,3 +1738,212 @@ export const adminTransferEmployee = createServerFn({ method: "POST" })
 
     return { ok: true };
   });
+
+// ── Export Employees with all profiles columns ─────────────
+export const exportEmployeesAdmin = createServerFn({ method: "POST" })
+  .middleware([requireAdminAccess])
+  .inputValidator((input?: { ids?: string[] }) => input ?? {})
+  .handler(async ({ context, data }) => {
+    const { supabase } = context as { supabase: any };
+
+    let query = supabase
+      .from("profiles")
+      .select("*")
+      .order("emp_code", { ascending: true, nullsFirst: false });
+
+    if (data?.ids && data.ids.length > 0) {
+      query = query.in("id", data.ids);
+    }
+
+    const { data: profiles, error } = await query;
+    if (error) throw new Error(error.message);
+
+    // Parallel lookups for related metadata
+    const [
+      { data: depts },
+      { data: poss },
+      { data: cities },
+      { data: districts },
+      { data: costCenters },
+      { data: graduations },
+      { data: majors },
+      { data: subSections },
+      { data: userRoles },
+    ] = await Promise.all([
+      supabase.from("departments").select("id, name_en, name_ar, code"),
+      supabase.from("positions").select("id, name_en, name_ar, code"),
+      supabase.from("cities").select("id, name_en, name_ar"),
+      supabase.from("districts").select("id, name_en, name_ar"),
+      supabase.from("cost_centers").select("id, code, name_en, name_ar"),
+      supabase.from("graduations").select("id, name_en, name_ar"),
+      supabase.from("majors").select("id, name_en, name_ar"),
+      (supabase as any).from("sub_sections").select("id, name_en, name_ar, code"),
+      supabase.from("user_roles").select("user_id, role"),
+    ]);
+
+    const deptMap = new Map<string, any>((depts ?? []).map((d: any) => [d.id, d]));
+    const posMap = new Map<string, any>((poss ?? []).map((p: any) => [p.id, p]));
+    const cityMap = new Map<string, any>((cities ?? []).map((c: any) => [c.id, c]));
+    const distMap = new Map<string, any>((districts ?? []).map((d: any) => [d.id, d]));
+    const ccMap = new Map<string, any>((costCenters ?? []).map((c: any) => [c.id, c]));
+    const gradMap = new Map<string, any>((graduations ?? []).map((g: any) => [g.id, g]));
+    const majorMap = new Map<string, any>((majors ?? []).map((m: any) => [m.id, m]));
+    const subSecMap = new Map<string, any>((subSections ?? []).map((s: any) => [s.id, s]));
+
+
+    const rolesByUser = new Map<string, string[]>();
+    for (const r of userRoles ?? []) {
+      const arr = rolesByUser.get(r.user_id) ?? [];
+      arr.push(String(r.role));
+      rolesByUser.set(r.user_id, arr);
+    }
+
+    const managerIds = (profiles ?? [])
+      .map((p: any) => p.manager_id)
+      .filter((id: any): id is string => typeof id === "string" && id.length > 0);
+    const managerMap = new Map<string, string>();
+    if (managerIds.length > 0) {
+      const { data: mgrs } = await supabase
+        .from("profiles")
+        .select("id, full_name, full_name_ar")
+        .in("id", managerIds);
+      for (const m of mgrs ?? []) {
+        managerMap.set(m.id, m.full_name?.trim() || m.full_name_ar?.trim() || "");
+      }
+    }
+
+    function sanitizeExcelCell(val: any): string | number | boolean {
+      if (val === null || val === undefined) return "";
+      if (typeof val === "number" || typeof val === "boolean") return val;
+      const str = typeof val === "string" ? val : JSON.stringify(val);
+      if (str.startsWith("data:image/")) {
+        return "[Base64 Image Attached]";
+      }
+      if (str.length > 32700) {
+        return str.slice(0, 32700) + "… (truncated)";
+      }
+      return str;
+    }
+
+    return (profiles ?? []).map((p: any) => {
+      const d = p.department_id ? deptMap.get(p.department_id) : null;
+      const pos = p.position_id ? posMap.get(p.position_id) : null;
+      const c = p.city_id ? cityMap.get(p.city_id) : null;
+      const dist = p.district_id ? distMap.get(p.district_id) : null;
+      const cc = p.cost_center_id ? ccMap.get(p.cost_center_id) : null;
+      const gr = p.graduation_id ? gradMap.get(p.graduation_id) : null;
+      const mj = p.major_id ? majorMap.get(p.major_id) : null;
+      const ss = p.section_id ? subSecMap.get(p.section_id) : null;
+      const roles = rolesByUser.get(p.id) ?? (p.role ? [p.role] : []);
+
+      const row: Record<string, any> = {
+        "ID": p.id,
+        "Employee Code": p.emp_code ?? "",
+        "Full Name (EN)": p.full_name ?? "",
+        "Full Name (AR)": p.full_name_ar ?? "",
+        "Email": p.email ?? "",
+        "Extra Email": p.extra_email ?? "",
+        "Phone": p.phone ?? "",
+        "Primary Role": p.role ?? "",
+        "Assigned Roles": roles.join(", "),
+        "Status": p.status ?? "",
+        "Inactive Reason": p.inactive_reason ?? "",
+        "Gender": p.gender ?? "",
+
+        // Organization & Position
+        "Department": d ? (d.name_en?.trim() || d.name_ar?.trim() || "") : "",
+        "Department (AR)": d?.name_ar ?? "",
+        "Department Code": d?.code ?? "",
+        "Department ID": p.department_id ?? "",
+        "Position": pos ? (pos.name_en?.trim() || pos.name_ar?.trim() || "") : "",
+        "Position (AR)": pos?.name_ar ?? "",
+        "Position ID": p.position_id ?? "",
+        "Section Name": ss ? (ss.name_en?.trim() || ss.name_ar?.trim() || "") : "",
+        "Section ID": p.section_id ?? "",
+        "Job Grade": p.job_grade ?? "",
+        "Manager Name": p.manager_id ? managerMap.get(p.manager_id) ?? "" : "",
+        "Manager ID": p.manager_id ?? "",
+        "Cost Center Code": cc?.code ?? "",
+        "Cost Center Name": cc ? (cc.name_en?.trim() || cc.name_ar?.trim() || "") : "",
+        "Cost Center ID": p.cost_center_id ?? "",
+
+        // Location & Address
+        "City": c ? (c.name_en?.trim() || c.name_ar?.trim() || "") : (p.city ?? ""),
+        "City ID": p.city_id ?? "",
+        "District": dist ? (dist.name_en?.trim() || dist.name_ar?.trim() || "") : (p.district ?? ""),
+        "District ID": p.district_id ?? "",
+
+        // Education & Background
+        "Graduation": gr ? (gr.name_en?.trim() || gr.name_ar?.trim() || "") : "",
+        "Graduation ID": p.graduation_id ?? "",
+        "Major": mj ? (mj.name_en?.trim() || mj.name_ar?.trim() || "") : "",
+        "Major ID": p.major_id ?? "",
+
+        // Identification & National ID
+        "National ID": p.national_id ?? "",
+        "ID Issue Date": p.id_issue_date ?? "",
+        "ID Expiry Date": p.id_expiry_date ?? "",
+        "Military Expiry Date": p.military_expire_date ?? "",
+
+        // Compensation & Payroll
+        "Salary Mode": p.salary_mode ?? "",
+        "Salary Type": p.salary_type ?? "",
+        "Salary Amount": p.salary_amount ?? 0,
+        "Gross Salary": p.salary_gross ?? "",
+        "Net Salary": p.salary_net ?? "",
+        "Insurance Salary": p.insurance_salary ?? 0,
+        "Allowance": p.allowance ?? 0,
+        "Other Deductions": p.other_deductions ?? 0,
+        "Annual Advance Limit": p.annual_advance_limit ?? 0,
+        "Target Value": p.target_value ?? "",
+        "Target Duration": p.target_duration ?? "",
+        "Emergency Fund": p.emergency_fund ?? 0,
+        "External Income": p.external_income ?? 0,
+        "External Tax Paid": p.external_tax_paid ?? 0,
+
+        // Contract
+        "Contract Type": p.contract_type ?? "",
+        "Contract Start Date": p.contract_start_date ?? "",
+        "Contract End Date": p.contract_end_date ?? "",
+        "Contract Cancelled": p.contract_cancelled ? "Yes" : "No",
+
+        // Insurance & Social
+        "Insurance Applicable": p.insurance_applicable ? "Yes" : "No",
+        "Tax Applicable": p.tax_applicable ? "Yes" : "No",
+        "Martyrs Fund Applicable": p.martyrs_fund_applicable ? "Yes" : "No",
+        "Is Insured": p.is_insured ? "Yes" : "No",
+        "Insurance Number": p.insurance_number ?? "",
+        "Social Insurance Date": p.social_insurance_date ?? "",
+        "Is 5% Quota": p.is_five_percent ? "Yes" : "No",
+
+        // Medical Insurance
+        "Medical Insurance": p.medical_insurance ?? 0,
+        "Medical Insurance Number": p.medical_insurance_number ?? "",
+        "Medical Insurance Type": p.medical_insurance_type ?? "",
+        "Medical Insurance Details": p.medical_insurance_details ?? "",
+
+        // Banking
+        "Bank Name": p.bank_name ?? "",
+        "Bank Account Name": p.bank_account_name ?? "",
+        "Bank Account Number": p.bank_account_number ?? "",
+
+        // Settings & Metadata
+        "Device Check Required": p.device_check_required ? "Yes" : "No",
+        "Face Required": p.face_required ? "Yes" : "No",
+        "Locale": p.locale ?? "",
+        "Custom Field": p.custom_field ?? "",
+        "Avatar URL": p.avatar_url ?? "",
+        "Last Action Date": p.last_action_date ?? "",
+        "Employment Documents Checklist": p.employment_documents_checklist ? JSON.stringify(p.employment_documents_checklist) : "",
+        "Created At": p.created_at ?? "",
+        "Updated At": p.updated_at ?? "",
+      };
+
+      const sanitized: Record<string, any> = {};
+      for (const [k, v] of Object.entries(row)) {
+        sanitized[k] = sanitizeExcelCell(v);
+      }
+      return sanitized;
+    });
+
+  });

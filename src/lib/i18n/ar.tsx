@@ -39,6 +39,14 @@ export const ui: Record<UiKey, string> = {
 
   // Nav - admin
   employees: "الموظفون",
+  contracts: "العقود",
+  operations: "العمليات",
+  payroll: "الرواتب",
+  payrolls: "الرواتب",
+  advances: "السلف",
+  auditLogs: "سجلات التدقيق",
+  directory: "دليل الشركة",
+  orgChart: "الهيكل التنظيمي",
   geofencing: "النطاق الجغرافي",
   workLocations: "مواقع العمل",
   networks: "الشبكات",

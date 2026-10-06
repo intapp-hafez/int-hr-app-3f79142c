@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useState, useMemo, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Plus, Trash2, Upload, Download, FileSpreadsheet, Pencil, Check, X } from "lucide-react";
+import { Plus, Trash2, Upload, Download, FileSpreadsheet, Pencil, Check, X, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import {
   listDepartments, upsertDepartment, deleteDepartment,
   listPositions, upsertPosition, deletePosition,
@@ -16,6 +16,7 @@ import { listCitiesAndDistricts } from "@/backend/functions/employees.functions"
 import { downloadTemplate, parseExcelFile } from "@/lib/excel";
 import { NetworksManager } from "./admin.networks";
 import { DepartmentStructureModal } from "@/components/admin/DepartmentStructureModal";
+import { DepartmentSectionsModal } from "@/components/admin/DepartmentSectionsModal";
 import { SectionsManager } from "@/components/admin/SectionsManager";
 import { SmsBroadcastTab } from "@/components/admin/SmsBroadcastTab";
 import { DevicesManager } from "@/components/admin/DevicesManager";
@@ -219,6 +220,35 @@ function DirectoryPage() {
   );
 }
 
+function computeNextCode(items: Array<{ code?: string | null }>): string {
+  const codes = items.map((i) => (i.code ?? "").trim()).filter(Boolean);
+  if (codes.length === 0) return "101";
+
+  const numericCodes = codes
+    .filter((c) => /^\d+$/.test(c))
+    .map((c) => parseInt(c, 10))
+    .filter((n) => !isNaN(n));
+
+  if (numericCodes.length > 0) {
+    const max = Math.max(...numericCodes);
+    return String(max + 1);
+  }
+
+  const prefixMatches = codes
+    .map((c) => c.match(/^([A-Za-z_-]+)(\d+)$/))
+    .filter((m): m is RegExpMatchArray => m !== null);
+
+  if (prefixMatches.length > 0) {
+    const prefix = prefixMatches[0][1];
+    const numPart = prefixMatches.map((m) => parseInt(m[2], 10));
+    const padLen = prefixMatches[0][2].length;
+    const nextNum = Math.max(...numPart) + 1;
+    return `${prefix}${String(nextNum).padStart(padLen, "0")}`;
+  }
+
+  return "101";
+}
+
 function NamedSection({ kind }: { kind: "departments" | "positions" | "job_grades" | "graduations" | "majors" }) {
   const qc = useQueryClient();
   const list = useServerFn(
@@ -242,6 +272,16 @@ function NamedSection({ kind }: { kind: "departments" | "positions" | "job_grade
   const key = [kind];
   const q = useQuery({ queryKey: key, queryFn: () => list() });
   const isDept = kind === "departments";
+
+  const nextCode = useMemo(() => {
+    return isDept ? computeNextCode(q.data ?? []) : "";
+  }, [q.data, isDept]);
+
+  const [codeSort, setCodeSort] = useState<"asc" | "desc" | null>(isDept ? "asc" : null);
+  const toggleCodeSort = () => {
+    setCodeSort((prev) => (prev === "asc" ? "desc" : prev === "desc" ? null : "asc"));
+  };
+
   const listMgrs = useServerFn(listCitiesAndDistricts);
   const mgrQ = useQuery({
     queryKey: ["dept-responsibles"],
@@ -252,7 +292,11 @@ function NamedSection({ kind }: { kind: "departments" | "positions" | "job_grade
   const managers: Array<{ id: string; name: string }> = (mgrQ.data as any)?.managers ?? [];
   const mUpsert = useMutation({
     mutationFn: (row: { id?: string; name_en: string; name_ar: string; active?: boolean; responsible_person_id?: string | null; code?: string | null; parent_id?: string | null; reports_to_position_id?: string | null }) => upsert({ data: row }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: key }); toast.success("Saved"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: key });
+      toast.success("Saved");
+      setDraft({ name_en: "", name_ar: "", responsible_person_id: "", code: "", parent_id: "", reports_to_position_id: "" });
+    },
     onError: (e: Error) => toast.error(e.message),
   });
   const mDel = useMutation({
@@ -264,6 +308,13 @@ function NamedSection({ kind }: { kind: "departments" | "positions" | "job_grade
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<{ name_en: string; name_ar: string; active: boolean; responsible_person_id: string; code: string; parent_id: string; reports_to_position_id: string }>({ name_en: "", name_ar: "", active: true, responsible_person_id: "", code: "", parent_id: "", reports_to_position_id: "" });
   const [structureDept, setStructureDept] = useState<{ id: string; name_en: string } | null>(null);
+  const [sectionsDept, setSectionsDept] = useState<{ id: string; name_en: string } | null>(null);
+
+  useEffect(() => {
+    if (isDept && nextCode && !draft.code) {
+      setDraft((d) => ({ ...d, code: nextCode }));
+    }
+  }, [nextCode, isDept]);
 
   function handleSaveEdit(id: string) {
     if (!editDraft.name_en.trim()) return toast.error("Name (EN) required");
@@ -285,7 +336,32 @@ function NamedSection({ kind }: { kind: "departments" | "positions" | "job_grade
   }
 
   const headers = ["name_en", "name_ar", "active"];
-  const paged = usePaged<any>(q.data ?? []);
+
+  const sortedData = useMemo(() => {
+    const items = [...(q.data ?? [])];
+    if (codeSort === "asc") {
+      items.sort((a: any, b: any) => {
+        const ca = (a.code ?? "").trim();
+        const cb = (b.code ?? "").trim();
+        if (!ca && !cb) return 0;
+        if (!ca) return 1;
+        if (!cb) return -1;
+        return ca.localeCompare(cb, undefined, { numeric: true, sensitivity: "base" });
+      });
+    } else if (codeSort === "desc") {
+      items.sort((a: any, b: any) => {
+        const ca = (a.code ?? "").trim();
+        const cb = (b.code ?? "").trim();
+        if (!ca && !cb) return 0;
+        if (!ca) return 1;
+        if (!cb) return -1;
+        return cb.localeCompare(ca, undefined, { numeric: true, sensitivity: "base" });
+      });
+    }
+    return items;
+  }, [q.data, codeSort]);
+
+  const paged = usePaged<any>(sortedData);
 
   async function handleImport(file: File) {
     try {
@@ -306,14 +382,99 @@ function NamedSection({ kind }: { kind: "departments" | "positions" | "job_grade
     } catch (e) { toast.error((e as Error).message); }
   }
 
+  async function handleExport() {
+    const list = q.data ?? [];
+    if (list.length === 0) {
+      toast.error("No data to export");
+      return;
+    }
+    const XLSX = await import("xlsx");
+    let exportRows: Record<string, any>[] = [];
+
+    if (kind === "departments") {
+      exportRows = list.map((d: any) => ({
+        "Code": d.code ?? "",
+        "Name (EN)": d.name_en ?? "",
+        "Name (AR)": d.name_ar ?? "",
+        "Sections": d.sections_names ?? "",
+        "Responsible Person": d.responsible_person_name ?? "",
+        "Status": d.active ? "Active" : "Inactive",
+      }));
+    } else if (kind === "positions") {
+      exportRows = list.map((p: any) => ({
+        "Code": p.code ?? "",
+        "Name (EN)": p.name_en ?? "",
+        "Name (AR)": p.name_ar ?? "",
+        "Reports To": p.reports_to_name ?? "",
+        "Status": p.active ? "Active" : "Inactive",
+      }));
+    } else if (kind === "job_grades") {
+      exportRows = list.map((j: any) => ({
+        "Code": j.code ?? "",
+        "Name (EN)": j.name_en ?? "",
+        "Name (AR)": j.name_ar ?? "",
+        "Status": j.active ? "Active" : "Inactive",
+      }));
+    } else if (kind === "graduations") {
+      exportRows = list.map((g: any) => ({
+        "Graduation (EN)": g.name_en ?? "",
+        "Graduation (AR)": g.name_ar ?? "",
+        "Status": g.active ? "Active" : "Inactive",
+      }));
+    } else if (kind === "majors") {
+      exportRows = list.map((m: any) => ({
+        "Major (EN)": m.name_en ?? "",
+        "Major (AR)": m.name_ar ?? "",
+        "Status": m.active ? "Active" : "Inactive",
+      }));
+    } else {
+      exportRows = list.map((r: any) => ({
+        "Name (EN)": r.name_en ?? "",
+        "Name (AR)": r.name_ar ?? "",
+        "Status": r.active ? "Active" : "Inactive",
+      }));
+    }
+
+    const ws = XLSX.utils.json_to_sheet(exportRows);
+    const wb = XLSX.utils.book_new();
+    const sheetName =
+      kind === "departments" ? "Departments" :
+      kind === "positions" ? "Positions" :
+      kind === "job_grades" ? "Job Grades" :
+      kind === "graduations" ? "Graduations" :
+      kind === "majors" ? "Majors" : "Directory";
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    XLSX.writeFile(wb, `${kind}_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast.success(`Exported ${exportRows.length} items`);
+  }
+
   return (
     <div className="space-y-4">
       <Toolbar
         onTemplate={() => downloadTemplate(`${kind}_template.xlsx`, headers, [{ name_en: "Sales", name_ar: "المبيعات", active: true }])}
         onImport={handleImport}
+        onExport={handleExport}
       />
       <div className={`grid gap-3 ${isDept ? "md:grid-cols-6" : "md:grid-cols-5"}`}>
-        <input className={inputCls} placeholder="Code" value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} />
+        <div className="relative">
+          <input
+            className={inputCls}
+            placeholder={isDept ? (nextCode ? `Code (${nextCode})` : "Code") : "Code"}
+            value={draft.code}
+            onChange={(e) => setDraft({ ...draft, code: e.target.value })}
+            title={isDept ? "Department Code (auto-generated, editable)" : "Code"}
+          />
+          {isDept && nextCode && draft.code !== nextCode && (
+            <button
+              type="button"
+              onClick={() => setDraft({ ...draft, code: nextCode })}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-brand hover:underline font-semibold"
+              title={`Set to next code: ${nextCode}`}
+            >
+              Auto
+            </button>
+          )}
+        </div>
         <input className={inputCls} placeholder="Name (EN)" value={draft.name_en} onChange={(e) => setDraft({ ...draft, name_en: e.target.value })} />
         <input className={inputCls} placeholder="Name (AR)" value={draft.name_ar} onChange={(e) => setDraft({ ...draft, name_ar: e.target.value })} />
         {isDept && (
@@ -346,7 +507,58 @@ function NamedSection({ kind }: { kind: "departments" | "positions" | "job_grade
           <Plus className="h-4 w-4" /> Add
         </button>
       </div>
-      <Table cols={isDept ? ["Code", "Name (EN)", "Name (AR)", "Parent", "Responsible", "Active", ""] : ["Code", "Name (EN)", "Name (AR)", "Reports To", "Active", ""]}>
+      <Table
+        cols={
+          isDept
+            ? [
+                <button
+                  key="code"
+                  type="button"
+                  onClick={toggleCodeSort}
+                  className="inline-flex items-center gap-1 font-semibold hover:text-foreground transition-colors group cursor-pointer"
+                  title="Click to sort by Code"
+                >
+                  <span>Code</span>
+                  {codeSort === "asc" ? (
+                    <ArrowUp className="h-3.5 w-3.5 text-brand" />
+                  ) : codeSort === "desc" ? (
+                    <ArrowDown className="h-3.5 w-3.5 text-brand" />
+                  ) : (
+                    <ArrowUpDown className="h-3 w-3 text-muted-foreground/60 group-hover:text-foreground" />
+                  )}
+                </button>,
+                "Name (EN)",
+                "Name (AR)",
+                "Sections",
+                "Responsible",
+                "Active",
+                "",
+              ]
+            : [
+                <button
+                  key="code"
+                  type="button"
+                  onClick={toggleCodeSort}
+                  className="inline-flex items-center gap-1 font-semibold hover:text-foreground transition-colors group cursor-pointer"
+                  title="Click to sort by Code"
+                >
+                  <span>Code</span>
+                  {codeSort === "asc" ? (
+                    <ArrowUp className="h-3.5 w-3.5 text-brand" />
+                  ) : codeSort === "desc" ? (
+                    <ArrowDown className="h-3.5 w-3.5 text-brand" />
+                  ) : (
+                    <ArrowUpDown className="h-3 w-3 text-muted-foreground/60 group-hover:text-foreground" />
+                  )}
+                </button>,
+                "Name (EN)",
+                "Name (AR)",
+                "Reports To",
+                "Active",
+                "",
+              ]
+        }
+      >
         {paged.slice.map((r: any) => editingId === r.id ? (
           <tr key={r.id} className="bg-brand/5">
             <td className="px-3 py-2">
@@ -378,7 +590,7 @@ function NamedSection({ kind }: { kind: "departments" | "positions" | "job_grade
               />
             </td>
             {isDept ? (
-              <td className="px-3 py-2 text-xs text-muted-foreground">{r.parent_name || "—"}</td>
+              <td className="px-3 py-2 text-xs text-muted-foreground">{r.sections_names || "—"}</td>
             ) : (
               <td className="px-3 py-2 text-xs text-muted-foreground">{r.reports_to_name || "—"}</td>
             )}
@@ -436,7 +648,19 @@ function NamedSection({ kind }: { kind: "departments" | "positions" | "job_grade
             <td className="px-3 py-2 font-medium">{r.name_en}</td>
             <td className="px-3 py-2">{r.name_ar || "—"}</td>
             {isDept ? (
-              <td className="px-3 py-2 text-xs text-muted-foreground">{r.parent_name || "—"}</td>
+              <td className="px-3 py-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setSectionsDept(r)}
+                  className="group inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-left hover:bg-muted/60 transition"
+                  title="Manage sections for this department"
+                >
+                  <span className="text-foreground max-w-[200px] truncate">{r.sections_names || "—"}</span>
+                  <span className="rounded-full bg-brand/10 text-brand px-1.5 py-0.5 text-[10px] font-semibold group-hover:bg-brand group-hover:text-brand-foreground transition">
+                    {r.sub_sections_count ? `${r.sub_sections_count} sec` : "+ add"}
+                  </span>
+                </button>
+              </td>
             ) : (
               <td className="px-3 py-2 text-xs text-muted-foreground">{r.reports_to_name || "—"}</td>
             )}
@@ -454,9 +678,23 @@ function NamedSection({ kind }: { kind: "departments" | "positions" | "job_grade
             <td className="px-3 py-2 text-end">
               <div className="flex items-center justify-end gap-1.5">
                 {isDept && (
-                  <button onClick={() => setStructureDept(r)} className="rounded-lg bg-brand/10 p-1.5 text-brand hover:bg-brand/20 text-xs font-semibold px-3">
-                    Manage Structure
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setSectionsDept(r)}
+                      className="rounded-lg bg-secondary/80 hover:bg-secondary text-foreground p-1.5 text-xs font-semibold px-2.5 transition"
+                      title="Manage sections (e.g. a, b, c, d)"
+                    >
+                      Sections
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStructureDept(r)}
+                      className="rounded-lg bg-brand/10 p-1.5 text-brand hover:bg-brand/20 text-xs font-semibold px-2.5"
+                    >
+                      Structure
+                    </button>
+                  </>
                 )}
                 <button
                   type="button"
@@ -519,6 +757,13 @@ function NamedSection({ kind }: { kind: "departments" | "positions" | "job_grade
           onClose={() => setStructureDept(null)}
         />
       )}
+      {sectionsDept && (
+        <DepartmentSectionsModal
+          departmentId={sectionsDept.id}
+          departmentName={sectionsDept.name_en}
+          onClose={() => setSectionsDept(null)}
+        />
+      )}
     </div>
   );
 }
@@ -567,6 +812,41 @@ function CitiesSection() {
     } catch (e) { toast.error((e as Error).message); }
   }
 
+  async function handleExport() {
+    const citiesList: any[] = q.data ?? [];
+    if (citiesList.length === 0) {
+      toast.error("No cities or districts to export");
+      return;
+    }
+    const XLSX = await import("xlsx");
+    const exportRows: Record<string, any>[] = [];
+    for (const c of citiesList) {
+      const districts = c.districts ?? [];
+      if (districts.length === 0) {
+        exportRows.push({
+          "City (EN)": c.name_en ?? "",
+          "City (AR)": c.name_ar ?? "",
+          "District (EN)": "",
+          "District (AR)": "",
+        });
+      } else {
+        for (const d of districts) {
+          exportRows.push({
+            "City (EN)": c.name_en ?? "",
+            "City (AR)": c.name_ar ?? "",
+            "District (EN)": d.name_en ?? "",
+            "District (AR)": d.name_ar ?? "",
+          });
+        }
+      }
+    }
+    const ws = XLSX.utils.json_to_sheet(exportRows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Cities & Districts");
+    XLSX.writeFile(wb, `cities_districts_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast.success(`Exported ${exportRows.length} entries`);
+  }
+
   return (
     <div className="space-y-4">
       <Toolbar
@@ -574,6 +854,7 @@ function CitiesSection() {
           ["city_en", "city_ar", "district_en", "district_ar"],
           [{ city_en: "Cairo", city_ar: "القاهرة", district_en: "Maadi", district_ar: "المعادي" }])}
         onImport={handleImport}
+        onExport={handleExport}
       />
       <div className="grid gap-3 md:grid-cols-3">
         <input className={inputCls} placeholder="City (EN)" value={city.name_en} onChange={(e) => setCity({ ...city, name_en: e.target.value })} />
@@ -634,12 +915,12 @@ function CitiesSection() {
 
 const inputCls = "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring";
 
-function Table({ cols, children }: { cols: string[]; children: React.ReactNode }) {
+function Table({ cols, children }: { cols: React.ReactNode[]; children: React.ReactNode }) {
   return (
     <div className="overflow-x-auto rounded-2xl border border-border">
       <table className="w-full text-sm">
         <thead className="bg-muted/50 text-[11px] uppercase tracking-wider text-muted-foreground">
-          <tr>{cols.map((c) => <th key={c} className="px-3 py-2 text-start font-semibold">{c}</th>)}</tr>
+          <tr>{cols.map((c, i) => <th key={i} className="px-3 py-2 text-start font-semibold">{c}</th>)}</tr>
         </thead>
         <tbody className="divide-y divide-border">{children}</tbody>
       </table>
@@ -647,16 +928,21 @@ function Table({ cols, children }: { cols: string[]; children: React.ReactNode }
   );
 }
 
-function Toolbar({ onTemplate, onImport }: { onTemplate: () => void; onImport: (f: File) => void }) {
+function Toolbar({ onTemplate, onImport, onExport }: { onTemplate: () => void; onImport: (f: File) => void; onExport?: () => void }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <button onClick={onTemplate} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 text-sm">
+      <button onClick={onTemplate} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 text-sm hover:bg-muted">
         <Download className="h-4 w-4" /> Download template
       </button>
-      <label className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 text-sm cursor-pointer">
+      <label className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 text-sm cursor-pointer hover:bg-muted">
         <Upload className="h-4 w-4" /> Import from Excel
         <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onImport(f); e.target.value = ""; }} />
       </label>
+      {onExport && (
+        <button onClick={onExport} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 text-sm hover:bg-muted">
+          <FileSpreadsheet className="h-4 w-4" /> Export Excel
+        </button>
+      )}
       <span className="ml-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
         <FileSpreadsheet className="h-3.5 w-3.5" /> .xlsx, .csv supported
       </span>

@@ -81,6 +81,17 @@ export const NamedRowSchema = z.object({
   parent_id: z.string().uuid().nullable().optional(),
   reports_to_position_id: z.string().uuid().nullable().optional(),
 });
+
+export const SubSectionRowSchema = z.object({
+  id: z.string().uuid().optional(),
+  department_id: z.string().uuid(),
+  name_en: z.string().min(1).max(120),
+  name_ar: z.string().max(120).default(""),
+  code: z.string().max(50).nullable().optional(),
+  active: z.boolean().optional().default(true),
+});
+export type SubSectionRowInput = z.infer<typeof SubSectionRowSchema>;
+
 export const DistrictRowSchema = z.object({
   id: z.string().uuid().optional(),
   city_id: z.string().uuid(),

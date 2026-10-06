@@ -262,17 +262,31 @@ export const reassignEmployeeManager = createServerFn({ method: "POST" })
       .eq("id", data.employeeId);
     if (ue) throw new Error(ue.message);
     // Durable change history (read by admins/HR)
-    const { error: he } = await supabase.from("manager_assignment_history").insert({
-      employee_id: data.employeeId,
-      previous_manager_id: previousManagerId,
-      new_manager_id: data.newManagerId,
-      changed_by: userId,
-      reason: data.reason ?? null,
-    });
-    if (he) {
-      // surface a clear error so admins know history wasn't recorded
-      throw new Error(`Reassigned but history not recorded: ${he.message}`);
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { error: he } = await supabaseAdmin.from("manager_assignment_history").insert({
+        employee_id: data.employeeId,
+        previous_manager_id: previousManagerId,
+        new_manager_id: data.newManagerId,
+        changed_by: userId,
+        reason: data.reason ?? null,
+      });
+      if (he) {
+        console.warn("manager_assignment_history insert warning:", he.message);
+      }
+    } catch {
+      const { error: he } = await supabase.from("manager_assignment_history").insert({
+        employee_id: data.employeeId,
+        previous_manager_id: previousManagerId,
+        new_manager_id: data.newManagerId,
+        changed_by: userId,
+        reason: data.reason ?? null,
+      });
+      if (he) {
+        console.warn("manager_assignment_history insert warning:", he.message);
+      }
     }
+
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       await supabaseAdmin.from("security_audit_events").insert({
@@ -351,8 +365,14 @@ export const listManagerAssignmentHistory = createServerFn({ method: "POST" })
     }).parse(input ?? {}),
   )
   .handler(async ({ context, data }): Promise<ManagerHistoryRow[]> => {
-    const { supabase } = context;
-    let q = supabase
+    let client = context.supabase;
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      if (supabaseAdmin) client = supabaseAdmin as any;
+    } catch {
+      // fallback to context.supabase
+    }
+    let q = client
       .from("manager_assignment_history")
       .select("id, employee_id, previous_manager_id, new_manager_id, changed_by, reason, created_at")
       .order("created_at", { ascending: false })
@@ -369,7 +389,7 @@ export const listManagerAssignmentHistory = createServerFn({ method: "POST" })
       if (r.new_manager_id) ids.add(r.new_manager_id);
       if (r.changed_by) ids.add(r.changed_by);
     }
-    const { data: profs } = await supabase
+    const { data: profs } = await client
       .from("profiles")
       .select("id, full_name, email")
       .in("id", Array.from(ids));

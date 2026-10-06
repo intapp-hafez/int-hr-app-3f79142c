@@ -39,6 +39,14 @@ export const ui = {
 
   // Nav - admin
   employees: "Employees",
+  contracts: "Contracts",
+  operations: "Operations",
+  payroll: "Payroll",
+  payrolls: "Payrolls",
+  advances: "Advances",
+  auditLogs: "Audit Logs",
+  directory: "Directory",
+  orgChart: "Org Chart",
   geofencing: "Geo-Fencing",
   workLocations: "Work Locations",
   networks: "Networks",

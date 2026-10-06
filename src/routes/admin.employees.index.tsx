@@ -29,6 +29,7 @@ import {
   bulkAssignEmployeeRole,
   listCitiesAndDistricts,
   sendEmployeeWelcomeEmail,
+  exportEmployeesAdmin,
   type AdminEmployeeRow,
   type ListEmployeesResult,
   INACTIVE_REASONS,
@@ -72,12 +73,12 @@ function EmployeesPage() {
   const [inactiveReasonFilter, setInactiveReasonFilter] = useState<"" | InactiveReason>("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
-  const [sort, setSort] = useState<"full_name" | "email" | "created_at" | "status" | "contract_end_date" | "contract_remaining">("created_at");
-  const [dir, setDir] = useState<"asc" | "desc">("desc");
+  const [sort, setSort] = useState<"emp_code" | "id" | "full_name" | "email" | "created_at" | "status" | "contract_end_date" | "contract_remaining">("emp_code");
+  const [dir, setDir] = useState<"asc" | "desc">("asc");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
   const [editing, setEditing] = useState<AdminEmployeeRow | null>(null);
-  const [resendTarget, setResendTarget] = useState<{ id: string; full_name?: string | null; email?: string | null } | null>(null);
+  const [resendTarget, setResendTarget] = useState<{ id: string; full_name?: string | null; email?: string | null; phone?: string | null } | null>(null);
 
   const listFn = useServerFn(listEmployeesAdmin);
   const citiesFn = useServerFn(listCitiesAndDistricts);
@@ -167,19 +168,47 @@ function EmployeesPage() {
     onError: (e: any) => toast.error(e?.message ?? "Assign role failed"),
   });
 
-  async function exportSelected() {
-    const XLSX = await import("xlsx");
-    const sel = rows.filter((r) => selected.has(r.id));
-    if (sel.length === 0) { toast.error("No rows selected"); return; }
-    const data = sel.map((r) => ({
-      id: r.id, name: r.full_name, email: r.email, phone: r.phone,
-      department: r.department, position: r.position, city: r.city, district: r.district,
-      status: r.status, roles: r.roles.join("|"), created_at: r.created_at,
-    }));
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Employees");
-    XLSX.writeFile(wb, `employees_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  const [isExporting, setIsExporting] = useState(false);
+  const exportAllFn = useServerFn(exportEmployeesAdmin);
+
+  async function handleExport(ids?: string[]) {
+    setIsExporting(true);
+    try {
+      const data = await exportAllFn({ data: { ids } });
+      if (!data || data.length === 0) {
+        toast.error("No employees found to export");
+        return;
+      }
+      const XLSX = await import("xlsx");
+      const safeData = (data as any[]).map((row) => {
+        const clean: Record<string, any> = {};
+        for (const [k, v] of Object.entries(row)) {
+          if (typeof v === "string") {
+            if (v.startsWith("data:image/")) {
+              clean[k] = "[Base64 Image Attached]";
+            } else if (v.length > 32700) {
+              clean[k] = v.slice(0, 32700) + "… (truncated)";
+            } else {
+              clean[k] = v;
+            }
+          } else {
+            clean[k] = v;
+          }
+        }
+        return clean;
+      });
+      const ws = XLSX.utils.json_to_sheet(safeData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Employees");
+
+      const suffix = ids && ids.length > 0 ? `_selected_${ids.length}` : `_all_${data.length}`;
+      XLSX.writeFile(wb, `employees_full_export${suffix}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      toast.success(`Exported ${data.length} employees with all profile columns`);
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to export employees");
+    } finally {
+      setIsExporting(false);
+    }
   }
 
   const allOnPageSelected = rows.length > 0 && rows.every((r) => selected.has(r.id));
@@ -199,11 +228,20 @@ function EmployeesPage() {
         { to: "/admin/reassign-managers", label: "Reassign Manager" },
       ]} />
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="min-w-0">
+        <div className="flex items-baseline gap-2.5 min-w-0">
           <h1 className="font-display text-2xl font-semibold tracking-tight md:text-3xl">{t("employees")}</h1>
-          <p className="text-sm text-muted-foreground">{total} · {locations.length} {t("branch")}</p>
+          <span className="font-display text-xl md:text-2xl font-bold text-muted-foreground">{total}</span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => handleExport()}
+            disabled={isExporting}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 text-sm font-semibold text-foreground hover:bg-muted shadow-sm transition disabled:opacity-50"
+            title="Export all employees with all profile columns to Excel"
+          >
+            <Download className="h-4 w-4" /> {isExporting ? "Exporting…" : "Export Excel"}
+          </button>
           <ImportExcelInline />
           <button
             onClick={() => setOpen(true)}
@@ -292,9 +330,14 @@ function EmployeesPage() {
               <option value="" disabled>Deactivate…</option>
               {INACTIVE_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
             </select>
-            <button onClick={exportSelected}
-              className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold">
-              <Download className="h-3.5 w-3.5" /> Export
+            <button
+              type="button"
+              onClick={() => handleExport(Array.from(selected))}
+              disabled={isExporting}
+              className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold hover:bg-muted transition disabled:opacity-50"
+              title="Export selected employees with all profile columns"
+            >
+              <Download className="h-3.5 w-3.5" /> {isExporting ? "Exporting…" : `Export (${selected.size})`}
             </button>
             <button
               onClick={() => setBulkAssignOpen(true)}
@@ -347,15 +390,13 @@ function EmployeesPage() {
               <th className="px-4 py-3 w-10">
                 <input type="checkbox" checked={allOnPageSelected} onChange={toggleAllOnPage} aria-label="Select all" />
               </th>
+              <SortableTh label="ID" col="emp_code" sort={sort} dir={dir} onSort={toggleSort} />
               <SortableTh label={t("name")} col="full_name" sort={sort} dir={dir} onSort={toggleSort} />
-              <Th>ID</Th>
               <Th>{t("department") || "Department"}</Th>
               <Th>{t("position")}</Th>
               <Th>{t("phone")}</Th>
-              <SortableTh label="Status" col="status" sort={sort} dir={dir} onSort={toggleSort} />
               <SortableTh label="Contract" col="contract_remaining" sort={sort} dir={dir} onSort={toggleSort} />
               <SortableTh label="Contract End" col="contract_end_date" sort={sort} dir={dir} onSort={toggleSort} />
-              <Th>Roles</Th>
               <Th>{t("actions")}</Th>
             </tr>
           </thead>
@@ -375,24 +416,6 @@ function EmployeesPage() {
                       setSelected(next);
                     }}
                     aria-label="Select row" />
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <EmployeeAvatar id={e.id} name={e.full_name ?? e.email ?? "?"} url={e.avatar_url} className="h-8 w-8" />
-                    <div>
-                      <p className="font-medium">{e.full_name ?? "—"}</p>
-                      {e.full_name_ar && <p className="text-xs text-muted-foreground" dir="rtl">{e.full_name_ar}</p>}
-                      <div className="flex items-center gap-1 mt-0.5">
-                        <p className="text-[11px] text-muted-foreground">{e.email}</p>
-                        {e.gender && (
-                          <>
-                            <span className="text-[11px] text-muted-foreground">·</span>
-                            <span className="text-[11px] font-medium uppercase text-muted-foreground">{e.gender}</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
                 </td>
                 <td className="px-4 py-3">
                   {e.emp_code ? (
@@ -420,43 +443,31 @@ function EmployeesPage() {
                     </div>
                   )}
                 </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <EmployeeAvatar id={e.id} name={e.full_name ?? e.email ?? "?"} url={e.avatar_url} className="h-8 w-8" />
+                    <div>
+                      <p className="font-medium">{e.full_name ?? "—"}</p>
+                      {e.full_name_ar && <p className="text-xs text-muted-foreground" dir="rtl">{e.full_name_ar}</p>}
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <p className="text-[11px] text-muted-foreground">{e.email}</p>
+                        {e.gender && (
+                          <>
+                            <span className="text-[11px] text-muted-foreground">·</span>
+                            <span className="text-[11px] font-medium uppercase text-muted-foreground">{e.gender}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </td>
                 <Td>{e.department ?? "—"}</Td>
                 <Td>{e.position ?? "—"}</Td>
                 <Td mono>{e.phone ?? "—"}</Td>
                 <Td>
-                  <div className="flex flex-wrap items-center gap-1">
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${e.status === "Active" ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-600"}`}>
-                      {e.status}
-                    </span>
-                    {e.status === "Inactive" && e.inactive_reason && (
-                      <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700">
-                        {e.inactive_reason}
-                      </span>
-                    )}
-                  </div>
-                </Td>
-                <Td>
                   <ContractDaysBadge endDate={e.contract_end_date} cancelled={e.contract_cancelled} />
                 </Td>
                 <Td mono>{e.contract_end_date ?? "—"}</Td>
-                <Td>
-                  <div className="flex flex-wrap gap-1">
-                    {e.roles.length === 0 && <span className="text-[10px] text-muted-foreground">—</span>}
-                    {e.roles.map((r) => {
-                      const rc: Record<string, string> = {
-                        admin: "bg-red-100 text-red-700 ring-1 ring-red-300",
-                        hr: "bg-purple-100 text-purple-700 ring-1 ring-purple-300",
-                        manager: "bg-blue-100 text-blue-700 ring-1 ring-blue-300",
-                        employee: "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-300",
-                        staff: "bg-amber-100 text-amber-700 ring-1 ring-amber-300",
-                        user: "bg-slate-100 text-slate-600 ring-1 ring-slate-300",
-                      };
-                      return (
-                        <span key={r} className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${rc[r] ?? "bg-muted text-muted-foreground"}`}>{r}</span>
-                      );
-                    })}
-                  </div>
-                </Td>
                 <Td>
                   <div className="flex items-center gap-1" onClick={(ev) => ev.stopPropagation()}>
                     <button
@@ -471,14 +482,6 @@ function EmployeesPage() {
                       title="Edit"
                       className="inline-flex items-center rounded-full border border-border bg-card p-1.5 text-xs font-semibold hover:bg-muted"
                     ><Pencil className="h-3.5 w-3.5" /></button>
-                    <button
-                      onClick={() => {
-                        if (confirm(`Delete ${e.full_name ?? e.email}? This cannot be undone.`)) deleteMut.mutate(e.id);
-                      }}
-                      disabled={deleteMut.isPending || !isAdmin}
-                      title={isAdmin ? "Delete" : "Admin role required"}
-                      className="inline-flex items-center rounded-full border border-destructive/30 bg-destructive/10 p-1.5 text-xs font-semibold text-destructive hover:bg-destructive/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-destructive/10"
-                    ><Trash2 className="h-3.5 w-3.5" /></button>
                     <Link
                       to="/admin/employees/$id"
                       params={{ id: e.id }}
@@ -492,7 +495,7 @@ function EmployeesPage() {
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={11} className="p-8 text-center text-sm text-muted-foreground">{isLoading ? "Loading…" : "—"}</td></tr>
+              <tr><td colSpan={9} className="p-8 text-center text-sm text-muted-foreground">{isLoading ? "Loading…" : "—"}</td></tr>
             )}
           </tbody>
         </table>
@@ -705,7 +708,7 @@ function ResendWelcomeEmailModal({
 }
 
 function SortableTh({ label, col, sort, dir, onSort }: {
-  label: string; col: "full_name" | "email" | "created_at" | "status" | "contract_end_date" | "contract_remaining";
+  label: string; col: "emp_code" | "id" | "full_name" | "email" | "created_at" | "status" | "contract_end_date" | "contract_remaining";
   sort: string; dir: "asc" | "desc"; onSort: (c: any) => void;
 }) {
   const active = sort === col;

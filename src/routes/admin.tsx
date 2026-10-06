@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, Link, useRouterState, Navigate, useNavigate } from "@tanstack/react-router";
-import { useState, useRef, useEffect } from "react";
-import { LayoutDashboard, Users, MapPin, Clock, CalendarDays, FileBarChart2, ScrollText, Menu, X, Bell, Search, Wallet, Settings, FileSignature, Shield, Building2, KeyRound, Calculator, UserCog, Network, StickyNote, Banknote, Plane, BarChart3, MessageSquare , Smartphone, Printer, ShieldAlert, ArrowLeft, Navigation, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { LayoutDashboard, Users, MapPin, Clock, CalendarDays, FileBarChart2, ScrollText, Menu, X, Bell, Search, Wallet, Settings, FileSignature, Shield, Building2, KeyRound, Calculator, UserCog, Network, StickyNote, Banknote, Plane, BarChart3, MessageSquare , Smartphone, Printer, ShieldAlert, ArrowLeft, Navigation, PanelLeftClose, PanelLeftOpen, ChevronDown, Sliders } from "lucide-react";
 import { NotificationsBell } from "@/components/admin/NotificationsBell";
 import { AppLogo } from "@/components/AppLogo";
 import { UserMenu } from "@/components/UserMenu";
@@ -13,10 +13,37 @@ import { useServerFn } from "@tanstack/react-start";
 import { getChatUnreadTotal } from "@/backend/functions/chat.functions";
 import { usePermissions } from "@/lib/permissions";
 import { GlobalSearch } from "@/components/admin/GlobalSearch";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export const Route = createFileRoute("/admin")({
   component: AdminLayout,
 });
+
+type NavItem = {
+  to: string;
+  icon: any;
+  label: string;
+  exact?: boolean;
+  page: string | null;
+};
+
+type NavGroup = {
+  id: string;
+  label: string;
+  icon: any;
+  items: NavItem[];
+};
+
+type NavEntry =
+  | { type: "item"; item: NavItem }
+  | { type: "group"; group: NavGroup };
 
 function AdminLayout() {
   const { t, dir } = useI18n();
@@ -28,6 +55,19 @@ function AdminLayout() {
     }
     return false;
   });
+
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
+    employees: true,
+    operations: true,
+    payrolls: true,
+  });
+
+  const toggleGroup = (groupId: string) => {
+    setOpenGroups((prev) => ({
+      ...prev,
+      [groupId]: !prev[groupId],
+    }));
+  };
 
   const toggleCollapsed = () => {
     setCollapsed((prev) => {
@@ -44,7 +84,7 @@ function AdminLayout() {
   const navigate = useNavigate();
   const searchInputRef = useRef<HTMLInputElement>(null);
   useExportScheduler();
-  const { can, isAdmin, loading: permsLoading } = usePermissions();
+  const { can, isAdmin, perms, loading: permsLoading } = usePermissions();
 
   // Hooks must run unconditionally before any early return below.
   const unreadFn = useServerFn(getChatUnreadTotal);
@@ -55,6 +95,131 @@ function AdminLayout() {
     enabled: !!session,
   });
   const unreadMessagesCount = unreadData?.total ?? 0;
+
+  const isItemActive = (to: string, exact?: boolean) => {
+    if (to === "/admin/geofencing" && path.startsWith("/admin/work-locations")) return true;
+    if (to === "/admin/geofencing" && (path.startsWith("/admin/networks") || path.startsWith("/admin/devices"))) return true;
+    if (to === "/admin/attendance" && (path.startsWith("/admin/shifts") || path.startsWith("/admin/attendance-rules") || path.startsWith("/admin/attendance-report") || path.startsWith("/admin/targets-overtime") || path.startsWith("/admin/late-penalties"))) return true;
+    if (to === "/admin/leaves" && (path.startsWith("/admin/leaves-requests") || path.startsWith("/admin/holidays") || path.startsWith("/admin/holiday-types"))) return true;
+    if (to === "/admin/audit" && (path.startsWith("/admin/biometrics-health") || path.startsWith("/admin/face-notifications") || path.startsWith("/admin/biometric-terminals") || path.startsWith("/admin/notification-activity"))) return true;
+    if (to === "/admin/payroll" && path.startsWith("/admin/payroll-settings")) return true;
+    if (to === "/admin/settings" && path.startsWith("/admin/settings")) return true;
+    if (to === "/admin/employees" && (path.startsWith("/admin/activity-timeline") || path.startsWith("/admin/manpower") || path.startsWith("/admin/reassign-managers"))) return true;
+    return exact ? path === to : path.startsWith(to);
+  };
+
+  const isGroupActive = (group: NavGroup) => {
+    return group.items.some((item) => isItemActive(item.to, item.exact));
+  };
+
+  const navStructure = useMemo<NavEntry[]>(() => [
+    {
+      type: "item",
+      item: { to: "/admin", icon: LayoutDashboard, label: t("dashboard"), exact: true, page: null },
+    },
+    {
+      type: "item",
+      item: { to: "/admin/chat", icon: MessageSquare, label: t("messagesAndChat"), page: null },
+    },
+    // 1- Employees: Employees, contracts
+    {
+      type: "group",
+      group: {
+        id: "employees",
+        label: t("employees") || "Employees",
+        icon: Users,
+        items: [
+          { to: "/admin/employees", icon: Users, label: t("employees") || "Employees", page: "employees" },
+          { to: "/admin/contracts", icon: FileSignature, label: t("contracts") || "Contracts", page: "contracts" },
+        ],
+      },
+    },
+    // 2- Operations: Attendance, Geo fencing, leaves, audit logs
+    {
+      type: "group",
+      group: {
+        id: "operations",
+        label: t("operations") || "Operations",
+        icon: Sliders,
+        items: [
+          { to: "/admin/attendance", icon: Clock, label: t("attendance") || "Attendance", page: "attendance" },
+          { to: "/admin/geofencing", icon: MapPin, label: t("geofencing") || "Geo-Fencing", page: "geofencing" },
+          { to: "/admin/leaves", icon: CalendarDays, label: t("leaves") || "Leaves", page: "leaves" },
+          { to: "/admin/audit", icon: ScrollText, label: t("auditLogs") || t("audit") || "Audit Logs", page: "audit" },
+        ],
+      },
+    },
+    // 3- Payrolls: payrolls, advances
+    {
+      type: "group",
+      group: {
+        id: "payrolls",
+        label: t("payrolls") || t("payroll") || "Payrolls",
+        icon: Wallet,
+        items: [
+          { to: "/admin/payroll", icon: Wallet, label: t("payroll") || "Payroll", page: "payroll" },
+          { to: "/admin/advances", icon: Banknote, label: t("advances") || t("advancesTitle") || "Advances", page: "advances" },
+        ],
+      },
+    },
+    // 4- Reports
+    {
+      type: "item",
+      item: { to: "/admin/reports", icon: FileBarChart2, label: t("reports") || "Reports", page: "reports" },
+    },
+    // 5- Directory
+    {
+      type: "item",
+      item: { to: "/admin/directory", icon: Building2, label: t("directory") || "Directory", page: "directory" },
+    },
+    // 6- Settings
+    {
+      type: "item",
+      item: { to: "/admin/settings", icon: Settings, label: t("settings") || "Settings", page: "settings" },
+    },
+    // 7- Org chart
+    {
+      type: "item",
+      item: { to: "/admin/org-chart", icon: Network, label: t("orgChart") || "Org Chart", page: "employees" },
+    },
+  ], [t]);
+
+  const filteredNav: NavEntry[] = useMemo(() => {
+    return navStructure
+      .map((entry): NavEntry | null => {
+        if (entry.type === "item") {
+          const allowed = isAdmin || permsLoading || entry.item.page === null || can(entry.item.page, "view");
+          return allowed ? entry : null;
+        }
+        if (entry.type === "group") {
+          const visibleItems = entry.group.items.filter(
+            (sub) => isAdmin || permsLoading || sub.page === null || can(sub.page, "view"),
+          );
+          if (visibleItems.length === 0) return null;
+          return {
+            type: "group",
+            group: {
+              ...entry.group,
+              items: visibleItems,
+            },
+          };
+        }
+        return null;
+      })
+  }, [navStructure, isAdmin, permsLoading, perms]);
+
+  useEffect(() => {
+    const activeEntry = navStructure.find(
+      (entry) => entry.type === "group" && entry.group.items.some((i) => isItemActive(i.to, i.exact)),
+    );
+    if (activeEntry && activeEntry.type === "group") {
+      const gid = activeEntry.group.id;
+      setOpenGroups((prev) => {
+        if (prev[gid]) return prev;
+        return { ...prev, [gid]: true };
+      });
+    }
+  }, [path, navStructure]);
 
   if (typeof window === "undefined") return null;
   if (!ready) return null;
@@ -72,33 +237,8 @@ function AdminLayout() {
     return <Navigate to="/manager" replace />;
   }
 
-  const navAll = [
-    { to: "/admin", icon: LayoutDashboard, label: t("dashboard"), exact: true, page: null },
-    { to: "/admin/chat", icon: MessageSquare, label: t("messagesAndChat"), page: null },
-    { to: "/admin/employees", icon: Users, label: t("employees"), page: "employees" },
-    { to: "/admin/contracts", icon: FileSignature, label: t("contracts"), page: "contracts" },
-    { to: "/admin/geofencing", icon: MapPin, label: t("geofencing"), page: "geofencing" },
-    { to: "/admin/attendance", icon: Clock, label: t("attendance"), page: "attendance" },
-    { to: "/admin/leaves", icon: CalendarDays, label: t("leaves"), page: "leaves" },
-    { to: "/admin/payroll", icon: Wallet, label: t("payroll"), page: "payroll" },
-    { to: "/admin/advances", icon: Banknote, label: t("advancesTitle"), page: "advances" },
-    { to: "/admin/reports", icon: FileBarChart2, label: t("reports"), page: "reports" },
-    { to: "/admin/audit", icon: ScrollText, label: t("audit"), page: "audit" },
-    { to: "/admin/directory", icon: Building2, label: t("directory"), page: "directory" },
-    { to: "/admin/org-chart", icon: Network, label: t("orgChart"), page: "employees" },
-    { to: "/admin/settings", icon: Settings, label: t("settings") || "Settings", page: "settings" },
-  ] as const;
-  const nav = isAdmin || permsLoading
-    ? navAll
-    : navAll.filter((n) => n.page === null || can(n.page, "view"));
-
   const currentRequiredPage = getPageSlugForPath(path);
   const isPageAllowed = isAdmin || permsLoading || !currentRequiredPage || can(currentRequiredPage, "view");
-
-  const isActive = (to: string, exact?: boolean) => {
-    if (to === "/admin/geofencing" && path.startsWith("/admin/work-locations")) return true;
-    return exact ? path === to : path.startsWith(to);
-  };
 
   return (
     <div dir={dir} className="min-h-screen bg-muted/40">
@@ -128,33 +268,133 @@ function AdminLayout() {
           )}
         </div>
         <nav className="flex-1 space-y-1.5 px-3 py-3 overflow-y-auto overflow-x-hidden">
-          {nav.map((n) => {
-            const active = isActive(n.to, "exact" in n ? n.exact : false);
+          {filteredNav.map((entry) => {
+            if (entry.type === "item") {
+              const active = isItemActive(entry.item.to, entry.item.exact);
+              return (
+                <Link
+                  key={entry.item.to}
+                  to={entry.item.to}
+                  title={collapsed ? entry.item.label : undefined}
+                  className={`group relative flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs sm:text-[13px] font-semibold leading-snug transition-all ${
+                    collapsed ? "justify-center px-2" : ""
+                  } ${
+                    active
+                      ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-brand"
+                      : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  }`}
+                >
+                  <entry.item.icon className="h-4 w-4 shrink-0" />
+                  {!collapsed && <span className="truncate">{entry.item.label}</span>}
+                  {entry.item.to === "/admin/chat" && unreadMessagesCount > 0 && (
+                    collapsed ? (
+                      <span className="absolute top-1.5 end-1.5 h-2 w-2 rounded-full bg-brand ring-2 ring-sidebar" />
+                    ) : (
+                      <span className="ms-auto grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 text-[10px] font-bold text-brand-foreground shadow-sm">
+                        {unreadMessagesCount}
+                      </span>
+                    )
+                  )}
+                </Link>
+              );
+            }
+
+            // Group entry
+            const groupActive = isGroupActive(entry.group);
+            const isGroupOpen = !!openGroups[entry.group.id];
+
+            if (collapsed) {
+              return (
+                <DropdownMenu key={entry.group.id}>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      title={entry.group.label}
+                      className={`group relative flex w-full items-center justify-center rounded-xl p-2.5 text-xs font-semibold transition-all ${
+                        groupActive
+                          ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-brand"
+                          : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                      }`}
+                    >
+                      <entry.group.icon className="h-4 w-4 shrink-0" />
+                      {groupActive && (
+                        <span className="absolute top-1.5 end-1.5 h-1.5 w-1.5 rounded-full bg-brand ring-2 ring-sidebar" />
+                      )}
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    side={dir === "rtl" ? "left" : "right"}
+                    align="start"
+                    className="min-w-48 z-50 bg-popover text-popover-foreground border-border shadow-lg"
+                  >
+                    <DropdownMenuLabel className="text-xs text-muted-foreground font-semibold px-2 py-1.5">
+                      {entry.group.label}
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {entry.group.items.map((subItem) => {
+                      const subActive = isItemActive(subItem.to, subItem.exact);
+                      return (
+                        <DropdownMenuItem key={subItem.to} asChild>
+                          <Link
+                            to={subItem.to}
+                            className={`flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium cursor-pointer ${
+                              subActive ? "font-semibold text-brand bg-brand/10" : ""
+                            }`}
+                          >
+                            <subItem.icon className="h-3.5 w-3.5 shrink-0" />
+                            <span>{subItem.label}</span>
+                          </Link>
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              );
+            }
+
             return (
-              <Link
-                key={n.to}
-                to={n.to}
-                title={collapsed ? n.label : undefined}
-                className={`group relative flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs sm:text-[13px] font-semibold leading-snug transition-all ${
-                  collapsed ? "justify-center px-2" : ""
-                } ${
-                  active
-                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-brand"
-                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                }`}
-              >
-                <n.icon className="h-4 w-4 shrink-0" />
-                {!collapsed && <span className="truncate">{n.label}</span>}
-                {n.to === "/admin/chat" && unreadMessagesCount > 0 && (
-                  collapsed ? (
-                    <span className="absolute top-1.5 end-1.5 h-2 w-2 rounded-full bg-brand ring-2 ring-sidebar" />
-                  ) : (
-                    <span className="ms-auto grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 text-[10px] font-bold text-brand-foreground shadow-sm">
-                      {unreadMessagesCount}
-                    </span>
-                  )
+              <div key={entry.group.id} className="space-y-1">
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(entry.group.id)}
+                  className={`group flex w-full items-center justify-between gap-2.5 rounded-xl px-3 py-2 text-xs sm:text-[13px] font-semibold leading-snug transition-all ${
+                    groupActive
+                      ? "text-sidebar-foreground bg-sidebar-accent/50"
+                      : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <entry.group.icon className="h-4 w-4 shrink-0 text-sidebar-foreground/75" />
+                    <span className="truncate">{entry.group.label}</span>
+                  </div>
+                  <ChevronDown
+                    className={`h-3.5 w-3.5 shrink-0 text-sidebar-foreground/60 transition-transform duration-200 ${
+                      isGroupOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+                {isGroupOpen && (
+                  <div className="ms-4 space-y-1 border-s border-sidebar-border/60 ps-2.5 pt-0.5">
+                    {entry.group.items.map((subItem) => {
+                      const subActive = isItemActive(subItem.to, subItem.exact);
+                      return (
+                        <Link
+                          key={subItem.to}
+                          to={subItem.to}
+                          className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all ${
+                            subActive
+                              ? "bg-sidebar-primary text-sidebar-primary-foreground font-semibold shadow-sm"
+                              : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                          }`}
+                        >
+                          <subItem.icon className="h-3.5 w-3.5 shrink-0 opacity-80" />
+                          <span className="truncate">{subItem.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
                 )}
-              </Link>
+              </div>
             );
           })}
         </nav>
@@ -180,17 +420,76 @@ function AdminLayout() {
               <button onClick={() => setOpen(false)} className="rounded-full p-1 text-sidebar-foreground/80"><X className="h-5 w-5" /></button>
             </div>
             <nav className="flex-1 space-y-1.5 overflow-y-auto px-1">
-              {nav.map((n) => {
-                const active = isActive(n.to, "exact" in n ? n.exact : false);
+              {filteredNav.map((entry) => {
+                if (entry.type === "item") {
+                  const active = isItemActive(entry.item.to, entry.item.exact);
+                  return (
+                    <Link
+                      key={entry.item.to}
+                      to={entry.item.to}
+                      onClick={() => setOpen(false)}
+                      className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs sm:text-[13px] font-semibold leading-snug ${
+                        active ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground/80"
+                      }`}
+                    >
+                      <entry.item.icon className="h-4 w-4" />
+                      <span className="truncate">{entry.item.label}</span>
+                      {entry.item.to === "/admin/chat" && unreadMessagesCount > 0 && (
+                        <span className="ms-auto grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 text-[10px] font-bold text-brand-foreground shadow-sm">
+                          {unreadMessagesCount}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                }
+
+                const groupActive = isGroupActive(entry.group);
+                const isGroupOpen = !!openGroups[entry.group.id];
+
                 return (
-                  <Link
-                    key={n.to}
-                    to={n.to}
-                    onClick={() => setOpen(false)}
-                    className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs sm:text-[13px] font-semibold leading-snug ${active ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground/80"}`}
-                  >
-                    <n.icon className="h-4 w-4" /> <span className="truncate">{n.label}</span>
-                  </Link>
+                  <div key={entry.group.id} className="space-y-1">
+                    <button
+                      type="button"
+                      onClick={() => toggleGroup(entry.group.id)}
+                      className={`group flex w-full items-center justify-between gap-2.5 rounded-xl px-3 py-2 text-xs sm:text-[13px] font-semibold leading-snug ${
+                        groupActive
+                          ? "text-sidebar-foreground bg-sidebar-accent/50"
+                          : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <entry.group.icon className="h-4 w-4 shrink-0 text-sidebar-foreground/75" />
+                        <span className="truncate">{entry.group.label}</span>
+                      </div>
+                      <ChevronDown
+                        className={`h-3.5 w-3.5 shrink-0 text-sidebar-foreground/60 transition-transform duration-200 ${
+                          isGroupOpen ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+                    {isGroupOpen && (
+                      <div className="ms-4 space-y-1 border-s border-sidebar-border/60 ps-2.5 pt-0.5">
+                        {entry.group.items.map((subItem) => {
+                          const subActive = isItemActive(subItem.to, subItem.exact);
+                          return (
+                            <Link
+                              key={subItem.to}
+                              to={subItem.to}
+                              onClick={() => setOpen(false)}
+                              className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all ${
+                                subActive
+                                  ? "bg-sidebar-primary text-sidebar-primary-foreground font-semibold shadow-sm"
+                                  : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                              }`}
+                            >
+                              <subItem.icon className="h-3.5 w-3.5 shrink-0 opacity-80" />
+                              <span className="truncate">{subItem.label}</span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </nav>

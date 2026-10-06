@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Check, Ban, ShieldX, Search, Smartphone, ScrollText, RotateCcw, Loader2 } from "lucide-react";
+import { Check, Ban, ShieldX, Search, Smartphone, ScrollText, RotateCcw, Loader2, FileSpreadsheet } from "lucide-react";
 import { formatDate } from "@/lib/date-format";
 import {
   listAllDevices,
@@ -66,6 +66,31 @@ export function DevicesManager() {
     onError: (e: any) => toast.error(e?.message ?? "Action failed"),
   });
 
+  async function handleExport() {
+    if (!devices || devices.length === 0) {
+      toast.error("No devices to export");
+      return;
+    }
+    const XLSX = await import("xlsx");
+    const exportRows = (devices as AdminDeviceRow[]).map((d) => ({
+      "Employee Name": d.employee_name ?? "",
+      "Employee Email": d.employee_email ?? "",
+      "Device Type": d.device_type ?? "",
+      "Browser": d.browser ?? "",
+      "OS": d.os ?? "",
+      "Label": d.label ?? "",
+      "Device ID": d.id,
+      "IP Address": d.ip_address ?? "",
+      "First Seen": d.created_at ? formatDate(d.created_at) : "",
+      "Status": d.status ?? "",
+    }));
+    const ws = XLSX.utils.json_to_sheet(exportRows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Devices");
+    XLSX.writeFile(wb, `devices_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast.success(`Exported ${exportRows.length} devices`);
+  }
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -75,14 +100,23 @@ export function DevicesManager() {
             Only approved devices can record check-in and check-out.
           </p>
         </div>
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search employee, device, IP…"
-            className="h-9 w-64 rounded-xl border border-border bg-card pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-          />
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search employee, device, IP…"
+              className="h-9 w-64 rounded-xl border border-border bg-card pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+          <button
+            onClick={handleExport}
+            disabled={devices.length === 0}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-card px-3.5 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50 h-9"
+          >
+            <FileSpreadsheet className="h-4 w-4" /> Export Excel
+          </button>
         </div>
       </header>
 

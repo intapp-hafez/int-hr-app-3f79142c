@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Loader2, Wifi } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, Wifi, FileSpreadsheet } from "lucide-react";
 import { listNetworks, upsertNetwork, deleteNetwork } from "@/backend/functions/networks.functions";
 import { NetworkSchema } from "@/backend/schemas";
 import { Button } from "@/components/ui/button";
@@ -46,6 +46,27 @@ export function NetworksManager() {
     if (!r.success) { const e: Record<string, string> = {}; r.error.issues.forEach(i => { const k = i.path[0] as string; if (k && !e[k]) e[k] = i.message; }); setErrs(e); return; }
     setErrs({}); m.mutate(form);
   }
+  async function handleExport() {
+    if (!rows || rows.length === 0) {
+      toast.error("No networks to export");
+      return;
+    }
+    const XLSX = await import("xlsx");
+    const exportRows = rows.map((r: any) => ({
+      "Name": r.name ?? "",
+      "SSID": r.ssid ?? "",
+      "BSSID": r.bssid ?? "",
+      "Branch": r.branch ?? "",
+      "Notes": r.notes ?? "",
+      "Active": r.is_active ? "Yes" : "No",
+    }));
+    const ws = XLSX.utils.json_to_sheet(exportRows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Networks");
+    XLSX.writeFile(wb, `networks_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast.success(`Exported ${exportRows.length} networks`);
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex items-end justify-between gap-3">
@@ -53,7 +74,19 @@ export function NetworksManager() {
           <h1 className="font-display text-2xl font-semibold md:text-3xl">Networks</h1>
           <p className="text-sm text-muted-foreground">Allowed Wi-Fi networks (SSID / BSSID) for office check-in.</p>
         </div>
-        <Button onClick={() => { setForm(blank); setErrs({}); setOpen(true); }} className="rounded-full"><Plus className="h-4 w-4" /> Add network</Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={handleExport}
+            disabled={rows.length === 0}
+            className="rounded-full"
+          >
+            <FileSpreadsheet className="h-4 w-4" /> Export Excel
+          </Button>
+          <Button onClick={() => { setForm(blank); setErrs({}); setOpen(true); }} className="rounded-full">
+            <Plus className="h-4 w-4" /> Add network
+          </Button>
+        </div>
       </div>
       <div className="overflow-hidden rounded-3xl border border-border bg-card">
         <table className="w-full text-sm">

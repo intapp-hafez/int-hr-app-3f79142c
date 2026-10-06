@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireAdminAccess } from "@/integrations/supabase/admin-auth-middleware";
-import { NamedRowSchema, DistrictRowSchema, LeaveTypeRowSchema, CostCenterRowSchema } from "../schemas";
+import { NamedRowSchema, SubSectionRowSchema, DistrictRowSchema, LeaveTypeRowSchema, CostCenterRowSchema } from "../schemas";
 
 type DepartmentUpsert = {
   id?: string;
@@ -44,11 +44,38 @@ export const listDepartments = createServerFn({ method: "GET" })
       }
     }
 
-    return (rawDepts ?? []).map((d: any) => ({
-      ...d,
-      responsible_person_name: d.responsible_person_id ? nameMap.get(d.responsible_person_id) ?? null : null,
-      parent_name: d.parent_id ? deptMap.get(d.parent_id) ?? null : null,
-    }));
+    // sub_sections table will be used for department sections (e.g. dept HR -> sections a, b, c, d)
+    const subSectionsByDept = new Map<string, any[]>();
+    try {
+      const { data: subs, error: subErr } = await (context.supabase as any)
+        .from("sub_sections")
+        .select("id, department_id, name_en, name_ar")
+        .order("name_en");
+      if (!subErr && subs) {
+        for (const s of subs) {
+          if (!s.department_id) continue;
+          const arr = subSectionsByDept.get(s.department_id) ?? [];
+          arr.push(s);
+          subSectionsByDept.set(s.department_id, arr);
+        }
+      }
+    } catch {
+      // sub_sections table not created yet
+    }
+
+    return (rawDepts ?? []).map((d: any) => {
+      const deptSubs = subSectionsByDept.get(d.id) ?? [];
+      const secNames = deptSubs
+        .map((s: any) => s.name_en?.trim() || s.name_ar?.trim() || "")
+        .filter(Boolean)
+        .join(", ");
+      return {
+        ...d,
+        responsible_person_name: d.responsible_person_id ? nameMap.get(d.responsible_person_id) ?? null : null,
+        parent_name: d.parent_id ? deptMap.get(d.parent_id) ?? null : null,
+        sections_names: secNames || null,
+      };
+    });
   });
 
 export const upsertDepartment = createServerFn({ method: "POST" })
@@ -81,6 +108,63 @@ export const deleteDepartment = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// ── Sub-Sections (Department Sections: e.g. Dept HR -> sections a, b, c, d) ──
+export const listSubSections = createServerFn({ method: "GET" })
+  .middleware([requireAdminAccess])
+  .inputValidator((i?: { department_id?: string }) => i ?? {})
+  .handler(async ({ data, context }) => {
+    try {
+      let q = (context.supabase as any)
+        .from("sub_sections")
+        .select("*, departments(id, name_en, name_ar)")
+        .order("name_en");
+      if (data?.department_id) {
+        q = q.eq("department_id", data.department_id);
+      }
+      const { data: rows, error } = await q;
+      if (error) {
+        console.warn("[listSubSections] error:", error);
+        return [];
+      }
+      return rows ?? [];
+    } catch {
+      return [];
+    }
+  });
+
+export const upsertSubSection = createServerFn({ method: "POST" })
+  .middleware([requireAdminAccess])
+  .inputValidator((i) => SubSectionRowSchema.parse(i))
+  .handler(async ({ data, context }) => {
+    const row = {
+      ...(data.id ? { id: data.id } : {}),
+      department_id: data.department_id,
+      name_en: data.name_en,
+      name_ar: data.name_ar,
+      code: data.code ?? null,
+      active: data.active ?? true,
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = await (context.supabase as any)
+      .from("sub_sections")
+      .upsert(row);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const deleteSubSection = createServerFn({ method: "POST" })
+  .middleware([requireAdminAccess])
+  .inputValidator((i: { id: string }) => z.object({ id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { error } = await (context.supabase as any)
+      .from("sub_sections")
+      .delete()
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+
 // ── Department Positions ───────────────────────────
 export const listDepartmentPositions = createServerFn({ method: "GET" })
   .middleware([requireAdminAccess])
@@ -99,7 +183,7 @@ export const listDepartmentPositions = createServerFn({ method: "GET" })
     return records ?? [];
   });
 
-// ── Sections ───────────────────────────────────────
+// ── Sections (Levels) ───────────────────────────────
 export const listSections = createServerFn({ method: "GET" })
   .middleware([requireAdminAccess])
   .inputValidator((i) => z.object({ department_id: z.string().uuid().optional() }).optional().parse(i))
@@ -115,35 +199,25 @@ export const listSections = createServerFn({ method: "GET" })
     
     const { data: records, error } = await query;
     if (error) throw new Error(error.message);
-
-    const sectionMap = new Map<string, string>(
-      (records ?? []).map((s: any) => [s.id, s.name_en?.trim() || s.name_ar?.trim() || ""])
-    );
-
-    return (records ?? []).map((s: any) => ({
-      ...s,
-      parent_name: s.parent_id ? sectionMap.get(s.parent_id) ?? null : null,
-    }));
+    return records ?? [];
   });
 
 export const upsertSection = createServerFn({ method: "POST" })
   .middleware([requireAdminAccess])
   .inputValidator((i) => z.object({
     id: z.string().uuid().optional(),
-    department_id: z.string().uuid(),
-    parent_id: z.string().uuid().nullable().optional(),
+    department_id: z.string().uuid().nullable().optional(),
     name_en: z.string().min(1),
     name_ar: z.string().min(1),
     active: z.boolean().default(true),
   }).parse(i))
   .handler(async ({ data, context }) => {
     const payload: Record<string, any> = {
-      id: data.id,
-      department_id: data.department_id,
+      ...(data.id ? { id: data.id } : {}),
+      department_id: data.department_id || null,
       name_en: data.name_en,
       name_ar: data.name_ar,
       active: data.active,
-      parent_id: data.parent_id || null,
     };
     const { error } = await (context.supabase as any).from("sections").upsert(payload);
     if (error) throw new Error(error.message);
