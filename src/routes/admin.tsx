@@ -206,6 +206,7 @@ function AdminLayout() {
         }
         return null;
       })
+      .filter((e): e is NavEntry => e !== null);
   }, [navStructure, isAdmin, permsLoading, perms]);
 
   useEffect(() => {
