@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Trash2 } from "lucide-react";
+import { Trash2, Pencil, Check, X } from "lucide-react";
 import { listLeaveTypes, upsertLeaveType, deleteLeaveType } from "@/backend/functions/directory.functions";
 
 const inputCls = "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring";
@@ -18,6 +18,13 @@ export function LeaveTypesManager() {
   const mD = useMutation({ mutationFn: (id: string) => del({ data: { id } }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["leave_types"] }); toast.success("Deleted"); }, onError: (e: Error) => toast.error(e.message) });
   const [draft, setDraft] = useState({ name: "", annual_days: 0, paid: true, active: true, requires_proof: false });
   const [page, setPage] = useState(1);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [edit, setEdit] = useState<any>(null);
+  const saveEdit = () => {
+    if (!edit?.name?.trim()) return toast.error("Name required");
+    if (!(edit.annual_days >= 0)) return toast.error("Annual days must be 0 or more");
+    m.mutate({ id: edit.id, name: edit.name.trim(), annual_days: Number(edit.annual_days), paid: edit.paid, active: edit.active, requires_proof: edit.requires_proof }, { onSuccess: () => setEditId(null) });
+  };
   const rows: any[] = q.data ?? [];
   const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount);
@@ -39,7 +46,19 @@ export function LeaveTypesManager() {
             <tr>{["Name", "Annual days", "Paid", "Requires proof", "Active", ""].map((c) => <th key={c} className="px-3 py-2 text-start font-semibold">{c}</th>)}</tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {slice.map((r: any) => (
+            {slice.map((r: any) => editId === r.id ? (
+              <tr key={r.id} className="bg-muted/30">
+                <td className="px-3 py-2"><input autoFocus className={inputCls} value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} onKeyDown={(e) => { if (e.key === "Enter") saveEdit(); if (e.key === "Escape") setEditId(null); }} /></td>
+                <td className="px-3 py-2"><input type="number" min={0} className={`${inputCls} w-24`} value={edit.annual_days} onChange={(e) => setEdit({ ...edit, annual_days: Number(e.target.value) })} /></td>
+                <td className="px-3 py-2"><input type="checkbox" checked={edit.paid} onChange={(e) => setEdit({ ...edit, paid: e.target.checked })} /></td>
+                <td className="px-3 py-2"><input type="checkbox" checked={edit.requires_proof} onChange={(e) => setEdit({ ...edit, requires_proof: e.target.checked })} /></td>
+                <td className="px-3 py-2"><input type="checkbox" checked={edit.active} onChange={(e) => setEdit({ ...edit, active: e.target.checked })} /></td>
+                <td className="px-3 py-2 text-end whitespace-nowrap">
+                  <button onClick={saveEdit} disabled={m.isPending} title="Save" className="rounded-lg p-1.5 text-success hover:bg-success/10"><Check className="h-4 w-4" /></button>
+                  <button onClick={() => setEditId(null)} title="Cancel" className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted"><X className="h-4 w-4" /></button>
+                </td>
+              </tr>
+            ) : (
               <tr key={r.id}>
                 <td className="px-3 py-2 font-medium">{r.name}</td>
                 <td className="px-3 py-2">{r.annual_days}</td>
@@ -54,7 +73,8 @@ export function LeaveTypesManager() {
                     {r.active ? "Yes" : "No"}
                   </button>
                 </td>
-                <td className="px-3 py-2 text-end">
+                <td className="px-3 py-2 text-end whitespace-nowrap">
+                  <button onClick={() => { setEditId(r.id); setEdit({ ...r }); }} title="Edit" className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"><Pencil className="h-4 w-4" /></button>
                   <button onClick={() => mD.mutate(r.id)} className="rounded-lg p-1.5 text-destructive hover:bg-destructive/10"><Trash2 className="h-4 w-4" /></button>
                 </td>
               </tr>
