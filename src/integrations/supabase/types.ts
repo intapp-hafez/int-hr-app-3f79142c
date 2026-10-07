@@ -3380,31 +3380,28 @@ export type Database = {
         Row: {
           active: boolean
           created_at: string
-          department_id: string
+          department_id: string | null
           id: string
           name_ar: string
           name_en: string
-          parent_id: string | null
           updated_at: string
         }
         Insert: {
           active?: boolean
           created_at?: string
-          department_id: string
+          department_id?: string | null
           id?: string
           name_ar: string
           name_en: string
-          parent_id?: string | null
           updated_at?: string
         }
         Update: {
           active?: boolean
           created_at?: string
-          department_id?: string
+          department_id?: string | null
           id?: string
           name_ar?: string
           name_en?: string
-          parent_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -3413,13 +3410,6 @@ export type Database = {
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "departments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sections_parent_id_fkey"
-            columns: ["parent_id"]
-            isOneToOne: false
-            referencedRelation: "sections"
             referencedColumns: ["id"]
           },
         ]
@@ -3743,6 +3733,47 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sub_sections: {
+        Row: {
+          active: boolean
+          code: string | null
+          created_at: string
+          department_id: string
+          id: string
+          name_ar: string
+          name_en: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          code?: string | null
+          created_at?: string
+          department_id: string
+          id?: string
+          name_ar?: string
+          name_en: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          code?: string | null
+          created_at?: string
+          department_id?: string
+          id?: string
+          name_ar?: string
+          name_en?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sub_sections_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
             referencedColumns: ["id"]
           },
         ]
@@ -4255,6 +4286,22 @@ export type Database = {
       }
     }
     Functions: {
+      _inspect_unique_constraints: {
+        Args: never
+        Returns: {
+          cname: string
+          col: string
+          tbl: string
+        }[]
+      }
+      _inspect_unique_indexes: {
+        Args: never
+        Returns: {
+          idx_def: string
+          idx_name: string
+          tbl: string
+        }[]
+      }
       biometric_verify_face: {
         Args: { _descriptor: Json; _email: string }
         Returns: Json
