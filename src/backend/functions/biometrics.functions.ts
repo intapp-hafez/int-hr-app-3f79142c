@@ -24,9 +24,22 @@ export const enrollFace = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => DescriptorSchema.parse(i))
   .handler(async ({ data, context }) => {
+    // Re-enrolling an existing face needs admin permission (one-time switch).
+    const { data: existing } = await context.supabase
+      .from("face_descriptors").select("user_id").eq("user_id", context.userId).maybeSingle();
+    if (existing) {
+      const { data: prof } = await (context.supabase as any)
+        .from("profiles").select("face_reenroll_allowed").eq("id", context.userId).maybeSingle();
+      if (prof?.face_reenroll_allowed !== true) {
+        throw new Error("Re-enrolling your face needs approval. Please ask HR or your admin to allow it.");
+      }
+    }
     const { error } = await context.supabase
       .from("face_descriptors")
       .upsert({ user_id: context.userId, descriptor: data.descriptor as any });
+    if (!error && existing) {
+      await (context.supabase as any).from("profiles").update({ face_reenroll_allowed: false }).eq("id", context.userId);
+    }
     await logBiometricEvent({
       userId: context.userId, method: "face", event: "enroll",
       success: !error, reason: error?.message ?? null,
@@ -556,15 +569,18 @@ export const webauthnAuthVerifyForSelf = createServerFn({ method: "POST" })
 export const listMyBiometrics = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const [{ data: face }, { data: creds }] = await Promise.all([
+    const [{ data: face }, { data: creds }, { data: prof }] = await Promise.all([
       context.supabase.from("face_descriptors").select("enrolled_at, updated_at")
         .eq("user_id", context.userId).maybeSingle(),
       context.supabase.from("webauthn_credentials")
         .select("id, device_label, created_at, last_used_at")
         .eq("user_id", context.userId)
         .order("created_at", { ascending: false }),
+      (context.supabase as any).from("profiles").select("face_reenroll_allowed")
+        .eq("id", context.userId).maybeSingle(),
     ]);
     return {
+      reenrollAllowed: (prof as any)?.face_reenroll_allowed === true,
       face: face ? { enrolled_at: face.enrolled_at, updated_at: face.updated_at } : null,
       fingerprints: (creds ?? []) as Array<{ id: string; device_label: string | null; created_at: string; last_used_at: string | null }>,
     };

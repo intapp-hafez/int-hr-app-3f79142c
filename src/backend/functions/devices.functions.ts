@@ -154,6 +154,33 @@ export const setFaceRequirement = createServerFn({ method: "POST" })
     return { ok: true, required: data.required };
   });
 
+// ── Per-employee one-time face re-enroll permission (off by default) ──
+export const getFaceReenroll = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { user_id: string }) => z.object({ user_id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: row, error } = await (context.supabase as any)
+      .from("profiles").select("face_reenroll_allowed").eq("id", data.user_id).maybeSingle();
+    if (error) return { allowed: false, available: false };
+    return { allowed: row?.face_reenroll_allowed === true, available: true };
+  });
+
+export const setFaceReenroll = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { user_id: string; allowed: boolean }) =>
+    z.object({ user_id: z.string().uuid(), allowed: z.boolean() }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.supabase, context.userId);
+    const { error } = await (context.supabase as any)
+      .from("profiles").update({ face_reenroll_allowed: data.allowed }).eq("id", data.user_id);
+    if (error) {
+      if (/face_reenroll_allowed/.test(error.message)) throw new Error("Database update needed: run migration 053-face-reenroll.sql");
+      throw new Error(error.message);
+    }
+    return { ok: true, allowed: data.allowed };
+  });
+
 export const listMyDevices = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
