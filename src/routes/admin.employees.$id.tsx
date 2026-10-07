@@ -38,6 +38,8 @@ import {
   setDeviceRequirement,
   getFaceRequirement,
   setFaceRequirement,
+  getFaceReenroll,
+  setFaceReenroll,
 } from "@/backend/functions/devices.functions";
 import { listJobGrades } from "@/backend/functions/directory.functions";
 import {
@@ -4097,6 +4099,45 @@ function DeviceRequirementToggle({ userId, canManage }: { userId: string; canMan
   );
 }
 
+function FaceReenrollToggle({ userId, canManage }: { userId: string; canManage: boolean }) {
+  const getFn = useServerFn(getFaceReenroll);
+  const setFn = useServerFn(setFaceReenroll);
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["employee-face-reenroll", userId],
+    queryFn: () => getFn({ data: { user_id: userId } }),
+  });
+  const allowed = data?.allowed === true;
+  async function toggle() {
+    try {
+      await setFn({ data: { user_id: userId, allowed: !allowed } });
+      toast.success(!allowed ? "Employee can now re-enroll their face" : "Face re-enroll turned off");
+      qc.invalidateQueries({ queryKey: ["employee-face-reenroll", userId] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed");
+    }
+  }
+  return (
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-muted/40 p-3">
+      <div className="min-w-0">
+        <p className="text-sm font-semibold">Allow face re-enroll</p>
+        <p className="text-xs text-muted-foreground">
+          Shows the "Re-enroll" button on the employee's Biometrics page. It switches off automatically after they re-scan.
+        </p>
+      </div>
+      <button
+        type="button"
+        disabled={!canManage}
+        onClick={toggle}
+        aria-pressed={allowed}
+        className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-50 ${allowed ? "bg-gradient-brand" : "bg-border"}`}
+      >
+        <span className={`absolute top-1 h-5 w-5 rounded-full bg-card shadow transition-all ${allowed ? "left-6 rtl:right-6 rtl:left-auto" : "left-1 rtl:right-1 rtl:left-auto"}`} />
+      </button>
+    </div>
+  );
+}
+
 function FaceRequirementToggle({ userId, canManage }: { userId: string; canManage: boolean }) {
   const { t } = useI18n();
   const getFn = useServerFn(getFaceRequirement);
@@ -4185,6 +4226,7 @@ function EmployeeDevicesPanel({ userId, canManage }: { userId: string; canManage
 
       <DeviceRequirementToggle userId={userId} canManage={canManage} />
       <FaceRequirementToggle userId={userId} canManage={canManage} />
+      <FaceReenrollToggle userId={userId} canManage={canManage} />
       {isLoading ? (
         <p className="text-center text-sm text-muted-foreground">{t("loading") || "Loading…"}</p>
       ) : rows.length === 0 ? (

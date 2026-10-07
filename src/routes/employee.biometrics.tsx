@@ -132,6 +132,7 @@ function BiometricsPage() {
             )}
           </div>
         </div>
+        {(!face || q.data?.reenrollAllowed) ? (
         <div className="mt-3 flex gap-2">
           <button
             onClick={() => setShowCapture(true)}
@@ -140,6 +141,7 @@ function BiometricsPage() {
             <Plus className="h-3.5 w-3.5" /> {face ? "Re-enroll" : "Enroll face"}
           </button>
         </div>
+        ) : null}
       </section>
 
       {/* Fingerprints */}
