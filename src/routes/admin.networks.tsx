@@ -30,7 +30,9 @@ export function NetworksManager() {
   const [form, setForm] = useState<Form>(blank);
   const [errs, setErrs] = useState<Record<string, string>>({});
   const [delId, setDelId] = useState<string | null>(null);
-  const { data: rows = [], isLoading } = useQuery({ queryKey: ["admin", "networks"], queryFn: () => listFn() });
+  const [term, setTerm] = useState("");
+  const { data: allRows = [], isLoading } = useQuery({ queryKey: ["admin", "networks"], queryFn: () => listFn() });
+  const rows = (allRows as any[]).filter((r) => !term.trim() || JSON.stringify(r).toLowerCase().includes(term.trim().toLowerCase()));
   const m = useMutation({
     mutationFn: (f: Form) => upsertFn({ data: { ...f, ssid: f.ssid || null, bssid: f.bssid || null, branch: f.branch || null, notes: f.notes || null } }),
     onSuccess: () => { toast.success(form.id ? "Updated" : "Created"); qc.invalidateQueries({ queryKey: ["admin", "networks"] }); setOpen(false); },
@@ -88,6 +90,7 @@ export function NetworksManager() {
           </Button>
         </div>
       </div>
+      <Input type="search" value={term} onChange={(e) => setTerm(e.target.value)} placeholder="Search name, SSID, BSSID, branch…" className="max-w-xs" />
       <div className="overflow-hidden rounded-3xl border border-border bg-card">
         <table className="w-full text-sm">
           <thead className="border-b border-border bg-muted/40 text-[11px] uppercase tracking-wider text-muted-foreground">
