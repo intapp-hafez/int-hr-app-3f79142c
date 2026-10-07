@@ -275,7 +275,6 @@ export const ui = {
   yearLabel: "Year",
   basicSalary: "Basic Salary",
   runPayroll: "Run Payroll",
-  payroll: "Payroll",
   salary: "Salary",
   allowance: "Allowance",
   penalty: "Penalty",
@@ -424,8 +423,6 @@ export const ui = {
   targetQuarterly: "Quarterly",
   validating: "Validating…",
   uploadRejected: "Upload rejected",
-  directory: "Directory",
-  orgChart: "Org Chart",
   stickyNotes: "Sticky Notes",
   employeeAccess: "Employee Access",
   retry: "Retry",
@@ -516,7 +513,6 @@ export const ui = {
   confirmDeleteHolidayType: "Delete this holiday category?",
 
   // Contracts
-  contracts: "Contracts",
   contractsSubtitle: "Track contract expirations and renewals",
   totalContracts: "Total Contracts",
   expiringIn30: "Expiring in 30 days",
@@ -884,7 +880,6 @@ export const ui = {
   searchEmployees: "Search employees...",
   employeeCode: "Code",
   // Sidebars
-  advances: "Advances",
   profile: "Profile",
 
   // Payroll Settings Page

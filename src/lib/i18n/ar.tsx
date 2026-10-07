@@ -276,7 +276,6 @@ export const ui: Record<UiKey, string> = {
   yearLabel: "السنة",
   basicSalary: "الراتب الأساسي",
   runPayroll: "تشغيل الرواتب",
-  payroll: "الرواتب",
   salary: "الراتب",
   allowance: "البدل",
   penalty: "خصم",
@@ -361,8 +360,6 @@ export const ui: Record<UiKey, string> = {
   male: "ذكر",
   female: "أنثى",
   country: "الدولة",
-  directory: "دليل الموظفين",
-  orgChart: "الهيكل التنظيمي",
   stickyNotes: "ملاحظات",
   employeeAccess: "صلاحيات الوصول",
   city: "المدينة",
@@ -513,7 +510,6 @@ export const ui: Record<UiKey, string> = {
   confirmDeleteHolidayType: "هل تريد حذف فئة العطلة هذه؟",
 
   // Contracts
-  contracts: "العقود",
   contractsSubtitle: "تتبع انتهاء العقود والتجديدات",
   totalContracts: "إجمالي العقود",
   expiringIn30: "تنتهي خلال 30 يومًا",
@@ -891,7 +887,6 @@ export const ui: Record<UiKey, string> = {
   cheque: "شيك",
 
   // Sidebars
-  advances: "السلف",
   profile: "الملف الشخصي",
   insuranceNumber: "الرقم التأميني",
   bankName: "اسم البنك",

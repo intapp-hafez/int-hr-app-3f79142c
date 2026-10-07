@@ -103,6 +103,24 @@ function Pagination({ page, pageCount, onChange }: { page: number; pageCount: nu
   );
 }
 
+function matchesSearch(row: any, term: string): boolean {
+  const t = term.trim().toLowerCase();
+  if (!t) return true;
+  return JSON.stringify(row ?? {}).toLowerCase().includes(t);
+}
+
+function SearchBox({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+  return (
+    <input
+      type="search"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder ?? "Search…"}
+      className="h-9 w-full max-w-xs rounded-xl border border-border bg-card px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+    />
+  );
+}
+
 function usePaged<T>(items: T[]) {
   const [page, setPage] = useState(1);
   const pageCount = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
@@ -361,7 +379,9 @@ function NamedSection({ kind }: { kind: "departments" | "positions" | "job_grade
     return items;
   }, [q.data, codeSort]);
 
-  const paged = usePaged<any>(sortedData);
+  const [term, setTerm] = useState("");
+  const filteredData = useMemo(() => sortedData.filter((r: any) => matchesSearch(r, term)), [sortedData, term]);
+  const paged = usePaged<any>(filteredData);
 
   async function handleImport(file: File) {
     try {
@@ -450,6 +470,7 @@ function NamedSection({ kind }: { kind: "departments" | "positions" | "job_grade
 
   return (
     <div className="space-y-4">
+      <SearchBox value={term} onChange={setTerm} placeholder="Search by code or name…" />
       <Toolbar
         onTemplate={() => downloadTemplate(`${kind}_template.xlsx`, headers, [{ name_en: "Sales", name_ar: "المبيعات", active: true }])}
         onImport={handleImport}
@@ -783,7 +804,8 @@ function CitiesSection() {
   const mDD = useMutation({ mutationFn: (id: string) => delD({ data: { id } }), onSuccess: () => { inv(); toast.success("Deleted"); }, onError: (e: Error) => toast.error(e.message) });
   const [city, setCity] = useState({ name_en: "", name_ar: "" });
   const [districtDraft, setDistrictDraft] = useState<Record<string, { name_en: string; name_ar: string }>>({});
-  const paged = usePaged<any>(q.data ?? []);
+  const [term, setTerm] = useState("");
+  const paged = usePaged<any>((q.data ?? []).filter((c: any) => matchesSearch(c, term)));
 
   async function handleImport(file: File) {
     try {
@@ -849,6 +871,7 @@ function CitiesSection() {
 
   return (
     <div className="space-y-4">
+      <SearchBox value={term} onChange={setTerm} placeholder="Search city or district…" />
       <Toolbar
         onTemplate={() => downloadTemplate("cities_districts_template.xlsx",
           ["city_en", "city_ar", "district_en", "district_ar"],
