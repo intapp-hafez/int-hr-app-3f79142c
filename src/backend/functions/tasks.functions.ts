@@ -163,7 +163,7 @@ export const createTask = createServerFn({ method: "POST" })
       status: "pending",
     }).select("id").single();
     if (error) throw new Error(error.message);
-    {
+    try {
       const { notifyUsers } = await import("@/backend/server/notify.server");
       await notifyUsers({
         userIds: data.assignees.filter((a: string) => a !== context.userId),
@@ -171,6 +171,8 @@ export const createTask = createServerFn({ method: "POST" })
         body: `${data.title}${data.due_date ? ` — due ${data.due_date}` : ""}`,
         url: "/employee/tasks", category: "task", severity: data.priority === "high" ? "warning" : "info",
       });
+    } catch (notifErr) {
+      console.warn("Failed to notify users about new task:", notifErr);
     }
     return { id: row.id };
   });
@@ -266,8 +268,12 @@ export const updateTaskAssignees = createServerFn({ method: "POST" })
     const prev = new Set<string>(((before as any)?.assignees ?? []) as string[]);
     const added = data.assignees.filter((a) => !prev.has(a) && a !== context.userId);
     if (added.length) {
-      const { notifyUsers } = await import("@/backend/server/notify.server");
-      await notifyUsers({ userIds: added, title: "New task assigned", body: (before as any)?.title ?? "A task was assigned to you.", url: "/employee/tasks", category: "task" });
+      try {
+        const { notifyUsers } = await import("@/backend/server/notify.server");
+        await notifyUsers({ userIds: added, title: "New task assigned", body: (before as any)?.title ?? "A task was assigned to you.", url: "/employee/tasks", category: "task" });
+      } catch (notifErr) {
+        console.warn("Failed to notify users about task assignment:", notifErr);
+      }
     }
     return { ok: true };
   });

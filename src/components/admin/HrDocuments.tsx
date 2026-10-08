@@ -1363,6 +1363,9 @@ export function SocialInsuranceForm1() {
   const picker = useEmployeePicker();
   const e = picker.detail as any;
 
+  const startDateStr = e?.social_insurance_date || e?.contract_start_date || new Date().toISOString().split("T")[0];
+  const [startY, startM, startD] = startDateStr.split("-");
+
   return (
     <div className="space-y-4">
       <EmployeePicker picker={picker} label="Select Employee for Form 1 (س1)" />
@@ -1483,7 +1486,13 @@ export function SocialInsuranceForm1() {
               </div>
               <div className="flex items-center gap-2 mt-4">
                  <span className="w-36 font-bold text-lg">تاريخ بدء الإشتراك :</span>
-                 <DigitBox count={8} value={new Date().toISOString().split('T')[0].replace(/-/g, "")} /> 
+                 <div className="flex items-center gap-1" dir="ltr">
+                    <DigitBox count={4} value={startY || "2026"} />
+                    <span className="font-bold">/</span>
+                    <DigitBox count={2} value={startM || "01"} />
+                    <span className="font-bold">/</span>
+                    <DigitBox count={2} value={startD || "01"} />
+                  </div>
                  <span className="w-20 font-bold text-lg mr-8">القطاع :</span>
                  <EditableText value="3" className="font-bold text-lg" />
               </div>
@@ -1517,7 +1526,13 @@ export function SocialInsuranceForm1() {
               
               <div className="flex items-center gap-2 mt-6">
                  <span className="font-bold text-lg">بيانات العجز إن وجدت : تاريخ بداية العجز :</span>
-                 <DigitBox count={8} />
+                 <div className="flex items-center gap-1" dir="ltr">
+                    <DigitBox count={4} />
+                    <span className="font-bold">/</span>
+                    <DigitBox count={2} />
+                    <span className="font-bold">/</span>
+                    <DigitBox count={2} />
+                  </div>
                  <span className="font-bold text-lg mr-4">نسبة العجز :</span>
                  <span className="border-b-[2px] border-dotted border-orange-400 w-32"></span>
                  <span className="text-orange-400 font-bold">%</span>

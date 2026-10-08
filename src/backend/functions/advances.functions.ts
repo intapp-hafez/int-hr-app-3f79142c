@@ -123,8 +123,12 @@ async function getActiveOutstandingBalance(employeeId: string): Promise<number> 
 
 
 async function notifyAdvance(userIds: string[], title: string, body: string, severity: "info" | "success" | "warning" | "danger", url: string) {
-  const { notifyUsers } = await import("@/backend/server/notify.server");
-  await notifyUsers({ userIds, title, body, url, severity, category: "advance" });
+  try {
+    const { notifyUsers } = await import("@/backend/server/notify.server");
+    await notifyUsers({ userIds, title, body, url, severity, category: "advance" });
+  } catch (e) {
+    console.warn("Failed to notify advance:", e);
+  }
 }
 
 export const createAdvanceRequest = createServerFn({ method: "POST" })

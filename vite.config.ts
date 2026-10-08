@@ -11,7 +11,7 @@ const startShim = path.resolve(__dirname, "src/lib/start-shim.ts");
 // and replaces them with an empty mock. This prevents Vite's import analysis 
 // from throwing errors or leaking these imports to the browser in pure SPA mode.
 function stubServerModules(): Plugin {
-  const stubs = ["cloudflare:sockets", "crypto", "https", "url", "util", "node:tls", "node:events", "node:buffer", "node:stream"];
+  const stubs = ["cloudflare:sockets", "crypto", "https", "url", "util", "node:tls", "node:events", "node:buffer", "node:stream", "web-push"];
   return {
     name: "stub-server-modules",
     enforce: "pre",
@@ -22,6 +22,9 @@ function stubServerModules(): Plugin {
     },
     load(id) {
       if (id.startsWith("\0stubbed:")) {
+        if (id.endsWith("web-push")) {
+          return `export default { setVapidDetails: () => {}, sendNotification: async () => ({ statusCode: 200 }) };\nexport const setVapidDetails = () => {};\nexport const sendNotification = async () => ({ statusCode: 200 });`;
+        }
         return `export default {};\nexport const connect = () => { throw new Error("Mocked server module"); };`;
       }
     },
@@ -56,7 +59,7 @@ export default defineConfig({
         {
           name: "external-node-builtins",
           setup(build) {
-            build.onResolve({ filter: /^(cloudflare:sockets|crypto|https|url|util|node:tls|node:events|node:buffer|node:stream)$/ }, (args) => ({
+            build.onResolve({ filter: /^(cloudflare:sockets|crypto|https|url|util|node:tls|node:events|node:buffer|node:stream|web-push)$/ }, (args) => ({
               path: args.path,
               external: true,
             }));
