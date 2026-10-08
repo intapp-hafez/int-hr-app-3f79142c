@@ -100,7 +100,11 @@ export function TripAllowancesTab() {
   const locations = (data?.locations ?? []).filter((l: any) =>
     !term.trim() || l.name.toLowerCase().includes(term.trim().toLowerCase()),
   );
-  const positions = data?.positions ?? [];
+  const [showAll, setShowAll] = useState(false);
+  const DEFAULTS = ["driver", "engineer", "technician", "technitian", "manager", "supervisor"];
+  const allPositions = data?.positions ?? [];
+  const defaultPositions = allPositions.filter((p: any) => DEFAULTS.includes(String(p.name_en ?? "").trim().toLowerCase()));
+  const positions = showAll || defaultPositions.length === 0 ? allPositions : defaultPositions;
 
   return (
     <div className="space-y-4">
@@ -108,6 +112,9 @@ export function TripAllowancesTab() {
         <div>
           <h2 className="text-lg font-semibold">Trip Allowances Policy</h2>
           <p className="text-sm text-muted-foreground">
+            <button type="button" className="mr-2 underline" onClick={() => setShowAll((v) => !v)}>
+              {showAll ? "Show main positions only" : "Show all positions"}
+            </button>
             Nightly allowance per position for each work location. Locations come from Geofencing (Work Locations).
           </p>
         </div>
