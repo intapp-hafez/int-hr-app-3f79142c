@@ -3968,34 +3968,40 @@ export type Database = {
       }
       trip_allowance_policies: {
         Row: {
-          city_id: string
+          city_id: string | null
           created_at: string
           district: string | null
+          geofence_location_id: string | null
           id: string
-          job_grade: string
+          job_grade: string | null
           nightly_rate: number
+          position_id: string | null
           radius_m: number
           street: string | null
           transport_expense: number
         }
         Insert: {
-          city_id: string
+          city_id?: string | null
           created_at?: string
           district?: string | null
+          geofence_location_id?: string | null
           id?: string
-          job_grade: string
+          job_grade?: string | null
           nightly_rate?: number
+          position_id?: string | null
           radius_m?: number
           street?: string | null
           transport_expense?: number
         }
         Update: {
-          city_id?: string
+          city_id?: string | null
           created_at?: string
           district?: string | null
+          geofence_location_id?: string | null
           id?: string
-          job_grade?: string
+          job_grade?: string | null
           nightly_rate?: number
+          position_id?: string | null
           radius_m?: number
           street?: string | null
           transport_expense?: number
@@ -4006,6 +4012,20 @@ export type Database = {
             columns: ["city_id"]
             isOneToOne: false
             referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_allowance_policies_geofence_location_id_fkey"
+            columns: ["geofence_location_id"]
+            isOneToOne: false
+            referencedRelation: "geofence_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_allowance_policies_position_id_fkey"
+            columns: ["position_id"]
+            isOneToOne: false
+            referencedRelation: "positions"
             referencedColumns: ["id"]
           },
         ]
@@ -4022,6 +4042,7 @@ export type Database = {
           created_by: string
           destination: string
           district: string | null
+          geofence_location_id: string | null
           id: string
           lat: number | null
           lng: number | null
@@ -4047,6 +4068,7 @@ export type Database = {
           created_by: string
           destination: string
           district?: string | null
+          geofence_location_id?: string | null
           id?: string
           lat?: number | null
           lng?: number | null
@@ -4072,6 +4094,7 @@ export type Database = {
           created_by?: string
           destination?: string
           district?: string | null
+          geofence_location_id?: string | null
           id?: string
           lat?: number | null
           lng?: number | null
@@ -4106,6 +4129,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trips_geofence_location_id_fkey"
+            columns: ["geofence_location_id"]
+            isOneToOne: false
+            referencedRelation: "geofence_locations"
             referencedColumns: ["id"]
           },
         ]
