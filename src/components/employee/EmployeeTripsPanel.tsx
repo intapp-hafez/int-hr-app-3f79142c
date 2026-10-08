@@ -135,11 +135,6 @@ export function EmployeeTripsPanel({ employeeId }: { employeeId: string }) {
               </div>
             )}
           </label>
-            )}
-            {cityId && cityPolicies?.length === 0 && (
-               <div className="mt-1.5 text-xs text-destructive">No policies configured for this city.</div>
-            )}
-          </label>
           <div className="grid grid-cols-2 gap-4">
             <label className="block">
               <span className="mb-1.5 block text-sm font-medium text-foreground">Date</span>
