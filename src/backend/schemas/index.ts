@@ -189,6 +189,7 @@ export const TripCreateSchema = z.object({
   overnight_nights: z.number().min(0).max(365).optional().default(0),
   transport_type: z.string().max(50).optional().nullable(),
   manual_allowance: z.number().min(0).max(100000).optional().nullable(),
+  geofence_location_id: z.string().uuid().optional().nullable(),
 });
 export const TransitionSchema = z.object({
   id: z.string().uuid(),

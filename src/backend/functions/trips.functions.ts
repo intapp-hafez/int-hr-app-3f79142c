@@ -17,7 +17,21 @@ export const createTrip = createServerFn({ method: "POST" })
   .inputValidator((i) => TripCreateSchema.parse(i))
   .handler(async ({ data, context }) => {
     let calculatedAllowance = 0;
-    if (data.manual_allowance !== undefined && data.manual_allowance !== null) {
+    let geo: { lat: number; lng: number; radius_m: number } | null = null;
+    if (data.geofence_location_id) {
+      // Location comes from geofencing; allowance by the assignee's position.
+      const { data: loc } = await context.supabase.from("geofence_locations")
+        .select("lat, lng, radius_m").eq("id", data.geofence_location_id).maybeSingle();
+      if (!loc) throw new Error("Work location not found");
+      geo = loc as any;
+      const { data: prof } = await context.supabase.from("profiles").select("position_id").eq("id", data.assignee).maybeSingle();
+      if (prof?.position_id && data.overnight_nights > 0) {
+        const { data: pol } = await (context.supabase as any).from("trip_allowance_policies")
+          .select("nightly_rate").eq("geofence_location_id", data.geofence_location_id)
+          .eq("position_id", prof.position_id).maybeSingle();
+        calculatedAllowance = Number(pol?.nightly_rate ?? 0) * data.overnight_nights;
+      }
+    } else if (data.manual_allowance !== undefined && data.manual_allowance !== null) {
       calculatedAllowance = data.manual_allowance;
     } else if (data.overnight_nights > 0) {
       const profReq = await context.supabase.from("profiles").select("job_grade").eq("id", data.assignee).single();
@@ -46,7 +60,7 @@ export const createTrip = createServerFn({ method: "POST" })
       }
     }
 
-    const { error, data: row } = await context.supabase.from("trips").insert({
+    const { error, data: row } = await (context.supabase as any).from("trips").insert({
       destination: data.destination,
       address: data.address ?? null,
       trip_date: data.trip_date,
@@ -55,9 +69,10 @@ export const createTrip = createServerFn({ method: "POST" })
       notes: data.notes ?? null,
       city: data.city ?? null,
       district: data.district ?? null,
-      lat: data.lat ?? null,
-      lng: data.lng ?? null,
-      radius_m: data.radius_m ?? null,
+      lat: geo?.lat ?? data.lat ?? null,
+      lng: geo?.lng ?? data.lng ?? null,
+      radius_m: geo?.radius_m ?? data.radius_m ?? null,
+      ...(data.geofence_location_id ? { geofence_location_id: data.geofence_location_id } : {}),
       assignee: data.assignee,
       created_by: context.userId,
       status: "pending",

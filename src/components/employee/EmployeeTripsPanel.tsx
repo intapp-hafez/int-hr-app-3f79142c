@@ -16,30 +16,27 @@ export function EmployeeTripsPanel({ employeeId }: { employeeId: string }) {
   const [destination, setDestination] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [nights, setNights] = useState(1);
-  const [cityId, setCityId] = useState("");
+  const [locId, setLocId] = useState("");
 
-  const { data: cities } = useQuery({
-    queryKey: ["geo", "cities"],
+  const { data: locations } = useQuery({
+    queryKey: ["geo", "work-locations"],
     queryFn: async () => {
-      const { data } = await supabase.from("cities").select("id, name_en, name_ar").order("name_en");
-      return data ?? [];
+      const { data } = await supabase.from("geofence_locations").select("id, name, radius_m, active").order("name");
+      return (data ?? []).filter((l: any) => l.active !== false);
     },
     enabled: showModal,
   });
 
-  const [selectedRate, setSelectedRate] = useState<number | "">("");
-
-  const { data: cityPolicies } = useQuery({
-    queryKey: ["trip-policies-city", cityId],
+  const { data: rateInfo } = useQuery({
+    queryKey: ["trip-rate", employeeId, locId],
     queryFn: async () => {
-      if (!cityId) return [];
-      const { data } = await supabase.from("trip_allowance_policies")
-        .select("job_grade, nightly_rate")
-        .eq("city_id", cityId)
-        .order("job_grade");
-      return data || [];
+      const { data: prof } = await supabase.from("profiles").select("position_id").eq("id", employeeId).maybeSingle();
+      if (!prof?.position_id) return { rate: null as number | null, noPosition: true };
+      const { data } = await (supabase as any).from("trip_allowance_policies")
+        .select("nightly_rate").eq("geofence_location_id", locId).eq("position_id", prof.position_id).maybeSingle();
+      return { rate: data ? Number(data.nightly_rate) : null, noPosition: false };
     },
-    enabled: !!cityId && showModal
+    enabled: !!locId && showModal,
   });
 
   const mutation = useMutation({
@@ -51,8 +48,7 @@ export function EmployeeTripsPanel({ employeeId }: { employeeId: string }) {
           destination: destination.trim(),
           trip_date: date,
           overnight_nights: nights,
-          city: cityId || undefined,
-          manual_allowance: selectedRate !== "" ? Number(selectedRate) * nights : undefined,
+          geofence_location_id: locId || undefined,
         }
       });
     },
@@ -61,7 +57,7 @@ export function EmployeeTripsPanel({ employeeId }: { employeeId: string }) {
       setShowModal(false);
       setDestination("");
       setNights(1);
-      setSelectedRate("");
+      setLocId("");
       qc.invalidateQueries({ queryKey: ["employee-trips", employeeId] });
     },
     onError: (err: any) => {
@@ -124,23 +120,21 @@ export function EmployeeTripsPanel({ employeeId }: { employeeId: string }) {
             <input value={destination} onChange={(e) => setDestination(e.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:border-brand focus:outline-none" placeholder="e.g. Branch visit" />
           </label>
           <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-foreground">City (for Allowance calculation)</span>
-            <select value={cityId} onChange={(e) => { setCityId(e.target.value); setSelectedRate(""); }} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:border-brand focus:outline-none">
-              <option value="">— Select City —</option>
-              {(cities || []).map((c: any) => <option key={c.id} value={c.id}>{c.name_en || c.name_ar}</option>)}
+            <span className="mb-1.5 block text-sm font-medium text-foreground">Work location (from geofencing)</span>
+            <select value={locId} onChange={(e) => setLocId(e.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:border-brand focus:outline-none">
+              <option value="">— Select location —</option>
+              {(locations || []).map((l: any) => <option key={l.id} value={l.id}>{l.name}</option>)}
             </select>
-            {cityId && cityPolicies && cityPolicies.length > 0 && (
-              <label className="block mt-4">
-                <span className="mb-1.5 block text-sm font-medium text-foreground">Applicable Role / Rate</span>
-                <select value={selectedRate} onChange={(e) => setSelectedRate(Number(e.target.value))} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:border-brand focus:outline-none">
-                  <option value="">— Select Role Rate —</option>
-                  {cityPolicies.map((p: any) => (
-                    <option key={p.job_grade} value={p.nightly_rate}>
-                      {p.job_grade} ({p.nightly_rate} EGP / night)
-                    </option>
-                  ))}
-                </select>
-              </label>
+            {locId && rateInfo && (
+              <div className={`mt-1.5 text-xs ${rateInfo.rate == null ? "text-destructive" : "text-muted-foreground"}`}>
+                {rateInfo.noPosition
+                  ? "This employee has no position set, so no allowance applies."
+                  : rateInfo.rate == null
+                    ? "No allowance set for this position at this location."
+                    : `${rateInfo.rate} EGP / night × ${nights} = ${rateInfo.rate * nights} EGP`}
+              </div>
+            )}
+          </label>
             )}
             {cityId && cityPolicies?.length === 0 && (
                <div className="mt-1.5 text-xs text-destructive">No policies configured for this city.</div>
