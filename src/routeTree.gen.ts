@@ -81,6 +81,7 @@ import { Route as ManagerNotificationsRouteImport } from './routes/manager.notif
 import { Route as ManagerProfileRouteImport } from './routes/manager.profile'
 import { Route as ManagerTasksRouteImport } from './routes/manager.tasks'
 import { Route as ManagerTeamRouteImport } from './routes/manager.team'
+import { Route as ManagerTripHistoryRouteImport } from './routes/manager.trip-history'
 import { Route as ManagerTripsRouteImport } from './routes/manager.trips'
 import { Route as StaffIndexRouteImport } from './routes/staff.index'
 import { Route as StaffAttendanceRouteImport } from './routes/staff.attendance'
@@ -460,6 +461,11 @@ const ManagerTeamRoute = ManagerTeamRouteImport.update({
   path: '/team',
   getParentRoute: () => ManagerRoute,
 } as any)
+const ManagerTripHistoryRoute = ManagerTripHistoryRouteImport.update({
+  id: '/trip-history',
+  path: '/trip-history',
+  getParentRoute: () => ManagerRoute,
+} as any)
 const ManagerTripsRoute = ManagerTripsRouteImport.update({
   id: '/trips',
   path: '/trips',
@@ -613,6 +619,7 @@ export interface FileRoutesByFullPath {
   '/manager/profile': typeof ManagerProfileRoute
   '/manager/tasks': typeof ManagerTasksRoute
   '/manager/team': typeof ManagerTeamRoute
+  '/manager/trip-history': typeof ManagerTripHistoryRoute
   '/manager/trips': typeof ManagerTripsRoute
   '/staff/attendance': typeof StaffAttendanceRoute
   '/staff/chat': typeof StaffChatRoute
@@ -696,6 +703,7 @@ export interface FileRoutesByTo {
   '/manager/profile': typeof ManagerProfileRoute
   '/manager/tasks': typeof ManagerTasksRoute
   '/manager/team': typeof ManagerTeamRoute
+  '/manager/trip-history': typeof ManagerTripHistoryRoute
   '/manager/trips': typeof ManagerTripsRoute
   '/staff/attendance': typeof StaffAttendanceRoute
   '/staff/chat': typeof StaffChatRoute
@@ -787,6 +795,7 @@ export interface FileRoutesById {
   '/manager/profile': typeof ManagerProfileRoute
   '/manager/tasks': typeof ManagerTasksRoute
   '/manager/team': typeof ManagerTeamRoute
+  '/manager/trip-history': typeof ManagerTripHistoryRoute
   '/manager/trips': typeof ManagerTripsRoute
   '/staff/attendance': typeof StaffAttendanceRoute
   '/staff/chat': typeof StaffChatRoute
@@ -879,6 +888,7 @@ export interface FileRouteTypes {
     | '/manager/profile'
     | '/manager/tasks'
     | '/manager/team'
+    | '/manager/trip-history'
     | '/manager/trips'
     | '/staff/attendance'
     | '/staff/chat'
@@ -962,6 +972,7 @@ export interface FileRouteTypes {
     | '/manager/profile'
     | '/manager/tasks'
     | '/manager/team'
+    | '/manager/trip-history'
     | '/manager/trips'
     | '/staff/attendance'
     | '/staff/chat'
@@ -1052,6 +1063,7 @@ export interface FileRouteTypes {
     | '/manager/profile'
     | '/manager/tasks'
     | '/manager/team'
+    | '/manager/trip-history'
     | '/manager/trips'
     | '/staff/attendance'
     | '/staff/chat'
@@ -1592,6 +1604,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ManagerTeamRouteImport
       parentRoute: typeof ManagerRoute
     }
+    '/manager/trip-history': {
+      id: '/manager/trip-history'
+      path: '/trip-history'
+      fullPath: '/manager/trip-history'
+      preLoaderRoute: typeof ManagerTripHistoryRouteImport
+      parentRoute: typeof ManagerRoute
+    }
     '/manager/trips': {
       id: '/manager/trips'
       path: '/trips'
@@ -1898,6 +1917,7 @@ interface ManagerRouteChildren {
   ManagerProfileRoute: typeof ManagerProfileRoute
   ManagerTasksRoute: typeof ManagerTasksRoute
   ManagerTeamRoute: typeof ManagerTeamRoute
+  ManagerTripHistoryRoute: typeof ManagerTripHistoryRoute
   ManagerTripsRoute: typeof ManagerTripsRoute
   ManagerIndexRoute: typeof ManagerIndexRoute
 }
@@ -1911,6 +1931,7 @@ const ManagerRouteChildren: ManagerRouteChildren = {
   ManagerProfileRoute: ManagerProfileRoute,
   ManagerTasksRoute: ManagerTasksRoute,
   ManagerTeamRoute: ManagerTeamRoute,
+  ManagerTripHistoryRoute: ManagerTripHistoryRoute,
   ManagerTripsRoute: ManagerTripsRoute,
   ManagerIndexRoute: ManagerIndexRoute,
 }

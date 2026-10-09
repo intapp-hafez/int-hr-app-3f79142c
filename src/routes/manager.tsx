@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, Link, useRouterState, Navigate } from "@tanstack/react-router";
 import { useMemo } from "react";
-import { Home, Users, ListChecks, Route as RouteIcon, LogOut, LogIn, UserCircle, Banknote, MessageSquare, CalendarCheck } from "lucide-react";
+import { Home, Users, ListChecks, Route as RouteIcon, LogOut, LogIn, UserCircle, Banknote, MessageSquare, CalendarCheck, History } from "lucide-react";
 import { AppLogo } from "@/components/AppLogo";
 import { LanguageToggle, useI18n } from "@/lib/i18n";
 import { useSession, useAuthReady, signOut } from "@/lib/auth";
