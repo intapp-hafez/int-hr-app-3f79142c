@@ -139,3 +139,40 @@ export const approveTrip = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+export type TripHistoryRow = {
+  id: string; tripId: string; event: string; fromStatus: string | null; toStatus: string | null;
+  allowanceBefore: number | null; allowanceAfter: number | null; allowanceStatusBefore: string | null;
+  allowanceStatusAfter: string | null; createdAt: string; destination: string; tripDate: string;
+  assigneeName: string; changedByName: string;
+};
+
+export const listTripHistory = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const sb = context.supabase as any;
+    const { data, error } = await sb.from("trip_history")
+      .select("id, trip_id, event, from_status, to_status, allowance_before, allowance_after, allowance_status_before, allowance_status_after, changed_by, created_at, trips(destination, trip_date, assignee)")
+      .order("created_at", { ascending: false }).limit(500);
+    if (error) {
+      if (/trip_history|schema cache|does not exist/i.test(error.message)) return { notSetUp: true, rows: [] as TripHistoryRow[] };
+      throw new Error(error.message);
+    }
+    const ids = new Set<string>();
+    for (const r of data ?? []) { if (r.changed_by) ids.add(r.changed_by); if (r.trips?.assignee) ids.add(r.trips.assignee); }
+    const names = new Map<string, string>();
+    if (ids.size) {
+      const { data: ppl } = await sb.rpc("get_staff_employee_names", { p_employee_ids: [...ids] });
+      for (const p of ppl ?? []) names.set(p.id, p.full_name || p.name || p.email || "—");
+    }
+    const rows: TripHistoryRow[] = (data ?? []).map((r: any) => ({
+      id: r.id as string, tripId: r.trip_id as string, event: r.event as string,
+      fromStatus: r.from_status as string | null, toStatus: r.to_status as string | null,
+      allowanceBefore: r.allowance_before as number | null, allowanceAfter: r.allowance_after as number | null,
+      allowanceStatusBefore: r.allowance_status_before as string | null, allowanceStatusAfter: r.allowance_status_after as string | null,
+      createdAt: r.created_at as string,
+      destination: (r.trips?.destination ?? "—") as string, tripDate: (r.trips?.trip_date ?? "") as string,
+      assigneeName: names.get(r.trips?.assignee) ?? "—",
+      changedByName: r.changed_by ? (names.get(r.changed_by) ?? "—") : "System",
+    }));
+    return { notSetUp: false, rows };
+  });

@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, Link, useRouterState, Navigate } from "@tanstack/react-router";
 import { useMemo } from "react";
-import { Home, Users, ListChecks, Route as RouteIcon, LogOut, LogIn, UserCircle, Banknote, MessageSquare, CalendarCheck } from "lucide-react";
+import { Home, Users, ListChecks, Route as RouteIcon, LogOut, LogIn, UserCircle, Banknote, MessageSquare, CalendarCheck, History } from "lucide-react";
 import { AppLogo } from "@/components/AppLogo";
 import { LanguageToggle, useI18n } from "@/lib/i18n";
 import { useSession, useAuthReady, signOut } from "@/lib/auth";
@@ -61,6 +61,7 @@ function ManagerLayout() {
     { to: "/manager/advances", icon: Banknote, label: t("advancesTitle") },
     { to: "/manager/tasks", icon: ListChecks, label: t("tasks") },
     { to: "/manager/trips", icon: RouteIcon, label: t("trips") },
+    { to: "/manager/trip-history", icon: History, label: "Trip history" },
     { to: "/manager/profile", icon: UserCircle, label: t("profile") },
   ] as const;
 
@@ -72,6 +73,7 @@ function ManagerLayout() {
     { to: "/manager/leaves", icon: CalendarCheck, label: t("teamLeaves") ?? "Team Leaves" },
     { to: "/manager/tasks", icon: ListChecks, label: t("tasks") },
     { to: "/manager/trips", icon: RouteIcon, label: t("trips") },
+    { to: "/manager/trip-history", icon: History, label: "Trip history" },
     { to: "/manager/profile", icon: UserCircle, label: t("profile") },
   ] as const;
 
