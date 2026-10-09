@@ -2,21 +2,28 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, Play, Check, X, MapPin, Search, History, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
-import { useStore, addTrip, transitionTrip, removeTrip, type TaskStatus, type ManagerTrip } from "@/lib/store";
+import { type TaskStatus, type ManagerTrip } from "@/lib/store";
 import { useSession } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getMyTeam } from "@/lib/team.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { TaskLocationPicker } from "@/components/admin/TaskLocationPicker";
 import { reverseGeocodeCoords } from "@/lib/reverse-geocode";
+import { listTrips, createTrip, transitionTrip as transitionTripFn, deleteTrip } from "@/backend/functions/trips.functions";
 
 export const Route = createFileRoute("/manager/trips")({
   component: ManagerTripsPage,
 });
 
 const STATUSES: TaskStatus[] = ["pending", "in_progress", "done", "cancelled"];
+
+type DbTripView = {
+  id: string; destination: string; address: string; date: string; time?: string;
+  purpose: string; notes?: string; assignee: string; createdBy: string; status: TaskStatus;
+  startedAt?: string; completedAt?: string; history?: ManagerTrip["history"];
+};
 
 function statusClass(s: TaskStatus) {
   if (s === "done") return "bg-success/10 text-success";
@@ -28,11 +35,34 @@ function statusClass(s: TaskStatus) {
 function ManagerTripsPage() {
   const { t } = useI18n();
   const session = useSession();
-  const trips = useStore((s) => s.trips);
+  const qc = useQueryClient();
+  const listFn = useServerFn(listTrips);
+  const transFn = useServerFn(transitionTripFn);
+  const delFn = useServerFn(deleteTrip);
   const me = useMemo(
     () => (session?.employeeId ? { id: session.employeeId, name: session.name } : undefined),
     [session],
   );
+  const { data: rawTrips = [] } = useQuery({
+    queryKey: ["manager-trips"],
+    queryFn: () => listFn(),
+    enabled: !!me,
+  });
+  const trips: DbTripView[] = useMemo(() => (rawTrips as any[]).map((r) => ({
+    id: r.id, destination: r.destination ?? "", address: r.address ?? "", date: r.trip_date,
+    time: r.trip_time ?? undefined, purpose: r.purpose ?? "", notes: r.notes ?? undefined,
+    assignee: r.assignee, createdBy: r.created_by, status: r.status,
+    startedAt: r.started_at ?? undefined, completedAt: r.completed_at ?? undefined, history: [],
+  })), [rawTrips]);
+  const refresh = () => qc.invalidateQueries({ queryKey: ["manager-trips"] });
+  const transitionTrip = async (id: string, status: TaskStatus, _by: string) => {
+    try { await transFn({ data: { id, status } }); refresh(); }
+    catch (e: any) { toast.error(e?.message ?? "Failed"); }
+  };
+  const removeTrip = async (id: string) => {
+    try { await delFn({ data: { id } }); refresh(); toast.success("Removed"); }
+    catch (e: any) { toast.error(e?.message ?? "Failed"); }
+  };
   const teamFn = useServerFn(getMyTeam);
   const { data: teamData } = useQuery({
     queryKey: ["manager-team-all"],
@@ -148,7 +178,7 @@ function ManagerTripsPage() {
                   <History className="h-3 w-3" /> {t("history")} ({tr.history?.length ?? 0})
                   {expanded[tr.id] ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                 </button>
-                <button onClick={() => { removeTrip(tr.id); toast.success("Removed"); }} className="ms-auto inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-semibold text-danger">
+                <button onClick={() => removeTrip(tr.id)} className="ms-auto inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-semibold text-danger">
                   <Trash2 className="h-3 w-3" /> {t("delete")}
                 </button>
               </div>
@@ -240,13 +270,28 @@ function AddTripModal({ me, team, onClose }: { me: string; team: Array<{ id: str
   const [overnightNights, setOvernightNights] = useState<number>(0);
   const [transportType, setTransportType] = useState<string>("");
 
-  const submit = () => {
+  const qc = useQueryClient();
+  const createFn = useServerFn(createTrip);
+  const [saving, setSaving] = useState(false);
+  const submit = async () => {
     if (!destination.trim()) return toast.error(t("destination"));
     if (!address.trim()) return toast.error(t("tripAddress"));
     if (!assignee) return toast.error(t("assignedTo"));
-    addTrip({ destination: destination.trim(), address: address.trim(), date, time: time || undefined, purpose: purpose.trim(), notes: notes.trim() || undefined, assignee, status: "pending", createdBy: me, lat, lng, radius_m, cityId: cityId || undefined, district: district || undefined, overnight_nights: overnightNights, transport_type: transportType || undefined });
-    toast.success(t("addTrip"));
-    onClose();
+    setSaving(true);
+    try {
+      await createFn({ data: {
+        destination: destination.trim(), address: address.trim(), trip_date: date,
+        trip_time: time || null, purpose: purpose.trim() || null, notes: notes.trim() || null,
+        assignee, city: cityId || null, district: district || null,
+        lat: lat ?? null, lng: lng ?? null, radius_m: lat != null ? radius_m : null,
+        overnight_nights: overnightNights, transport_type: transportType || null,
+      } });
+      qc.invalidateQueries({ queryKey: ["manager-trips"] });
+      toast.success(t("addTrip"));
+      onClose();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to save trip");
+    } finally { setSaving(false); }
   };
 
   const cityName = cities.find((c: any) => c.id === cityId)?.name_en || destination;
@@ -333,7 +378,7 @@ function AddTripModal({ me, team, onClose }: { me: string; team: Array<{ id: str
         </div>
         <div className="mt-5 flex justify-end gap-2">
           <button onClick={onClose} className="rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold">{t("cancel")}</button>
-          <button onClick={submit} className="rounded-full bg-gradient-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground shadow-brand">{t("save")}</button>
+          <button onClick={submit} disabled={saving} className="disabled:opacity-50 rounded-full bg-gradient-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground shadow-brand">{t("save")}</button>
         </div>
       </div>
     </div>
