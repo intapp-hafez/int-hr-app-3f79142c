@@ -139,6 +139,13 @@ export const approveTrip = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+export type TripHistoryRow = {
+  id: string; tripId: string; event: string; fromStatus: string | null; toStatus: string | null;
+  allowanceBefore: number | null; allowanceAfter: number | null; allowanceStatusBefore: string | null;
+  allowanceStatusAfter: string | null; createdAt: string; destination: string; tripDate: string;
+  assigneeName: string; changedByName: string;
+};
+
 export const listTripHistory = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -147,7 +154,7 @@ export const listTripHistory = createServerFn({ method: "GET" })
       .select("id, trip_id, event, from_status, to_status, allowance_before, allowance_after, allowance_status_before, allowance_status_after, changed_by, created_at, trips(destination, trip_date, assignee)")
       .order("created_at", { ascending: false }).limit(500);
     if (error) {
-      if (/trip_history|schema cache|does not exist/i.test(error.message)) return { notSetUp: true, rows: [] as any[] };
+      if (/trip_history|schema cache|does not exist/i.test(error.message)) return { notSetUp: true, rows: [] as TripHistoryRow[] };
       throw new Error(error.message);
     }
     const ids = new Set<string>();
@@ -157,7 +164,7 @@ export const listTripHistory = createServerFn({ method: "GET" })
       const { data: ppl } = await sb.rpc("get_staff_employee_names", { p_employee_ids: [...ids] });
       for (const p of ppl ?? []) names.set(p.id, p.full_name || p.name || p.email || "—");
     }
-    const rows = (data ?? []).map((r: any) => ({
+    const rows: TripHistoryRow[] = (data ?? []).map((r: any) => ({
       id: r.id as string, tripId: r.trip_id as string, event: r.event as string,
       fromStatus: r.from_status as string | null, toStatus: r.to_status as string | null,
       allowanceBefore: r.allowance_before as number | null, allowanceAfter: r.allowance_after as number | null,
