@@ -178,7 +178,7 @@ function ManagerTripsPage() {
                   <History className="h-3 w-3" /> {t("history")} ({tr.history?.length ?? 0})
                   {expanded[tr.id] ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                 </button>
-                <button onClick={() => { removeTrip(tr.id); toast.success("Removed"); }} className="ms-auto inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-semibold text-danger">
+                <button onClick={() => removeTrip(tr.id)} className="ms-auto inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-semibold text-danger">
                   <Trash2 className="h-3 w-3" /> {t("delete")}
                 </button>
               </div>
@@ -270,13 +270,28 @@ function AddTripModal({ me, team, onClose }: { me: string; team: Array<{ id: str
   const [overnightNights, setOvernightNights] = useState<number>(0);
   const [transportType, setTransportType] = useState<string>("");
 
-  const submit = () => {
+  const qc = useQueryClient();
+  const createFn = useServerFn(createTrip);
+  const [saving, setSaving] = useState(false);
+  const submit = async () => {
     if (!destination.trim()) return toast.error(t("destination"));
     if (!address.trim()) return toast.error(t("tripAddress"));
     if (!assignee) return toast.error(t("assignedTo"));
-    addTrip({ destination: destination.trim(), address: address.trim(), date, time: time || undefined, purpose: purpose.trim(), notes: notes.trim() || undefined, assignee, status: "pending", createdBy: me, lat, lng, radius_m, cityId: cityId || undefined, district: district || undefined, overnight_nights: overnightNights, transport_type: transportType || undefined });
-    toast.success(t("addTrip"));
-    onClose();
+    setSaving(true);
+    try {
+      await createFn({ data: {
+        destination: destination.trim(), address: address.trim(), trip_date: date,
+        trip_time: time || null, purpose: purpose.trim() || null, notes: notes.trim() || null,
+        assignee, city: cityId || null, district: district || null,
+        lat: lat ?? null, lng: lng ?? null, radius_m: lat != null ? radius_m : null,
+        overnight_nights: overnightNights, transport_type: transportType || null,
+      } });
+      qc.invalidateQueries({ queryKey: ["manager-trips"] });
+      toast.success(t("addTrip"));
+      onClose();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to save trip");
+    } finally { setSaving(false); }
   };
 
   const cityName = cities.find((c: any) => c.id === cityId)?.name_en || destination;
@@ -363,7 +378,7 @@ function AddTripModal({ me, team, onClose }: { me: string; team: Array<{ id: str
         </div>
         <div className="mt-5 flex justify-end gap-2">
           <button onClick={onClose} className="rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold">{t("cancel")}</button>
-          <button onClick={submit} className="rounded-full bg-gradient-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground shadow-brand">{t("save")}</button>
+          <button onClick={submit} disabled={saving} className="disabled:opacity-50 rounded-full bg-gradient-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground shadow-brand">{t("save")}</button>
         </div>
       </div>
     </div>
