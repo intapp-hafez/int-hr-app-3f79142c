@@ -3055,6 +3055,7 @@ export type Database = {
           target_duration: string | null
           target_value: number | null
           tax_applicable: boolean
+          trip_allowance_enabled: boolean
           updated_at: string
         }
         Insert: {
@@ -3126,6 +3127,7 @@ export type Database = {
           target_duration?: string | null
           target_value?: number | null
           tax_applicable?: boolean
+          trip_allowance_enabled?: boolean
           updated_at?: string
         }
         Update: {
@@ -3197,6 +3199,7 @@ export type Database = {
           target_duration?: string | null
           target_value?: number | null
           tax_applicable?: boolean
+          trip_allowance_enabled?: boolean
           updated_at?: string
         }
         Relationships: [

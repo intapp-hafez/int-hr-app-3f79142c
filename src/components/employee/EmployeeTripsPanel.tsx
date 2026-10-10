@@ -1,9 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
-import { Plane, Calendar, RouteIcon, Plus, X, CheckCircle } from "lucide-react";
-import { useState } from "react";
-import { createTrip, approveTrip } from "@/backend/functions/trips.functions";
+import { Calendar, MapPin } from "lucide-react";
+import { useMemo, useState } from "react";
 import { getTripAllowanceEnabled, setTripAllowanceEnabled } from "@/backend/functions/devices.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -12,7 +11,7 @@ export function EmployeeTripsPanel({ employeeId }: { employeeId: string }) {
   return (
     <div className="space-y-4">
       <TripAllowanceSwitch employeeId={employeeId} />
-      <TripsPanelInner employeeId={employeeId} />
+      <MonthlyTripAllowance employeeId={employeeId} />
     </div>
   );
 }
@@ -40,7 +39,7 @@ function TripAllowanceSwitch({ employeeId }: { employeeId: string }) {
       <div className="min-w-0">
         <p className="text-sm font-semibold">Has trip allowance</p>
         <p className="text-xs text-muted-foreground">
-          {enabled ? "New trips for this employee get an overnight allowance." : "Off: new trips for this employee get no allowance."}
+          {enabled ? "Days checked in at a work location earn that location's allowance." : "Off: this employee earns no trip allowance."}
         </p>
       </div>
       <button
@@ -56,241 +55,84 @@ function TripAllowanceSwitch({ employeeId }: { employeeId: string }) {
   );
 }
 
-function TripsPanelInner({ employeeId }: { employeeId: string }) {
-  const { t } = useI18n();
-  const qc = useQueryClient();
-  const createFn = useServerFn(createTrip);
-  const approveFn = useServerFn(approveTrip);
-  const [showModal, setShowModal] = useState(false);
-  const [destination, setDestination] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [nights, setNights] = useState(1);
-  const [locId, setLocId] = useState("");
+function distM(aLat: number, aLng: number, bLat: number, bLng: number) {
+  const R = 6371000, r = (d: number) => (d * Math.PI) / 180;
+  const s = Math.sin(r(bLat - aLat) / 2) ** 2 + Math.cos(r(aLat)) * Math.cos(r(bLat)) * Math.sin(r(bLng - aLng) / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
 
-  const { data: locations } = useQuery({
-    queryKey: ["geo", "work-locations"],
+/** Monthly allowance: each day checked in inside a work location earns the
+ * rate set for the employee's position at that location (Allowances → Trips). */
+function MonthlyTripAllowance({ employeeId }: { employeeId: string }) {
+  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
+  const { data: en } = useQuery({ queryKey: ["employee-trip-allowance-enabled", employeeId], enabled: false }) as any;
+  const enabled = en?.enabled !== false;
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["monthly-trip-allowance", employeeId, month],
     queryFn: async () => {
-      const { data } = await supabase.from("geofence_locations").select("id, name, radius_m, active").order("name");
-      return (data ?? []).filter((l: any) => l.active !== false);
-    },
-    enabled: showModal,
-  });
-
-  const { data: rateInfo } = useQuery({
-    queryKey: ["trip-rate", employeeId, locId],
-    queryFn: async () => {
-      const { data: prof } = await supabase.from("profiles").select("position_id").eq("id", employeeId).maybeSingle();
-      if (!prof?.position_id) return { rate: null as number | null, noPosition: true };
-      const { data } = await (supabase as any).from("trip_allowance_policies")
-        .select("nightly_rate").eq("geofence_location_id", locId).eq("position_id", prof.position_id).maybeSingle();
-      return { rate: data ? Number(data.nightly_rate) : null, noPosition: false };
-    },
-    enabled: !!locId && showModal,
-  });
-
-  const mutation = useMutation({
-    mutationFn: async () => {
-      if (!destination.trim()) throw new Error("Destination is required");
-      return createFn({
-        data: {
-          assignee: employeeId,
-          destination: destination.trim(),
-          trip_date: date,
-          overnight_nights: nights,
-          geofence_location_id: locId || undefined,
+      const [y, m] = month.split("-").map(Number);
+      const from = `${month}-01`;
+      const to = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+      const [prof, att, locs] = await Promise.all([
+        (supabase as any).from("profiles").select("position_id").eq("id", employeeId).maybeSingle(),
+        supabase.from("attendance").select("date, in_time, lat, lng").eq("employee_id", employeeId).gte("date", from).lte("date", to).order("date"),
+        supabase.from("geofence_locations").select("id, name, lat, lng, radius_m, active"),
+      ]);
+      if (att.error) throw new Error(att.error.message);
+      const positionId = prof.data?.position_id ?? null;
+      let rates = new Map<string, number>();
+      if (positionId) {
+        const pol = await (supabase as any).from("trip_allowance_policies").select("geofence_location_id, nightly_rate").eq("position_id", positionId);
+        for (const p of pol.data ?? []) rates.set(p.geofence_location_id, Number(p.nightly_rate) || 0);
+      }
+      const fences = (locs.data ?? []).filter((l: any) => l.active !== false && l.lat != null && l.lng != null);
+      const rows = (att.data ?? []).map((a: any) => {
+        let loc: any = null, best = Infinity;
+        if (a.lat != null && a.lng != null) for (const f of fences) {
+          const d = distM(a.lat, a.lng, f.lat, f.lng);
+          if (d <= (f.radius_m ?? 0) && d < best) { best = d; loc = f; }
         }
+        const rate = loc && rates.has(loc.id) ? rates.get(loc.id)! : null;
+        return { date: a.date as string, time: a.in_time as string | null, location: loc?.name ?? null, rate };
       });
-    },
-    onSuccess: () => {
-      toast.success(t("addTrip") ?? "Trip added");
-      setShowModal(false);
-      setDestination("");
-      setNights(1);
-      setLocId("");
-      qc.invalidateQueries({ queryKey: ["employee-trips", employeeId] });
-    },
-    onError: (err: any) => {
-      console.error(err);
-      toast.error(err.message || "Failed to create trip");
-    }
-  });
-
-  const approveMutation = useMutation({
-    mutationFn: async (tripId: string) => approveFn({ data: { id: tripId } }),
-    onSuccess: () => {
-      toast.success("Trip approved successfully");
-      qc.invalidateQueries({ queryKey: ["employee-trips", employeeId] });
-    },
-    onError: (err: any) => {
-      toast.error(err.message || "Failed to approve trip");
-    }
-  });
-
-  const { data: trips, isLoading } = useQuery({
-    queryKey: ["employee-trips", employeeId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("trips")
-        .select(`
-          id,
-          destination,
-          trip_date,
-          status,
-          overnight_nights,
-          calculated_allowance,
-          allowance_status,
-          city,
-          cities (name_en, name_ar)
-        `)
-        .eq("assignee", employeeId)
-        .order("trip_date", { ascending: false });
-
-      if (error) throw error;
-      return data ?? [];
+      return { positionId, rows };
     },
   });
 
-  if (isLoading) {
-    return <div className="p-8 text-center text-sm text-muted-foreground">Loading...</div>;
-  }
-
-  const modalUi = showModal && (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-3xl border border-border bg-card p-5 shadow-lg">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="font-display text-lg font-semibold">{t("addTrip") ?? "Add Trip"}</h3>
-          <button onClick={() => setShowModal(false)} className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="space-y-4">
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-foreground">Destination</span>
-            <input value={destination} onChange={(e) => setDestination(e.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:border-brand focus:outline-none" placeholder="e.g. Branch visit" />
-          </label>
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-foreground">Work location (from geofencing)</span>
-            <select value={locId} onChange={(e) => setLocId(e.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:border-brand focus:outline-none">
-              <option value="">— Select location —</option>
-              {(locations || []).map((l: any) => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </select>
-            {locId && rateInfo && (
-              <div className={`mt-1.5 text-xs ${rateInfo.rate == null ? "text-destructive" : "text-muted-foreground"}`}>
-                {rateInfo.noPosition
-                  ? "This employee has no position set, so no allowance applies."
-                  : rateInfo.rate == null
-                    ? "No allowance set for this position at this location."
-                    : `${rateInfo.rate} EGP / night × ${nights} = ${rateInfo.rate * nights} EGP`}
-              </div>
-            )}
-          </label>
-          <div className="grid grid-cols-2 gap-4">
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-foreground">Date</span>
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:border-brand focus:outline-none" />
-            </label>
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-foreground">Overnights</span>
-              <input type="number" min="0" value={nights} onChange={(e) => setNights(Number(e.target.value))} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:border-brand focus:outline-none" />
-            </label>
-          </div>
-          <button
-            disabled={mutation.isPending}
-            onClick={() => mutation.mutate()}
-            className="mt-2 w-full rounded-xl bg-brand py-2.5 text-sm font-semibold text-brand-foreground hover:opacity-90 disabled:opacity-50"
-          >
-            {mutation.isPending ? "Saving..." : t("save") ?? "Save"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  if (!trips || trips.length === 0) {
-    return (
-      <div className="rounded-3xl border border-border bg-card p-8 text-center">
-        <RouteIcon className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" />
-        <p className="text-sm font-medium text-muted-foreground mb-4">No trips found for this employee.</p>
-        <button onClick={() => setShowModal(true)} className="inline-flex items-center gap-1.5 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-brand-foreground shadow hover:opacity-90">
-          <Plus className="h-4 w-4" /> {t("addTrip") ?? "Add Trip"}
-        </button>
-        {modalUi}
-      </div>
-    );
-  }
+  const total = useMemo(() => (enabled ? (data?.rows ?? []).reduce((s, r) => s + (r.rate ?? 0), 0) : 0), [data, enabled]);
+  const fmt = (d: string) => d.split("-").reverse().join("-");
 
   return (
-    <div className="rounded-3xl border border-border bg-card p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="font-display text-base font-semibold">{t("tripAllowance") ?? "Trip Allowance"}</h2>
-        <button onClick={() => setShowModal(true)} className="inline-flex items-center gap-1.5 rounded-full bg-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground shadow hover:opacity-90">
-          <Plus className="h-3.5 w-3.5" /> {t("addTrip") ?? "Add Trip"}
-        </button>
+    <div className="space-y-3 rounded-2xl border border-border p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="inline-flex items-center gap-1.5 text-sm font-semibold"><Calendar className="h-4 w-4" /> Monthly trip allowance</p>
+        <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="h-9 rounded-xl border border-input bg-background px-3 text-sm" />
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-muted/40 font-medium text-muted-foreground">
-            <tr>
-              <th className="px-4 py-3">Destination</th>
-              <th className="px-4 py-3">Date</th>
-              <th className="px-4 py-3">Nights</th>
-              <th className="px-4 py-3">Allowance (EGP)</th>
-              <th className="px-4 py-3">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {trips.map((trip: any) => (
-              <tr key={trip.id} className="hover:bg-muted/20">
-                <td className="p-4">
-                  <div className="font-medium text-foreground">{trip.destination}</div>
-                  {trip.cities && (
-                    <div className="text-xs text-muted-foreground">
-                      {trip.cities.name_en || trip.cities.name_ar}
-                    </div>
-                  )}
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-1.5 text-muted-foreground">
-                    <Calendar className="h-3.5 w-3.5" />
-                    {trip.trip_date}
-                  </div>
-                </td>
-                <td className="px-4 py-3 font-mono">{trip.overnight_nights || 0}</td>
-                <td className="px-4 py-3 font-mono">
-                  {trip.calculated_allowance ? `${trip.calculated_allowance.toLocaleString()} EGP` : "—"}
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex flex-col gap-1">
-                    <span className="inline-flex w-fit items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-foreground">
-                      Trip: {trip.status}
-                    </span>
-                    {trip.calculated_allowance > 0 && (
-                      <span className={`inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
-                        trip.allowance_status === "paid" ? "bg-emerald-500/20 text-emerald-700" :
-                        trip.allowance_status === "approved" ? "bg-blue-500/20 text-blue-700" :
-                        "bg-amber-500/20 text-amber-700"
-                      }`}>
-                        Allow: {trip.allowance_status}
-                      </span>
-                    )}
-                    {trip.allowance_status === "pending" && (
-                      <button 
-                        onClick={() => approveMutation.mutate(trip.id)}
-                        disabled={approveMutation.isPending}
-                        className="mt-1 flex w-fit items-center gap-1 rounded bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-500/20 disabled:opacity-50"
-                      >
-                        <CheckCircle className="h-3 w-3" /> Approve
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {modalUi}
+      {isLoading ? <p className="text-sm text-muted-foreground">Loading…</p>
+        : error ? <p className="text-sm text-destructive">{(error as Error).message}</p>
+        : !data?.positionId ? <p className="text-sm text-muted-foreground">This employee has no position, so no allowance rate applies.</p>
+        : data.rows.length === 0 ? <p className="text-sm text-muted-foreground">No check-ins this month.</p>
+        : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                <tr><th className="px-2 py-2 text-start">Date</th><th className="px-2 py-2 text-start">Check-in</th><th className="px-2 py-2 text-start">Work location</th><th className="px-2 py-2 text-end">Allowance (EGP)</th></tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {data.rows.map((r) => (
+                  <tr key={r.date}>
+                    <td className="px-2 py-2">{fmt(r.date)}</td>
+                    <td className="px-2 py-2">{r.time ? new Date(r.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</td>
+                    <td className="px-2 py-2">{r.location ? <span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5 text-brand" />{r.location}</span> : <span className="text-muted-foreground">Outside work locations</span>}</td>
+                    <td className="px-2 py-2 text-end font-mono">{enabled && r.rate != null ? r.rate : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot><tr className="border-t border-border font-semibold"><td colSpan={3} className="px-2 py-2">Total</td><td className="px-2 py-2 text-end font-mono">{total}</td></tr></tfoot>
+            </table>
+          </div>
+        )}
     </div>
   );
 }
