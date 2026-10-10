@@ -18,6 +18,7 @@ import {
   Search,
   Globe,
   Pencil,
+  TableProperties,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
@@ -25,6 +26,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useI18n } from "@/lib/i18n";
 import { LeafletMap } from "@/components/LeafletMap";
 import { SubTabs } from "@/components/SubTabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { GeofenceLocationsTable } from "@/components/admin/GeofenceLocationsTable";
 import { lookupCity } from "@/lib/egypt-cities";
 
 import { listCitiesWithDistricts } from "@/backend/functions/directory.functions";
@@ -74,6 +77,26 @@ function GeoPage() {
   const [showEgyptOverview, setShowEgyptOverview] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive">("all");
+  const [activeTab, setActiveTab] = useState<"map" | "table">(() => {
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search);
+      if (p.get("tab") === "table") return "table";
+    }
+    return "map";
+  });
+
+  const handleTabChange = (val: "map" | "table") => {
+    setActiveTab(val);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      if (val === "table") {
+        url.searchParams.set("tab", "table");
+      } else {
+        url.searchParams.delete("tab");
+      }
+      window.history.replaceState({}, "", url.toString());
+    }
+  };
 
   const selected = locations.find((l) => l.id === selectedId) ?? null;
 
@@ -181,15 +204,55 @@ function GeoPage() {
         </div>
       </div>
 
-      {/* Optional macro Egypt overview */}
-      {showEgyptOverview && (
-        <Suspense fallback={<div className="h-[420px] rounded-3xl border border-border bg-card" />}>
-          <EgyptMap />
-        </Suspense>
-      )}
+      {/* View Tabs */}
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => handleTabChange(v as "map" | "table")}
+        className="space-y-4"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/80 pb-3">
+          <TabsList className="h-10 rounded-full border border-border bg-muted/60 p-1">
+            <TabsTrigger
+              value="map"
+              className="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+            >
+              <MapPin className="h-3.5 w-3.5 text-brand" />
+              <span>Map & Zones</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="table"
+              className="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+            >
+              <TableProperties className="h-3.5 w-3.5 text-brand" />
+              <span>All Locations (Table)</span>
+              <span className="ms-1 rounded-full bg-brand/10 text-brand px-1.5 py-0.2 text-[10px] font-bold">
+                {locations.length}
+              </span>
+            </TabsTrigger>
+          </TabsList>
 
-      {/* Main split view: Map on the left, Locations on the right */}
-      <div className="grid gap-5 lg:grid-cols-12 items-start">
+          {activeTab === "map" && (
+            <span className="text-xs text-muted-foreground hidden sm:inline">
+              Interactive Leaflet Map with drag-resizable zone radiuses
+            </span>
+          )}
+          {activeTab === "table" && (
+            <span className="text-xs text-muted-foreground hidden sm:inline">
+              Tabular view of all zones with assigned employees and instant toggles
+            </span>
+          )}
+        </div>
+
+        <TabsContent value="map" className="mt-0 space-y-4">
+          {/* Optional macro Egypt overview */}
+          {showEgyptOverview && (
+            <Suspense fallback={<div className="h-[420px] rounded-3xl border border-border bg-card" />}>
+              <EgyptMap />
+            </Suspense>
+          )}
+
+          {/* Main split view: Map on the left, Locations on the right */}
+          <div className="grid gap-5 lg:grid-cols-12 items-start">
         {/* Left column: Interactive Map */}
         <div className="lg:col-span-7 xl:col-span-7 space-y-2 lg:sticky lg:top-4">
           <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm flex flex-col">
@@ -482,6 +545,28 @@ function GeoPage() {
           </ul>
         </div>
       </div>
+      </TabsContent>
+
+      <TabsContent value="table" className="mt-0">
+        <GeofenceLocationsTable
+          locations={locations}
+          isLoading={isLoading}
+          onEdit={(loc) => setEditFor(loc)}
+          onAssign={(loc) => setAssignFor(loc)}
+          onToggleActive={(id, active) => updateMut.mutate({ id, active })}
+          onDelete={(loc) => {
+            if (confirm(`Delete ${loc.name}?`)) deleteMut.mutate(loc.id);
+          }}
+          onViewOnMap={(loc) => {
+            setSelectedId(loc.id);
+            handleTabChange("map");
+          }}
+          onAddLocation={() => setAdding(true)}
+          onOpenImport={() => setImportOpen(true)}
+          onOpenBulkAssign={() => setBulkOpen(true)}
+        />
+      </TabsContent>
+      </Tabs>
 
       {adding && (
         <AddLocationModal

@@ -1,0 +1,74 @@
+================================================================================
+ARCHITECTURE & IMPLEMENTATION PLAN: VERIFIED FACE IMAGE AUDIT
+Feature: Display Captured Face Snapshots in admin/audit?tab=biometrics
+================================================================================
+
+1. OVERVIEW & CURRENT LIMITATION
+--------------------------------------------------------------------------------
+- Currently, the face verification system uses client-side face embeddings
+  (128-dimensional mathematical vector descriptors).
+- Neither the enrollment nor the verification process saves face photos to the
+  database or cloud storage.
+- The `biometric_audit_log` table only records: event, success/failure,
+  distance score, timestamp, user/device info.
+- Goal: Capture, securely store, and display the face photo taken at the moment
+  of verification (check-in / check-out / verify) in the Admin Biometric Audit viewer.
+
+
+2. STEP-BY-STEP IMPLEMENTATION PLAN
+--------------------------------------------------------------------------------
+
+STEP 1: SUPABASE STORAGE BUCKET
+- Create a private bucket in Supabase Storage:
+  Bucket Name: `biometric-snapshots` (private)
+- Storage RLS Policies:
+  - Service Role / Backend: Full read/write access.
+  - Authenticated Users (Admin / HR): Read access via signed URLs only.
+  - Public: No public access.
+
+STEP 2: DATABASE MIGRATION
+- Add image storage reference columns:
+  ALTER TABLE public.biometric_audit_log
+    ADD COLUMN IF NOT EXISTS snapshot_path text;
+
+  (Optional - for attendance records):
+  ALTER TABLE public.attendance
+    ADD COLUMN IF NOT EXISTS check_in_photo_path text,
+    ADD COLUMN IF NOT EXISTS check_out_photo_path text;
+
+STEP 3: CLIENT-SIDE PHOTO CAPTURE
+- Location: `AttendancePage.tsx` / `FaceScannerModal.tsx` / `face-recognition.ts`
+- When face match is verified or attempted:
+  1. Capture a lightweight snapshot frame from the active `<video>` element using
+     a hidden `<canvas>`.
+  2. Compress the frame to JPEG or WebP (e.g., 320x320 px, quality: 0.7) to keep
+     file sizes under ~30-50 KB per check-in.
+  3. Send the image (base64 string or FormData) as part of the check-in / audit payload.
+
+STEP 4: BACKEND PROCESSING & UPLOAD PIPELINE
+- Location: `src/backend/server/biometric-audit.server.ts` & `attendance.functions.ts`
+- In `logBiometricEvent`:
+  1. Receive the image payload (if provided).
+  2. Upload to `biometric-snapshots/{userId}/{date}_{timestamp}_{eventId}.jpg`.
+  3. Save the returned storage path into `biometric_audit_log.snapshot_path`.
+  4. Ensure failures in photo upload do not block attendance or authentication.
+
+STEP 5: UI IN ADMIN BIOMETRICS AUDIT (admin/audit?tab=biometrics)
+- Location: `src/components/admin/BiometricAuditViewer.tsx`
+- Add "Photo / Snapshot" column to the audit table:
+  1. For rows with `snapshot_path`:
+     - Render a small circular thumbnail avatar or preview icon.
+     - Click thumbnail to open a high-res lightbox / modal dialog with:
+       * Full captured photo
+       * Comparison against profile/enrollment avatar
+       * Match distance score & threshold
+       * Device, timestamp, and location info
+  2. For rows without photo (legacy or failed capture):
+     - Display placeholder "—" or "No photo".
+
+STEP 6: PRIVACY & STORAGE RETENTION POLICY
+- Auto-cleanup scheduled job (Cron / Supabase Edge Function):
+  - Automatically delete photos older than 30 or 60 days from the bucket
+    and clear `snapshot_path` to avoid excessive storage costs and comply with
+    biometric data privacy regulations (e.g. GDPR / local labor laws).
+================================================================================

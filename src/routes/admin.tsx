@@ -144,6 +144,7 @@ function AdminLayout() {
         items: [
           { to: "/admin/attendance", icon: Clock, label: t("attendance") || "Attendance", page: "attendance" },
           { to: "/admin/geofencing", icon: MapPin, label: t("geofencing") || "Geo-Fencing", page: "geofencing" },
+          { to: "/admin/applied-trip-allowances", icon: Navigation, label: "Applied Trip Allowances", page: "attendance" },
           { to: "/admin/leaves", icon: CalendarDays, label: t("leaves") || "Leaves", page: "leaves" },
           { to: "/admin/audit", icon: ScrollText, label: t("auditLogs") || t("audit") || "Audit Logs", page: "audit" },
         ],

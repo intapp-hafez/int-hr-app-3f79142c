@@ -19,6 +19,7 @@ import { Route as StaffRouteImport } from './routes/staff'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminAdvancesRouteImport } from './routes/admin.advances'
 import { Route as AdminAllowancesRouteImport } from './routes/admin.allowances'
+import { Route as AdminAppliedTripAllowancesRouteImport } from './routes/admin.applied-trip-allowances'
 import { Route as AdminAttendanceRouteImport } from './routes/admin.attendance'
 import { Route as AdminAttendanceReportRouteImport } from './routes/admin.attendance-report'
 import { Route as AdminAttendanceRulesRouteImport } from './routes/admin.attendance-rules'
@@ -149,6 +150,12 @@ const AdminAllowancesRoute = AdminAllowancesRouteImport.update({
   path: '/allowances',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminAppliedTripAllowancesRoute =
+  AdminAppliedTripAllowancesRouteImport.update({
+    id: '/applied-trip-allowances',
+    path: '/applied-trip-allowances',
+    getParentRoute: () => AdminRoute,
+  } as any)
 const AdminAttendanceRoute = AdminAttendanceRouteImport.update({
   id: '/attendance',
   path: '/attendance',
@@ -560,6 +567,7 @@ export interface FileRoutesByFullPath {
   '/staff': typeof StaffRouteWithChildren
   '/admin/advances': typeof AdminAdvancesRoute
   '/admin/allowances': typeof AdminAllowancesRoute
+  '/admin/applied-trip-allowances': typeof AdminAppliedTripAllowancesRoute
   '/admin/attendance': typeof AdminAttendanceRoute
   '/admin/attendance-report': typeof AdminAttendanceReportRoute
   '/admin/attendance-rules': typeof AdminAttendanceRulesRoute
@@ -646,6 +654,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/admin/advances': typeof AdminAdvancesRoute
   '/admin/allowances': typeof AdminAllowancesRoute
+  '/admin/applied-trip-allowances': typeof AdminAppliedTripAllowancesRoute
   '/admin/attendance': typeof AdminAttendanceRoute
   '/admin/attendance-report': typeof AdminAttendanceReportRoute
   '/admin/attendance-rules': typeof AdminAttendanceRulesRoute
@@ -736,6 +745,7 @@ export interface FileRoutesById {
   '/staff': typeof StaffRouteWithChildren
   '/admin/advances': typeof AdminAdvancesRoute
   '/admin/allowances': typeof AdminAllowancesRoute
+  '/admin/applied-trip-allowances': typeof AdminAppliedTripAllowancesRoute
   '/admin/attendance': typeof AdminAttendanceRoute
   '/admin/attendance-report': typeof AdminAttendanceReportRoute
   '/admin/attendance-rules': typeof AdminAttendanceRulesRoute
@@ -829,6 +839,7 @@ export interface FileRouteTypes {
     | '/staff'
     | '/admin/advances'
     | '/admin/allowances'
+    | '/admin/applied-trip-allowances'
     | '/admin/attendance'
     | '/admin/attendance-report'
     | '/admin/attendance-rules'
@@ -915,6 +926,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/admin/advances'
     | '/admin/allowances'
+    | '/admin/applied-trip-allowances'
     | '/admin/attendance'
     | '/admin/attendance-report'
     | '/admin/attendance-rules'
@@ -1004,6 +1016,7 @@ export interface FileRouteTypes {
     | '/staff'
     | '/admin/advances'
     | '/admin/allowances'
+    | '/admin/applied-trip-allowances'
     | '/admin/attendance'
     | '/admin/attendance-report'
     | '/admin/attendance-rules'
@@ -1168,6 +1181,13 @@ declare module '@tanstack/react-router' {
       path: '/allowances'
       fullPath: '/admin/allowances'
       preLoaderRoute: typeof AdminAllowancesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/applied-trip-allowances': {
+      id: '/admin/applied-trip-allowances'
+      path: '/applied-trip-allowances'
+      fullPath: '/admin/applied-trip-allowances'
+      preLoaderRoute: typeof AdminAppliedTripAllowancesRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/attendance': {
@@ -1768,6 +1788,7 @@ const AdminSettingsRolesRouteWithChildren =
 interface AdminRouteChildren {
   AdminAdvancesRoute: typeof AdminAdvancesRoute
   AdminAllowancesRoute: typeof AdminAllowancesRoute
+  AdminAppliedTripAllowancesRoute: typeof AdminAppliedTripAllowancesRoute
   AdminAttendanceRoute: typeof AdminAttendanceRoute
   AdminAttendanceReportRoute: typeof AdminAttendanceReportRoute
   AdminAttendanceRulesRoute: typeof AdminAttendanceRulesRoute
@@ -1810,6 +1831,7 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminAdvancesRoute: AdminAdvancesRoute,
   AdminAllowancesRoute: AdminAllowancesRoute,
+  AdminAppliedTripAllowancesRoute: AdminAppliedTripAllowancesRoute,
   AdminAttendanceRoute: AdminAttendanceRoute,
   AdminAttendanceReportRoute: AdminAttendanceReportRoute,
   AdminAttendanceRulesRoute: AdminAttendanceRulesRoute,

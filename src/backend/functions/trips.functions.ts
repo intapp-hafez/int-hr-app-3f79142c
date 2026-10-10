@@ -180,3 +180,226 @@ export const listTripHistory = createServerFn({ method: "GET" })
     }));
     return { notSetUp: false, rows };
   });
+
+function distM(aLat: number, aLng: number, bLat: number, bLng: number) {
+  const R = 6371000;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(bLat - aLat);
+  const dLng = toRad(bLng - aLng);
+  const s =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
+
+export type AppliedTripAllowanceRow = {
+  id: string;
+  attendanceId: string;
+  date: string;
+  employeeId: string;
+  employeeName: string;
+  employeeCode: string | null;
+  department: string | null;
+  positionId: string | null;
+  positionName: string;
+  locationId: string;
+  locationName: string;
+  locationRadius: number;
+  distanceMeters: number | null;
+  inTime: string | null;
+  outTime: string | null;
+  lat: number | null;
+  lng: number | null;
+  nightlyRate: number;
+  tripAllowanceEnabled: boolean;
+  allowanceApplied: boolean;
+  earnedAmount: number;
+  note: string | null;
+};
+
+export const listAppliedTripAllowances = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+        locationId: z.string().optional(),
+        employeeId: z.string().optional(),
+      })
+      .optional()
+      .parse(input)
+  )
+  .handler(async ({ data: input, context }) => {
+    const { supabase } = context;
+    const now = new Date();
+    const defaultStart = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1))
+      .toISOString()
+      .slice(0, 10);
+    const defaultEnd = now.toISOString().slice(0, 10);
+
+    const fromDate = input?.startDate || defaultStart;
+    const toDate = input?.endDate || defaultEnd;
+
+    // 1. Fetch geofence locations and policies
+    const [locsRes, polsRes] = await Promise.all([
+      supabase.from("geofence_locations").select("id, name, lat, lng, radius_m, active"),
+      (supabase as any)
+        .from("trip_allowance_policies")
+        .select("id, geofence_location_id, position_id, nightly_rate"),
+    ]);
+
+    const activeLocations = (locsRes.data ?? []).filter(
+      (l: any) => l.active !== false && l.lat != null && l.lng != null,
+    );
+    const policies = (polsRes.data ?? []) as Array<{
+      geofence_location_id: string;
+      position_id: string;
+      nightly_rate: number;
+    }>;
+
+    // Map policies: key = `${location_id}:${position_id}` => nightly_rate
+    const policyMap = new Map<string, number>();
+    const tripLocationIds = new Set<string>();
+    for (const p of policies) {
+      if (p.geofence_location_id) {
+        tripLocationIds.add(p.geofence_location_id);
+        if (p.position_id) {
+          policyMap.set(`${p.geofence_location_id}:${p.position_id}`, Number(p.nightly_rate) || 0);
+        }
+      }
+    }
+
+    // 2. Fetch attendance in range
+    let attQuery = supabase
+      .from("attendance")
+      .select("id, employee_id, date, in_time, out_time, lat, lng, branch, note, status")
+      .gte("date", fromDate)
+      .lte("date", toDate)
+      .order("date", { ascending: false });
+
+    if (input?.employeeId) {
+      attQuery = attQuery.eq("employee_id", input.employeeId);
+    }
+
+    const { data: attData, error: attError } = await attQuery;
+    if (attError) throw new Error(attError.message);
+    const attendanceRecords = attData ?? [];
+
+    if (attendanceRecords.length === 0) {
+      return {
+        rows: [] as AppliedTripAllowanceRow[],
+        locations: activeLocations.map((l: any) => ({
+          id: l.id,
+          name: l.name,
+          hasPolicy: tripLocationIds.has(l.id),
+        })),
+        totalAppliedAmount: 0,
+        eligibleCount: 0,
+        totalCheckedInCount: 0,
+      };
+    }
+
+    // 3. Fetch profiles and positions
+    const empIds = [...new Set(attendanceRecords.map((a: any) => a.employee_id))];
+    const { data: profData } = await (supabase as any)
+      .from("profiles")
+      .select(
+        "id, full_name, emp_code, department, position_id, trip_allowance_enabled, positions(id, name_en, name_ar)",
+      )
+      .in("id", empIds);
+
+    const profileMap = new Map<string, any>();
+    for (const p of profData ?? []) {
+      profileMap.set(p.id, p);
+    }
+
+    // 4. Match attendance against Trip Allowance locations
+    const rows: AppliedTripAllowanceRow[] = [];
+    let totalAppliedAmount = 0;
+    let eligibleCount = 0;
+
+    for (const att of attendanceRecords) {
+      const prof = profileMap.get(att.employee_id);
+      const positionId = prof?.position_id ?? null;
+      const positionName = prof?.positions?.name_en || prof?.positions?.name_ar || "—";
+      const tripAllowanceEnabled = prof?.trip_allowance_enabled !== false;
+
+      let matchedLoc: any = null;
+      let minDistance = Infinity;
+
+      if (att.lat != null && att.lng != null) {
+        for (const loc of activeLocations) {
+          const d = distM(att.lat, att.lng, loc.lat, loc.lng);
+          if (d <= (loc.radius_m ?? 0) && d < minDistance) {
+            minDistance = d;
+            matchedLoc = loc;
+          }
+        }
+      }
+
+      // Fallback matching by branch name if lat/lng was null
+      if (!matchedLoc && att.branch) {
+        const found = activeLocations.find(
+          (loc: any) => loc.name.trim().toLowerCase() === String(att.branch).trim().toLowerCase(),
+        );
+        if (found) {
+          matchedLoc = found;
+          minDistance = 0;
+        }
+      }
+
+      if (matchedLoc) {
+        if (input?.locationId && matchedLoc.id !== input.locationId) {
+          continue;
+        }
+
+        const rateKey = positionId ? `${matchedLoc.id}:${positionId}` : "";
+        const nightlyRate = policyMap.get(rateKey) ?? 0;
+        const allowanceApplied = tripAllowanceEnabled && nightlyRate > 0;
+        const earnedAmount = allowanceApplied ? nightlyRate : 0;
+
+        if (allowanceApplied) {
+          totalAppliedAmount += earnedAmount;
+          eligibleCount++;
+        }
+
+        rows.push({
+          id: att.id,
+          attendanceId: att.id,
+          date: att.date,
+          employeeId: att.employee_id,
+          employeeName: prof?.full_name || "—",
+          employeeCode: prof?.emp_code || null,
+          department: prof?.department || null,
+          positionId,
+          positionName,
+          locationId: matchedLoc.id,
+          locationName: matchedLoc.name,
+          locationRadius: matchedLoc.radius_m,
+          distanceMeters: minDistance < Infinity ? Math.round(minDistance) : null,
+          inTime: att.in_time,
+          outTime: att.out_time,
+          lat: att.lat,
+          lng: att.lng,
+          nightlyRate,
+          tripAllowanceEnabled,
+          allowanceApplied,
+          earnedAmount,
+          note: att.note || null,
+        });
+      }
+    }
+
+    return {
+      rows,
+      locations: activeLocations.map((l: any) => ({
+        id: l.id,
+        name: l.name,
+        hasPolicy: tripLocationIds.has(l.id),
+      })),
+      totalAppliedAmount,
+      eligibleCount,
+      totalCheckedInCount: rows.length,
+    };
+  });

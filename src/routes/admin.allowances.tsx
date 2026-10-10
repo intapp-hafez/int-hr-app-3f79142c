@@ -1,9 +1,25 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Loader2, Download, Upload, FileSpreadsheet, CheckCircle2, AlertCircle } from "lucide-react";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Loader2,
+  Download,
+  Upload,
+  FileSpreadsheet,
+  CheckCircle2,
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Search,
+  X,
+} from "lucide-react";
 import { listAllowances, upsertAllowance, deleteAllowance, bulkUpsertAllowances } from "@/backend/functions/allowances.functions";
 import { AllowanceSchema } from "@/backend/schemas";
 import { downloadTemplate, parseExcelFile } from "@/lib/excel";
@@ -70,7 +86,39 @@ function Page() {
   const [parsedRows, setParsedRows] = useState<ParsedAllowanceRow[]>([]);
   const [isImporting, setIsImporting] = useState(false);
 
+  // Pagination state (default: 30 per page)
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(30);
+  const [search, setSearch] = useState("");
+
   const { data: rows = [], isLoading } = useQuery({ queryKey: ["admin", "allowances"], queryFn: () => listFn() });
+
+  const filteredRows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((r: any) =>
+      r.name.toLowerCase().includes(q) ||
+      r.kind.toLowerCase().includes(q) ||
+      String(r.amount).includes(q) ||
+      r.currency.toLowerCase().includes(q),
+    );
+  }, [rows, search]);
+
+  const totalItems = filteredRows.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const safePage = Math.min(Math.max(1, page), totalPages);
+
+  const paginatedRows = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return filteredRows.slice(start, start + pageSize);
+  }, [filteredRows, safePage, pageSize]);
+
+  function getPaginationRange(current: number, total: number) {
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+    if (current <= 3) return [1, 2, 3, 4, "...", total];
+    if (current >= total - 2) return [1, "...", total - 3, total - 2, total - 1, total];
+    return [1, "...", current - 1, current, current + 1, "...", total];
+  }
 
   const m = useMutation({
     mutationFn: (f: Form) => upsertFn({ data: f }),
@@ -329,48 +377,75 @@ function Page() {
           <TabsTrigger value="trips">Trip Allowances</TabsTrigger>
         </TabsList>
         <TabsContent value="general" className="mt-4 space-y-4">
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleDownloadTemplate}
-              className="rounded-full"
-              title="Download blank sample Excel template"
-            >
-              <Download className="me-1.5 h-3.5 w-3.5" />
-              Template
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => fileInputRef.current?.click()}
-              className="rounded-full"
-              title="Import allowances from Excel file"
-            >
-              <Upload className="me-1.5 h-3.5 w-3.5" />
-              Import
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExport}
-              disabled={rows.length === 0}
-              className="rounded-full"
-              title="Export existing allowances to Excel"
-            >
-              <FileSpreadsheet className="me-1.5 h-3.5 w-3.5" />
-              Export
-            </Button>
-            <Button
-              onClick={() => {
-                setForm(blank);
-                setErrs({});
-                setOpen(true);
-              }}
-              className="rounded-full"
-            >
-              <Plus className="me-1.5 h-4 w-4" /> Add allowance
-            </Button>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="relative w-full max-w-xs">
+              <Search className="pointer-events-none absolute start-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
+                placeholder="Search allowances…"
+                className="h-9 w-full rounded-full border border-input bg-card ps-8 pe-7 text-xs outline-none focus:ring-2 focus:ring-ring"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearch("");
+                    setPage(1);
+                  }}
+                  className="absolute end-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 ms-auto">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadTemplate}
+                className="rounded-full"
+                title="Download blank sample Excel template"
+              >
+                <Download className="me-1.5 h-3.5 w-3.5" />
+                Template
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                className="rounded-full"
+                title="Import allowances from Excel file"
+              >
+                <Upload className="me-1.5 h-3.5 w-3.5" />
+                Import
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExport}
+                disabled={rows.length === 0}
+                className="rounded-full"
+                title="Export existing allowances to Excel"
+              >
+                <FileSpreadsheet className="me-1.5 h-3.5 w-3.5" />
+                Export
+              </Button>
+              <Button
+                onClick={() => {
+                  setForm(blank);
+                  setErrs({});
+                  setOpen(true);
+                }}
+                className="rounded-full"
+              >
+                <Plus className="me-1.5 h-4 w-4" /> Add allowance
+              </Button>
+            </div>
           </div>
 
           <div className="overflow-hidden rounded-3xl border border-border bg-card">
@@ -393,14 +468,14 @@ function Page() {
                       <Loader2 className="mx-auto h-4 w-4 animate-spin text-muted-foreground" />
                     </td>
                   </tr>
-                ) : rows.length === 0 ? (
+                ) : paginatedRows.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
-                      No allowances yet.
+                      {search ? `No allowances matching "${search}".` : "No allowances yet."}
                     </td>
                   </tr>
                 ) : (
-                  rows.map((r: any) => (
+                  paginatedRows.map((r: any) => (
                     <tr key={r.id} className="border-b border-border last:border-b-0 hover:bg-muted/40">
                       <td className="px-4 py-3 font-medium">{r.name}</td>
                       <td className="px-4 py-3 capitalize">{r.kind.replace("_", " ")}</td>
@@ -431,6 +506,99 @@ function Page() {
                 )}
               </tbody>
             </table>
+
+            {/* Pagination Footer */}
+            {!isLoading && totalItems > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <span>Rows per page:</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value));
+                      setPage(1);
+                    }}
+                    className="rounded-lg border border-border bg-card px-2.5 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-brand"
+                  >
+                    <option value={15}>15</option>
+                    <option value={30}>30</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                  <span className="hidden sm:inline">
+                    Showing {(safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, totalItems)} of {totalItems} allowances
+                  </span>
+                </div>
+
+                {totalPages > 1 && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="me-2 font-medium text-foreground sm:inline hidden">
+                      Page {safePage} of {totalPages}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setPage(1)}
+                      disabled={safePage <= 1}
+                      title="First Page"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ChevronsLeft className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={safePage <= 1}
+                      title="Previous Page"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+
+                    <div className="hidden items-center gap-1 sm:flex">
+                      {getPaginationRange(safePage, totalPages).map((p, idx) =>
+                        typeof p === "number" ? (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setPage(p)}
+                            className={`inline-flex h-8 min-w-[32px] items-center justify-center rounded-lg px-2 text-xs font-semibold transition-colors ${
+                              p === safePage
+                                ? "bg-foreground text-background shadow-sm"
+                                : "border border-border bg-card text-foreground hover:bg-muted"
+                            }`}
+                          >
+                            {p}
+                          </button>
+                        ) : (
+                          <span key={idx} className="px-1 text-muted-foreground select-none">
+                            …
+                          </span>
+                        ),
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={safePage >= totalPages}
+                      title="Next Page"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPage(totalPages)}
+                      disabled={safePage >= totalPages}
+                      title="Last Page"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ChevronsRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Edit / Add Modal */}
