@@ -4,10 +4,59 @@ import { useI18n } from "@/lib/i18n";
 import { Plane, Calendar, RouteIcon, Plus, X, CheckCircle } from "lucide-react";
 import { useState } from "react";
 import { createTrip, approveTrip } from "@/backend/functions/trips.functions";
+import { getTripAllowanceEnabled, setTripAllowanceEnabled } from "@/backend/functions/devices.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 
 export function EmployeeTripsPanel({ employeeId }: { employeeId: string }) {
+  return (
+    <div className="space-y-4">
+      <TripAllowanceSwitch employeeId={employeeId} />
+      <TripsPanelInner employeeId={employeeId} />
+    </div>
+  );
+}
+
+function TripAllowanceSwitch({ employeeId }: { employeeId: string }) {
+  const getFn = useServerFn(getTripAllowanceEnabled);
+  const setFn = useServerFn(setTripAllowanceEnabled);
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["employee-trip-allowance-enabled", employeeId],
+    queryFn: () => getFn({ data: { user_id: employeeId } }),
+  });
+  const enabled = data?.enabled !== false;
+  async function toggle() {
+    try {
+      await setFn({ data: { user_id: employeeId, enabled: !enabled } });
+      toast.success(!enabled ? "Trip allowance turned on" : "Trip allowance turned off");
+      qc.invalidateQueries({ queryKey: ["employee-trip-allowance-enabled", employeeId] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed");
+    }
+  }
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-muted/40 p-3">
+      <div className="min-w-0">
+        <p className="text-sm font-semibold">Has trip allowance</p>
+        <p className="text-xs text-muted-foreground">
+          {enabled ? "New trips for this employee get an overnight allowance." : "Off: new trips for this employee get no allowance."}
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={toggle}
+        aria-pressed={enabled}
+        aria-label="Has trip allowance"
+        className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${enabled ? "bg-gradient-brand" : "bg-border"}`}
+      >
+        <span className={`absolute top-1 h-5 w-5 rounded-full bg-card shadow transition-all ${enabled ? "left-6 rtl:right-6 rtl:left-auto" : "left-1 rtl:right-1 rtl:left-auto"}`} />
+      </button>
+    </div>
+  );
+}
+
+function TripsPanelInner({ employeeId }: { employeeId: string }) {
   const { t } = useI18n();
   const qc = useQueryClient();
   const createFn = useServerFn(createTrip);

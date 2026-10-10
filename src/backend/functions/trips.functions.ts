@@ -60,6 +60,10 @@ export const createTrip = createServerFn({ method: "POST" })
       }
     }
 
+    const { data: elig } = await (context.supabase as any).from("profiles")
+      .select("trip_allowance_enabled").eq("id", data.assignee).maybeSingle();
+    if (elig && elig.trip_allowance_enabled === false) calculatedAllowance = 0;
+
     const { error, data: row } = await (context.supabase as any).from("trips").insert({
       destination: data.destination,
       address: data.address ?? null,
