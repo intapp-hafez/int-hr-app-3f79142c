@@ -11,7 +11,7 @@ import { getMyTeam } from "@/lib/team.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { TaskLocationPicker } from "@/components/admin/TaskLocationPicker";
 import { reverseGeocodeCoords } from "@/lib/reverse-geocode";
-import { listTrips, createTrip, transitionTrip as transitionTripFn, deleteTrip } from "@/backend/functions/trips.functions";
+import { listTripHistory, listTrips, createTrip, transitionTrip as transitionTripFn, deleteTrip } from "@/backend/functions/trips.functions";
 
 export const Route = createFileRoute("/manager/trips")({
   component: ManagerTripsPage,
@@ -48,13 +48,26 @@ function ManagerTripsPage() {
     queryFn: () => listFn(),
     enabled: !!me,
   });
+  const histFn = useServerFn(listTripHistory);
+  const { data: histData } = useQuery({ queryKey: ["trip-history"], queryFn: () => histFn(), enabled: !!me });
+  const histByTrip = useMemo(() => {
+    const m: Record<string, NonNullable<ManagerTrip["history"]>> = {};
+    const label: Record<string, string> = { created: "Created", started: "Started", finished: "Finished", cancelled: "Cancelled", status: "Status changed", allowance: "Allowance changed" };
+    for (const h of (histData?.rows ?? []).slice().reverse()) {
+      const note = h.event === "allowance"
+        ? `${h.allowanceBefore ?? "—"} → ${h.allowanceAfter ?? "—"} EGP`
+        : h.event === "created" && h.allowanceAfter != null ? `Allowance ${h.allowanceAfter} EGP` : undefined;
+      (m[h.tripId] ??= []).push({ ts: h.createdAt, by: h.changedByName, to: label[h.event] ?? h.event, note } as any);
+    }
+    return m;
+  }, [histData]);
   const trips: DbTripView[] = useMemo(() => (rawTrips as any[]).map((r) => ({
     id: r.id, destination: r.destination ?? "", address: r.address ?? "", date: r.trip_date,
     time: r.trip_time ?? undefined, purpose: r.purpose ?? "", notes: r.notes ?? undefined,
     assignee: r.assignee, createdBy: r.created_by, status: r.status,
-    startedAt: r.started_at ?? undefined, completedAt: r.completed_at ?? undefined, history: [],
-  })), [rawTrips]);
-  const refresh = () => qc.invalidateQueries({ queryKey: ["manager-trips"] });
+    startedAt: r.started_at ?? undefined, completedAt: r.completed_at ?? undefined, history: histByTrip[r.id] ?? [],
+  })), [rawTrips, histByTrip]);
+  const refresh = () => { qc.invalidateQueries({ queryKey: ["manager-trips"] }); qc.invalidateQueries({ queryKey: ["trip-history"] }); };
   const transitionTrip = async (id: string, status: TaskStatus, _by: string) => {
     try { await transFn({ data: { id, status } }); refresh(); }
     catch (e: any) { toast.error(e?.message ?? "Failed"); }
