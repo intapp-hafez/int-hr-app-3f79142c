@@ -4030,6 +4030,56 @@ export type Database = {
           },
         ]
       }
+      trip_history: {
+        Row: {
+          allowance_after: number | null
+          allowance_before: number | null
+          allowance_status_after: string | null
+          allowance_status_before: string | null
+          changed_by: string | null
+          created_at: string
+          event: string
+          from_status: string | null
+          id: string
+          to_status: string | null
+          trip_id: string
+        }
+        Insert: {
+          allowance_after?: number | null
+          allowance_before?: number | null
+          allowance_status_after?: string | null
+          allowance_status_before?: string | null
+          changed_by?: string | null
+          created_at?: string
+          event: string
+          from_status?: string | null
+          id?: string
+          to_status?: string | null
+          trip_id: string
+        }
+        Update: {
+          allowance_after?: number | null
+          allowance_before?: number | null
+          allowance_status_after?: string | null
+          allowance_status_before?: string | null
+          changed_by?: string | null
+          created_at?: string
+          event?: string
+          from_status?: string | null
+          id?: string
+          to_status?: string | null
+          trip_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_history_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trips: {
         Row: {
           address: string | null
