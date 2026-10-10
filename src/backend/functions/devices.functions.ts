@@ -181,6 +181,32 @@ export const setFaceReenroll = createServerFn({ method: "POST" })
     return { ok: true, allowed: data.allowed };
   });
 
+export const getTripAllowanceEnabled = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { user_id: string }) => z.object({ user_id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: row, error } = await (context.supabase as any)
+      .from("profiles").select("trip_allowance_enabled").eq("id", data.user_id).maybeSingle();
+    if (error) return { enabled: true, available: false };
+    return { enabled: row?.trip_allowance_enabled !== false, available: true };
+  });
+
+export const setTripAllowanceEnabled = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { user_id: string; enabled: boolean }) =>
+    z.object({ user_id: z.string().uuid(), enabled: z.boolean() }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.supabase, context.userId);
+    const { error } = await (context.supabase as any)
+      .from("profiles").update({ trip_allowance_enabled: data.enabled }).eq("id", data.user_id);
+    if (error) {
+      if (/trip_allowance_enabled/.test(error.message)) throw new Error("Database update needed: run migration 056-trip-allowance-enabled.sql");
+      throw new Error(error.message);
+    }
+    return { ok: true, enabled: data.enabled };
+  });
+
 export const listMyDevices = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
