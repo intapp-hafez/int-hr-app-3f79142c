@@ -87,6 +87,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { title: "INT-HR App — Employee Attendance Management" },
+      { name: "google", content: "notranslate" },
       { name: "description", content: "Secure mobile attendance with GPS geo-fencing, authorized network validation, leave management, and real-time reporting." },
       { name: "author", content: "INT-HR App" },
       { property: "og:title", content: "INT-HR App — Employee Attendance Management" },

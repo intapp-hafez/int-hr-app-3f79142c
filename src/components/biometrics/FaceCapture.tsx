@@ -37,23 +37,35 @@ export function FaceCapture({
   const [needsNewTab, setNeedsNewTab] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
 
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         if (typeof window !== "undefined" && !window.isSecureContext) {
-          setStatus("Camera requires HTTPS. Open this page in a secure tab.");
-          setNeedsNewTab(true);
+          if (mountedRef.current) {
+            setStatus("Camera requires HTTPS. Open this page in a secure tab.");
+            setNeedsNewTab(true);
+          }
           return;
         }
         if (!navigator.mediaDevices?.getUserMedia) {
-          setStatus("This browser/embed does not expose the camera. Open in a new tab.");
-          setNeedsNewTab(true);
+          if (mountedRef.current) {
+            setStatus("This browser/embed does not expose the camera. Open in a new tab.");
+            setNeedsNewTab(true);
+          }
           return;
         }
         const faceapi = await loadFaceApi();
         await ensureModels(faceapi);
-        if (cancelled) return;
+        if (cancelled || !mountedRef.current) return;
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: "user", width: 480, height: 360 },
           audio: false,
@@ -63,8 +75,11 @@ export function FaceCapture({
           videoRef.current.srcObject = stream;
           await videoRef.current.play();
         }
-        setStatus("Position your face inside the frame, then capture.");
+        if (mountedRef.current) {
+          setStatus("Position your face inside the frame, then capture.");
+        }
       } catch (e: any) {
+        if (!mountedRef.current) return;
         const name = e?.name ?? "";
         if (name === "NotAllowedError" || /permission/i.test(e?.message ?? "")) {
           setStatus(
@@ -82,6 +97,9 @@ export function FaceCapture({
     })();
     return () => {
       cancelled = true;
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, []);
@@ -97,31 +115,45 @@ export function FaceCapture({
         .withFaceLandmarks()
         .withFaceDescriptor();
       if (!detection) {
-        setStatus("No face detected — try again with more light.");
-        setBusy(false);
+        if (mountedRef.current) {
+          setStatus("No face detected — try again with more light.");
+          setBusy(false);
+        }
         return;
       }
       await onCapture(Array.from(detection.descriptor));
     } catch (e: any) {
-      setStatus(e.message ?? "Capture failed");
+      if (mountedRef.current) {
+        setStatus(e.message ?? "Capture failed");
+      }
     } finally {
-      setBusy(false);
+      if (mountedRef.current) {
+        setBusy(false);
+      }
     }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/50 px-4 pb-4 md:items-center" onClick={onClose}>
+    <div
+      translate="no"
+      className="notranslate fixed inset-0 z-50 flex items-end justify-center bg-foreground/50 px-4 pb-4 md:items-center"
+      onClick={onClose}
+    >
       <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-3xl bg-background p-5 shadow-soft">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="font-display text-lg font-semibold">
-            {mode === "enroll" ? "Enroll face" : "Verify face"}
+            <span>{mode === "enroll" ? "Enroll face" : "Verify face"}</span>
           </h2>
-          <button onClick={onClose} className="rounded-full p-1 hover:bg-muted"><X className="h-4 w-4" /></button>
+          <button onClick={onClose} className="rounded-full p-1 hover:bg-muted" aria-label="Close">
+            <X className="h-4 w-4" />
+          </button>
         </div>
         <div className="relative overflow-hidden rounded-2xl bg-black aspect-[4/3]">
           <video ref={videoRef} muted playsInline className="h-full w-full object-cover" />
         </div>
-        <p className="mt-3 min-h-[2.5em] text-xs text-muted-foreground">{status}</p>
+        <p className="mt-3 min-h-[2.5em] text-xs text-muted-foreground">
+          <span>{status}</span>
+        </p>
         {needsNewTab && typeof window !== "undefined" && (
           <a
             href={window.location.href}
@@ -129,7 +161,7 @@ export function FaceCapture({
             rel="noreferrer"
             className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-border px-3 py-2.5 text-xs font-semibold"
           >
-            <ExternalLink className="h-3.5 w-3.5" /> Open in new tab
+            <ExternalLink className="h-3.5 w-3.5" /> <span>Open in new tab</span>
           </a>
         )}
         <button
@@ -138,7 +170,7 @@ export function FaceCapture({
           className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-brand py-3 text-sm font-semibold text-brand-foreground shadow-brand disabled:opacity-60"
         >
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-          {busy ? "Working…" : mode === "enroll" ? "Capture & save" : "Capture & verify"}
+          <span>{busy ? "Working…" : mode === "enroll" ? "Capture & save" : "Capture & verify"}</span>
         </button>
       </div>
     </div>

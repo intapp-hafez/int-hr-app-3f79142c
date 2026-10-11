@@ -41,6 +41,8 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     if (typeof document === "undefined") return;
     document.documentElement.lang = lang;
     document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
+    document.documentElement.setAttribute("translate", "no");
+    document.documentElement.classList.add("notranslate");
   }, [lang]);
 
   const setLang = (l: Lang) => {

@@ -254,14 +254,18 @@ function CheckInOutCard() {
   }
 
   async function handleFaceCapture(descriptor: number[]) {
-    const res = await verifyFaceFn({ data: { descriptor } });
-    if (res.match) {
-      setVerified((v) => ({ ...v, face: true }));
-      setLastDistance(res.distance ?? null);
-      toast.success(`Face verified (distance ${res.distance?.toFixed(3)})`);
-      setShowFace(null);
-    } else {
-      toast.error(`Face did not match${res.distance != null ? ` (distance ${res.distance.toFixed(3)})` : ""}`);
+    try {
+      const res = await verifyFaceFn({ data: { descriptor } });
+      if (res.match) {
+        setVerified((v) => ({ ...v, face: true }));
+        setLastDistance(res.distance ?? null);
+        toast.success(`Face verified (distance ${res.distance?.toFixed(3)})`);
+        setShowFace(null);
+      } else {
+        toast.error(`Face did not match${res.distance != null ? ` (distance ${res.distance.toFixed(3)})` : ""}`);
+      }
+    } catch (e: any) {
+      toast.error(e?.message ?? "Face verification failed");
     }
   }
 
