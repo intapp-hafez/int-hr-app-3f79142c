@@ -8,6 +8,7 @@ import { useI18n } from "@/lib/i18n";
 import { getPayrollPeriod, lockPayrollRun, unlockPayrollRun, type PayrollRow } from "@/backend/functions/payroll.functions";
 import { SubTabs } from "@/components/SubTabs";
 import { AdvancedSettingsTab } from "@/components/payroll/AdvancedSettingsTab";
+import { TripAllowancePayrollTab } from "@/components/payroll/TripAllowancePayrollTab";
 import { formatName3Words } from "@/lib/utils";
 
 export const Route = createFileRoute("/admin/payroll")({
@@ -24,7 +25,7 @@ function AdminPayroll() {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
-  const [activeTab, setActiveTab] = useState<"run" | "advanced">("run");
+  const [activeTab, setActiveTab] = useState<"run" | "advanced" | "trips">("run");
   const [q, setQ] = useState("");
   const [dept, setDept] = useState<string>("All");
   const [page, setPage] = useState(1);
@@ -308,9 +309,24 @@ function AdminPayroll() {
         >
           <Settings2 className="h-4 w-4" /> {t("advancedSettings")}
         </button>
+        <button
+          onClick={() => setActiveTab("trips")}
+          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === "trips" ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <TrendingUp className="h-4 w-4" /> Trip allowances
+        </button>
       </div>
 
-      {activeTab === "advanced" ? (
+      {activeTab === "trips" ? (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <input type="month" value={`${year}-${String(month).padStart(2, "0")}`} onChange={(e) => { const [y, m] = e.target.value.split("-").map(Number); if (y && m) { setYear(y); setMonth(m); } }} className="h-9 rounded-xl border border-input bg-background px-3 text-sm" />
+          </div>
+          <TripAllowancePayrollTab year={year} month={month} />
+        </div>
+      ) : activeTab === "advanced" ? (
         <AdvancedSettingsTab />
       ) : (
         <>
