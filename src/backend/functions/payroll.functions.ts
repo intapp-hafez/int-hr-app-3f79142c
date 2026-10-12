@@ -17,6 +17,7 @@ export type PayrollRow = {
   department: string | null;
   salary: number;
   allowance: number;
+  trip_allowance?: number;
   daily_rate: number;
   working_days: number;
   present_days: number;
@@ -103,7 +104,7 @@ async function computeRows(
   // Use the last day of the period for "active settings on payroll date".
   const periodEndDate = new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
 
-  const [profRes, deptRes, attRes, leaveRes, settingsRes, bracketsRes, installmentsRes, tripsRes] = await Promise.all([
+  const [profRes, deptRes, attRes, leaveRes, settingsRes, bracketsRes, installmentsRes, tripsRes, mtaRes] = await Promise.all([
     supabase
       .from("profiles")
       .select(
@@ -141,7 +142,13 @@ async function computeRows(
       .eq("status", "done")
       .eq("allowance_status", "approved")
       .gte("trip_date", startISO)
-      .lt("trip_date", endISO)
+      .lt("trip_date", endISO),
+    (supabase as any)
+      .from("monthly_trip_allowances")
+      .select("employee_id, total")
+      .eq("year", year)
+      .eq("month", month)
+      .eq("status", "approved"),
   ]);
   if (profRes.error) throw new Error(profRes.error.message);
   if (deptRes.error) throw new Error(deptRes.error.message);
@@ -162,6 +169,9 @@ async function computeRows(
       tripAllowanceMap.set(t.assignee, v + Number(t.calculated_allowance));
     }
   }
+
+  // Approved monthly trip allowance (check-in days + finished trips) replaces the raw trip sum.
+  for (const m of mtaRes?.data ?? []) tripAllowanceMap.set(m.employee_id, Number(m.total || 0));
 
   const installmentMap = new Map<string, { deduction: number; ids: string[] }>();
   for (const r of installmentsRes.data ?? []) {
@@ -281,6 +291,7 @@ async function computeRows(
       department: p.department_id ? (deptMap.get(p.department_id) ?? null) : null,
       salary,
       allowance,
+      trip_allowance: tripAllowance,
       daily_rate: +dailyRate.toFixed(2),
       working_days: workingDays,
       present_days: att.p,
