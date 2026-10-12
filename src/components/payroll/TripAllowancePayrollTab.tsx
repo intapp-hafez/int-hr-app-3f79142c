@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -51,7 +51,7 @@ export function TripAllowancePayrollTab({ year, month }: { year: number; month: 
               </thead>
               <tbody className="divide-y divide-border">
                 {rows.map((r) => (
-                  <>
+                  <Fragment key={r.employee_id}>
                     <tr key={r.employee_id}>
                       <td className="px-3 py-2">
                         <button onClick={() => setOpen(open === r.employee_id ? null : r.employee_id)} className="inline-flex items-center gap-1 font-medium">
@@ -73,7 +73,7 @@ export function TripAllowancePayrollTab({ year, month }: { year: number; month: 
                         {r.details.length === 0 ? "No check-in days — trips only." : r.details.map((d) => <div key={d.date}>{fmtD(d.date)} · {d.location} · {d.rate} EGP</div>)}
                       </td></tr>
                     )}
-                  </>
+                  </Fragment>
                 ))}
               </tbody>
               <tfoot><tr className="border-t border-border font-semibold"><td colSpan={4} className="px-3 py-2">Total</td><td className="px-3 py-2 text-end font-mono">{total.toFixed(2)}</td><td colSpan={2} /></tr></tfoot>
