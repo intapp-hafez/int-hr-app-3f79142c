@@ -12,15 +12,20 @@ export function TripAllowancePayrollTab({ year, month }: { year: number; month: 
   const statusFn = useServerFn(setMonthlyTripAllowanceStatus);
   const [open, setOpen] = useState<string | null>(null);
   const key = ["monthly-trip-allowances", year, month];
-  const { data: rows = [], isLoading, error } = useQuery({ queryKey: key, queryFn: () => listFn({ data: { year, month } }) });
+  const { data, isLoading, error } = useQuery({ queryKey: key, queryFn: () => listFn({ data: { year, month } }) });
+  const rows = data?.rows ?? [];
+  const canFinal = data?.canFinal ?? false;
   const refresh = () => { qc.invalidateQueries({ queryKey: key }); qc.invalidateQueries({ queryKey: ["payroll"] }); };
   const save = useMutation({ mutationFn: () => saveFn({ data: { year, month } }), onSuccess: (r) => { toast.success(`Saved ${r.saved} employees`); refresh(); }, onError: (e: Error) => toast.error(e.message) });
   const status = useMutation({
-    mutationFn: (v: { ids: string[]; status: "draft" | "approved" }) => statusFn({ data: { year, month, employee_ids: v.ids, status: v.status } }),
-    onSuccess: () => { toast.success("Updated — approved amounts are added to payroll"); refresh(); },
+    mutationFn: (v: { ids: string[]; status: "draft" | "manager_approved" | "approved" }) => statusFn({ data: { year, month, employee_ids: v.ids, status: v.status } }),
+    onSuccess: (r) => { toast.success(`Updated ${r.updated}${r.skipped ? `, skipped ${r.skipped}` : ""}`); refresh(); qc.invalidateQueries({ queryKey: ["payroll-payments"] }); },
     onError: (e: Error) => toast.error(e.message),
   });
   const drafts = rows.filter((r) => r.saved && r.status === "draft").map((r) => r.employee_id);
+  const mgrOk = rows.filter((r) => r.status === "manager_approved").map((r) => r.employee_id);
+  const badge = (st: string) => st === "approved" ? "bg-primary/15 text-primary" : st === "manager_approved" ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground";
+  const label = (st: string) => st === "manager_approved" ? "manager approved" : st;
   const total = rows.reduce((s, r) => s + r.total, 0);
   const fmtD = (d: string) => d.split("-").reverse().join("-");
 
@@ -29,15 +34,18 @@ export function TripAllowancePayrollTab({ year, month }: { year: number; month: 
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="font-display text-xl font-semibold">Trip allowances · {String(month).padStart(2, "0")}-{year}</h2>
-          <p className="text-sm text-muted-foreground">Check-in days at a work location × position rate, plus approved finished trips. Only <b>approved</b> rows are added to payroll.</p>
+          <p className="text-sm text-muted-foreground">Check-in days at a work location × position rate, plus finished trips (employee and manager trips). Steps: calculate → manager approves → HR/finance approves → paid in Payments.</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => save.mutate()} disabled={save.isPending} className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-border bg-card px-3 text-sm font-medium disabled:opacity-50">
+          {canFinal && <button onClick={() => save.mutate()} disabled={save.isPending} className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-border bg-card px-3 text-sm font-medium disabled:opacity-50">
             {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Calculate & save
+          </button>}
+          <button onClick={() => status.mutate({ ids: drafts, status: "manager_approved" })} disabled={!drafts.length || status.isPending} className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-border bg-card px-3 text-sm font-medium disabled:opacity-50">
+            <CheckCircle2 className="h-4 w-4" /> Manager approve ({drafts.length})
           </button>
-          <button onClick={() => status.mutate({ ids: drafts, status: "approved" })} disabled={!drafts.length || status.isPending} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-50">
-            <CheckCircle2 className="h-4 w-4" /> Approve all ({drafts.length})
-          </button>
+          {canFinal && <button onClick={() => status.mutate({ ids: mgrOk, status: "approved" })} disabled={!mgrOk.length || status.isPending} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-50">
+            <CheckCircle2 className="h-4 w-4" /> Final approve ({mgrOk.length})
+          </button>}
         </div>
       </div>
       {isLoading ? <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</p>
@@ -47,7 +55,7 @@ export function TripAllowancePayrollTab({ year, month }: { year: number; month: 
           <div className="overflow-x-auto rounded-2xl border border-border bg-card">
             <table className="w-full text-sm">
               <thead className="bg-muted/50 text-[11px] uppercase tracking-wider text-muted-foreground">
-                <tr><th className="px-3 py-2 text-start">Employee</th><th className="px-3 py-2 text-end">Days</th><th className="px-3 py-2 text-end">Check-in days</th><th className="px-3 py-2 text-end">Trips</th><th className="px-3 py-2 text-end">Total (EGP)</th><th className="px-3 py-2 text-start">Status</th><th /></tr>
+                <tr><th className="px-3 py-2 text-start">Employee</th><th className="px-3 py-2 text-end">Days</th><th className="px-3 py-2 text-end">Check-in days</th><th className="px-3 py-2 text-end">Trips</th><th className="px-3 py-2 text-end">of which manager trips</th><th className="px-3 py-2 text-end">Total (EGP)</th><th className="px-3 py-2 text-start">Status</th><th /></tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {rows.map((r) => (
@@ -60,23 +68,25 @@ export function TripAllowancePayrollTab({ year, month }: { year: number; month: 
                       </td>
                       <td className="px-3 py-2 text-end">{r.days}</td>
                       <td className="px-3 py-2 text-end font-mono">{r.checkin_amount}</td>
-                      <td className="px-3 py-2 text-end font-mono">{r.trips_amount}</td>
+                      <td className="px-3 py-2 text-end font-mono">{r.trips_amount}</td><td className="px-3 py-2 text-end font-mono text-muted-foreground">{r.manager_trips_amount}</td>
                       <td className="px-3 py-2 text-end font-mono font-semibold">{r.total}</td>
-                      <td className="px-3 py-2"><span className={`rounded-full px-2 py-0.5 text-xs ${r.status === "approved" ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}>{r.status}</span></td>
+                      <td className="px-3 py-2"><span className={`rounded-full px-2 py-0.5 text-xs ${badge(r.status)}`}>{label(r.status)}</span></td>
                       <td className="px-3 py-2 text-end">
-                        {r.saved && r.status === "draft" && <button onClick={() => status.mutate({ ids: [r.employee_id], status: "approved" })} className="text-xs text-primary underline">Approve</button>}
-                        {r.status === "approved" && <button onClick={() => status.mutate({ ids: [r.employee_id], status: "draft" })} className="inline-flex items-center gap-1 text-xs text-muted-foreground underline"><Undo2 className="h-3 w-3" />Reopen</button>}
+                        {r.saved && r.status === "draft" && <button onClick={() => status.mutate({ ids: [r.employee_id], status: "manager_approved" })} className="text-xs text-primary underline">Manager approve</button>}
+                        {canFinal && r.status === "manager_approved" && <button onClick={() => status.mutate({ ids: [r.employee_id], status: "approved" })} className="me-2 text-xs text-primary underline">Final approve</button>}
+                        {(r.status === "approved" || r.status === "manager_approved") && <button onClick={() => status.mutate({ ids: [r.employee_id], status: "draft" })} className="inline-flex items-center gap-1 text-xs text-muted-foreground underline"><Undo2 className="h-3 w-3" />Reopen</button>}
                       </td>
                     </tr>
                     {open === r.employee_id && (
-                      <tr key={r.employee_id + "-d"}><td colSpan={7} className="bg-muted/30 px-6 py-2 text-xs">
-                        {r.details.length === 0 ? "No check-in days — trips only." : r.details.map((d) => <div key={d.date}>{fmtD(d.date)} · {d.location} · {d.rate} EGP</div>)}
+                      <tr key={r.employee_id + "-d"}><td colSpan={8} className="bg-muted/30 px-6 py-2 text-xs">
+                        {r.details.length === 0 ? <div>No check-in days.</div> : r.details.map((d) => <div key={d.date}>{fmtD(d.date)} · {d.location} · {d.rate} EGP</div>)}
+                        {(r.trip_details ?? []).map((t, i) => <div key={"t" + i}>Trip {fmtD(t.date)} · {t.destination} · {t.amount} EGP{t.by_manager ? " · added by manager" : ""}</div>)}
                       </td></tr>
                     )}
                   </Fragment>
                 ))}
               </tbody>
-              <tfoot><tr className="border-t border-border font-semibold"><td colSpan={4} className="px-3 py-2">Total</td><td className="px-3 py-2 text-end font-mono">{total.toFixed(2)}</td><td colSpan={2} /></tr></tfoot>
+              <tfoot><tr className="border-t border-border font-semibold"><td colSpan={5} className="px-3 py-2">Total</td><td className="px-3 py-2 text-end font-mono">{total.toFixed(2)}</td><td colSpan={2} /></tr></tfoot>
             </table>
           </div>
         )}
