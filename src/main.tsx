@@ -10,7 +10,7 @@ if (typeof Node !== "undefined" && Node.prototype) {
       return this.appendChild(newNode);
     }
     try {
-      return origInsertBefore.call(this, newNode, referenceNode);
+      return origInsertBefore.call(this, newNode, referenceNode) as T;
     } catch (err: any) {
       if (err?.name === "NotFoundError") {
         return this.appendChild(newNode);
@@ -25,7 +25,7 @@ if (typeof Node !== "undefined" && Node.prototype) {
       return child;
     }
     try {
-      return origRemoveChild.call(this, child);
+      return origRemoveChild.call(this, child) as T;
     } catch (err: any) {
       if (err?.name === "NotFoundError") {
         return child;
