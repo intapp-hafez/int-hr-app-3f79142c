@@ -82,6 +82,7 @@ import { Route as ManagerNotificationsRouteImport } from './routes/manager.notif
 import { Route as ManagerProfileRouteImport } from './routes/manager.profile'
 import { Route as ManagerTasksRouteImport } from './routes/manager.tasks'
 import { Route as ManagerTeamRouteImport } from './routes/manager.team'
+import { Route as ManagerTripAllowancesRouteImport } from './routes/manager.trip-allowances'
 import { Route as ManagerTripHistoryRouteImport } from './routes/manager.trip-history'
 import { Route as ManagerTripsRouteImport } from './routes/manager.trips'
 import { Route as StaffIndexRouteImport } from './routes/staff.index'
@@ -468,6 +469,11 @@ const ManagerTeamRoute = ManagerTeamRouteImport.update({
   path: '/team',
   getParentRoute: () => ManagerRoute,
 } as any)
+const ManagerTripAllowancesRoute = ManagerTripAllowancesRouteImport.update({
+  id: '/trip-allowances',
+  path: '/trip-allowances',
+  getParentRoute: () => ManagerRoute,
+} as any)
 const ManagerTripHistoryRoute = ManagerTripHistoryRouteImport.update({
   id: '/trip-history',
   path: '/trip-history',
@@ -627,6 +633,7 @@ export interface FileRoutesByFullPath {
   '/manager/profile': typeof ManagerProfileRoute
   '/manager/tasks': typeof ManagerTasksRoute
   '/manager/team': typeof ManagerTeamRoute
+  '/manager/trip-allowances': typeof ManagerTripAllowancesRoute
   '/manager/trip-history': typeof ManagerTripHistoryRoute
   '/manager/trips': typeof ManagerTripsRoute
   '/staff/attendance': typeof StaffAttendanceRoute
@@ -712,6 +719,7 @@ export interface FileRoutesByTo {
   '/manager/profile': typeof ManagerProfileRoute
   '/manager/tasks': typeof ManagerTasksRoute
   '/manager/team': typeof ManagerTeamRoute
+  '/manager/trip-allowances': typeof ManagerTripAllowancesRoute
   '/manager/trip-history': typeof ManagerTripHistoryRoute
   '/manager/trips': typeof ManagerTripsRoute
   '/staff/attendance': typeof StaffAttendanceRoute
@@ -805,6 +813,7 @@ export interface FileRoutesById {
   '/manager/profile': typeof ManagerProfileRoute
   '/manager/tasks': typeof ManagerTasksRoute
   '/manager/team': typeof ManagerTeamRoute
+  '/manager/trip-allowances': typeof ManagerTripAllowancesRoute
   '/manager/trip-history': typeof ManagerTripHistoryRoute
   '/manager/trips': typeof ManagerTripsRoute
   '/staff/attendance': typeof StaffAttendanceRoute
@@ -899,6 +908,7 @@ export interface FileRouteTypes {
     | '/manager/profile'
     | '/manager/tasks'
     | '/manager/team'
+    | '/manager/trip-allowances'
     | '/manager/trip-history'
     | '/manager/trips'
     | '/staff/attendance'
@@ -984,6 +994,7 @@ export interface FileRouteTypes {
     | '/manager/profile'
     | '/manager/tasks'
     | '/manager/team'
+    | '/manager/trip-allowances'
     | '/manager/trip-history'
     | '/manager/trips'
     | '/staff/attendance'
@@ -1076,6 +1087,7 @@ export interface FileRouteTypes {
     | '/manager/profile'
     | '/manager/tasks'
     | '/manager/team'
+    | '/manager/trip-allowances'
     | '/manager/trip-history'
     | '/manager/trips'
     | '/staff/attendance'
@@ -1624,6 +1636,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ManagerTeamRouteImport
       parentRoute: typeof ManagerRoute
     }
+    '/manager/trip-allowances': {
+      id: '/manager/trip-allowances'
+      path: '/trip-allowances'
+      fullPath: '/manager/trip-allowances'
+      preLoaderRoute: typeof ManagerTripAllowancesRouteImport
+      parentRoute: typeof ManagerRoute
+    }
     '/manager/trip-history': {
       id: '/manager/trip-history'
       path: '/trip-history'
@@ -1939,6 +1958,7 @@ interface ManagerRouteChildren {
   ManagerProfileRoute: typeof ManagerProfileRoute
   ManagerTasksRoute: typeof ManagerTasksRoute
   ManagerTeamRoute: typeof ManagerTeamRoute
+  ManagerTripAllowancesRoute: typeof ManagerTripAllowancesRoute
   ManagerTripHistoryRoute: typeof ManagerTripHistoryRoute
   ManagerTripsRoute: typeof ManagerTripsRoute
   ManagerIndexRoute: typeof ManagerIndexRoute
@@ -1953,6 +1973,7 @@ const ManagerRouteChildren: ManagerRouteChildren = {
   ManagerProfileRoute: ManagerProfileRoute,
   ManagerTasksRoute: ManagerTasksRoute,
   ManagerTeamRoute: ManagerTeamRoute,
+  ManagerTripAllowancesRoute: ManagerTripAllowancesRoute,
   ManagerTripHistoryRoute: ManagerTripHistoryRoute,
   ManagerTripsRoute: ManagerTripsRoute,
   ManagerIndexRoute: ManagerIndexRoute,
