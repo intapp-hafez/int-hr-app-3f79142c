@@ -62,6 +62,7 @@ function ManagerLayout() {
     { to: "/manager/tasks", icon: ListChecks, label: t("tasks") },
     { to: "/manager/trips", icon: RouteIcon, label: t("trips") },
     { to: "/manager/trip-history", icon: History, label: "Trip history" },
+    { to: "/manager/trip-allowances", icon: Banknote, label: "Trip allowances" },
     { to: "/manager/profile", icon: UserCircle, label: t("profile") },
   ] as const;
 
@@ -74,6 +75,7 @@ function ManagerLayout() {
     { to: "/manager/tasks", icon: ListChecks, label: t("tasks") },
     { to: "/manager/trips", icon: RouteIcon, label: t("trips") },
     { to: "/manager/trip-history", icon: History, label: "Trip history" },
+    { to: "/manager/trip-allowances", icon: Banknote, label: "Trip allowances" },
     { to: "/manager/profile", icon: UserCircle, label: t("profile") },
   ] as const;
 
