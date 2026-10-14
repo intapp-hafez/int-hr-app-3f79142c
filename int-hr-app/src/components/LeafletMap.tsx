@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { EGYPT_BOUNDS, EGYPT_MAX_BOUNDS } from "@/lib/egypt-cities";
 
 export type MapMarker = {
   id: number | string;
@@ -43,12 +44,15 @@ export function LeafletMap({ markers, points = [], selectedId, onSelect, height 
   // Init map once
   useEffect(() => {
     if (!ref.current || mapRef.current) return;
-    // Default view: Egypt (Cairo) when no markers are supplied.
-    const initLat = markers[0]?.lat ?? 26.8206;
-    const initLng = markers[0]?.lng ?? 30.8025;
-    const initZoom = markers.length ? 6 : 6;
-    const map = L.map(ref.current, { zoomControl: true, attributionControl: true })
-      .setView([initLat, initLng], initZoom);
+    // Always open framed on Egypt; panning is clamped so the view never leaves it.
+    const map = L.map(ref.current, {
+      zoomControl: true,
+      attributionControl: true,
+      maxBounds: EGYPT_MAX_BOUNDS,
+      maxBoundsViscosity: 0.9,
+      minZoom: 6,
+      maxZoom: 17,
+    }).fitBounds(EGYPT_BOUNDS, { padding: [8, 8] });
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "© OpenStreetMap",
       maxZoom: 19,
