@@ -58,7 +58,7 @@ export function EgyptMap() {
         </div>
       </header>
       {open && (
-        <div className="relative h-[520px] w-full border-t border-border bg-muted/30">
+        <div className="relative h-[620px] w-full border-t border-border bg-muted/30">
           {!mounted || isLoading ? (
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading map…
