@@ -113,7 +113,7 @@ function WorkLocationsPage() {
         <LeafletMap
           markers={markers}
           selectedId={active?.assignments.find((a) => a.is_default)?.location_id}
-          height={340}
+          height={620}
         />
         <p className="mt-2 text-xs text-muted-foreground">
           {active ? `Approved areas for ${active.full_name}` : "All approved work areas · pick an employee to focus"}
