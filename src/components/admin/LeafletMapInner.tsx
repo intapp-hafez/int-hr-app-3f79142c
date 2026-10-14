@@ -1,6 +1,6 @@
 import { MapContainer, TileLayer, CircleMarker, Circle, Popup, LayerGroup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import { EGYPT_CENTER } from "@/lib/egypt-cities";
+import { EGYPT_BOUNDS, EGYPT_MAX_BOUNDS } from "@/lib/egypt-cities";
 
 export type LeafletMapProps = {
   employees: Array<{ city: string; count: number; centroid: { lat: number; lng: number; en: string } }>;
@@ -10,7 +10,16 @@ export type LeafletMapProps = {
 
 export default function LeafletMapInner({ employees, geofences, checkins }: LeafletMapProps) {
   return (
-    <MapContainer center={EGYPT_CENTER} zoom={6} scrollWheelZoom={false} style={{ height: "100%", width: "100%" }}>
+    <MapContainer
+      bounds={EGYPT_BOUNDS}
+      boundsOptions={{ padding: [8, 8] }}
+      maxBounds={EGYPT_MAX_BOUNDS}
+      maxBoundsViscosity={0.9}
+      minZoom={6}
+      maxZoom={17}
+      scrollWheelZoom={false}
+      style={{ height: "100%", width: "100%" }}
+    >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

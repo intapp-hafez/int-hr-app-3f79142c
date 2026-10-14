@@ -70,3 +70,15 @@ export function lookupCity(name?: string | null): CityCentroid | null {
 }
 
 export const EGYPT_CENTER: [number, number] = [26.8206, 30.8025];
+
+// Egypt's own extent (SW corner, NE corner) — the admin map opens framed on this.
+export const EGYPT_BOUNDS: [[number, number], [number, number]] = [
+  [21.4, 24.0],
+  [32.2, 37.4],
+];
+
+// Padded box the map can be dragged inside, so panning never drifts away from Egypt.
+export const EGYPT_MAX_BOUNDS: [[number, number], [number, number]] = [
+  [17.0, 15.0],
+  [37.0, 46.0],
+];
