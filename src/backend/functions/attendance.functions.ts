@@ -909,12 +909,25 @@ export const adminAttendanceReport = createServerFn({ method: "POST" })
     });
 
     if (!data.onlyApprovedLocations) return mapped;
-    // Only count punches made inside an approved work location.
+    // Strict: keep a punch only when it was verified inside an active work
+    // location (or was an admin-granted free check). Punches with no GPS or
+    // no matching location are dropped instead of defaulting to "inside".
+    const strictOk = (lat: any, lng: any, fences: any[]) =>
+      lat != null && lng != null && fences.length > 0 && !!evaluateFence(fences, lat, lng)?.ok;
     return mapped
-      .map((r) => ({
-        ...r,
-        in_time: r.in_location_ok === false ? null : r.in_time,
-        out_time: r.out_location_ok === false ? null : r.out_time,
-      }))
+      .map((r, i) => {
+        const src = list[i];
+        const assigned = fenceMap.get(src.employee_id) ?? [];
+        const fences = assigned.length > 0 ? assigned : companyFences;
+        const inOk = r.free_check || strictOk(src.lat, src.lng, fences);
+        const outOk = r.free_check || strictOk(src.out_lat, src.out_lng, fences);
+        return {
+          ...r,
+          in_time: inOk ? r.in_time : null,
+          in_location_ok: inOk ? r.in_location_ok : null,
+          out_time: outOk ? r.out_time : null,
+          out_location_ok: outOk ? r.out_location_ok : null,
+        };
+      })
       .filter((r) => r.in_time || r.out_time);
   });
