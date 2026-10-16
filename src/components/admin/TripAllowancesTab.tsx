@@ -119,7 +119,32 @@ export function TripAllowancesTab() {
   const DEFAULTS = ["driver", "engineer", "technician", "technitian", "manager", "supervisor"];
   const allPositions = data?.positions ?? [];
   const defaultPositions = allPositions.filter((p: any) => DEFAULTS.includes(String(p.name_en ?? "").trim().toLowerCase()));
-  const positions = showAll || defaultPositions.length === 0 ? allPositions : defaultPositions;
+
+  const EXTRA_KEY = "trip-allowance-extra-positions";
+  const [extraIds, setExtraIds] = useState<string[]>(() => {
+    try { const v = JSON.parse(localStorage.getItem(EXTRA_KEY) ?? "[]"); return Array.isArray(v) ? v.filter((x: any) => typeof x === "string") : []; } catch { return []; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(EXTRA_KEY, JSON.stringify(extraIds)); } catch { /* ignore */ }
+  }, [extraIds]);
+
+  const positions = useMemo(() => {
+    const base = showAll || defaultPositions.length === 0 ? allPositions : defaultPositions;
+    const seen = new Set(base.map((p: any) => p.id));
+    const extra = extraIds
+      .map((id) => allPositions.find((p: any) => p.id === id))
+      .filter((p: any) => p && !seen.has(p.id));
+    return [...base, ...extra];
+  }, [showAll, allPositions, defaultPositions, extraIds]);
+
+  const addablePositions = allPositions.filter((p: any) => !positions.some((v: any) => v.id === p.id));
+  function addPosition(id: string) {
+    if (!id) return;
+    setExtraIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+  }
+  function removePosition(id: string) {
+    setExtraIds((prev) => prev.filter((x) => x !== id));
+  }
 
   const totalItems = locations.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
@@ -143,9 +168,23 @@ export function TripAllowancesTab() {
         <div>
           <h2 className="text-lg font-semibold">Trip Allowances Policy</h2>
           <p className="text-sm text-muted-foreground">
-            <button type="button" className="mr-2 underline" onClick={() => setShowAll((v) => !v)}>
-              {showAll ? "Show main positions only" : "Show all positions"}
-            </button>
+            <span className="flex flex-wrap items-center gap-2">
+              <button type="button" className="underline" onClick={() => setShowAll((v) => !v)}>
+                {showAll ? "Show main positions only" : "Show all positions"}
+              </button>
+              {addablePositions.length > 0 && (
+                <select
+                  value=""
+                  onChange={(e) => addPosition(e.target.value)}
+                  className="h-7 rounded-lg border border-border bg-card px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="">+ Add position…</option>
+                  {addablePositions.map((p: any) => (
+                    <option key={p.id} value={p.id}>{p.name_en}</option>
+                  ))}
+                </select>
+              )}
+            </span>
             Nightly allowance per position for each work location. Locations come from Geofencing (Work Locations).
           </p>
         </div>
@@ -194,7 +233,19 @@ export function TripAllowancesTab() {
                   </th>
                   {positions.map((p: any) => (
                     <th key={p.id} className="px-3.5 py-2.5 text-start font-semibold whitespace-nowrap w-36 min-w-[120px]">
-                      {p.name_en}
+                      <span className="inline-flex items-center gap-1">
+                        {p.name_en}
+                        {extraIds.includes(p.id) && (
+                          <button
+                            type="button"
+                            title="Remove this column"
+                            onClick={() => removePosition(p.id)}
+                            className="grid h-4 w-4 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-destructive"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </span>
                     </th>
                   ))}
                   <th className="w-auto" />
