@@ -1,4 +1,5 @@
 # Current work
+- [ ] Fix payroll trip allowance crash caused by missing role context in both app copies; run regression checks.
 - [x] Refresh employee mobile header and navigation.
 - [x] Refine employee home and attendance mobile layouts.
 - [x] Check the preview for build errors and signed-out mobile overflow.
