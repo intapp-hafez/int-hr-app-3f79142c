@@ -271,7 +271,7 @@ function ReportsPage() {
         <div className="rounded-3xl border border-border bg-card p-6">
           <h2 className="font-display text-base font-semibold">By department</h2>
           <p className="text-xs text-muted-foreground">{filteredEmployees.length} employees</p>
-          <ul className="mt-5 space-y-3">
+          <ul className={`mt-5 space-y-3 ${showAllDepts ? "max-h-[13rem] overflow-y-auto pr-1" : ""}`}>
             {(showAllDepts ? depts : depts.slice(0, DEPT_PREVIEW)).map(([name, count]) => {
               const pct = Math.round((count / deptTotal) * 100);
               return (
