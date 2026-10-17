@@ -13,6 +13,14 @@ import { PayrollPaymentsTab } from "@/components/payroll/PayrollPaymentsTab";
 import { formatName3Words } from "@/lib/utils";
 
 export const Route = createFileRoute("/admin/payroll")({
+  head: () => ({ meta: [
+    { title: "Payroll Administration | INT-HR" },
+    { name: "description", content: "Review monthly employee payroll, trip allowances and payment approvals in INT-HR." },
+    { property: "og:title", content: "Payroll Administration | INT-HR" },
+    { property: "og:description", content: "Review monthly employee payroll, trip allowances and payment approvals in INT-HR." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   component: AdminPayroll,
 });
 

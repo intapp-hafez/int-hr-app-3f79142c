@@ -11,6 +11,14 @@ import { useI18n } from "@/lib/i18n";
 import { getPayrollPeriod, lockPayrollRun, unlockPayrollRun, type PayrollRow } from "@/backend/functions/payroll.functions";
 
 export const Route = createFileRoute("/admin/payroll")({
+  head: () => ({ meta: [
+    { title: "Payroll Administration | INT-HR" },
+    { name: "description", content: "Review monthly employee payroll and salary calculations in INT-HR." },
+    { property: "og:title", content: "Payroll Administration | INT-HR" },
+    { property: "og:description", content: "Review monthly employee payroll and salary calculations in INT-HR." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   component: AdminPayroll,
 });
 

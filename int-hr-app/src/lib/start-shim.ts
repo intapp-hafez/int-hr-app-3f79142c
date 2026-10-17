@@ -27,10 +27,21 @@ export function createServerFn(_opts?: { method?: string }) {
 
         // Resolve context dynamically on the client using the browser's auth session
         const { data: sessionData } = await supabase.auth.getSession();
+        const userId = sessionData.session?.user?.id ?? null;
+        let roles: string[] = [];
+        if (userId) {
+          const { data: roleRows, error } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", userId);
+          if (error) throw new Error(error.message);
+          roles = (roleRows ?? []).map((row: { role: string }) => row.role);
+        }
         const context = {
           supabase,
-          userId: sessionData.session?.user?.id ?? null,
+          userId,
           claims: sessionData.session?.user ?? {},
+          roles,
         };
 
         return fn({ data, context });
