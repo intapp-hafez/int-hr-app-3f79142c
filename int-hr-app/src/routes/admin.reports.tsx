@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
   Download, FileText, FileSpreadsheet, FileBarChart2,
-  TrendingUp, TrendingDown, Clock, UserX, Users, Timer, CheckCircle2, Calendar,
+  TrendingUp, TrendingDown, Clock, UserX, Users, Timer, CheckCircle2, Calendar, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
@@ -31,6 +31,8 @@ function ReportsPage() {
   const leaves = useStore((s) => s.leaves);
   const [range, setRange] = useState<Range>("30d");
   const [branch, setBranch] = useState<string>("all");
+  const [showAllDepts, setShowAllDepts] = useState(false);
+  const DEPT_PREVIEW = 5;
 
   const filteredEmployees = useMemo(
     () => (branch === "all" ? employees : employees.filter((e) => e.branch === branch)),
@@ -139,7 +141,7 @@ function ReportsPage() {
           <h2 className="font-display text-base font-semibold">By department</h2>
           <p className="text-xs text-muted-foreground">{filteredEmployees.length} employees</p>
           <ul className="mt-5 space-y-3">
-            {depts.map(([name, count]) => {
+            {(showAllDepts ? depts : depts.slice(0, DEPT_PREVIEW)).map(([name, count]) => {
               const pct = Math.round((count / deptTotal) * 100);
               return (
                 <li key={name}>
@@ -154,6 +156,26 @@ function ReportsPage() {
               );
             })}
           </ul>
+          {depts.length > DEPT_PREVIEW && (
+            <button
+              type="button"
+              onClick={() => setShowAllDepts((v) => !v)}
+              aria-expanded={showAllDepts}
+              className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-border bg-muted/60 px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              {showAllDepts ? (
+                <>
+                  <ChevronUp className="h-3.5 w-3.5" />
+                  Show less
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="h-3.5 w-3.5" />
+                  View all {depts.length} departments
+                </>
+              )}
+            </button>
+          )}
         </div>
       </section>
 
