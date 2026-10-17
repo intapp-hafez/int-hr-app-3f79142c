@@ -2521,6 +2521,80 @@ export type Database = {
           },
         ]
       }
+      monthly_trip_allowances: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          checkin_amount: number
+          computed_by: string | null
+          created_at: string
+          days: number
+          details: Json
+          employee_id: string
+          id: string
+          manager_approved_at: string | null
+          manager_approved_by: string | null
+          manager_trips_amount: number
+          month: number
+          status: string
+          total: number
+          trip_details: Json
+          trips_amount: number
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          checkin_amount?: number
+          computed_by?: string | null
+          created_at?: string
+          days?: number
+          details?: Json
+          employee_id: string
+          id?: string
+          manager_approved_at?: string | null
+          manager_approved_by?: string | null
+          manager_trips_amount?: number
+          month: number
+          status?: string
+          total?: number
+          trip_details?: Json
+          trips_amount?: number
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          checkin_amount?: number
+          computed_by?: string | null
+          created_at?: string
+          days?: number
+          details?: Json
+          employee_id?: string
+          id?: string
+          manager_approved_at?: string | null
+          manager_approved_by?: string | null
+          manager_trips_amount?: number
+          month?: number
+          status?: string
+          total?: number
+          trip_details?: Json
+          trips_amount?: number
+          updated_at?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monthly_trip_allowances_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       network_assignments: {
         Row: {
           assigned_by: string | null
@@ -2698,6 +2772,74 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      payroll_payments: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          employee_id: string
+          id: string
+          method: string | null
+          month: number
+          notes: string | null
+          other_earnings: number
+          paid_at: string | null
+          paid_by: string | null
+          reference: string | null
+          status: string
+          total: number
+          trip_allowance: number
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          employee_id: string
+          id?: string
+          method?: string | null
+          month: number
+          notes?: string | null
+          other_earnings?: number
+          paid_at?: string | null
+          paid_by?: string | null
+          reference?: string | null
+          status?: string
+          total?: number
+          trip_allowance?: number
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          employee_id?: string
+          id?: string
+          method?: string | null
+          month?: number
+          notes?: string | null
+          other_earnings?: number
+          paid_at?: string | null
+          paid_by?: string | null
+          reference?: string | null
+          status?: string
+          total?: number
+          trip_allowance?: number
+          updated_at?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_payments_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       payroll_run_items: {
         Row: {
