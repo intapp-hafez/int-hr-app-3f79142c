@@ -18,7 +18,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { Banknote } from "lucide-react";
+import { Banknote, ChevronDown, ChevronUp } from "lucide-react";
 import { ExpiryScheduleManager } from "@/components/admin/ExpiryScheduleManager";
 
 const EXPIRY_REPORTS = ["National ID Expiry", "Contract Expiry"];
@@ -49,6 +49,8 @@ function ReportsPage() {
   const [expiryDays, setExpiryDays] = useState<number>(30);
   const [viewingReport, setViewingReport] = useState<string | null>(null);
   const [branchPage, setBranchPage] = useState(0);
+  const [showAllDepts, setShowAllDepts] = useState(false);
+  const DEPT_PREVIEW = 5;
 
   const currentMonth = format(new Date(), "yyyy-MM");
   const fetchAdvances = useServerFn(getMonthlyAdvances);
@@ -270,7 +272,7 @@ function ReportsPage() {
           <h2 className="font-display text-base font-semibold">By department</h2>
           <p className="text-xs text-muted-foreground">{filteredEmployees.length} employees</p>
           <ul className="mt-5 space-y-3">
-            {depts.map(([name, count]) => {
+            {(showAllDepts ? depts : depts.slice(0, DEPT_PREVIEW)).map(([name, count]) => {
               const pct = Math.round((count / deptTotal) * 100);
               return (
                 <li key={name}>
@@ -285,6 +287,26 @@ function ReportsPage() {
               );
             })}
           </ul>
+          {depts.length > DEPT_PREVIEW && (
+            <button
+              type="button"
+              onClick={() => setShowAllDepts((v) => !v)}
+              aria-expanded={showAllDepts}
+              className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-border bg-muted/60 px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              {showAllDepts ? (
+                <>
+                  <ChevronUp className="h-3.5 w-3.5" />
+                  Show less
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="h-3.5 w-3.5" />
+                  View all {depts.length} departments
+                </>
+              )}
+            </button>
+          )}
         </div>
       </section>
 
