@@ -287,6 +287,9 @@ function ReportsPage() {
               );
             })}
           </ul>
+          {showAllDepts && (
+            <p className="mt-3 text-center text-[11px] text-muted-foreground">Scroll the list to browse all {depts.length} departments</p>
+          )}
           {depts.length > DEPT_PREVIEW && (
             <button
               type="button"
