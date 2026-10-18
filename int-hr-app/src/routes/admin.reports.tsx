@@ -7,6 +7,7 @@ import {
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
 import { useStore } from "@/lib/store";
+import { GroupedAttendanceReport } from "@/components/admin/GroupedAttendanceReport";
 
 const reportTemplates = [
   { name: "Daily Attendance", desc: "Per-day breakdown by employee and branch", icon: FileBarChart2 },
@@ -21,6 +22,14 @@ const ranges = ["7d", "30d", "90d", "1y"] as const;
 type Range = (typeof ranges)[number];
 
 export const Route = createFileRoute("/admin/reports")({
+  head: () => ({ meta: [
+    { title: "Attendance & Workforce Reports | INT HR" },
+    { name: "description", content: "Employee attendance and worked hours by cost center, department and work location." },
+    { property: "og:title", content: "Attendance & Workforce Reports | INT HR" },
+    { property: "og:description", content: "Review grouped employee attendance and total worked hours." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   component: ReportsPage,
 });
 
@@ -94,6 +103,8 @@ function ReportsPage() {
           </select>
         </div>
       </div>
+
+      <GroupedAttendanceReport />
 
       {/* KPI grid */}
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

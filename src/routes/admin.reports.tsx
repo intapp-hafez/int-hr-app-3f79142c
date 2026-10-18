@@ -20,6 +20,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Banknote, ChevronDown, ChevronUp } from "lucide-react";
 import { ExpiryScheduleManager } from "@/components/admin/ExpiryScheduleManager";
+import { GroupedAttendanceReport } from "@/components/admin/GroupedAttendanceReport";
 
 const EXPIRY_REPORTS = ["National ID Expiry", "Contract Expiry"];
 
@@ -38,6 +39,14 @@ const ranges = ["today", "yesterday", "thisMonth"] as const;
 type Range = (typeof ranges)[number] | string;
 
 export const Route = createFileRoute("/admin/reports")({
+  head: () => ({ meta: [
+    { title: "Attendance & Workforce Reports | INT HR" },
+    { name: "description", content: "Employee attendance and worked hours by cost center, department and work location." },
+    { property: "og:title", content: "Attendance & Workforce Reports | INT HR" },
+    { property: "og:description", content: "Review grouped employee attendance and total worked hours." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   component: ReportsPage,
 });
 
@@ -193,6 +202,8 @@ function ReportsPage() {
           </select>
         </div>
       </div>
+
+      <GroupedAttendanceReport />
 
       {/* KPI grid */}
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

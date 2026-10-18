@@ -1,2 +1,3 @@
 # Architecture rules
 - The existing SPA function adapters in both app copies populate role context from the authenticated Supabase `user_roles` query, never browser-stored roles; database RLS remains the authorization boundary because these adapters execute in the browser.
+- Both app copies use matching grouped-attendance modules with paginated RLS-scoped reads and pure timestamp aggregation; this prevents report truncation and keeps worked-hour calculations consistent.
