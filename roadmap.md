@@ -1,4 +1,5 @@
 # Current work
+- [ ] Add saved attendance reports by cost center, department and location with employee totals and worked hours in both app copies.
 - [x] Fix payroll trip allowance crash caused by missing role context in both app copies; eight regression checks passed.
 - [ ] Verify payroll Trip allowances and Payments with a real signed-in account — blocked by externally managed sign-in; no test session is available.
 - [x] Refresh employee mobile header and navigation.
