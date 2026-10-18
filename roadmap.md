@@ -1,5 +1,6 @@
 # Current work
-- [ ] Add saved attendance reports by cost center, department and location with employee totals and worked hours in both app copies.
+- [x] Add database-backed attendance reports by cost center, department and location with employee totals, worked hours, daily details and exports in both app copies; eight calculation tests passed in each copy.
+- [ ] Verify grouped attendance reports with real employee records while signed in — blocked by externally managed sign-in without an available test session.
 - [x] Fix payroll trip allowance crash caused by missing role context in both app copies; eight regression checks passed.
 - [ ] Verify payroll Trip allowances and Payments with a real signed-in account — blocked by externally managed sign-in; no test session is available.
 - [x] Refresh employee mobile header and navigation.
