@@ -1,0 +1,13 @@
+import { describe, it, expect } from "vitest";
+import { summarizeAttendance, workedMilliseconds, reportLocation, type AttendanceDetail } from "./attendance-report";
+const row: AttendanceDetail = { id: "a", employeeId: "e1", employee: "Employee A", code: "1", costCenter: "Operations", department: "Engineering", location: "Alexandria", date: "2026-10-01", checkIn: "2026-10-01T06:00:00Z", checkOut: "2026-10-01T14:30:00Z", status: "present" };
+describe("attendance hours and grouping", () => {
+  it("totals exact worked time by cost center", () => { expect(summarizeAttendance([row], "costCenter")[0].milliseconds / 3600000).toBe(8.5); });
+  it("groups employees by department", () => { const result = summarizeAttendance([row, { ...row, id: "b", employeeId: "e2", department: "Finance" }], "department"); expect(result.map(g => [g.name, g.employees.length])).toEqual([["Engineering", 1], ["Finance", 1]]); });
+  it("keeps location hours separate without duplicate employees in a group", () => { const result = summarizeAttendance([row, { ...row, id: "b", date: "2026-10-02", location: "Cairo" }], "location"); expect(result.map(g => [g.name, g.employees[0].daysAttended, g.milliseconds / 3600000])).toEqual([["Alexandria", 1, 8.5], ["Cairo", 1, 8.5]]); });
+  it("does not fabricate hours for incomplete punches", () => { const result = summarizeAttendance([{ ...row, checkOut: null }], "costCenter")[0].employees[0]; expect(result.milliseconds).toBe(0); expect(result.incomplete).toBe(1); });
+  it("uses absolute timestamps for overnight shifts", () => { expect(workedMilliseconds({ checkIn: "2026-10-01T22:00:00+03:00", checkOut: "2026-10-02T06:00:00+03:00" }) / 3600000).toBe(8); });
+  it("rejects invalid and reversed intervals", () => { expect(workedMilliseconds({ checkIn: "invalid", checkOut: row.checkOut })).toBe(0); expect(workedMilliseconds({ checkIn: row.checkOut, checkOut: row.checkIn })).toBe(0); });
+  it("counts distinct attended dates and recorded absences", () => { const result = summarizeAttendance([row, { ...row, id: "b" }, { ...row, id: "c", date: "2026-10-02", checkIn: null, checkOut: null, status: "absent" }], "department")[0].employees[0]; expect(result.daysAttended).toBe(1); expect(result.daysAbsent).toBe(1); });
+  it("matches GPS to a work location and labels fallback instead of inventing one", () => { expect(reportLocation(31.2, 29.9, [{ id: "l", name: "Alex office", lat: 31.2, lng: 29.9, radius_m: 100 }], "Alex")).toBe("Alex office"); expect(reportLocation(null, null, [], "Cairo")).toBe("Cairo (recorded branch/city)"); expect(reportLocation(null, null, [], null)).toBe("Unknown location"); });
+});
