@@ -100,8 +100,8 @@ export function LeaveDecisionsPanel() {
                   <Icon className="h-4 w-4" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{a.title}</p>
-                  <p className="truncate text-[11px] text-muted-foreground">{a.description}</p>
+                  <p className="break-words text-sm font-medium leading-snug" title={a.title}>{a.title}</p>
+                  {a.description && <p className="mt-1 break-words text-[11px] leading-relaxed text-muted-foreground">{a.description}</p>}
                 </div>
                 <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{timeAgo(a.ts)}</span>
               </li>

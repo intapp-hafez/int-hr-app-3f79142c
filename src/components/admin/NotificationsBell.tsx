@@ -177,7 +177,7 @@ export function NotificationsBell() {
           )}
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-[360px] p-0">
+      <PopoverContent align="end" className="w-[380px] sm:w-[440px] max-w-[calc(100vw-1rem)] p-0">
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <div>
             <p className="font-display text-sm font-semibold">Notifications</p>
@@ -229,12 +229,14 @@ export function NotificationsBell() {
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
-                        <p className={`truncate text-sm ${i.unread ? "font-semibold" : "font-medium"}`}>{i.title}</p>
-                        {i.unread && <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />}
+                        <p className={`break-words text-sm leading-snug ${i.unread ? "font-semibold" : "font-medium"}`} title={i.title}>{i.title}</p>
+                        <div className="flex shrink-0 items-center gap-1.5 pt-0.5">
+                          {i.unread && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+                          <span className="text-[10px] tabular-nums text-muted-foreground">{timeAgo(i.ts)}</span>
+                        </div>
                       </div>
-                      {i.body && <p className="line-clamp-2 text-[11px] text-muted-foreground">{i.body}</p>}
+                      {i.body && <p className="mt-1 break-words text-[11px] leading-relaxed text-muted-foreground">{i.body}</p>}
                     </div>
-                    <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{timeAgo(i.ts)}</span>
                   </button>
                 </li>
               ))}
@@ -258,12 +260,14 @@ export function NotificationsBell() {
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
-                        <p className={`truncate text-sm ${isNew ? "font-semibold" : "font-medium"}`}>{a.title}</p>
-                        {isNew && <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />}
+                        <p className={`break-words text-sm leading-snug ${isNew ? "font-semibold" : "font-medium"}`} title={a.title}>{a.title}</p>
+                        <div className="flex shrink-0 items-center gap-1.5 pt-0.5">
+                          {isNew && <span className="h-1.5 w-1.5 rounded-full bg-brand" />}
+                          <span className="text-[10px] tabular-nums text-muted-foreground">{timeAgo(a.ts)}</span>
+                        </div>
                       </div>
-                      <p className="truncate text-[11px] text-muted-foreground">{a.description}</p>
+                      {a.description && <p className="mt-1 break-words text-[11px] leading-relaxed text-muted-foreground">{a.description}</p>}
                     </div>
-                    <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{timeAgo(a.ts)}</span>
                   </button>
                 </li>
               );

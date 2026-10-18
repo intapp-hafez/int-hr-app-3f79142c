@@ -22,6 +22,8 @@ import {
   ChevronsRight,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import {
   Table,
   TableBody,
@@ -31,7 +33,117 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { GeofenceLocation } from "@/backend/functions/geofencing.functions";
+import { listCitiesWithDistricts } from "@/backend/functions/directory.functions";
+import { EGYPT_CITIES, type CityCentroid } from "@/lib/egypt-cities";
 import { useI18n } from "@/lib/i18n";
+
+function getHaversineDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+
+export function resolveLocationCityAndDistrict(
+  loc: { name: string; lat: number; lng: number },
+  dbCities: Array<{ name_en: string; name_ar?: string; districts?: Array<{ name_en: string; name_ar?: string }> }> = [],
+  isArabic: boolean = false,
+): { city: string; district: string } {
+  let city = "";
+  let district = "";
+
+  // 1. Try to parse from name if it follows "[name] · [district] · [city]" or "[name] - [district] - [city]"
+  const delimiter = loc.name.includes(" · ") ? " · " : loc.name.includes(" - ") ? " - " : null;
+  if (delimiter) {
+    const parts = loc.name.split(delimiter).map((p) => p.trim()).filter(Boolean);
+    if (parts.length >= 3) {
+      district = parts[1];
+      city = parts[2];
+    } else if (parts.length === 2) {
+      const p1Lower = parts[1].toLowerCase();
+      const isP1City =
+        Boolean(EGYPT_CITIES[p1Lower]) ||
+        dbCities.some((c) => c.name_en.toLowerCase() === p1Lower || (c.name_ar && c.name_ar === parts[1]));
+      if (isP1City) {
+        city = parts[1];
+      } else {
+        district = parts[1];
+      }
+    }
+  }
+
+  // 2. If city is not found, check if loc.name mentions any known city
+  const nameLower = loc.name.toLowerCase();
+  if (!city) {
+    for (const c of dbCities) {
+      if (c.name_en && nameLower.includes(c.name_en.toLowerCase())) {
+        city = isArabic && c.name_ar ? c.name_ar : c.name_en;
+        break;
+      }
+      if (c.name_ar && loc.name.includes(c.name_ar)) {
+        city = isArabic ? c.name_ar : c.name_en;
+        break;
+      }
+    }
+  }
+  if (!city) {
+    for (const [key, centroid] of Object.entries(EGYPT_CITIES)) {
+      if (nameLower.includes(key) || nameLower.includes(centroid.en.toLowerCase())) {
+        city = isArabic ? centroid.ar : centroid.en;
+        break;
+      }
+      if (centroid.ar && loc.name.includes(centroid.ar)) {
+        city = isArabic ? centroid.ar : centroid.en;
+        break;
+      }
+    }
+  }
+
+  // 3. If district is not found, check if loc.name mentions any known district
+  if (!district) {
+    for (const c of dbCities) {
+      for (const d of c.districts ?? []) {
+        if (d.name_en && nameLower.includes(d.name_en.toLowerCase())) {
+          district = isArabic && d.name_ar ? d.name_ar : d.name_en;
+          if (!city) city = isArabic && c.name_ar ? c.name_ar : c.name_en;
+          break;
+        }
+        if (d.name_ar && loc.name.includes(d.name_ar)) {
+          district = isArabic ? d.name_ar : d.name_en;
+          if (!city) city = isArabic && c.name_ar ? c.name_ar : c.name_en;
+          break;
+        }
+      }
+      if (district) break;
+    }
+  }
+
+  // 4. If city is STILL not found, calculate nearest city by coordinates (lat, lng)
+  if (!city && isFinite(loc.lat) && isFinite(loc.lng) && loc.lat !== 0 && loc.lng !== 0) {
+    let nearestCity: CityCentroid | null = null;
+    let minDistance = Infinity;
+
+    for (const centroid of Object.values(EGYPT_CITIES)) {
+      const d = getHaversineDistanceKm(loc.lat, loc.lng, centroid.lat, centroid.lng);
+      if (d < minDistance) {
+        minDistance = d;
+        nearestCity = centroid;
+      }
+    }
+
+    if (nearestCity && minDistance <= 65) {
+      city = isArabic ? nearestCity.ar : nearestCity.en;
+    }
+  }
+
+  return { city, district };
+}
 
 export interface GeofenceLocationsTableProps {
   locations: GeofenceLocation[];
@@ -61,7 +173,14 @@ export function GeofenceLocationsTable({
   onOpenImport,
   onOpenBulkAssign,
 }: GeofenceLocationsTableProps) {
-  const { t } = useI18n();
+  const { t, isAr } = useI18n();
+  const listCitiesFn = useServerFn(listCitiesWithDistricts);
+  const { data: dbCities = [] } = useQuery({
+    queryKey: ["admin", "cities-districts"],
+    queryFn: () => listCitiesFn(),
+    staleTime: 5 * 60_000,
+  });
+
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive">("all");
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -102,13 +221,17 @@ export function GeofenceLocationsTable({
 
     const q = searchQuery.trim().toLowerCase();
     if (q) {
-      list = list.filter(
-        (l) =>
+      list = list.filter((l) => {
+        const geo = resolveLocationCityAndDistrict(l, dbCities, isAr);
+        return (
           l.name.toLowerCase().includes(q) ||
+          geo.city.toLowerCase().includes(q) ||
+          geo.district.toLowerCase().includes(q) ||
           String(l.lat).includes(q) ||
           String(l.lng).includes(q) ||
-          String(l.radius_m).includes(q),
-      );
+          String(l.radius_m).includes(q)
+        );
+      });
     }
 
     return [...list].sort((a, b) => {
@@ -535,9 +658,29 @@ export function GeofenceLocationsTable({
 
                     {/* Radius */}
                     <TableCell className="py-3.5 align-middle">
-                      <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 font-mono text-xs font-semibold tabular-nums text-muted-foreground">
-                        {loc.radius_m} m
-                      </span>
+                      <div className="flex flex-col items-start gap-1">
+                        <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 font-mono text-xs font-semibold tabular-nums text-muted-foreground">
+                          {loc.radius_m} m
+                        </span>
+                        {(() => {
+                          const geo = resolveLocationCityAndDistrict(loc, dbCities, isAr);
+                          const parts = [geo.city, geo.district].filter(Boolean);
+                          const uniqueParts = parts.filter(
+                            (val, idx, arr) => idx === 0 || val.toLowerCase() !== arr[0].toLowerCase(),
+                          );
+                          const text = uniqueParts.join(" · ");
+                          if (!text) return null;
+                          return (
+                            <span
+                              className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground"
+                              title={text}
+                            >
+                              <MapPin className="h-3 w-3 shrink-0 text-muted-foreground/60" />
+                              <span className="truncate max-w-[170px]">{text}</span>
+                            </span>
+                          );
+                        })()}
+                      </div>
                     </TableCell>
 
                     {/* On / Off Switch */}
