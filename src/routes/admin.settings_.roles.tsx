@@ -32,6 +32,7 @@ import {
   type UserAllowedPageStatus,
 } from "@/backend/functions/permissions.functions";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ChangeAccountPassword } from "@/components/admin/ChangeAccountPassword";
 import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog,
@@ -55,6 +56,14 @@ export const Route = createFileRoute("/admin/settings_/roles")({
     userId: typeof search.userId === "string" ? search.userId : undefined,
   }),
   component: RolesPage,
+  head: () => ({ meta: [
+    { title: "Account Roles & Passwords | INT HR" },
+    { name: "description", content: "Manage INT HR account roles, permissions and administrator password changes." },
+    { property: "og:title", content: "Account Roles & Passwords | INT HR" },
+    { property: "og:description", content: "Manage INT HR account access and passwords." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
 });
 
 const ALL_ROLES = ["admin", "hr", "finance", "manager", "employee", "staff", "user"] as const;
@@ -303,6 +312,7 @@ function UsersAndRoles() {
                 <td className="px-4 py-3">
                   <p className="font-semibold">{u.full_name || "—"}</p>
                   <p className="text-xs text-muted-foreground">{u.email}</p>
+                  <div className="mt-2"><ChangeAccountPassword userId={u.id} name={u.full_name || ""} email={u.email || ""} /></div>
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-1.5">

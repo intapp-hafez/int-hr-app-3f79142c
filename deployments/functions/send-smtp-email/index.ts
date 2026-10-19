@@ -4,6 +4,7 @@
 // Body: { auth: { host, port, secure, username, password }, msg: { from, fromEmail, to[], subject, text?, html? } }
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { changeAccountPassword } from "./password-change.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -204,6 +205,16 @@ Deno.serve(async (req) => {
     if (userErr || !userData.user) return json(401, { ok: false, error: "Invalid session" });
 
     const uid = userData.user.id;
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") return json(400, { ok: false, error: "Invalid body" });
+    if (body.action === "change-account-password") {
+      const result = await changeAccountPassword(supabase, () => {
+        const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+        if (!key) throw new Error("Account management service is not configured");
+        return createClient(supabaseUrl, key, { auth: { persistSession: false, autoRefreshToken: false } });
+      }, body);
+      return json(result.status, result.body);
+    }
     const [isAdmin, isHr] = await Promise.all([
       supabase.rpc("has_role", { _user_id: uid, _role: "admin" }),
       supabase.rpc("has_role", { _user_id: uid, _role: "hr" }),
@@ -211,9 +222,6 @@ Deno.serve(async (req) => {
     if (!isAdmin.data && !isHr.data) {
       return json(403, { ok: false, error: "Forbidden" });
     }
-
-    const body = await req.json().catch(() => null);
-    if (!body || typeof body !== "object") return json(400, { ok: false, error: "Invalid body" });
 
     const auth = (body as any).auth;
     const msg = (body as any).msg;

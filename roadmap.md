@@ -1,4 +1,5 @@
 # Current work
+- [x] Add secure admin-only password changes for other accounts in both account-management screens; eleven authorization tests passed and a live admin change on a temporary account accepted the new password, rejected the old password, and denied signed-out/employee callers; test account removed.
 - [ ] Synchronize shared work locations, positions and allowance rates in both apps, preserving unsaved rates during refresh; verify refresh behavior.
 - [x] Add database-backed attendance reports by cost center, department and location with employee totals, worked hours, daily details and exports in both app copies; eight calculation tests passed in each copy.
 - [ ] Verify grouped attendance reports with real employee records while signed in — blocked by externally managed sign-in without an available test session.
