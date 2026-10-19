@@ -22,6 +22,9 @@ export async function changeAccountPassword(
   // No target-role restriction: admins manage passwords for every account type.
   // Never persist, log or return the password, and never alter roles or account status.
   const { error } = await createAdmin().auth.admin.updateUserById(input.userId, { password: input.password });
-  if (error) return { status: 400, body: { ok: false, error: "Password was not changed. Check the account and password requirements, then retry." } };
+  if (error) {
+    const message = (error as { message?: string })?.message || "Password was not changed. Check the account and password requirements, then retry.";
+    return { status: 400, body: { ok: false, error: message } };
+  }
   return { status: 200, body: { ok: true } };
 }

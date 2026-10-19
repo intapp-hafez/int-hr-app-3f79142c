@@ -68,6 +68,7 @@ function CheckInOutCard() {
   const [showFace, setShowFace] = useState<null | "in" | "out">(null);
   const [verified, setVerified] = useState<{ face: boolean; fp: boolean }>({ face: false, fp: false });
   const [lastDistance, setLastDistance] = useState<number | null>(null);
+  const [bioToken, setBioToken] = useState<string | null>(null);
 
   const hasFace = !!bioQ.data?.face;
   const hasFp = (bioQ.data?.fingerprints?.length ?? 0) > 0;
@@ -218,6 +219,7 @@ function CheckInOutCard() {
         street: geo.street,
         biometric_method: bioMethod,
         biometric_distance: bioMethod === "face" ? lastDistance : null,
+        biometric_token: bioToken,
       };
       const addr = geo.formatted || [geo.street, geo.district, geo.city].filter(Boolean).join(", ");
       if (kind === "in") {
@@ -232,6 +234,7 @@ function CheckInOutCard() {
       setNote("");
       setVerified({ face: false, fp: false });
       setLastDistance(null);
+      setBioToken(null);
       qc.invalidateQueries({ queryKey: ["my-attendance"] });
     } catch (e) {
       toast.error((e as Error).message);
@@ -245,7 +248,10 @@ function CheckInOutCard() {
       const { startAuthentication } = await import("@simplewebauthn/browser");
       const options = await fpOptsFn();
       const assertion = await startAuthentication({ optionsJSON: options as any });
-      await fpVerifyFn({ data: { response: assertion } });
+      const res: any = await fpVerifyFn({ data: { response: assertion } });
+      if (res?.token) {
+        setBioToken(res.token);
+      }
       setVerified((v) => ({ ...v, fp: true }));
       toast.success("Fingerprint verified");
     } catch (e: any) {
@@ -255,10 +261,14 @@ function CheckInOutCard() {
 
   async function handleFaceCapture(descriptor: number[]) {
     try {
-      const res = await verifyFaceFn({ data: { descriptor } });
+      const targetAction = showFace === "out" ? "check_out" : "check_in";
+      const res: any = await verifyFaceFn({ data: { descriptor, action: targetAction } });
       if (res.match) {
         setVerified((v) => ({ ...v, face: true }));
         setLastDistance(res.distance ?? null);
+        if (res.token) {
+          setBioToken(res.token);
+        }
         toast.success(`Face verified (distance ${res.distance?.toFixed(3)})`);
         setShowFace(null);
       } else {
@@ -342,7 +352,7 @@ function CheckInOutCard() {
           <div className="flex flex-wrap items-center gap-2">
             {hasFace && (
               <button
-                onClick={() => setShowFace("in")}
+                onClick={() => setShowFace(hasCheckedIn ? "out" : "in")}
                 disabled={verified.face}
                 className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
                   verified.face ? "bg-success/20 text-success" : "bg-gradient-brand text-brand-foreground shadow-brand hover:opacity-95"

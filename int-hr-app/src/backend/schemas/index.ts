@@ -78,6 +78,9 @@ export const AttendanceCheckSchema = z.object({
   city: z.string().max(120).optional().nullable(),
   district: z.string().max(120).optional().nullable(),
   street: z.string().max(255).optional().nullable(),
+  biometric_method: z.enum(["face", "fingerprint"]).optional(),
+  biometric_distance: z.number().optional().nullable(),
+  biometric_token: z.string().max(255).optional().nullable(),
 });
 
 // ── Leaves ────────────────────────────────────────────────

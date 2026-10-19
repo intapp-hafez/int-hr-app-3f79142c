@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
 import {
   Users, UserCheck, UserX, Clock, CalendarDays, TrendingUp, MapPin, Bell, CheckCheck,
-  LogOut as LogOutIcon, ListChecks, CheckCircle2, FileText, Wallet, Shield, BarChart3, Settings,
+  LogOut as LogOutIcon, ListChecks, CheckCircle2, FileText, IdCard, Wallet, Shield, BarChart3, Settings,
   Building2, ArrowRight, Plus, Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -35,6 +35,7 @@ function AdminDashboard() {
   const stats = s ?? {
     totalEmployees: 0, present: 0, late: 0, absent: 0, onLeave: 0, attendanceRate: 0,
     checkedOut: 0, pendingLeaves: 0, openTasks: 0, doneTasks: 0,
+    contractsEnding30: 0, idsExpiring30: 0,
   } as any;
   const activity = dash?.activity ?? [];
   const pendingLeaves = dash?.pendingLeaves ?? [];
@@ -102,7 +103,7 @@ function AdminDashboard() {
       </section>
 
       {/* Colored KPI grid */}
-      <section className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
         <KpiCard icon={Users} label={t("totalEmployees")} value={String(stats.totalEmployees)} tone="indigo" hint="Across all branches" />
         <KpiCard icon={UserCheck} label={t("present")} value={String(stats.present)} tone="emerald" hint={`${pct(stats.present, stats.totalEmployees)}% of staff`} />
         <KpiCard icon={Clock} label={t("late")} value={String(stats.late)} tone="amber" hint="Arrived after threshold" />
@@ -111,6 +112,8 @@ function AdminDashboard() {
         <KpiCard icon={LogOutIcon} label="Checked out" value={String(stats.checkedOut ?? 0)} tone="violet" hint="Completed shift" />
         <KpiCard icon={ListChecks} label="Open tasks" value={String(stats.openTasks ?? 0)} tone="orange" hint={`${stats.doneTasks ?? 0} completed`} />
         <KpiCard icon={TrendingUp} label={t("attendanceRate")} value={`${stats.attendanceRate}%`} tone="brand" hint="Today" />
+        <KpiCard icon={FileText} label={t("contractsEnding30")} value={String(stats.contractsEnding30 ?? 0)} tone="teal" hint={t("contractsEndingHint")} to="/admin/contracts" />
+        <KpiCard icon={IdCard} label={t("nationalIdsExpiring30")} value={String(stats.idsExpiring30 ?? 0)} tone="cyan" hint={t("nationalIdsExpiringHint")} to="/admin/reports" />
       </section>
 
       {/* Attendance trend + Notifications */}
@@ -297,7 +300,7 @@ function AdminDashboard() {
   );
 }
 
-type Tone = "indigo" | "emerald" | "amber" | "rose" | "sky" | "violet" | "orange" | "brand";
+type Tone = "indigo" | "emerald" | "amber" | "rose" | "sky" | "violet" | "orange" | "brand" | "teal" | "cyan";
 const TONE_BG: Record<Tone, string> = {
   indigo: "from-indigo-500/15 to-indigo-500/5 ring-indigo-500/20",
   emerald: "from-emerald-500/15 to-emerald-500/5 ring-emerald-500/20",
@@ -307,6 +310,8 @@ const TONE_BG: Record<Tone, string> = {
   violet: "from-violet-500/15 to-violet-500/5 ring-violet-500/20",
   orange: "from-orange-500/15 to-orange-500/5 ring-orange-500/20",
   brand: "from-brand/20 to-brand/5 ring-brand/30",
+  teal: "from-teal-500/15 to-teal-500/5 ring-teal-500/20",
+  cyan: "from-cyan-500/15 to-cyan-500/5 ring-cyan-500/20",
 };
 const TONE_ICON: Record<Tone, string> = {
   indigo: "bg-indigo-500 text-white shadow-lg shadow-indigo-500/30",
@@ -317,11 +322,13 @@ const TONE_ICON: Record<Tone, string> = {
   violet: "bg-violet-500 text-white shadow-lg shadow-violet-500/30",
   orange: "bg-orange-500 text-white shadow-lg shadow-orange-500/30",
   brand: "bg-gradient-brand text-brand-foreground shadow-brand",
+  teal: "bg-teal-500 text-white shadow-lg shadow-teal-500/30",
+  cyan: "bg-cyan-500 text-white shadow-lg shadow-cyan-500/30",
 };
 
-function KpiCard({ icon: Icon, label, value, tone, hint }: { icon: typeof Users; label: string; value: string; tone: Tone; hint?: string }) {
-  return (
-    <div className={`group relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br ${TONE_BG[tone]} bg-card p-4 ring-1 shadow-soft transition-all hover:-translate-y-0.5 hover:shadow-md`}>
+function KpiCard({ icon: Icon, label, value, tone, hint, to }: { icon: any; label: string; value: string; tone: Tone; hint?: string; to?: string }) {
+  const card = (
+    <div className={`group relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br ${TONE_BG[tone]} bg-card p-4 ring-1 shadow-soft transition-all hover:-translate-y-0.5 hover:shadow-md h-full`}>
       <div className="flex items-start justify-between gap-2">
         <span className={`grid h-10 w-10 place-items-center rounded-xl ${TONE_ICON[tone]}`}>
           <Icon className="h-5 w-5" />
@@ -332,6 +339,10 @@ function KpiCard({ icon: Icon, label, value, tone, hint }: { icon: typeof Users;
       {hint && <p className="mt-0.5 text-[11px] text-muted-foreground">{hint}</p>}
     </div>
   );
+  if (to) {
+    return <Link to={to} className="block transition-transform h-full">{card}</Link>;
+  }
+  return card;
 }
 
 function QuickAction({ to, icon: Icon, label, badge }: { to: string; icon: typeof Users; label: string; badge?: number }) {

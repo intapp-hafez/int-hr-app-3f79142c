@@ -694,7 +694,7 @@ export const getEmployeeAttendanceHistory = createServerFn({ method: "POST" })
     await assertAdminOrHr(context.supabase, context.userId);
     const { data: rows, error } = await context.supabase
       .from("attendance")
-      .select("id, date, in_time, out_time, branch, status, note, city, district, free_check")
+      .select("id, date, in_time, out_time, branch, status, note, city, district, street, free_check, lat, lng, out_lat, out_lng, out_city, out_district, out_street")
       .eq("employee_id", data.employee_id)
       .order("date", { ascending: false })
       .limit(data.limit);

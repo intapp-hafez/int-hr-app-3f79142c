@@ -91,7 +91,7 @@ export function TripAllowancesTab() {
         });
       }
       if (toDelete.length) {
-        const { error } = await supabase.from("trip_allowance_policies").delete().in("id", toDelete);
+        const { error } = await (supabase as any).from("trip_allowance_policies").delete().in("id", toDelete);
         if (error) throw new Error(error.message);
       }
       if (toUpsert.length) {
@@ -115,7 +115,6 @@ export function TripAllowancesTab() {
     );
   }, [data?.locations, term]);
 
-  const [showAll, setShowAll] = useState(false);
   const DEFAULTS = ["driver", "engineer", "technician", "technitian", "manager", "supervisor"];
   const allPositions = data?.positions ?? [];
   const defaultPositions = allPositions.filter((p: any) => DEFAULTS.includes(String(p.name_en ?? "").trim().toLowerCase()));
@@ -129,13 +128,13 @@ export function TripAllowancesTab() {
   }, [extraIds]);
 
   const positions = useMemo(() => {
-    const base = showAll || defaultPositions.length === 0 ? allPositions : defaultPositions;
+    const base = defaultPositions.length === 0 ? allPositions : defaultPositions;
     const seen = new Set(base.map((p: any) => p.id));
     const extra = extraIds
       .map((id) => allPositions.find((p: any) => p.id === id))
       .filter((p: any) => p && !seen.has(p.id));
     return [...base, ...extra];
-  }, [showAll, allPositions, defaultPositions, extraIds]);
+  }, [allPositions, defaultPositions, extraIds]);
 
   const addablePositions = allPositions.filter((p: any) => !positions.some((v: any) => v.id === p.id));
   function addPosition(id: string) {
@@ -166,25 +165,22 @@ export function TripAllowancesTab() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Trip Allowances Policy</h2>
+          <div className="flex items-center gap-2.5">
+            <h2 className="text-lg font-semibold">Trip Allowances Policy</h2>
+            {addablePositions.length > 0 && (
+              <select
+                value=""
+                onChange={(e) => addPosition(e.target.value)}
+                className="h-7 rounded-lg border border-border bg-card px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">+ Add position…</option>
+                {addablePositions.map((p: any) => (
+                  <option key={p.id} value={p.id}>{p.name_en}</option>
+                ))}
+              </select>
+            )}
+          </div>
           <p className="text-sm text-muted-foreground">
-            <span className="flex flex-wrap items-center gap-2">
-              <button type="button" className="underline" onClick={() => setShowAll((v) => !v)}>
-                {showAll ? "Show main positions only" : "Show all positions"}
-              </button>
-              {addablePositions.length > 0 && (
-                <select
-                  value=""
-                  onChange={(e) => addPosition(e.target.value)}
-                  className="h-7 rounded-lg border border-border bg-card px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
-                >
-                  <option value="">+ Add position…</option>
-                  {addablePositions.map((p: any) => (
-                    <option key={p.id} value={p.id}>{p.name_en}</option>
-                  ))}
-                </select>
-              )}
-            </span>
             Nightly allowance per position for each work location. Locations come from Geofencing (Work Locations).
           </p>
         </div>

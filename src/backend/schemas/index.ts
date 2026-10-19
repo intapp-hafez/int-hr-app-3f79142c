@@ -131,6 +131,7 @@ export const AttendanceCheckSchema = z.object({
   device_id: z.string().optional(),
   biometric_method: z.enum(["face", "fingerprint"]).optional(),
   biometric_distance: z.number().optional().nullable(),
+  biometric_token: z.string().max(255).optional().nullable(),
 });
 
 // ── Leaves ────────────────────────────────────────────────

@@ -31,8 +31,10 @@ async function logAttendanceBio(
   event: "check_in" | "check_out",
   success: boolean,
   reason?: string | null,
+  overrideMethod?: "face" | "fingerprint" | "none",
+  overrideDistance?: number | null,
 ) {
-  const method = data.biometric_method ?? "face";
+  const method = overrideMethod === "none" ? "face" : overrideMethod ?? data.biometric_method ?? "face";
   await logBiometricEvent({
     userId,
     method,
@@ -40,8 +42,94 @@ async function logAttendanceBio(
     success,
     reason: reason ?? null,
     deviceId: data.device_id ?? null,
-    distance: data.biometric_distance ?? null,
+    distance: overrideDistance ?? data.biometric_distance ?? null,
   });
+}
+
+async function validateAndConsumeBioToken(
+  supabase: any,
+  userId: string,
+  token: string | null | undefined,
+  action: "check_in" | "check_out",
+  faceRequired: boolean,
+): Promise<
+  | { ok: true; method: "face" | "fingerprint" | "none"; distance: number | null }
+  | { ok: false; code: string; reason: string }
+> {
+  // If face is not required and no token was provided, allow without biometrics
+  if (!faceRequired && !token) {
+    return { ok: true, method: "none", distance: null };
+  }
+
+  if (!token) {
+    return {
+      ok: false,
+      code: "face_required",
+      reason: `${action === "check_in" ? "Check-in" : "Check-out"} blocked · face recognition is required. Please scan your face first.`,
+    };
+  }
+
+  const { data: tokenRow, error: tokenErr } = await supabase
+    .from("biometric_verification_tokens")
+    .select("id, token, user_id, action, method, distance, expires_at, used_at")
+    .eq("token", token)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (tokenErr || !tokenRow) {
+    return {
+      ok: false,
+      code: "biometric_invalid",
+      reason: `${action === "check_in" ? "Check-in" : "Check-out"} blocked · invalid biometric verification token. Please verify again.`,
+    };
+  }
+
+  if (tokenRow.used_at) {
+    return {
+      ok: false,
+      code: "biometric_replayed",
+      reason: `${action === "check_in" ? "Check-in" : "Check-out"} blocked · this biometric verification has already been used. Please scan again.`,
+    };
+  }
+
+  if (new Date(tokenRow.expires_at).getTime() < Date.now()) {
+    return {
+      ok: false,
+      code: "biometric_expired",
+      reason: `${action === "check_in" ? "Check-in" : "Check-out"} blocked · biometric verification expired (valid for 2 minutes). Please scan again.`,
+    };
+  }
+
+  if (tokenRow.action !== "attendance" && tokenRow.action !== action) {
+    return {
+      ok: false,
+      code: "biometric_action_mismatch",
+      reason: `${action === "check_in" ? "Check-in" : "Check-out"} blocked · biometric verification was not issued for this action.`,
+    };
+  }
+
+  // Atomically mark token as used so it can NEVER be reused
+  const now = new Date().toISOString();
+  const { error: markErr, data: updatedRows } = await supabase
+    .from("biometric_verification_tokens")
+    .update({ used_at: now })
+    .eq("id", tokenRow.id)
+    .is("used_at", null)
+    .select("id");
+
+  if (markErr || !updatedRows || updatedRows.length === 0) {
+    return {
+      ok: false,
+      code: "biometric_replayed",
+      reason: `${action === "check_in" ? "Check-in" : "Check-out"} blocked · token was already consumed. Please scan again.`,
+    };
+  }
+
+  return {
+    ok: true,
+    method: tokenRow.method as "face" | "fingerprint",
+    distance: tokenRow.distance != null ? Number(tokenRow.distance) : null,
+  };
 }
 
 export const checkIn = createServerFn({ method: "POST" })
@@ -86,7 +174,8 @@ export const checkIn = createServerFn({ method: "POST" })
       }
     }
 
-    // Face recognition gate (on by default per employee; admin can disable)
+    // Face recognition gate (verified via single-use server token)
+    let bioCheck: { ok: true; method: "face" | "fingerprint" | "none"; distance: number | null };
     {
       const { data: faceRow, error: faceErr } = await (supabase as any)
         .from("profiles")
@@ -94,12 +183,17 @@ export const checkIn = createServerFn({ method: "POST" })
         .eq("id", userId)
         .maybeSingle();
       const faceRequired = faceErr ? true : faceRow?.face_required !== false;
-      if (faceRequired && data.biometric_method !== "face") {
-        return block(
-          "face_required",
-          "Check-in blocked · face recognition is required. Please scan your face first.",
-        );
+      const res = await validateAndConsumeBioToken(
+        supabase,
+        userId,
+        data.biometric_token,
+        "check_in",
+        faceRequired,
+      );
+      if (!res.ok) {
+        return block(res.code, res.reason);
       }
+      bioCheck = res;
     }
 
     // Resolve assigned geofences + per-employee authorized networks + branch-level networks
@@ -248,8 +342,8 @@ export const checkIn = createServerFn({ method: "POST" })
         street,
         free_check: freeCheck,
         status: "present",
-        verified_face: (data.biometric_method ?? "face") === "face",
-        verified_fp: data.biometric_method === "fingerprint",
+        verified_face: bioCheck.method === "face",
+        verified_fp: bioCheck.method === "fingerprint",
       },
       { onConflict: "employee_id,date" },
     );
@@ -259,7 +353,7 @@ export const checkIn = createServerFn({ method: "POST" })
       await touchDeviceCheck(data.device_id!, "in");
     }
 
-    await logAttendanceBio(userId, data, "check_in", true, null);
+    await logAttendanceBio(userId, data, "check_in", true, null, bioCheck.method, bioCheck.distance);
     return {
       ok: true as const,
       blocked: false as const,
@@ -310,7 +404,8 @@ export const checkOut = createServerFn({ method: "POST" })
       }
     }
 
-    // Face recognition gate (on by default per employee; admin can disable)
+    // Face recognition gate (verified via single-use server token)
+    let bioCheckOut: { ok: true; method: "face" | "fingerprint" | "none"; distance: number | null };
     {
       const { data: faceRow, error: faceErr } = await (supabase as any)
         .from("profiles")
@@ -318,12 +413,17 @@ export const checkOut = createServerFn({ method: "POST" })
         .eq("id", userId)
         .maybeSingle();
       const faceRequired = faceErr ? true : faceRow?.face_required !== false;
-      if (faceRequired && data.biometric_method !== "face") {
-        return block(
-          "face_required",
-          "Check-out blocked · face recognition is required. Please scan your face first.",
-        );
+      const res = await validateAndConsumeBioToken(
+        supabase,
+        userId,
+        data.biometric_token,
+        "check_out",
+        faceRequired,
+      );
+      if (!res.ok) {
+        return block(res.code, res.reason);
       }
+      bioCheckOut = res;
     }
 
     // Interlock: check if an active task or travel is in progress
@@ -456,7 +556,7 @@ export const checkOut = createServerFn({ method: "POST" })
       const { touchDeviceCheck } = await import("@/backend/server/device-registry.server");
       await touchDeviceCheck(data.device_id!, "out");
     }
-    await logAttendanceBio(userId, data, "check_out", true, null);
+    await logAttendanceBio(userId, data, "check_out", true, null, bioCheckOut.method, bioCheckOut.distance);
     return { ok: true as const, blocked: false as const };
   });
 

@@ -7,6 +7,7 @@ import { logBiometricEvent } from "@/backend/server/biometric-audit.server";
 // ── Face descriptors ─────────────────────────────────────
 const DescriptorSchema = z.object({
   descriptor: z.array(z.number()).length(128),
+  action: z.enum(["check_in", "check_out", "attendance"]).optional().default("attendance"),
 });
 
 function distance(a: number[], b: number[]) {
@@ -83,12 +84,25 @@ export const verifyFace = createServerFn({ method: "POST" })
     const stored = row.descriptor as unknown as number[];
     const d = distance(stored, data.descriptor);
     const match = d <= FACE_THRESHOLD;
+    let token: string | null = null;
+    if (match) {
+      token = crypto.randomUUID();
+      const expiresAt = new Date(Date.now() + 2 * 60 * 1000).toISOString();
+      await (context.supabase as any).from("biometric_verification_tokens").insert({
+        user_id: context.userId,
+        token,
+        action: data.action || "attendance",
+        method: "face",
+        distance: d,
+        expires_at: expiresAt,
+      });
+    }
     await logBiometricEvent({
       userId: context.userId, method: "face", event: "verify",
       success: match, distance: d,
       reason: match ? null : `Distance ${d.toFixed(3)} above threshold ${FACE_THRESHOLD}`,
     });
-    return { match, enrolled: true, distance: d };
+    return { match, enrolled: true, distance: d, token };
   });
 
 // Used during login: scope the lookup by an email the user types
@@ -562,7 +576,17 @@ export const webauthnAuthVerifyForSelf = createServerFn({ method: "POST" })
       deviceId: credId,
       deviceLabel: cred.device_label,
     });
-    return { ok: true };
+    const token = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 2 * 60 * 1000).toISOString();
+    await (context.supabase as any).from("biometric_verification_tokens").insert({
+      user_id: context.userId,
+      token,
+      action: "attendance",
+      method: "fingerprint",
+      distance: null,
+      expires_at: expiresAt,
+    });
+    return { ok: true, token };
   });
 
 // ── Management ───────────────────────────────────────────

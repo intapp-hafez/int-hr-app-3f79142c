@@ -11,6 +11,7 @@ import {
   Check,
   Plus,
   FileSpreadsheet,
+  Download,
   Layers,
   ArrowUpDown,
   Navigation,
@@ -214,10 +215,83 @@ export function GeofenceLocationsTable({
     setPage(1);
   };
 
+  const [selectedCity, setSelectedCity] = useState<string>("all");
+
+  const uniqueCities = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const loc of locations) {
+      const geo = resolveLocationCityAndDistrict(loc, dbCities, isAr);
+      const city = geo.city?.trim() || "Other";
+      counts.set(city, (counts.get(city) || 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => {
+        if (a.name === "Other") return 1;
+        if (b.name === "Other") return -1;
+        return a.name.localeCompare(b.name);
+      });
+  }, [locations, dbCities, isAr]);
+
+  const handleExportExcel = async () => {
+    try {
+      const XLSX = await import("xlsx");
+      const targetList = filteredLocations.length > 0 ? filteredLocations : locations;
+      if (targetList.length === 0) {
+        toast.error("No locations to export");
+        return;
+      }
+
+      const exportData = targetList.map((loc) => {
+        const geo = resolveLocationCityAndDistrict(loc, dbCities, isAr);
+        return {
+          Name: loc.name,
+          City: geo.city || "",
+          District: geo.district || "",
+          Latitude: Number(loc.lat.toFixed(6)),
+          Longitude: Number(loc.lng.toFixed(6)),
+          Radius_m: loc.radius_m,
+          Active: loc.active ? "Yes" : "No",
+          Assigned_Employees: loc.assigned_count || 0,
+        };
+      });
+
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      ws["!cols"] = [
+        { wch: 32 },
+        { wch: 18 },
+        { wch: 20 },
+        { wch: 14 },
+        { wch: 14 },
+        { wch: 12 },
+        { wch: 10 },
+        { wch: 20 },
+      ];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Work Locations");
+
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const citySuffix = selectedCity !== "all" ? `_${selectedCity.toLowerCase().replace(/[^a-z0-9]+/g, "_")}` : "";
+      XLSX.writeFile(wb, `geofence_locations${citySuffix}_${dateStr}.xlsx`);
+      toast.success(`Exported ${exportData.length} locations to Excel`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to export locations");
+    }
+  };
+
   const filteredLocations = useMemo(() => {
     let list = locations;
     if (filterStatus === "active") list = list.filter((l) => l.active);
     if (filterStatus === "inactive") list = list.filter((l) => !l.active);
+
+    if (selectedCity !== "all") {
+      list = list.filter((l) => {
+        const geo = resolveLocationCityAndDistrict(l, dbCities, isAr);
+        const c = geo.city?.trim() || "Other";
+        return c.toLowerCase() === selectedCity.toLowerCase();
+      });
+    }
 
     const q = searchQuery.trim().toLowerCase();
     if (q) {
@@ -247,7 +321,7 @@ export function GeofenceLocationsTable({
       }
       return sortOrder === "asc" ? comparison : -comparison;
     });
-  }, [locations, filterStatus, searchQuery, sortField, sortOrder]);
+  }, [locations, filterStatus, selectedCity, searchQuery, sortField, sortOrder, dbCities, isAr]);
 
   // Pagination calculations (50 per page default)
   const totalItems = filteredLocations.length;
@@ -406,6 +480,16 @@ export function GeofenceLocationsTable({
                 <Layers className="h-3.5 w-3.5 text-muted-foreground" /> Bulk Assign
               </button>
             )}
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              disabled={locations.length === 0}
+              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors disabled:opacity-50 shadow-2xs"
+              title="Export locations to Excel (.xlsx)"
+            >
+              <Download className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+              Export Excel
+            </button>
             {onOpenImport && (
               <button
                 type="button"
@@ -427,31 +511,52 @@ export function GeofenceLocationsTable({
           </div>
         </div>
 
-        {/* Search Input Bar */}
-        <div className="relative">
-          <Search className="pointer-events-none absolute start-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setPage(1);
-            }}
-            placeholder="Search locations by name, latitude, longitude, radius..."
-            className="w-full rounded-xl border border-input bg-background py-2 ps-10 pe-9 text-xs sm:text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => {
-                setSearchQuery("");
+        {/* Search & City Filter Bar */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute start-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
                 setPage(1);
               }}
-              className="absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5 rounded-full"
-              title="Clear search"
+              placeholder="Search locations by name, latitude, longitude, radius..."
+              className="w-full rounded-xl border border-input bg-background py-2 ps-10 pe-9 text-xs sm:text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery("");
+                  setPage(1);
+                }}
+                className="absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5 rounded-full"
+                title="Clear search"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          <div className="relative w-full sm:w-56 shrink-0">
+            <select
+              value={selectedCity}
+              onChange={(e) => {
+                setSelectedCity(e.target.value);
+                setPage(1);
+              }}
+              aria-label="Filter by city"
+              className="h-10 w-full rounded-xl border border-input bg-background px-3 text-xs sm:text-sm text-foreground outline-none focus:ring-2 focus:ring-brand cursor-pointer shadow-2xs"
             >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          )}
+              <option value="all">All Cities ({uniqueCities.length})</option>
+              {uniqueCities.map(({ name, count }) => (
+                <option key={name} value={name}>
+                  {name} ({count})
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 

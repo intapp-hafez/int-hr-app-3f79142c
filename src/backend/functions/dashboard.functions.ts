@@ -8,11 +8,30 @@ export const getAdminStats = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabase } = context;
     const d = today();
-    const [emp, att, lv, tk] = await Promise.all([
+    const now = new Date();
+    const todayIso = d;
+    const in30 = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const in30Iso = in30.toISOString().slice(0, 10);
+
+    const [emp, att, lv, tk, ctrExp, idExp] = await Promise.all([
       supabase.from("profiles").select("id", { count: "exact", head: true }),
       supabase.from("attendance").select("status, out_time").eq("date", d),
       supabase.from("leaves").select("status"),
       supabase.from("tasks").select("status"),
+      supabase
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "Active")
+        .neq("contract_cancelled", true)
+        .gte("contract_end_date", todayIso)
+        .lte("contract_end_date", in30Iso),
+      supabase
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "Active")
+        .not("id_expiry_date", "is", null)
+        .gte("id_expiry_date", todayIso)
+        .lte("id_expiry_date", in30Iso),
     ]);
     const attRows = att.data ?? [];
     const present = attRows.filter((r: any) => r.status === "present").length;
@@ -25,7 +44,22 @@ export const getAdminStats = createServerFn({ method: "GET" })
     const openTasks = (tk.data ?? []).filter((r: any) => r.status !== "done" && r.status !== "cancelled").length;
     const doneTasks = (tk.data ?? []).filter((r: any) => r.status === "done").length;
     const attendanceRate = totalEmployees > 0 ? Math.round(((present + late) / totalEmployees) * 100) : 0;
-    return { totalEmployees, present, late, absent, checkedOut, onLeave, pendingLeaves, openTasks, doneTasks, attendanceRate };
+    const contractsEnding30 = ctrExp.count ?? 0;
+    const idsExpiring30 = idExp.count ?? 0;
+    return {
+      totalEmployees,
+      present,
+      late,
+      absent,
+      checkedOut,
+      onLeave,
+      pendingLeaves,
+      openTasks,
+      doneTasks,
+      attendanceRate,
+      contractsEnding30,
+      idsExpiring30,
+    };
   });
 
 export type AdminDashboardActivity = {

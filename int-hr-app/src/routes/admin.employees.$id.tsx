@@ -502,7 +502,10 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
             )}
 
             {sideTab === "attendance" && (
-              <AttendanceHistoryPanel employeeId={detail.id} />
+              <AttendanceHistoryPanel
+                employeeId={detail.id}
+                employeeName={detail.full_name || detail.name_en || detail.email}
+              />
             )}
 
             {sideTab === "leaves" && (
@@ -772,16 +775,73 @@ function DevicesTab({ devices }: { devices: Device[] }) {
 
 type LeaveStatus = "All" | "Pending" | "Approved" | "Rejected";
 
-function AttendanceHistoryPanel({ employeeId }: { employeeId: string }) {
+function storedPlaceName(...parts: Array<string | null | undefined>) {
+  const seen = new Set<string>();
+  const cleaned: string[] = [];
+  for (const part of parts) {
+    const trimmed = part?.trim();
+    if (!trimmed || /^-?\d{1,3}(?:\.\d+)?\s*,\s*-?\d{1,3}(?:\.\d+)?$/.test(trimmed) || /^-?\d{1,3}(?:\.\d+)?$/.test(trimmed)) continue;
+    const lower = trimmed.toLowerCase();
+    if (seen.has(lower)) continue;
+    seen.add(lower);
+    cleaned.push(trimmed);
+  }
+  return cleaned.join(", ");
+}
+
+function AttendanceHistoryPanel({
+  employeeId,
+  employeeName,
+}: {
+  employeeId: string;
+  employeeName?: string;
+}) {
   const fn = useServerFn(getEmployeeAttendanceHistory);
   const { data, isLoading } = useQuery({
     queryKey: ["employee", "attendance", employeeId],
     queryFn: () => fn({ data: { employee_id: employeeId, limit: 180 } }),
   });
   const rows = (data ?? []) as any[];
+
+  async function exportToExcel() {
+    try {
+      const XLSX = await import("xlsx");
+      const exportRows = rows.map((r) => ({
+        Date: r.date,
+        "Check In": r.in_time ? new Date(r.in_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—",
+        "Check In Location": storedPlaceName(r.street, r.district, r.city) || r.branch || "—",
+        "Check Out": r.out_time ? new Date(r.out_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—",
+        "Check Out Location": storedPlaceName(r.out_street, r.out_district, r.out_city) || "—",
+        Branch: r.branch ?? "—",
+        Status: r.status ?? "—",
+      }));
+      const ws = XLSX.utils.json_to_sheet(exportRows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Attendance");
+      const cleanName = (employeeName || "employee").trim().toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]+/g, "_");
+      XLSX.writeFile(wb, `attendance_${cleanName}_last_180_days.xlsx`);
+      toast.success("Attendance exported to Excel");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to export Excel file");
+    }
+  }
+
   return (
     <div className="rounded-3xl border border-border bg-card p-5">
-      <h2 className="mb-4 font-display text-base font-semibold">Attendance · last 180 days</h2>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="font-display text-base font-semibold">Attendance · last 180 days</h2>
+        {rows.length > 0 && (
+          <button
+            type="button"
+            onClick={exportToExcel}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted shadow-2xs transition-colors"
+            title="Export to Excel (.xlsx)"
+          >
+            <Download className="h-3.5 w-3.5 text-muted-foreground" />
+            <span>Export to Excel</span>
+          </button>
+        )}
+      </div>
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : rows.length === 0 ? (
@@ -795,11 +855,25 @@ function AttendanceHistoryPanel({ employeeId }: { employeeId: string }) {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id} className="border-b border-border last:border-b-0">
-                  <td className="px-2 py-2 font-mono">{r.date}</td>
-                  <td className="px-2 py-2 font-mono">{r.in_time ? new Date(r.in_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</td>
-                  <td className="px-2 py-2 font-mono">{r.out_time ? new Date(r.out_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</td>
-                  <td className="px-2 py-2">{r.branch ?? "—"}</td>
-                  <td className="px-2 py-2"><span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase">{r.status ?? "—"}</span></td>
+                  <td className="px-2 py-2 font-mono align-top">{r.date}</td>
+                  <td className="px-2 py-2 font-mono align-top">
+                    <div>{r.in_time ? new Date(r.in_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</div>
+                    {(storedPlaceName(r.street, r.district, r.city) || r.branch) && (
+                      <div className="text-[11px] text-muted-foreground font-sans truncate max-w-[140px]" title={storedPlaceName(r.street, r.district, r.city) || r.branch}>
+                        {storedPlaceName(r.street, r.district, r.city) || r.branch}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-2 py-2 font-mono align-top">
+                    <div>{r.out_time ? new Date(r.out_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</div>
+                    {storedPlaceName(r.out_street, r.out_district, r.out_city) && (
+                      <div className="text-[11px] text-muted-foreground font-sans truncate max-w-[140px]" title={storedPlaceName(r.out_street, r.out_district, r.out_city)}>
+                        {storedPlaceName(r.out_street, r.out_district, r.out_city)}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-2 py-2 align-top">{r.branch ?? "—"}</td>
+                  <td className="px-2 py-2 align-top"><span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase">{r.status ?? "—"}</span></td>
                 </tr>
               ))}
             </tbody>

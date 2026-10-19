@@ -25,6 +25,7 @@ import {
 import { getEmployeeWorkingDays } from "@/backend/functions/employee-working-days.functions";
 import { listHolidays } from "@/backend/functions/holidays.functions";
 import { staffDecideLeave } from "@/backend/functions/staff.functions";
+import { adminReverseGeocode } from "@/backend/functions/attendance.functions";
 import {
   getEmployeeLeaveBalances,
   upsertEmployeeLeaveBalance,
@@ -1376,7 +1377,10 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
             )}
 
             {sideTab === "attendance" && (
-              <AttendanceHistoryPanel employeeId={detail.id} />
+              <AttendanceHistoryPanel
+                employeeId={detail.id}
+                employeeName={detail.full_name || detail.email || undefined}
+              />
             )}
 
             {sideTab === "leaves" && (
@@ -2355,14 +2359,176 @@ function DevicesTab({ devices }: { devices: Device[] }) {
   );
 }
 
-type LeaveStatus = "All" | "Pending" | "Approved" | "Rejected";
+// In-memory reverse-geocode cache (lat,lng → label).
+const geoCache = new Map<string, string>();
+const geoInflight = new Map<string, Promise<string>>();
 
-function AttendanceHistoryPanel({ employeeId }: { employeeId: string }) {
+function geoKey(lat: number, lng: number) {
+  return `${lat.toFixed(4)},${lng.toFixed(4)}`;
+}
+
+function looksLikeCoordinates(value: string) {
+  return /^-?\d{1,3}(?:\.\d+)?\s*,\s*-?\d{1,3}(?:\.\d+)?$/.test(value.trim());
+}
+
+function storedPlaceName(...parts: Array<string | null | undefined>) {
+  const seen = new Set<string>();
+  const cleaned: string[] = [];
+  for (const part of parts) {
+    const trimmed = part?.trim();
+    if (!trimmed || looksLikeCoordinates(trimmed) || /^-?\d{1,3}(?:\.\d+)?$/.test(trimmed)) continue;
+    const lower = trimmed.toLowerCase();
+    if (seen.has(lower)) continue;
+    seen.add(lower);
+    cleaned.push(trimmed);
+  }
+  return cleaned.join(", ");
+}
+
+async function reverseGeocode(
+  lat: number,
+  lng: number,
+  lookup: (args: { data: { lat: number; lng: number } }) => Promise<string>,
+): Promise<string> {
+  const k = geoKey(lat, lng);
+  if (geoCache.has(k)) return geoCache.get(k)!;
+  if (geoInflight.has(k)) return geoInflight.get(k)!;
+  const p = (async () => {
+    try {
+      const out = await lookup({ data: { lat, lng } });
+      geoCache.set(k, out);
+      return out;
+    } catch {
+      const fallback = "Location name unavailable";
+      geoCache.set(k, fallback);
+      return fallback;
+    } finally {
+      geoInflight.delete(k);
+    }
+  })();
+  geoInflight.set(k, p);
+  return p;
+}
+
+function AddressFromCoords({
+  lat,
+  lng,
+  lookup,
+  fallback,
+}: {
+  lat: number;
+  lng: number;
+  lookup: (args: { data: { lat: number; lng: number } }) => Promise<string>;
+  fallback?: string;
+}) {
+  const k = geoKey(lat, lng);
+  const [label, setLabel] = useState<string>(geoCache.get(k) ?? fallback ?? "");
+  useEffect(() => {
+    let alive = true;
+    if (!geoCache.has(k)) {
+      reverseGeocode(lat, lng, lookup).then((v) => {
+        if (alive) setLabel(v && v !== "Location name unavailable" ? v : (fallback || v));
+      });
+    } else {
+      setLabel(geoCache.get(k)!);
+    }
+    return () => {
+      alive = false;
+    };
+  }, [k, lat, lng, lookup, fallback]);
+  return <span>{label || fallback || "Locating…"}</span>;
+}
+
+function LocationName({
+  place,
+  lat,
+  lng,
+  lookup,
+}: {
+  place: string;
+  lat?: number | null;
+  lng?: number | null;
+  lookup?: (args: { data: { lat: number; lng: number } }) => Promise<string>;
+}) {
+  if (place && place.includes(",")) return <span>{place}</span>;
+  if (lat != null && lng != null && lookup) return <AddressFromCoords lat={lat} lng={lng} lookup={lookup} fallback={place} />;
+  if (place) return <span>{place}</span>;
+  return null;
+}
+
+function AttendancePlaceCell({
+  place,
+  lat,
+  lng,
+  freeCheck,
+  lookup,
+}: {
+  place: string;
+  lat?: number | null;
+  lng?: number | null;
+  freeCheck?: boolean | null;
+  lookup?: (args: { data: { lat: number; lng: number } }) => Promise<string>;
+}) {
+  const hasCoords = lat != null && lng != null;
+  if (!place && !hasCoords) {
+    if (freeCheck) {
+      return (
+        <span className="mt-0.5 inline-flex w-fit items-center rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+          Free check
+        </span>
+      );
+    }
+    return null;
+  }
+
+  const content = (
+    <span className="inline-flex items-center gap-1 font-sans text-[11px] text-muted-foreground group-hover:text-foreground">
+      <MapPin className="h-3 w-3 shrink-0 text-brand" />
+      <span className="max-w-[130px] sm:max-w-[160px] truncate">
+        <LocationName place={place} lat={lat} lng={lng} lookup={lookup} />
+      </span>
+    </span>
+  );
+
+  return (
+    <div className="flex flex-col gap-0.5 font-sans">
+      {hasCoords ? (
+        <a
+          href={`https://www.google.com/maps?q=${lat},${lng}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Open location in Google Maps"
+          className="group inline-flex items-center hover:underline"
+        >
+          {content}
+        </a>
+      ) : (
+        <div title={place} className="inline-flex items-center">
+          {content}
+        </div>
+      )}
+      {freeCheck && (
+        <span className="inline-flex w-fit items-center rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+          Free check
+        </span>
+      )}
+    </div>
+  );
+}
+
+function AttendanceHistoryPanel({
+  employeeId,
+  employeeName,
+}: {
+  employeeId: string;
+  employeeName?: string;
+}) {
   const fn = useServerFn(getEmployeeAttendanceHistory);
   const wdFn = useServerFn(getEmployeeWorkingDays);
   const holFn = useServerFn(listHolidays);
   const leavesFn = useServerFn(getEmployeeLeavesHistory);
   const decideLeaveFn = useServerFn(staffDecideLeave);
+  const reverseGeocodeFn = useServerFn(adminReverseGeocode);
   const qc = useQueryClient();
   const [pendingLeaveId, setPendingLeaveId] = useState<string | null>(null);
   const [selectedDates, setSelectedDates] = useState<Set<string>>(new Set());
@@ -2706,6 +2872,76 @@ function AttendanceHistoryPanel({ employeeId }: { employeeId: string }) {
     });
   }
 
+  async function exportToExcel() {
+    try {
+      const XLSX = await import("xlsx");
+      const exportRows = rows.map((r) => {
+        const inLoc =
+          storedPlaceName(r.rec?.street, r.rec?.district, r.rec?.city) ||
+          r.rec?.branch ||
+          (r.rec?.lat != null && r.rec?.lng != null ? geoCache.get(geoKey(r.rec.lat, r.rec.lng)) : "") ||
+          (r.rec?.free_check ? "Free check-in" : "");
+        const outLoc =
+          storedPlaceName(r.rec?.out_street, r.rec?.out_district, r.rec?.out_city) ||
+          (r.rec?.out_lat != null && r.rec?.out_lng != null ? geoCache.get(geoKey(r.rec.out_lat, r.rec.out_lng)) : "") ||
+          (r.rec?.free_check && r.rec?.out_time ? "Free check-out" : "");
+        const st = statusFor(r);
+        return {
+          Date: formatDate(r.date),
+          Day: r.dayLabel,
+          "Check In": r.rec?.in_time ? new Date(r.rec.in_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—",
+          "Check In Location": inLoc || "—",
+          "Check Out": r.rec?.out_time ? new Date(r.rec.out_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—",
+          "Check Out Location": outLoc || "—",
+          Hours: hours(r.rec),
+          Status: st.label,
+          Details: explainFor(r, st.label),
+        };
+      });
+
+      const ws = XLSX.utils.json_to_sheet(exportRows);
+      ws["!cols"] = [
+        { wch: 14 },
+        { wch: 8 },
+        { wch: 12 },
+        { wch: 28 },
+        { wch: 12 },
+        { wch: 28 },
+        { wch: 10 },
+        { wch: 12 },
+        { wch: 36 },
+      ];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Attendance");
+
+      const summaryData = [
+        ["Employee", employeeName ?? "Employee"],
+        ["Period", monthLabel],
+        ["Generated At", new Date().toLocaleString()],
+        [],
+        ["Status", "Days"],
+        ["Present", stats.present],
+        ["Late", stats.late],
+        ["Absent", stats.absent],
+        ["Leave", stats.leave],
+        ["Working Days", stats.working],
+      ];
+      const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
+      summaryWs["!cols"] = [{ wch: 18 }, { wch: 18 }];
+      XLSX.utils.book_append_sheet(wb, summaryWs, "Summary");
+
+      const cleanName = (employeeName || "employee")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9\u0600-\u06FF]+/g, "_");
+      XLSX.writeFile(wb, `attendance_${cleanName}_${cursor.year}_${String(cursor.month).padStart(2, "0")}.xlsx`);
+      toast.success("Attendance exported to Excel");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to export Excel file");
+    }
+  }
+
   return (
     <div className="rounded-3xl border border-border bg-card">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
@@ -2727,11 +2963,22 @@ function AttendanceHistoryPanel({ employeeId }: { employeeId: string }) {
           </button>
         </div>
         <div className="flex flex-wrap items-center gap-3 text-xs">
-          <span><span className="font-semibold text-emerald-600 tabular-nums">{stats.present}</span> <span className="text-muted-foreground">present</span></span>
-          <span><span className="font-semibold text-amber-600 tabular-nums">{stats.late}</span> <span className="text-muted-foreground">late</span></span>
-          <span><span className="font-semibold text-destructive tabular-nums">{stats.absent}</span> <span className="text-muted-foreground">absent</span></span>
-          <span><span className="font-semibold text-sky-600 tabular-nums">{stats.leave}</span> <span className="text-muted-foreground">leave</span></span>
-          <span className="text-muted-foreground">/ <span className="font-semibold text-foreground tabular-nums">{stats.working}</span> working days</span>
+          <div className="flex flex-wrap items-center gap-3">
+            <span><span className="font-semibold text-emerald-600 tabular-nums">{stats.present}</span> <span className="text-muted-foreground">present</span></span>
+            <span><span className="font-semibold text-amber-600 tabular-nums">{stats.late}</span> <span className="text-muted-foreground">late</span></span>
+            <span><span className="font-semibold text-destructive tabular-nums">{stats.absent}</span> <span className="text-muted-foreground">absent</span></span>
+            <span><span className="font-semibold text-sky-600 tabular-nums">{stats.leave}</span> <span className="text-muted-foreground">leave</span></span>
+            <span className="text-muted-foreground">/ <span className="font-semibold text-foreground tabular-nums">{stats.working}</span> working days</span>
+          </div>
+          <button
+            type="button"
+            onClick={exportToExcel}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted shadow-2xs transition-colors"
+            title="Export to Excel (.xlsx)"
+          >
+            <Download className="h-3.5 w-3.5 text-muted-foreground" />
+            <span>Export to Excel</span>
+          </button>
         </div>
       </div>
       {selectedDates.size > 0 && (
@@ -2794,8 +3041,8 @@ function AttendanceHistoryPanel({ employeeId }: { employeeId: string }) {
               </th>
               <th className="px-3 py-3 text-start font-semibold">Date</th>
               <th className="px-3 py-3 text-start font-semibold">Day</th>
-              <th className="px-3 py-3 text-start font-semibold">Check In</th>
-              <th className="px-3 py-3 text-start font-semibold">Check Out</th>
+              <th className="px-3 py-3 text-start font-semibold min-w-[130px]">Check In</th>
+              <th className="px-3 py-3 text-start font-semibold min-w-[130px]">Check Out</th>
               <th className="px-3 py-3 text-start font-semibold">Hours</th>
               <th className="px-3 py-3 text-end font-semibold">Status</th>
               <th className="px-5 py-3 text-end font-semibold">Actions</th>
@@ -2813,7 +3060,7 @@ function AttendanceHistoryPanel({ employeeId }: { employeeId: string }) {
               const paidLabel = r.leave ? (r.leave.paid === false ? "unpaid" : r.leave.paid ? "paid" : "n/a") : "";
               return (
                 <tr key={r.date} className="border-b border-border last:border-b-0 hover:bg-muted/30">
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 align-top">
                     {r.leave ? (
                       <input
                         type="checkbox"
@@ -2823,8 +3070,8 @@ function AttendanceHistoryPanel({ employeeId }: { employeeId: string }) {
                       />
                     ) : null}
                   </td>
-                  <td className="px-3 py-3 font-mono text-[13px] tabular-nums">{formatDate(r.date)}</td>
-                  <td className="px-3 py-3 text-muted-foreground">
+                  <td className="px-3 py-3 font-mono text-[13px] tabular-nums align-top">{formatDate(r.date)}</td>
+                  <td className="px-3 py-3 text-muted-foreground align-top">
                     {r.dayLabel}
                     {r.holiday && <span className="ms-2 text-[11px] font-medium text-violet-600">· {r.holiday.name}</span>}
                     {r.leave && (
@@ -2843,10 +3090,40 @@ function AttendanceHistoryPanel({ employeeId }: { employeeId: string }) {
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-3 font-mono tabular-nums">{r.rec?.in_time ? new Date(r.rec.in_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</td>
-                  <td className="px-3 py-3 font-mono tabular-nums">{r.rec?.out_time ? new Date(r.rec.out_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</td>
-                  <td className="px-3 py-3 font-mono tabular-nums">{hours(r.rec)}</td>
-                  <td className="px-3 py-3 text-end">
+                  <td className="px-3 py-3 font-mono tabular-nums align-top">
+                    {r.rec?.in_time ? (
+                      <div className="flex flex-col gap-0.5">
+                        <span>{new Date(r.rec.in_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                        <AttendancePlaceCell
+                          place={storedPlaceName(r.rec.street, r.rec.district, r.rec.city) || r.rec.branch || ""}
+                          lat={r.rec.lat}
+                          lng={r.rec.lng}
+                          freeCheck={r.rec.free_check}
+                          lookup={reverseGeocodeFn}
+                        />
+                      </div>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td className="px-3 py-3 font-mono tabular-nums align-top">
+                    {r.rec?.out_time ? (
+                      <div className="flex flex-col gap-0.5">
+                        <span>{new Date(r.rec.out_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                        <AttendancePlaceCell
+                          place={storedPlaceName(r.rec.out_street, r.rec.out_district, r.rec.out_city) || ""}
+                          lat={r.rec.out_lat}
+                          lng={r.rec.out_lng}
+                          freeCheck={r.rec.free_check}
+                          lookup={reverseGeocodeFn}
+                        />
+                      </div>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td className="px-3 py-3 font-mono tabular-nums align-top">{hours(r.rec)}</td>
+                  <td className="px-3 py-3 text-end align-top">
                     <div className="inline-flex items-center gap-1.5">
                       <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${st.cls}`}>{st.label}</span>
                       <TooltipProvider delayDuration={100}>
@@ -2994,10 +3271,12 @@ function LeavesHistoryPanel({ employeeId }: { employeeId: string }) {
   );
 }
 
+type LeaveStatus = "All" | "Pending" | "Approved" | "Rejected";
+
 function LeavesTab({ leaves }: { leaves: Array<{ id: number; type: string; start: string; end: string; status: string }> }) {
   const { t } = useI18n();
   const [filter, setFilter] = useState<LeaveStatus>("All");
-  const counts = {
+  const counts: Record<LeaveStatus, number> = {
     All: leaves.length,
     Pending: leaves.filter((l) => l.status === "Pending").length,
     Approved: leaves.filter((l) => l.status === "Approved").length,
