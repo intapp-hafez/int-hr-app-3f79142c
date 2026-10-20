@@ -1165,19 +1165,20 @@ export const sendEmployeeWelcomeEmail = createServerFn({ method: "POST" })
         to: z.string().email(),
         employeeName: z.string().min(1).max(160),
         username: z.string().min(1).max(160),
-        password: z.string().min(1).max(256),
+        password: z.string().max(256).optional().default(""),
         loginUrl: z.string().min(1).max(500),
         appName: z.string().max(120).optional().default(""),
         /** Optional Egyptian mobile number — when present a welcome SMS is also sent. */
         phone: z.string().max(20).optional().default(""),
+        customMessage: z.string().max(3000).optional().default(""),
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    if (data.userId && data.password) {
+    if (data.userId && data.password && data.password.trim().length > 0) {
       try {
         const { supabaseAdmin } = await import("@/backend/server/admin-client.server");
-        await supabaseAdmin.auth.admin.updateUserById(data.userId, { password: data.password });
+        await supabaseAdmin.auth.admin.updateUserById(data.userId, { password: data.password.trim() });
       } catch (err) {
         console.warn("Could not update auth password:", err);
       }
@@ -1192,6 +1193,7 @@ export const sendEmployeeWelcomeEmail = createServerFn({ method: "POST" })
       password: data.password,
       loginUrl: data.loginUrl,
       appName: data.appName || undefined,
+      customMessage: data.customMessage || undefined,
     });
 
     // Optionally send welcome SMS when a phone number is supplied.
@@ -1208,7 +1210,7 @@ export const sendEmployeeWelcomeEmail = createServerFn({ method: "POST" })
           if (!authErr) {
             const rec = normalizeRecipients(data.phone);
             if (rec.ok) {
-              const welcomeMsg = `welcome to Integrated technics your user name is ${data.username} and password ${data.password} and ${data.loginUrl} , thanks\nHR department`;
+              const welcomeMsg = data.customMessage?.trim() || `welcome to Integrated technics your user name is ${data.username} and password ${data.password} and ${data.loginUrl} , thanks\nHR department`;
               const smsRes = await sendSmsEpush(
                 { environment: cfg.environment, username: cfg.username, password: cfg.password, apiKey: cfg.api_key, sender: cfg.sender },
                 { mobile: rec.mobile, message: welcomeMsg, language: cfg.language },

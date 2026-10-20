@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import {
   MapPin,
   Users,
@@ -37,6 +37,7 @@ import type { GeofenceLocation } from "@/backend/functions/geofencing.functions"
 import { listCitiesWithDistricts } from "@/backend/functions/directory.functions";
 import { EGYPT_CITIES, type CityCentroid } from "@/lib/egypt-cities";
 import { useI18n } from "@/lib/i18n";
+import { reverseGeocodeCoords, getCachedGeocode } from "@/lib/reverse-geocode";
 
 function getHaversineDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371;
@@ -52,10 +53,35 @@ function getHaversineDistanceKm(lat1: number, lon1: number, lat2: number, lon2: 
 }
 
 export function resolveLocationCityAndDistrict(
-  loc: { name: string; lat: number; lng: number },
-  dbCities: Array<{ name_en: string; name_ar?: string; districts?: Array<{ name_en: string; name_ar?: string }> }> = [],
+  loc: { id?: string; name: string; lat: number; lng: number },
+  rawDbCities?: Array<{ name_en: string; name_ar?: string; districts?: Array<{ name_en: string; name_ar?: string }> }> | null,
   isArabic: boolean = false,
+  dynamicLookup?: Record<string, { city?: string; district?: string }> | null,
 ): { city: string; district: string } {
+  if (!loc || typeof loc.name !== "string") {
+    return { city: "", district: "" };
+  }
+
+  // 0. Check dynamic lookup override first
+  if (dynamicLookup) {
+    const byId = loc.id ? dynamicLookup[loc.id] : undefined;
+    const coordKey = `${Number(loc.lat).toFixed(4)},${Number(loc.lng).toFixed(4)}`;
+    const byCoord = dynamicLookup[coordKey];
+    const match = byId || byCoord;
+    if (match && (match.city || match.district)) {
+      return { city: match.city || "", district: match.district || "" };
+    }
+  }
+
+  // 0.1 Check synchronous cached reverse geocode
+  if (isFinite(loc.lat) && isFinite(loc.lng) && loc.lat !== 0 && loc.lng !== 0) {
+    const cached = getCachedGeocode(loc.lat, loc.lng, isArabic ? "ar" : "en");
+    if (cached && (cached.city || cached.district)) {
+      return { city: cached.city || "", district: cached.district || "" };
+    }
+  }
+
+  const dbCities = Array.isArray(rawDbCities) ? rawDbCities : [];
   let city = "";
   let district = "";
 
@@ -138,12 +164,72 @@ export function resolveLocationCityAndDistrict(
       }
     }
 
-    if (nearestCity && minDistance <= 65) {
+    if (nearestCity && minDistance <= 150) {
       city = isArabic ? nearestCity.ar : nearestCity.en;
     }
   }
 
   return { city, district };
+}
+
+function LocationCityDistrictBadge({
+  loc,
+  dbCities,
+  isAr,
+  dynamicGeo,
+  onResolved,
+}: {
+  loc: GeofenceLocation;
+  dbCities: Array<{ name_en: string; name_ar?: string; districts?: Array<{ name_en: string; name_ar?: string }> }>;
+  isAr: boolean;
+  dynamicGeo?: { city?: string; district?: string };
+  onResolved?: (locId: string, city: string, district: string) => void;
+}) {
+  const syncGeo = resolveLocationCityAndDistrict(loc, dbCities, isAr, { [loc.id]: dynamicGeo || {} });
+  const [geoState, setGeoState] = useState<{ city: string; district: string }>(syncGeo);
+
+  useEffect(() => {
+    setGeoState(resolveLocationCityAndDistrict(loc, dbCities, isAr, { [loc.id]: dynamicGeo || {} }));
+  }, [loc.id, loc.lat, loc.lng, isAr, dynamicGeo, dbCities]);
+
+  useEffect(() => {
+    // If both city and district are already present, no network fetch needed
+    if (geoState.city && geoState.district) return;
+    if (!isFinite(loc.lat) || !isFinite(loc.lng) || (loc.lat === 0 && loc.lng === 0)) return;
+
+    let isMounted = true;
+    reverseGeocodeCoords(loc.lat, loc.lng, isAr ? "ar" : "en").then((res) => {
+      if (!isMounted) return;
+      if (res.city || res.district) {
+        const mergedCity = res.city || geoState.city || "";
+        const mergedDistrict = res.district || geoState.district || "";
+        setGeoState({ city: mergedCity, district: mergedDistrict });
+        onResolved?.(loc.id, mergedCity, mergedDistrict);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [loc.id, loc.lat, loc.lng, isAr]);
+
+  const parts = [geoState.city, geoState.district].filter(Boolean);
+  const uniqueParts = parts.filter(
+    (val, idx, arr) => idx === 0 || val.toLowerCase() !== arr[0].toLowerCase(),
+  );
+  const text = uniqueParts.join(" · ");
+
+  if (!text) return null;
+
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground"
+      title={text}
+    >
+      <MapPin className="h-3 w-3 shrink-0 text-muted-foreground/60" />
+      <span className="truncate max-w-[170px]">{text}</span>
+    </span>
+  );
 }
 
 export interface GeofenceLocationsTableProps {
@@ -176,11 +262,12 @@ export function GeofenceLocationsTable({
 }: GeofenceLocationsTableProps) {
   const { t, isAr } = useI18n();
   const listCitiesFn = useServerFn(listCitiesWithDistricts);
-  const { data: dbCities = [] } = useQuery({
+  const citiesQuery = useQuery({
     queryKey: ["admin", "cities-districts"],
     queryFn: () => listCitiesFn(),
     staleTime: 5 * 60_000,
   });
+  const dbCities = Array.isArray(citiesQuery.data) ? citiesQuery.data : [];
 
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive">("all");
@@ -189,6 +276,35 @@ export function GeofenceLocationsTable({
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
+
+  const [dynamicGeocodes, setDynamicGeocodes] = useState<Record<string, { city: string; district: string }>>({});
+
+  const handleGeocodeResolved = useCallback((locId: string, city: string, district: string) => {
+    setDynamicGeocodes((prev) => {
+      const existing = prev[locId];
+      if (existing && existing.city === city && existing.district === district) {
+        return prev;
+      }
+      return { ...prev, [locId]: { city, district } };
+    });
+  }, []);
+
+  // Pre-populate dynamicGeocodes synchronously on mount from localStorage cache
+  useEffect(() => {
+    const lang = isAr ? "ar" : "en";
+    const found: Record<string, { city: string; district: string }> = {};
+    for (const loc of locations) {
+      if (loc.lat && loc.lng) {
+        const c = getCachedGeocode(loc.lat, loc.lng, lang);
+        if (c && (c.city || c.district)) {
+          found[loc.id] = { city: c.city || "", district: c.district || "" };
+        }
+      }
+    }
+    if (Object.keys(found).length > 0) {
+      setDynamicGeocodes((prev) => ({ ...found, ...prev }));
+    }
+  }, [locations, isAr]);
 
   const totalAssigned = useMemo(
     () => locations.reduce((sum, l) => sum + (l.assigned_count || 0), 0),
@@ -220,7 +336,7 @@ export function GeofenceLocationsTable({
   const uniqueCities = useMemo(() => {
     const counts = new Map<string, number>();
     for (const loc of locations) {
-      const geo = resolveLocationCityAndDistrict(loc, dbCities, isAr);
+      const geo = resolveLocationCityAndDistrict(loc, dbCities, isAr, dynamicGeocodes);
       const city = geo.city?.trim() || "Other";
       counts.set(city, (counts.get(city) || 0) + 1);
     }
@@ -231,7 +347,7 @@ export function GeofenceLocationsTable({
         if (b.name === "Other") return -1;
         return a.name.localeCompare(b.name);
       });
-  }, [locations, dbCities, isAr]);
+  }, [locations, dbCities, isAr, dynamicGeocodes]);
 
   const handleExportExcel = async () => {
     try {
@@ -243,7 +359,7 @@ export function GeofenceLocationsTable({
       }
 
       const exportData = targetList.map((loc) => {
-        const geo = resolveLocationCityAndDistrict(loc, dbCities, isAr);
+        const geo = resolveLocationCityAndDistrict(loc, dbCities, isAr, dynamicGeocodes);
         return {
           Name: loc.name,
           City: geo.city || "",
@@ -287,7 +403,7 @@ export function GeofenceLocationsTable({
 
     if (selectedCity !== "all") {
       list = list.filter((l) => {
-        const geo = resolveLocationCityAndDistrict(l, dbCities, isAr);
+        const geo = resolveLocationCityAndDistrict(l, dbCities, isAr, dynamicGeocodes);
         const c = geo.city?.trim() || "Other";
         return c.toLowerCase() === selectedCity.toLowerCase();
       });
@@ -296,7 +412,7 @@ export function GeofenceLocationsTable({
     const q = searchQuery.trim().toLowerCase();
     if (q) {
       list = list.filter((l) => {
-        const geo = resolveLocationCityAndDistrict(l, dbCities, isAr);
+        const geo = resolveLocationCityAndDistrict(l, dbCities, isAr, dynamicGeocodes);
         return (
           l.name.toLowerCase().includes(q) ||
           geo.city.toLowerCase().includes(q) ||
@@ -321,7 +437,7 @@ export function GeofenceLocationsTable({
       }
       return sortOrder === "asc" ? comparison : -comparison;
     });
-  }, [locations, filterStatus, selectedCity, searchQuery, sortField, sortOrder, dbCities, isAr]);
+  }, [locations, filterStatus, selectedCity, searchQuery, sortField, sortOrder, dbCities, isAr, dynamicGeocodes]);
 
   // Pagination calculations (50 per page default)
   const totalItems = filteredLocations.length;
@@ -767,24 +883,13 @@ export function GeofenceLocationsTable({
                         <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 font-mono text-xs font-semibold tabular-nums text-muted-foreground">
                           {loc.radius_m} m
                         </span>
-                        {(() => {
-                          const geo = resolveLocationCityAndDistrict(loc, dbCities, isAr);
-                          const parts = [geo.city, geo.district].filter(Boolean);
-                          const uniqueParts = parts.filter(
-                            (val, idx, arr) => idx === 0 || val.toLowerCase() !== arr[0].toLowerCase(),
-                          );
-                          const text = uniqueParts.join(" · ");
-                          if (!text) return null;
-                          return (
-                            <span
-                              className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground"
-                              title={text}
-                            >
-                              <MapPin className="h-3 w-3 shrink-0 text-muted-foreground/60" />
-                              <span className="truncate max-w-[170px]">{text}</span>
-                            </span>
-                          );
-                        })()}
+                        <LocationCityDistrictBadge
+                          loc={loc}
+                          dbCities={dbCities}
+                          isAr={isAr}
+                          dynamicGeo={dynamicGeocodes[loc.id]}
+                          onResolved={handleGeocodeResolved}
+                        />
                       </div>
                     </TableCell>
 

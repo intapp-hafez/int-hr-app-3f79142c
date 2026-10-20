@@ -30,11 +30,12 @@ import { EmployeeAvatar } from "@/components/EmployeeAvatar";
 import { AttendanceReportView } from "@/components/admin/AttendanceReportView";
 import { AdminTimeManagementView } from "@/components/admin/AdminTimeManagementView";
 import { AttendanceRulesView } from "@/components/admin/AttendanceRulesView";
+import { AttendanceReviewQueueView } from "@/components/admin/AttendanceReviewQueueView";
 
 const LeafletMap = lazy(() => import("@/components/LeafletMap").then((mod) => ({ default: mod.LeafletMap })));
 const EgyptMap = lazy(() => import("@/components/admin/EgyptMap").then((mod) => ({ default: mod.EgyptMap })));
 
-const ATTENDANCE_TABS = ["overview", "records", "report", "map", "tasks", "rules"] as const;
+const ATTENDANCE_TABS = ["overview", "records", "reviews", "report", "map", "tasks", "rules"] as const;
 type AttendanceTab = (typeof ATTENDANCE_TABS)[number];
 
 export const Route = createFileRoute("/admin/attendance")({
@@ -226,6 +227,9 @@ type AttendanceRow = {
   out_city?: string | null;
   out_district?: string | null;
   out_street?: string | null;
+  decision?: "accept" | "review" | "reject";
+  reason_codes?: string[] | null;
+  accuracy_m?: number | null;
 };
 
 type FormState = {
@@ -592,6 +596,7 @@ function AdminAttendance() {
         <TabsList className="flex w-full flex-wrap justify-start gap-1 print:hidden">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="records">Records</TabsTrigger>
+          <TabsTrigger value="reviews" className="gap-1.5">Review Queue</TabsTrigger>
           <TabsTrigger value="report">Attendance Report</TabsTrigger>
           <TabsTrigger value="map">Live map</TabsTrigger>
           <TabsTrigger value="tasks">{t("tasks") || "Tasks"}</TabsTrigger>
@@ -688,7 +693,19 @@ function AdminAttendance() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${tone[row.status] ?? "bg-muted text-muted-foreground"}`}>{row.status}</span>
+                      <div className="flex flex-col gap-1">
+                        <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${tone[row.status] ?? "bg-muted text-muted-foreground"}`}>{row.status}</span>
+                        {row.decision === "review" && (
+                          <span className="inline-flex w-fit items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-[9px] font-semibold text-amber-600 dark:text-amber-400">
+                            Review Needed
+                          </span>
+                        )}
+                        {row.decision === "reject" && (
+                          <span className="inline-flex w-fit items-center rounded-full bg-destructive/15 px-2 py-0.5 text-[9px] font-semibold text-destructive">
+                            Rejected
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-end">
                       <button onClick={() => openEdit(row)} className="me-1 grid h-7 w-7 place-items-center rounded-full bg-muted hover:text-foreground" aria-label="Edit"><Pencil className="h-3.5 w-3.5" /></button>
@@ -742,6 +759,10 @@ function AdminAttendance() {
               </div>
             )}
           </div>
+        </TabsContent>
+
+        <TabsContent value="reviews" className="space-y-5">
+          <AttendanceReviewQueueView />
         </TabsContent>
 
         <TabsContent value="report" className="space-y-5">

@@ -87,15 +87,56 @@ function CheckInOutCard() {
     }
   }
 
-  async function getCoords(): Promise<{ lat?: number; lng?: number; err?: string }> {
-    if (typeof navigator === "undefined" || !navigator.geolocation) return { err: "Geolocation not supported" };
-    return new Promise((resolve) => {
-      navigator.geolocation.getCurrentPosition(
-        (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
-        (e) => resolve({ err: e.message }),
-        { timeout: 8000, enableHighAccuracy: true },
+  async function getCoords(): Promise<{
+    lat?: number; lng?: number;
+    accuracy_m?: number; gps_age_ms?: number; gps_sample_count?: number;
+    err?: string;
+  }> {
+    if (typeof navigator === "undefined" || !navigator.geolocation)
+      return { err: "Geolocation not supported" };
+
+    const GPS_SAMPLES = 3;
+    const SAMPLE_INTERVAL_MS = 1500;
+    const readings: GeolocationPosition[] = [];
+
+    await new Promise<void>((resolve) => {
+      let gathered = 0;
+      const watcher = navigator.geolocation.watchPosition(
+        (pos) => {
+          readings.push(pos);
+          gathered++;
+          if (gathered >= GPS_SAMPLES) { navigator.geolocation.clearWatch(watcher); resolve(); }
+        },
+        () => resolve(),
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 },
       );
+      setTimeout(() => { navigator.geolocation.clearWatch(watcher); resolve(); }, SAMPLE_INTERVAL_MS * GPS_SAMPLES + 2000);
     });
+
+    if (readings.length === 0) {
+      return new Promise((resolve) => {
+        navigator.geolocation.getCurrentPosition(
+          (p) => resolve({
+            lat: p.coords.latitude, lng: p.coords.longitude,
+            accuracy_m: p.coords.accuracy ?? undefined,
+            gps_age_ms: Math.max(0, Date.now() - p.timestamp),
+            gps_sample_count: 1,
+          }),
+          (e) => resolve({ err: e.message }),
+          { timeout: 8000, enableHighAccuracy: true },
+        );
+      });
+    }
+
+    const best = readings.reduce((a, b) =>
+      (b.coords.accuracy ?? Infinity) < (a.coords.accuracy ?? Infinity) ? b : a
+    );
+    return {
+      lat: best.coords.latitude, lng: best.coords.longitude,
+      accuracy_m: best.coords.accuracy ?? undefined,
+      gps_age_ms: Math.max(0, Date.now() - best.timestamp),
+      gps_sample_count: readings.length,
+    };
   }
 
   async function go(kind: "in" | "out") {
@@ -109,6 +150,9 @@ function CheckInOutCard() {
         branch,
         lat: coords.lat,
         lng: coords.lng,
+        accuracy_m: coords.accuracy_m ?? null,
+        gps_age_ms: coords.gps_age_ms ?? null,
+        gps_sample_count: coords.gps_sample_count ?? null,
         network_ok: online,
         note: note.trim() || undefined,
         device_id: getCurrentDeviceId(),
@@ -120,11 +164,19 @@ function CheckInOutCard() {
       if (kind === "in") {
         const res: any = await inFn({ data: payload });
         if (res?.blocked) { toast.error(res.reason); return; }
-        toast.success(res?.free_check ? `Checked in (free)${locLabel}` : `Checked in${locLabel}`);
+        if (res?.pending_review) {
+          toast.warning(`Checked in · Pending review${locLabel}`, { description: "Location could not be fully confirmed. A manager will review." });
+        } else {
+          toast.success(res?.free_check ? `Checked in (free)${locLabel}` : `Checked in${locLabel}`);
+        }
       } else {
         const res: any = await outFn({ data: payload });
         if (res?.blocked) { toast.error(res.reason); return; }
-        toast.success(`Checked out${locLabel}`);
+        if (res?.pending_review) {
+          toast.warning(`Checked out · Pending review${locLabel}`, { description: "Location could not be fully confirmed. A manager will review." });
+        } else {
+          toast.success(`Checked out${locLabel}`);
+        }
       }
       setNote("");
       qc.invalidateQueries({ queryKey: ["my-attendance"] });

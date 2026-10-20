@@ -257,7 +257,10 @@ export const checkIn = createServerFn({ method: "POST" })
       );
     }
 
-    const { loadAssignedFences, evaluateFence } = await import("@/backend/server/geofence.server");
+    const { loadAssignedFences } = await import("@/backend/server/geofence.server");
+    const { evaluatePresence, loadLastTrustedLocation, POLICY_VERSION } = await import(
+      "@/backend/server/anti-spoofing.server"
+    );
     const locs = (await loadAssignedFences(supabase as any, [userId])).get(userId) ?? [];
 
     const nets = ((netAssigns ?? []) as any[])
@@ -267,50 +270,55 @@ export const checkIn = createServerFn({ method: "POST" })
     const hasConstraints = locs.length > 0 || nets.length > 0;
     const freeCheck = !hasConstraints;
 
-    const fenceCheck = evaluateFence(locs, data.lat, data.lng);
-    const withinGeofence = !!fenceCheck?.ok;
-    const nearestDistance = fenceCheck?.distance_m ?? null;
-    const nearestRadius = fenceCheck?.allowed_m ?? 0;
-
+    // NOTE: SSID from the client is untrusted; we only use it as a supplemental
+    // advisory signal — it CANNOT substitute for geofence presence.
     const onAuthorizedNetwork =
       nets.length > 0 && !!data.ssid && nets.some((n: any) => n.ssid === data.ssid);
 
-    // A work location assignment is a hard gate: being on an authorized network
-    // cannot substitute for standing inside the assigned radius.
-    const blockedByFence = locs.length > 0 && !withinGeofence;
-    if (blockedByFence || (hasConstraints && !withinGeofence && !onAuthorizedNetwork)) {
-      const reasonCodes: Array<{ code: string; params?: Record<string, any> }> = [];
-      const reasons: string[] = [];
-      if (locs.length > 0) {
-        if (data.lat == null || data.lng == null) {
-          reasonCodes.push({ code: "gps_unavailable" });
-          reasons.push("GPS location not available");
-        } else if (nearestDistance != null) {
-          reasonCodes.push({
-            code: "gps_outside_fence",
-            params: { dist: Math.round(nearestDistance), allowed: nearestRadius },
-          });
-          reasons.push(
-            `GPS outside assigned fence (${Math.round(nearestDistance)} m away, allowed ${nearestRadius} m)`,
-          );
-        } else {
-          reasonCodes.push({ code: "gps_outside_any" });
-          reasons.push("GPS outside any assigned location");
-        }
-      }
-      if (nets.length > 0) {
-        if (!data.ssid) {
-          reasonCodes.push({ code: "ssid_undetected" });
-          reasons.push("network SSID not detected");
-        } else {
-          reasonCodes.push({ code: "ssid_not_authorized", params: { ssid: data.ssid } });
-          reasons.push(`network "${data.ssid}" is not authorized for you`);
-        }
-      }
+    // ── Three-Tier Presence Decision ──────────────────────────────────────
+    const lastTrusted = await loadLastTrustedLocation(supabase as any, userId);
+    const presenceDecision = evaluatePresence(
+      {
+        lat: data.lat,
+        lng: data.lng,
+        accuracy_m: (data as any).accuracy_m ?? null,
+        gps_age_ms: (data as any).gps_age_ms ?? null,
+        gps_sample_count: (data as any).gps_sample_count ?? null,
+      },
+      locs,
+      lastTrusted,
+    );
+
+    // Hard REJECT from presence engine (clearly outside fence)
+    if (presenceDecision.outcome === "reject") {
+      // Log the attempt before blocking
+      await (supabase as any).from("attendance_attempts").insert({
+        employee_id: userId,
+        action: "check_in",
+        claimed_lat: data.lat ?? null,
+        claimed_lng: data.lng ?? null,
+        claimed_accuracy_m: (data as any).accuracy_m ?? null,
+        claimed_gps_age_ms: (data as any).gps_age_ms ?? null,
+        claimed_gps_samples: (data as any).gps_sample_count ?? null,
+        device_id: data.device_id ?? null,
+        ssid_claimed: data.ssid ?? null,
+        biometric_method: bioCheck.method,
+        fence_distance_m: presenceDecision.fenceDistanceM,
+        fence_allowed_m: presenceDecision.fenceAllowedM,
+        fence_result: presenceDecision.fenceOutcome,
+        risk_signals: presenceDecision.riskSignals,
+        decision: "reject",
+        reason_codes: presenceDecision.reasonCodes,
+        policy_version: POLICY_VERSION,
+      });
+      const primaryCode = presenceDecision.reasonCodes[0] ?? "gps_outside_fence";
+      const distDetail = presenceDecision.fenceDistanceM != null
+        ? ` (${presenceDecision.fenceDistanceM} m away, allowed ${presenceDecision.fenceAllowedM} m)`
+        : "";
       return block(
-        "constraints",
-        `Check-in blocked · ${reasons.join(" · ")}.`,
-        { action: "check_in", reasons: reasonCodes }
+        primaryCode,
+        `Check-in blocked · GPS outside your assigned work area${distDetail}.`,
+        { action: "check_in", reasons: presenceDecision.reasonCodes, signals: presenceDecision.riskSignals }
       );
     }
 
@@ -327,7 +335,10 @@ export const checkIn = createServerFn({ method: "POST" })
       } catch {}
     }
 
-    const { error } = await supabase.from("attendance").upsert(
+    // decision is 'accept' or 'review'
+    const finalDecision = presenceDecision.outcome;
+
+    const { data: attRow, error } = await (supabase as any).from("attendance").upsert(
       {
         employee_id: userId,
         date: today,
@@ -335,6 +346,9 @@ export const checkIn = createServerFn({ method: "POST" })
         branch: data.branch,
         lat: data.lat,
         lng: data.lng,
+        accuracy_m: (data as any).accuracy_m ?? null,
+        gps_age_ms: (data as any).gps_age_ms ?? null,
+        gps_sample_count: (data as any).gps_sample_count ?? null,
         network_ok: data.network_ok,
         note: data.note,
         city,
@@ -344,10 +358,50 @@ export const checkIn = createServerFn({ method: "POST" })
         status: "present",
         verified_face: bioCheck.method === "face",
         verified_fp: bioCheck.method === "fingerprint",
+        decision: finalDecision,
+        reason_codes: presenceDecision.reasonCodes.length > 0 ? presenceDecision.reasonCodes : null,
+        policy_version: POLICY_VERSION,
       },
       { onConflict: "employee_id,date" },
-    );
+    ).select("id").maybeSingle();
     if (error) throw new Error(error.message);
+
+    const attendanceId = attRow?.id ?? null;
+
+    // Log structured attempt
+    await (supabase as any).from("attendance_attempts").insert({
+      employee_id: userId,
+      action: "check_in",
+      claimed_lat: data.lat ?? null,
+      claimed_lng: data.lng ?? null,
+      claimed_accuracy_m: (data as any).accuracy_m ?? null,
+      claimed_gps_age_ms: (data as any).gps_age_ms ?? null,
+      claimed_gps_samples: (data as any).gps_sample_count ?? null,
+      device_id: data.device_id ?? null,
+      ssid_claimed: data.ssid ?? null,
+      biometric_method: bioCheck.method,
+      fence_distance_m: presenceDecision.fenceDistanceM,
+      fence_allowed_m: presenceDecision.fenceAllowedM,
+      fence_result: presenceDecision.fenceOutcome,
+      risk_signals: presenceDecision.riskSignals,
+      decision: finalDecision,
+      reason_codes: presenceDecision.reasonCodes,
+      policy_version: POLICY_VERSION,
+      attendance_id: attendanceId,
+    });
+
+    // If REVIEW: create a review case for admin/manager triage
+    if (finalDecision === "review" && attendanceId) {
+      await (supabase as any).from("attendance_review_cases").insert({
+        attendance_id: attendanceId,
+        employee_id: userId,
+        action: "check_in",
+        reason_codes: presenceDecision.reasonCodes,
+        risk_signals: presenceDecision.riskSignals,
+        status: "pending",
+      });
+    }
+
     {
       const { touchDeviceCheck } = await import("@/backend/server/device-registry.server");
       await touchDeviceCheck(data.device_id!, "in");
@@ -358,8 +412,11 @@ export const checkIn = createServerFn({ method: "POST" })
       ok: true as const,
       blocked: false as const,
       free_check: freeCheck,
-      within_geofence: withinGeofence,
+      within_geofence: presenceDecision.fenceOutcome === "inside",
       network_match: onAuthorizedNetwork,
+      decision: finalDecision,
+      pending_review: finalDecision === "review",
+      risk_signals: presenceDecision.riskSignals,
     };
   });
 
@@ -516,48 +573,126 @@ export const checkOut = createServerFn({ method: "POST" })
       } catch {}
     }
 
-    // Work-location gate: check-out must also happen inside an assigned radius.
+    // Work-location gate via three-tier presence engine
     {
-      const { loadAssignedFences, evaluateFence } = await import("@/backend/server/geofence.server");
+      const { loadAssignedFences } = await import("@/backend/server/geofence.server");
+      const { evaluatePresence, loadLastTrustedLocation, POLICY_VERSION } = await import(
+        "@/backend/server/anti-spoofing.server"
+      );
       const fences = (await loadAssignedFences(supabase as any, [userId])).get(userId) ?? [];
-      if (fences.length > 0) {
-        const fc = evaluateFence(fences, data.lat, data.lng);
-        if (!fc?.ok) {
-          const reasons: Array<{ code: string; params?: Record<string, any> }> =
-            data.lat == null || data.lng == null
-              ? [{ code: "gps_unavailable" }]
-              : [{ code: "gps_outside_fence", params: { dist: fc?.distance_m ?? 0, allowed: fc?.allowed_m ?? 0 } }];
-          return block(
-            "constraints",
-            data.lat == null || data.lng == null
-              ? "Check-out blocked · GPS location not available."
-              : `Check-out blocked · you are ${fc?.distance_m ?? 0} m away from "${fc?.name ?? "your work location"}" (allowed ${fc?.allowed_m ?? 0} m).`,
-            { action: "check_out", reasons }
-          );
-        }
-      }
-    }
+      const lastTrusted = await loadLastTrustedLocation(supabase as any, userId);
+      const presenceDecision = evaluatePresence(
+        {
+          lat: data.lat,
+          lng: data.lng,
+          accuracy_m: (data as any).accuracy_m ?? null,
+          gps_age_ms: (data as any).gps_age_ms ?? null,
+          gps_sample_count: (data as any).gps_sample_count ?? null,
+        },
+        fences,
+        lastTrusted,
+      );
 
-    const { error } = await supabase
-      .from("attendance")
-      .update({
-        out_time: now,
-        note: data.note,
-        out_lat: data.lat ?? null,
-        out_lng: data.lng ?? null,
-        out_city: outCity,
-        out_district: outDistrict,
-        out_street: outStreet,
-      })
-      .eq("employee_id", userId)
-      .eq("date", today);
-    if (error) throw new Error(error.message);
-    {
-      const { touchDeviceCheck } = await import("@/backend/server/device-registry.server");
-      await touchDeviceCheck(data.device_id!, "out");
+      if (presenceDecision.outcome === "reject") {
+        // Log the rejected attempt
+        await (supabase as any).from("attendance_attempts").insert({
+          employee_id: userId,
+          action: "check_out",
+          claimed_lat: data.lat ?? null,
+          claimed_lng: data.lng ?? null,
+          claimed_accuracy_m: (data as any).accuracy_m ?? null,
+          claimed_gps_age_ms: (data as any).gps_age_ms ?? null,
+          claimed_gps_samples: (data as any).gps_sample_count ?? null,
+          device_id: data.device_id ?? null,
+          ssid_claimed: data.ssid ?? null,
+          biometric_method: bioCheckOut.method,
+          fence_distance_m: presenceDecision.fenceDistanceM,
+          fence_allowed_m: presenceDecision.fenceAllowedM,
+          fence_result: presenceDecision.fenceOutcome,
+          risk_signals: presenceDecision.riskSignals,
+          decision: "reject",
+          reason_codes: presenceDecision.reasonCodes,
+          policy_version: POLICY_VERSION,
+        });
+        const distDetail = presenceDecision.fenceDistanceM != null
+          ? ` (${presenceDecision.fenceDistanceM} m away, allowed ${presenceDecision.fenceAllowedM} m)`
+          : "";
+        return block(
+          presenceDecision.reasonCodes[0] ?? "gps_outside_fence",
+          `Check-out blocked · GPS outside your assigned work area${distDetail}.`,
+          { action: "check_out", reasons: presenceDecision.reasonCodes, signals: presenceDecision.riskSignals }
+        );
+      }
+
+      const outDecision = presenceDecision.outcome; // 'accept' | 'review'
+
+      const { data: updatedRow, error } = await (supabase as any)
+        .from("attendance")
+        .update({
+          out_time: now,
+          note: data.note,
+          out_lat: data.lat ?? null,
+          out_lng: data.lng ?? null,
+          out_city: outCity,
+          out_district: outDistrict,
+          out_street: outStreet,
+          out_accuracy_m: (data as any).accuracy_m ?? null,
+          out_gps_age_ms: (data as any).gps_age_ms ?? null,
+        })
+        .eq("employee_id", userId)
+        .eq("date", today)
+        .select("id")
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+
+      const attendanceId = updatedRow?.id ?? null;
+
+      // Log the structured attempt
+      await (supabase as any).from("attendance_attempts").insert({
+        employee_id: userId,
+        action: "check_out",
+        claimed_lat: data.lat ?? null,
+        claimed_lng: data.lng ?? null,
+        claimed_accuracy_m: (data as any).accuracy_m ?? null,
+        claimed_gps_age_ms: (data as any).gps_age_ms ?? null,
+        claimed_gps_samples: (data as any).gps_sample_count ?? null,
+        device_id: data.device_id ?? null,
+        ssid_claimed: data.ssid ?? null,
+        biometric_method: bioCheckOut.method,
+        fence_distance_m: presenceDecision.fenceDistanceM,
+        fence_allowed_m: presenceDecision.fenceAllowedM,
+        fence_result: presenceDecision.fenceOutcome,
+        risk_signals: presenceDecision.riskSignals,
+        decision: outDecision,
+        reason_codes: presenceDecision.reasonCodes,
+        policy_version: POLICY_VERSION,
+        attendance_id: attendanceId,
+      });
+
+      if (outDecision === "review" && attendanceId) {
+        await (supabase as any).from("attendance_review_cases").insert({
+          attendance_id: attendanceId,
+          employee_id: userId,
+          action: "check_out",
+          reason_codes: presenceDecision.reasonCodes,
+          risk_signals: presenceDecision.riskSignals,
+          status: "pending",
+        });
+      }
+
+      {
+        const { touchDeviceCheck } = await import("@/backend/server/device-registry.server");
+        await touchDeviceCheck(data.device_id!, "out");
+      }
+      await logAttendanceBio(userId, data, "check_out", true, null, bioCheckOut.method, bioCheckOut.distance);
+      return {
+        ok: true as const,
+        blocked: false as const,
+        decision: outDecision,
+        pending_review: outDecision === "review",
+        risk_signals: presenceDecision.riskSignals,
+      };
     }
-    await logAttendanceBio(userId, data, "check_out", true, null, bioCheckOut.method, bioCheckOut.distance);
-    return { ok: true as const, blocked: false as const };
   });
 
 export const listMyAccess = createServerFn({ method: "GET" })
@@ -700,7 +835,7 @@ export const adminListAttendance = createServerFn({ method: "POST" })
     let q = context.supabase
       .from("attendance")
       .select(
-        "id, employee_id, date, in_time, out_time, branch, status, note, city, district, street, free_check, lat, lng, out_lat, out_lng, out_city, out_district, out_street, profiles:employee_id(full_name, email)",
+        "id, employee_id, date, in_time, out_time, branch, status, note, city, district, street, free_check, lat, lng, out_lat, out_lng, out_city, out_district, out_street, decision, reason_codes, accuracy_m, out_accuracy_m, profiles:employee_id(full_name, email)",
       )
       .gte("date", data.from)
       .lte("date", data.to)
@@ -730,6 +865,10 @@ export const adminListAttendance = createServerFn({ method: "POST" })
       out_city: (r.out_city ?? null) as string | null,
       out_district: (r.out_district ?? null) as string | null,
       out_street: (r.out_street ?? null) as string | null,
+      decision: (r.decision ?? "accept") as "accept" | "review" | "reject",
+      reason_codes: (r.reason_codes ?? null) as string[] | null,
+      accuracy_m: (r.accuracy_m ?? null) as number | null,
+      out_accuracy_m: (r.out_accuracy_m ?? null) as number | null,
     }));
   });
 
@@ -1031,3 +1170,101 @@ export const adminAttendanceReport = createServerFn({ method: "POST" })
       })
       .filter((r) => r.in_time || r.out_time);
   });
+
+async function assertAdminHrOrManager(supabase: any, userId: string): Promise<"admin" | "hr" | "manager"> {
+  const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", userId);
+  const userRoles = (roles ?? []).map((r: any) => r.role);
+  if (userRoles.includes("admin")) return "admin";
+  if (userRoles.includes("hr")) return "hr";
+  if (userRoles.includes("manager")) return "manager";
+  throw new Error("Forbidden");
+}
+
+export const listAttendanceReviewCases = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) =>
+    z.object({
+      status: z.enum(["pending", "approved", "rejected", "all"]).optional().default("pending"),
+    }).parse(i ?? {}),
+  )
+  .handler(async ({ data, context }) => {
+    const role = await assertAdminHrOrManager(context.supabase, context.userId);
+    let q = (context.supabase as any)
+      .from("attendance_review_cases")
+      .select(
+        "id, attendance_id, employee_id, action, reason_codes, risk_signals, status, reviewer_id, reviewer_note, created_at, resolved_at, profiles:employee_id(full_name, email, emp_code, manager_id), attendance:attendance_id(date, in_time, out_time, branch, lat, lng, accuracy_m, out_lat, out_lng, out_accuracy_m)"
+      )
+      .order("created_at", { ascending: false })
+      .limit(200);
+
+    if (data.status !== "all") {
+      q = q.eq("status", data.status);
+    }
+
+    if (role === "manager") {
+      const { data: reports } = await (context.supabase as any)
+        .from("profiles")
+        .select("id")
+        .eq("manager_id", context.userId);
+      const reportIds = (reports ?? []).map((p: any) => p.id);
+      if (!reportIds.length) return [];
+      q = q.in("employee_id", reportIds);
+    }
+
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+    return (rows ?? []) as any[];
+  });
+
+export const resolveAttendanceReviewCase = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) =>
+    z.object({
+      caseId: z.string().uuid(),
+      decision: z.enum(["approved", "rejected"]),
+      note: z.string().max(500).optional(),
+    }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const role = await assertAdminHrOrManager(context.supabase, context.userId);
+    const { data: caseRow, error: fetchErr } = await (context.supabase as any)
+      .from("attendance_review_cases")
+      .select("id, attendance_id, employee_id, status")
+      .eq("id", data.caseId)
+      .maybeSingle();
+
+    if (fetchErr || !caseRow) throw new Error("Review case not found");
+
+    if (role === "manager") {
+      const { data: empProfile } = await (context.supabase as any)
+        .from("profiles")
+        .select("manager_id")
+        .eq("id", caseRow.employee_id)
+        .maybeSingle();
+      if (empProfile?.manager_id !== context.userId) {
+        throw new Error("Forbidden: You are not the line manager for this employee.");
+      }
+    }
+
+    const now = new Date().toISOString();
+    const { error: updErr } = await (context.supabase as any)
+      .from("attendance_review_cases")
+      .update({
+        status: data.decision,
+        reviewer_id: context.userId,
+        reviewer_note: data.note?.trim() || null,
+        resolved_at: now,
+      })
+      .eq("id", data.caseId);
+
+    if (updErr) throw new Error(updErr.message);
+
+    const attDecision = data.decision === "approved" ? "accept" : "reject";
+    await (context.supabase as any)
+      .from("attendance")
+      .update({ decision: attDecision })
+      .eq("id", caseRow.attendance_id);
+
+    return { ok: true, caseId: data.caseId, status: data.decision };
+  });
+

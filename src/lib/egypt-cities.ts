@@ -36,6 +36,7 @@ export const EGYPT_CITIES: Record<string, CityCentroid> = {
   badr: { lat: 30.1326, lng: 31.7195, en: "Badr", ar: "بدر" },
   helwan: { lat: 29.8493, lng: 31.3343, en: "Helwan", ar: "حلوان" },
   shubra: { lat: 30.1286, lng: 31.2422, en: "Shubra El-Kheima", ar: "شبرا الخيمة" },
+  "abu simbel": { lat: 22.3468, lng: 31.6111, en: "Abu Simbel", ar: "أبو سمبل" },
 };
 
 const ALIASES: Record<string, string> = {

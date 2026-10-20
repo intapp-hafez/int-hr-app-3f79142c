@@ -253,24 +253,16 @@ import { adminTransferEmployee } from "@/backend/functions/employees.functions";
 function ResendWelcomeEmailModal({ detail, close }: { detail: EmployeeDetailRow; close: () => void }) {
   const { isAr } = useI18n();
   const sendEmailFn = useServerFn(sendEmployeeWelcomeEmail);
-  const [password, setPassword] = useState(() => {
-    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
-    let res = "";
-    for (let i = 0; i < 10; i++) res += chars.charAt(Math.floor(Math.random() * chars.length));
-    return res;
-  });
+  const initialMessage = isAr
+    ? `مرحبًا بك في فريق العمل! يسعدنا انضمامك إلينا، وتم تجهيز حسابك بنجاح. يمكنك الآن تسجيل الدخول والبدء في استخدام النظام. نتمنى لك رحلة موفقة ومليئة بالنجاح معنا!`
+    : `Welcome to the team! We are thrilled to have you with us. Your account is ready, and you can now sign in to the portal. We wish you all the best and look forward to working together!`;
+
+  const [message, setMessage] = useState(initialMessage);
   const [sending, setSending] = useState(false);
 
-  function generateNew() {
-    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
-    let res = "";
-    for (let i = 0; i < 10; i++) res += chars.charAt(Math.floor(Math.random() * chars.length));
-    setPassword(res);
-  }
-
   async function handleSend() {
-    if (!password.trim()) {
-      toast.error("Password is required");
+    if (!message.trim()) {
+      toast.error(isAr ? "نص رسالة الترحيب مطلوب" : "Welcoming message text is required");
       return;
     }
     if (!detail.email) {
@@ -285,7 +277,8 @@ function ResendWelcomeEmailModal({ detail, close }: { detail: EmployeeDetailRow;
           to: detail.email,
           employeeName: detail.full_name || detail.email,
           username: detail.email,
-          password: password.trim(),
+          password: "",
+          customMessage: message.trim(),
           loginUrl: window.location.origin,
           appName: document.title || "INT-HR App",
           phone: detail.phone || "",
@@ -337,28 +330,19 @@ function ResendWelcomeEmailModal({ detail, close }: { detail: EmployeeDetailRow;
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-semibold text-muted-foreground">
-                {isAr ? "كلمة المرور المرسلة للموظف" : "Password to send to employee"}
-              </label>
-              <button
-                type="button"
-                onClick={generateNew}
-                className="text-xs font-semibold text-brand hover:underline"
-              >
-                {isAr ? "توليد كلمة سر جديدة" : "Generate New"}
-              </button>
-            </div>
-            <input
-              type="text"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-xl border border-border bg-background px-3 py-2 font-mono text-sm text-foreground focus:outline-hidden focus:ring-2 focus:ring-brand"
+            <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+              {isAr ? "نص رسالة الترحيب" : "Welcoming message text"}
+            </label>
+            <textarea
+              rows={5}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs leading-relaxed text-foreground focus:outline-hidden focus:ring-2 focus:ring-brand"
             />
             <p className="mt-1 text-[11px] text-muted-foreground">
               {isAr
-                ? "سيتم تعيين هذه الكلمة لحساب الموظف وإرسالها له بالبريد بتصميم INT-HR الرسمي."
-                : "This password will be updated in the employee's account and emailed in the official template."}
+                ? "يمكنك تعديل نص الرسالة الترحيبية بحرية قبل إرسالها للموظف بالبريد."
+                : "You can customize the welcoming message text before sending it to the employee."}
             </p>
           </div>
         </div>

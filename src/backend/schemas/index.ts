@@ -122,6 +122,12 @@ export const AttendanceCheckSchema = z.object({
   branch: z.string().max(120).optional(),
   lat: z.number().min(-90).max(90).optional(),
   lng: z.number().min(-180).max(180).optional(),
+  /** Reported GPS accuracy radius in metres (from GeolocationCoordinates.accuracy). */
+  accuracy_m: z.number().nonnegative().optional().nullable(),
+  /** Age of GPS fix in milliseconds (Date.now() − position.timestamp). */
+  gps_age_ms: z.number().nonnegative().int().optional().nullable(),
+  /** Number of consecutive GPS readings collected before submitting. */
+  gps_sample_count: z.number().positive().int().max(20).optional().nullable(),
   network_ok: z.boolean().optional(),
   note: z.string().max(500).optional(),
   ssid: z.string().max(120).optional().nullable(),

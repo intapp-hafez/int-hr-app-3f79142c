@@ -11,12 +11,13 @@ export async function sendWelcomeEmail(opts: {
   to: string;
   employeeName: string;
   username: string;
-  password: string;
+  password?: string;
   loginUrl: string;
   appName?: string;
+  customMessage?: string;
 }): Promise<{ ok: boolean; error?: string }> {
   try {
-    if (!opts.to || !opts.password) return { ok: false, error: "missing recipient or password" };
+    if (!opts.to) return { ok: false, error: "missing recipient" };
     const smtp = await loadSmtpConfig();
     if (!smtp || !smtp.host || !smtp.password) {
       return { ok: false, error: "SMTP not configured" };
@@ -27,6 +28,7 @@ export async function sendWelcomeEmail(opts: {
       password: opts.password,
       loginUrl: opts.loginUrl,
       appName: opts.appName,
+      customMessage: opts.customMessage,
     });
     const res = await sendEmail(
       { host: smtp.host, port: smtp.port, secure: smtp.secure, username: smtp.username, password: smtp.password },
