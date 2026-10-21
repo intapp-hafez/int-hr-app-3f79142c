@@ -53,12 +53,26 @@ async function validateAndConsumeBioToken(
   action: "check_in" | "check_out",
   faceRequired: boolean,
 ): Promise<
-  | { ok: true; method: "face" | "fingerprint" | "none"; distance: number | null }
+  | {
+      ok: true;
+      method: "face" | "fingerprint" | "none";
+      distance: number | null;
+      snapshot_lat: number | null;
+      snapshot_lng: number | null;
+      snapshot_accuracy_m: number | null;
+    }
   | { ok: false; code: string; reason: string }
 > {
   // If face is not required and no token was provided, allow without biometrics
   if (!faceRequired && !token) {
-    return { ok: true, method: "none", distance: null };
+    return {
+      ok: true,
+      method: "none",
+      distance: null,
+      snapshot_lat: null,
+      snapshot_lng: null,
+      snapshot_accuracy_m: null,
+    };
   }
 
   if (!token) {
@@ -71,7 +85,7 @@ async function validateAndConsumeBioToken(
 
   const { data: tokenRow, error: tokenErr } = await supabase
     .from("biometric_verification_tokens")
-    .select("id, token, user_id, action, method, distance, expires_at, used_at")
+    .select("id, token, user_id, action, method, distance, expires_at, used_at, snapshot_lat, snapshot_lng, snapshot_accuracy_m")
     .eq("token", token)
     .eq("user_id", userId)
     .maybeSingle();
@@ -129,6 +143,9 @@ async function validateAndConsumeBioToken(
     ok: true,
     method: tokenRow.method as "face" | "fingerprint",
     distance: tokenRow.distance != null ? Number(tokenRow.distance) : null,
+    snapshot_lat: tokenRow.snapshot_lat != null ? Number(tokenRow.snapshot_lat) : null,
+    snapshot_lng: tokenRow.snapshot_lng != null ? Number(tokenRow.snapshot_lng) : null,
+    snapshot_accuracy_m: tokenRow.snapshot_accuracy_m != null ? Number(tokenRow.snapshot_accuracy_m) : null,
   };
 }
 
@@ -175,7 +192,14 @@ export const checkIn = createServerFn({ method: "POST" })
     }
 
     // Face recognition gate (verified via single-use server token)
-    let bioCheck: { ok: true; method: "face" | "fingerprint" | "none"; distance: number | null };
+    let bioCheck: {
+      ok: true;
+      method: "face" | "fingerprint" | "none";
+      distance: number | null;
+      snapshot_lat: number | null;
+      snapshot_lng: number | null;
+      snapshot_accuracy_m: number | null;
+    };
     {
       const { data: faceRow, error: faceErr } = await (supabase as any)
         .from("profiles")
@@ -275,6 +299,24 @@ export const checkIn = createServerFn({ method: "POST" })
     const onAuthorizedNetwork =
       nets.length > 0 && !!data.ssid && nets.some((n: any) => n.ssid === data.ssid);
 
+    // ── STAGE 5: Temporary Restriction for High-Risk Cases ───────────────
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    const { data: recentSpoofAttempts } = await (supabase as any)
+      .from("attendance_attempts")
+      .select("id")
+      .eq("employee_id", userId)
+      .eq("decision", "reject")
+      .gte("server_received_at", twoHoursAgo)
+      .contains("reason_codes", ["mock_gps_detected"]);
+
+    if (recentSpoofAttempts && recentSpoofAttempts.length >= 3) {
+      return block(
+        "attendance_restricted",
+        "تعذر إتمام العملية حاليًا. يرجى التواصل مع الإدارة.",
+        { action: "check_in", restricted: true }
+      );
+    }
+
     // ── Three-Tier Presence Decision ──────────────────────────────────────
     const lastTrusted = await loadLastTrustedLocation(supabase as any, userId);
     const presenceDecision = evaluatePresence(
@@ -284,12 +326,20 @@ export const checkIn = createServerFn({ method: "POST" })
         accuracy_m: (data as any).accuracy_m ?? null,
         gps_age_ms: (data as any).gps_age_ms ?? null,
         gps_sample_count: (data as any).gps_sample_count ?? null,
+        samples: (data as any).samples ?? null,
+        altitude: (data as any).altitude ?? null,
+        altitude_accuracy: (data as any).altitude_accuracy ?? null,
+        heading: (data as any).heading ?? null,
+        speed: (data as any).speed ?? null,
+        snapshot_lat: bioCheck.snapshot_lat,
+        snapshot_lng: bioCheck.snapshot_lng,
+        snapshot_accuracy_m: bioCheck.snapshot_accuracy_m,
       },
       locs,
       lastTrusted,
     );
 
-    // Hard REJECT from presence engine (clearly outside fence)
+    // Hard REJECT from presence engine (mock GPS or clearly outside fence)
     if (presenceDecision.outcome === "reject") {
       // Log the attempt before blocking
       await (supabase as any).from("attendance_attempts").insert({
@@ -311,13 +361,26 @@ export const checkIn = createServerFn({ method: "POST" })
         reason_codes: presenceDecision.reasonCodes,
         policy_version: POLICY_VERSION,
       });
-      const primaryCode = presenceDecision.reasonCodes[0] ?? "gps_outside_fence";
-      const distDetail = presenceDecision.fenceDistanceM != null
-        ? ` (${presenceDecision.fenceDistanceM} m away, allowed ${presenceDecision.fenceAllowedM} m)`
-        : "";
+
+      // ── STAGE 6: Immediate Administrative Security Alert ───────────────
+      if (
+        presenceDecision.reasonCodes.includes("mock_gps_detected") ||
+        presenceDecision.reasonCodes.includes("geo_face_discrepancy")
+      ) {
+        await (supabase as any).from("attendance_review_cases").insert({
+          employee_id: userId,
+          action: "check_in",
+          reason_codes: presenceDecision.reasonCodes,
+          risk_signals: presenceDecision.riskSignals,
+          status: "pending",
+          reviewer_note: "SECURITY ALERT: High-risk spoofed GPS or face-location discrepancy detected.",
+        });
+      }
+
+      const primaryCode = presenceDecision.reasonCodes[0] ?? "security_policy_rejection";
       return block(
         primaryCode,
-        `Check-in blocked · GPS outside your assigned work area${distDetail}.`,
+        "تعذر إتمام العملية حاليًا. يرجى التواصل مع الإدارة.",
         { action: "check_in", reasons: presenceDecision.reasonCodes, signals: presenceDecision.riskSignals }
       );
     }
@@ -338,12 +401,25 @@ export const checkIn = createServerFn({ method: "POST" })
     // decision is 'accept' or 'review'
     const finalDecision = presenceDecision.outcome;
 
+    // Resolve dynamic location/branch instead of static "HQ"
+    let resolvedBranch = data.branch;
+    if (locs.length > 0 && data.lat != null && data.lng != null) {
+      const insideFence = locs.find((f: any) => distMeters(data.lat!, data.lng!, f.lat, f.lng) <= f.radius_m);
+      if (insideFence?.name) {
+        resolvedBranch = insideFence.name;
+      }
+    } else if (freeCheck && (district || city)) {
+      resolvedBranch = [district, city].filter(Boolean).join(", ");
+    } else if (data.branch && data.branch !== "HQ") {
+      resolvedBranch = data.branch;
+    }
+
     const { data: attRow, error } = await (supabase as any).from("attendance").upsert(
       {
         employee_id: userId,
         date: today,
         in_time: now,
-        branch: data.branch,
+        branch: resolvedBranch || data.branch || null,
         lat: data.lat,
         lng: data.lng,
         accuracy_m: (data as any).accuracy_m ?? null,
@@ -462,7 +538,14 @@ export const checkOut = createServerFn({ method: "POST" })
     }
 
     // Face recognition gate (verified via single-use server token)
-    let bioCheckOut: { ok: true; method: "face" | "fingerprint" | "none"; distance: number | null };
+    let bioCheckOut: {
+      ok: true;
+      method: "face" | "fingerprint" | "none";
+      distance: number | null;
+      snapshot_lat: number | null;
+      snapshot_lng: number | null;
+      snapshot_accuracy_m: number | null;
+    };
     {
       const { data: faceRow, error: faceErr } = await (supabase as any)
         .from("profiles")
@@ -588,6 +671,14 @@ export const checkOut = createServerFn({ method: "POST" })
           accuracy_m: (data as any).accuracy_m ?? null,
           gps_age_ms: (data as any).gps_age_ms ?? null,
           gps_sample_count: (data as any).gps_sample_count ?? null,
+          samples: (data as any).samples ?? null,
+          altitude: (data as any).altitude ?? null,
+          altitude_accuracy: (data as any).altitude_accuracy ?? null,
+          heading: (data as any).heading ?? null,
+          speed: (data as any).speed ?? null,
+          snapshot_lat: bioCheckOut.snapshot_lat,
+          snapshot_lng: bioCheckOut.snapshot_lng,
+          snapshot_accuracy_m: bioCheckOut.snapshot_accuracy_m,
         },
         fences,
         lastTrusted,
@@ -614,12 +705,26 @@ export const checkOut = createServerFn({ method: "POST" })
           reason_codes: presenceDecision.reasonCodes,
           policy_version: POLICY_VERSION,
         });
-        const distDetail = presenceDecision.fenceDistanceM != null
-          ? ` (${presenceDecision.fenceDistanceM} m away, allowed ${presenceDecision.fenceAllowedM} m)`
-          : "";
+
+        // ── STAGE 6: Immediate Administrative Security Alert ───────────────
+        if (
+          presenceDecision.reasonCodes.includes("mock_gps_detected") ||
+          presenceDecision.reasonCodes.includes("geo_face_discrepancy")
+        ) {
+          await (supabase as any).from("attendance_review_cases").insert({
+            employee_id: userId,
+            action: "check_out",
+            reason_codes: presenceDecision.reasonCodes,
+            risk_signals: presenceDecision.riskSignals,
+            status: "pending",
+            reviewer_note: "SECURITY ALERT: High-risk spoofed GPS or face-location discrepancy detected on check-out.",
+          });
+        }
+
+        const primaryCode = presenceDecision.reasonCodes[0] ?? "security_policy_rejection";
         return block(
-          presenceDecision.reasonCodes[0] ?? "gps_outside_fence",
-          `Check-out blocked · GPS outside your assigned work area${distDetail}.`,
+          primaryCode,
+          "تعذر إتمام العملية حاليًا. يرجى التواصل مع الإدارة.",
           { action: "check_out", reasons: presenceDecision.reasonCodes, signals: presenceDecision.riskSignals }
         );
       }

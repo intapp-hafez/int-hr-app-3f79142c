@@ -833,8 +833,8 @@ export function GeofenceLocationsTable({
                         <button
                           type="button"
                           onClick={() => onAssign(loc)}
-                          title="Click to manage employee assignments"
-                          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground hover:border-brand/40 hover:bg-brand/5 transition-all shadow-sm group-hover:border-border/80"
+                          title={`Click to view ${assignedCount} assigned employee${assignedCount === 1 ? "" : "s"}`}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground hover:border-brand/40 hover:bg-brand/10 hover:text-brand transition-all shadow-sm group-hover:border-border/80 cursor-pointer active:scale-95"
                         >
                           <Users className="h-3.5 w-3.5 text-brand" />
                           <span className="font-bold tabular-nums">{assignedCount}</span>

@@ -88,8 +88,16 @@ function CheckInOutCard() {
   }
 
   async function getCoords(): Promise<{
-    lat?: number; lng?: number;
-    accuracy_m?: number; gps_age_ms?: number; gps_sample_count?: number;
+    lat?: number;
+    lng?: number;
+    accuracy_m?: number;
+    gps_age_ms?: number;
+    gps_sample_count?: number;
+    altitude?: number | null;
+    altitude_accuracy?: number | null;
+    heading?: number | null;
+    speed?: number | null;
+    samples?: Array<{ lat: number; lng: number; accuracy_m?: number | null; timestamp?: number | null }>;
     err?: string;
   }> {
     if (typeof navigator === "undefined" || !navigator.geolocation)
@@ -131,28 +139,53 @@ function CheckInOutCard() {
     const best = readings.reduce((a, b) =>
       (b.coords.accuracy ?? Infinity) < (a.coords.accuracy ?? Infinity) ? b : a
     );
+    const samples = readings.map((r) => ({
+      lat: r.coords.latitude,
+      lng: r.coords.longitude,
+      accuracy_m: r.coords.accuracy ?? null,
+      timestamp: r.timestamp,
+    }));
     return {
-      lat: best.coords.latitude, lng: best.coords.longitude,
+      lat: best.coords.latitude,
+      lng: best.coords.longitude,
       accuracy_m: best.coords.accuracy ?? undefined,
       gps_age_ms: Math.max(0, Date.now() - best.timestamp),
       gps_sample_count: readings.length,
+      altitude: best.coords.altitude ?? null,
+      altitude_accuracy: best.coords.altitudeAccuracy ?? null,
+      heading: best.coords.heading ?? null,
+      speed: best.coords.speed ?? null,
+      samples,
     };
   }
 
   async function go(kind: "in" | "out") {
     setBusy(kind);
+    const toastId = toast.loading("جاري الاتصال بالسيرفر، برجاء الانتظار...");
     try {
       const coords = await getCoords();
-      if (coords.err) { toast.error(`Location error: ${coords.err}`); }
+      if (coords.err) {
+        toast.error("تعذر إتمام العملية حاليًا. يرجى التواصل مع الإدارة.", { id: toastId });
+        return;
+      }
       const online = typeof navigator !== "undefined" ? navigator.onLine : true;
       const geo = coords.lat != null && coords.lng != null ? await reverseGeocodeCoords(coords.lat, coords.lng) : {};
+      const resolvedBranch =
+        (geo.district && geo.city ? `${geo.district}, ${geo.city}` : geo.city || geo.district) ||
+        (meQ.data as any)?.profile?.branch ||
+        "HQ";
       const payload = {
-        branch,
+        branch: resolvedBranch,
         lat: coords.lat,
         lng: coords.lng,
         accuracy_m: coords.accuracy_m ?? null,
         gps_age_ms: coords.gps_age_ms ?? null,
         gps_sample_count: coords.gps_sample_count ?? null,
+        altitude: coords.altitude ?? null,
+        altitude_accuracy: coords.altitude_accuracy ?? null,
+        heading: coords.heading ?? null,
+        speed: coords.speed ?? null,
+        samples: coords.samples ?? null,
         network_ok: online,
         note: note.trim() || undefined,
         device_id: getCurrentDeviceId(),
@@ -160,28 +193,39 @@ function CheckInOutCard() {
         district: geo.district,
         street: geo.street,
       };
-      const locLabel = geo.formatted ? ` · ${geo.formatted}` : "";
       if (kind === "in") {
         const res: any = await inFn({ data: payload });
-        if (res?.blocked) { toast.error(res.reason); return; }
+        if (res?.blocked) {
+          toast.error("تعذر إتمام العملية حاليًا. يرجى التواصل مع الإدارة.", { id: toastId });
+          return;
+        }
         if (res?.pending_review) {
-          toast.warning(`Checked in · Pending review${locLabel}`, { description: "Location could not be fully confirmed. A manager will review." });
+          toast.warning("تم تسجيل الحضور · قيد المراجعة", {
+            id: toastId,
+            description: "جاري مراجعة البيانات من قبل الإدارة.",
+          });
         } else {
-          toast.success(res?.free_check ? `Checked in (free)${locLabel}` : `Checked in${locLabel}`);
+          toast.success("تم تسجيل الحضور بنجاح", { id: toastId });
         }
       } else {
         const res: any = await outFn({ data: payload });
-        if (res?.blocked) { toast.error(res.reason); return; }
+        if (res?.blocked) {
+          toast.error("تعذر إتمام العملية حاليًا. يرجى التواصل مع الإدارة.", { id: toastId });
+          return;
+        }
         if (res?.pending_review) {
-          toast.warning(`Checked out · Pending review${locLabel}`, { description: "Location could not be fully confirmed. A manager will review." });
+          toast.warning("تم تسجيل الانصراف · قيد المراجعة", {
+            id: toastId,
+            description: "جاري مراجعة البيانات من قبل الإدارة.",
+          });
         } else {
-          toast.success(`Checked out${locLabel}`);
+          toast.success("تم تسجيل الانصراف بنجاح", { id: toastId });
         }
       }
       setNote("");
       qc.invalidateQueries({ queryKey: ["my-attendance"] });
     } catch (e) {
-      toast.error((e as Error).message);
+      toast.error("تعذر إتمام العملية حاليًا. يرجى التواصل مع الإدارة.", { id: toastId });
     } finally {
       setBusy(null);
     }

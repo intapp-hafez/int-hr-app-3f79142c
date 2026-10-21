@@ -259,7 +259,7 @@ function EmployeesPage() {
             value={q}
             onChange={(e) => { setQ(e.target.value); resetPage(); }}
             className="w-full rounded-full border border-input bg-card py-2.5 ps-9 pe-3 text-sm"
-            placeholder={t("search")}
+            placeholder={isAr ? "بحث بالاسم، البريد، الكود، الهاتف، أو الرقم القومي…" : "Search by name, email, ID, or phone…"}
           />
         </div>
         <div className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground">

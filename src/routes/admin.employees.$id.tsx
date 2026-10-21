@@ -7,6 +7,7 @@ import { EmployeeTripsPanel } from "@/components/employee/EmployeeTripsPanel";
 import { EmployeeCustodyPanel } from "@/components/admin/EmployeeCustodyPanel";
 import { EmployeePenaltiesPanel } from "@/components/admin/EmployeePenaltiesPanel";
 import { EmployeePermissionsPanel } from "@/components/admin/EmployeePermissionsPanel";
+import { EmployeeLocationsPanel } from "@/components/admin/EmployeeLocationsPanel";
 import { AvatarUploader } from "@/components/AvatarUploader";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -593,12 +594,13 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
   const upd = <K extends keyof typeof form>(k: K, v: typeof form[K]) => setForm((f) => ({ ...f, [k]: v }));
   const districtsForCity = (locs?.districts ?? []).filter((d) => !form.city_id || d.city_id === form.city_id);
   const sectionsForDept = (locs?.sections ?? []).filter((s: any) => !form.department_id || s.department_id === form.department_id);
-  type SideTab = "overview" | "employment" | "assignments" | "attendance" | "leaves" | "permissions" | "documents" | "devices" | "notes" | "advances" | "penalties" | "status" | "offboarding" | "trips" | "custody";
+  type SideTab = "overview" | "employment" | "assignments" | "locations" | "attendance" | "leaves" | "permissions" | "documents" | "devices" | "notes" | "advances" | "penalties" | "status" | "offboarding" | "trips" | "custody";
   const [sideTab, setSideTab] = useState<SideTab>("overview");
   const sideNav: { id: SideTab; label: string; icon: any }[] = [
     { id: "overview", label: "Overview", icon: UserIcon },
     { id: "employment", label: "Employment", icon: Briefcase },
     { id: "assignments", label: "Assignments", icon: Target },
+    { id: "locations", label: isAr ? "المواقع المخصصة" : "Assigned locations", icon: MapPin },
     { id: "attendance", label: "Attendance", icon: CalendarDays },
     { id: "leaves", label: "Leaves", icon: Plane },
     { id: "permissions", label: t("employeePermissions" as any) || "Permissions", icon: Clock },
@@ -1157,7 +1159,7 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
                       }`}
                   >
                     <n.icon className="h-4 w-4" />
-                    <span>{t((n.id === "status" ? "status_history" : n.id === "trips" ? "tripAllowance" : n.id) as any) ?? n.label}</span>
+                    <span>{n.id === "locations" ? n.label : (t((n.id === "status" ? "status_history" : n.id === "trips" ? "tripAllowance" : n.id) as any) ?? n.label)}</span>
                   </button>
                 );
               })}
@@ -1354,6 +1356,14 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
                 </p>
                 <EmployeeAssignmentsPicker employeeId={detail.id} />
               </div>
+            )}
+
+            {sideTab === "locations" && (
+              <EmployeeLocationsPanel
+                profileId={detail.id}
+                canManage={canEdit}
+                employeeName={detail.full_name}
+              />
             )}
 
             {sideTab === "documents" && (

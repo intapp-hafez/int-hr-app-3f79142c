@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -39,17 +39,31 @@ function Page() {
   const geosQ = useQuery({ queryKey: ["access", "geofences"], queryFn: () => geosFn() });
 
   const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const employees = empQ.data ?? [];
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
     if (!s) return employees;
+    const sDigits = s.replace(/\D/g, "");
     return employees.filter((e: any) =>
-      e.name.toLowerCase().includes(s) ||
+      (e.name ?? "").toLowerCase().includes(s) ||
+      (e.email ?? "").toLowerCase().includes(s) ||
+      (e.phone ?? "").toLowerCase().includes(s) ||
+      (sDigits && (e.phone ?? "").replace(/\D/g, "").includes(sDigits)) ||
       (e.emp_code ?? "").toLowerCase().includes(s) ||
+      (e.national_id ?? "").toLowerCase().includes(s) ||
+      (e.id ?? "").toLowerCase().includes(s) ||
       (e.department ?? "").toLowerCase().includes(s),
     );
   }, [employees, q]);
+
+  const PAGE_SIZE = 50;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, page]);
 
   const assignedNetsQ = useQuery({
     queryKey: ["access", "emp-networks", selectedId],
@@ -105,6 +119,34 @@ function Page() {
   const selectedEmp = employees.find((e: any) => e.id === selectedId);
   const hasAnyAccess = (assignedNetsQ.data?.length ?? 0) + (assignedGeosQ.data?.length ?? 0) > 0;
 
+  const [geoQ, setGeoQ] = useState("");
+  const [geoPage, setGeoPage] = useState(1);
+  const [geoTab, setGeoTab] = useState<"all" | "assigned">("all");
+
+  const filteredGeos = useMemo(() => {
+    let list = geos;
+    if (geoTab === "assigned") {
+      list = list.filter((g: any) => geoSet.has(g.id));
+    }
+    const s = geoQ.trim().toLowerCase();
+    if (!s) return list;
+    return list.filter((g: any) =>
+      (g.name ?? "").toLowerCase().includes(s) ||
+      (g.address ?? "").toLowerCase().includes(s),
+    );
+  }, [geos, geoTab, geoSet, geoQ]);
+
+  const GEO_PAGE_SIZE = 50;
+  const totalGeoPages = Math.max(1, Math.ceil(filteredGeos.length / GEO_PAGE_SIZE));
+  const paginatedGeos = useMemo(() => {
+    const start = (geoPage - 1) * GEO_PAGE_SIZE;
+    return filteredGeos.slice(start, start + GEO_PAGE_SIZE);
+  }, [filteredGeos, geoPage]);
+
+  useEffect(() => {
+    setGeoPage(1);
+  }, [selectedId]);
+
   return (
     <div className="space-y-5">
       <div>
@@ -122,7 +164,10 @@ function Page() {
             <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
               value={q}
-              onChange={(e) => setQ(e.target.value)}
+              onChange={(e) => {
+                setQ(e.target.value);
+                setPage(1);
+              }}
               placeholder="Search employees…"
               className="w-full rounded-xl border border-input bg-background py-2 ps-9 pe-3 text-sm"
             />
@@ -133,7 +178,7 @@ function Page() {
                 <Loader2 className="mx-auto h-4 w-4 animate-spin" />
               </li>
             )}
-            {filtered.map((e: any) => {
+            {paginated.map((e: any) => {
               const active = e.id === selectedId;
               return (
                 <li key={e.id}>
@@ -157,6 +202,35 @@ function Page() {
               <li className="py-6 text-center text-xs text-muted-foreground">No employees</li>
             )}
           </ul>
+
+          {filtered.length > PAGE_SIZE && (
+            <div className="mt-3 flex items-center justify-between border-t border-border pt-2.5 px-1 text-xs text-muted-foreground">
+              <span>
+                {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                  className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs font-medium hover:bg-muted disabled:opacity-40 transition-colors"
+                >
+                  Prev
+                </button>
+                <span className="px-1 font-mono text-[11px]">
+                  {page} / {totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                  className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs font-medium hover:bg-muted disabled:opacity-40 transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </aside>
 
         {/* Detail panel */}
@@ -211,21 +285,70 @@ function Page() {
 
               {/* Geofences */}
               <div className="rounded-3xl border border-border bg-card">
-                <header className="flex items-center justify-between border-b border-border px-4 py-3">
-                  <h2 className="inline-flex items-center gap-2 font-display text-sm font-semibold">
-                    <MapPin className="h-4 w-4 text-brand" /> Allowed locations
-                  </h2>
-                  <span className="text-xs text-muted-foreground">
-                    {assignedGeosQ.data?.length ?? 0} / {geos.length} assigned
-                  </span>
+                <header className="flex flex-col gap-2.5 border-b border-border p-4">
+                  <div className="flex items-center justify-between">
+                    <h2 className="inline-flex items-center gap-2 font-display text-sm font-semibold">
+                      <MapPin className="h-4 w-4 text-brand" /> Allowed locations
+                    </h2>
+                    <span className="text-xs text-muted-foreground">
+                      {assignedGeosQ.data?.length ?? 0} / {geos.length} assigned
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <div className="relative min-w-[200px] flex-1">
+                      <Search className="pointer-events-none absolute start-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                      <input
+                        value={geoQ}
+                        onChange={(e) => {
+                          setGeoQ(e.target.value);
+                          setGeoPage(1);
+                        }}
+                        placeholder="Search locations…"
+                        className="w-full rounded-xl border border-input bg-background py-1.5 ps-8 pe-3 text-xs"
+                      />
+                    </div>
+                    <div className="flex items-center rounded-xl border border-border bg-muted/40 p-0.5 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setGeoTab("all");
+                          setGeoPage(1);
+                        }}
+                        className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                          geoTab === "all" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        All ({geos.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setGeoTab("assigned");
+                          setGeoPage(1);
+                        }}
+                        className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                          geoTab === "assigned" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        Assigned ({assignedGeosQ.data?.length ?? 0})
+                      </button>
+                    </div>
+                  </div>
                 </header>
+
                 <ul className="divide-y divide-border">
                   {geos.length === 0 && (
                     <li className="px-4 py-6 text-center text-xs text-muted-foreground">
                       No geofence locations defined.
                     </li>
                   )}
-                  {geos.map((g: any) => {
+                  {geos.length > 0 && paginatedGeos.length === 0 && (
+                    <li className="px-4 py-6 text-center text-xs text-muted-foreground">
+                      No matching locations found.
+                    </li>
+                  )}
+                  {paginatedGeos.map((g: any) => {
                     const checked = geoSet.has(g.id);
                     const overrideRadius = assignedGeoMap.get(g.id);
                     return (
@@ -284,6 +407,35 @@ function Page() {
                     );
                   })}
                 </ul>
+
+                {filteredGeos.length > GEO_PAGE_SIZE && (
+                  <div className="flex items-center justify-between border-t border-border px-4 py-3 text-xs text-muted-foreground">
+                    <span>
+                      {(geoPage - 1) * GEO_PAGE_SIZE + 1}–{Math.min(geoPage * GEO_PAGE_SIZE, filteredGeos.length)} of {filteredGeos.length}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setGeoPage((p) => Math.max(1, p - 1))}
+                        disabled={geoPage <= 1}
+                        className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs font-medium hover:bg-muted disabled:opacity-40 transition-colors"
+                      >
+                        Prev
+                      </button>
+                      <span className="px-1 font-mono text-[11px]">
+                        {geoPage} / {totalGeoPages}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setGeoPage((p) => Math.min(totalGeoPages, p + 1))}
+                        disabled={geoPage >= totalGeoPages}
+                        className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs font-medium hover:bg-muted disabled:opacity-40 transition-colors"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Networks */}

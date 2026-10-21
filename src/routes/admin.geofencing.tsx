@@ -19,7 +19,10 @@ import {
   Globe,
   Pencil,
   TableProperties,
+  UserPlus,
+  Check,
 } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -953,165 +956,595 @@ function AddLocationModal({
   );
 }
 
-function AssigneeRow({
+function getInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "—";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function AssignedEmployeeCard({
   e,
   location,
-  onToggle,
-  onRadiusChange,
   isPending,
+  onRemove,
+  onRadiusChange,
 }: {
   e: AssignableEmployee;
   location: GeofenceLocation;
-  onToggle: (assign: boolean) => void;
-  onRadiusChange: (radius: number | null) => void;
   isPending: boolean;
+  onRemove: () => void;
+  onRadiusChange: (radius: number | null) => void;
 }) {
-  const { t } = useI18n();
-  const [radiusVal, setRadiusVal] = useState<string>(e.radius_m != null ? String(e.radius_m) : "");
+  const [isEditingRadius, setIsEditingRadius] = useState(false);
+  const [radiusVal, setRadiusVal] = useState<string>(
+    e.radius_m != null ? String(e.radius_m) : "",
+  );
 
   useEffect(() => {
     setRadiusVal(e.radius_m != null ? String(e.radius_m) : "");
   }, [e.radius_m]);
 
-  return (
-    <li className="space-y-2 rounded-xl border border-border bg-card p-3">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-medium">{e.full_name}</p>
-          <p className="text-[11px] text-muted-foreground">
-            {e.emp_code ?? "—"}
-            {e.department ? ` · ${e.department}` : ""}
-          </p>
-        </div>
-        <button
-          disabled={isPending}
-          onClick={() => onToggle(!e.assigned)}
-          className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-            e.assigned ? "bg-destructive/10 text-destructive hover:bg-destructive/20" : "bg-gradient-brand text-brand-foreground"
-          }`}
-        >
-          {e.assigned ? (
-            <span className="inline-flex items-center gap-1">
-              <Trash2 className="h-3 w-3" /> {t("remove")}
-            </span>
-          ) : (
-            t("add")
-          )}
-        </button>
-      </div>
+  const handleSaveRadius = () => {
+    const trimmed = radiusVal.trim();
+    const num = trimmed ? parseInt(trimmed, 10) : null;
+    if (num !== (e.radius_m ?? null)) {
+      onRadiusChange(num && !isNaN(num) && num > 0 ? num : null);
+    }
+    setIsEditingRadius(false);
+  };
 
-      {e.assigned && (
-        <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/60 text-xs">
-          <span className="text-muted-foreground text-[11px]">Radius override:</span>
-          <div className="flex items-center gap-1.5">
+  const hasOverride = e.radius_m != null;
+
+  return (
+    <li className="group rounded-xl border border-border bg-card p-3 shadow-sm hover:border-brand/30 hover:shadow-md transition-all">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* Left: Avatar & Identity */}
+        <div className="flex items-center gap-3 min-w-0">
+          <Avatar className="h-9 w-9 border border-border/80 shadow-sm shrink-0">
+            <AvatarImage src={e.avatar_url ?? undefined} alt={e.full_name} />
+            <AvatarFallback className="bg-brand/10 text-brand text-xs font-bold font-mono">
+              {getInitials(e.full_name)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-sm text-foreground truncate">
+                {e.full_name}
+              </span>
+              {e.emp_code && (
+                <span className="font-mono text-[11px] rounded bg-muted px-1.5 py-0.5 text-muted-foreground border border-border/60">
+                  #{e.emp_code}
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+              {e.department && (
+                <span className="truncate max-w-[150px]">{e.department}</span>
+              )}
+              {e.email && (
+                <>
+                  <span>•</span>
+                  <span className="truncate max-w-[180px] font-mono text-[10px]">
+                    {e.email}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Right: Actions */}
+        <div className="flex items-center gap-2">
+          {/* Radius badge or editor button */}
+          {!isEditingRadius ? (
+            <button
+              type="button"
+              onClick={() => setIsEditingRadius(true)}
+              title="Click to edit check-in radius override for this employee"
+              className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium border transition-colors ${
+                hasOverride
+                  ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20"
+                  : "bg-muted text-muted-foreground border-border hover:bg-muted/80"
+              }`}
+            >
+              <Pencil className="h-3 w-3 opacity-70" />
+              <span>
+                {hasOverride ? `${e.radius_m}m custom` : `${location.radius_m}m default`}
+              </span>
+            </button>
+          ) : (
+            <div className="inline-flex items-center gap-1 bg-muted/60 p-0.5 rounded-lg border border-border">
+              <input
+                type="number"
+                min={10}
+                max={10000}
+                step={10}
+                autoFocus
+                placeholder={`${location.radius_m}`}
+                value={radiusVal}
+                onChange={(evt) => setRadiusVal(evt.target.value)}
+                onKeyDown={(evt) => {
+                  if (evt.key === "Enter") handleSaveRadius();
+                  if (evt.key === "Escape") setIsEditingRadius(false);
+                }}
+                className="w-16 rounded border border-input bg-background px-1.5 py-0.5 text-xs font-mono text-end"
+              />
+              <span className="text-[10px] text-muted-foreground font-mono">m</span>
+              <button
+                type="button"
+                onClick={handleSaveRadius}
+                className="rounded p-1 text-emerald-600 hover:bg-emerald-500/10"
+                title="Save radius"
+              >
+                <Check className="h-3 w-3" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsEditingRadius(false)}
+                className="rounded p-1 text-muted-foreground hover:bg-muted"
+                title="Cancel"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          )}
+
+          {/* Remove / Unassign Button */}
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={onRemove}
+            title="Unassign employee from this location"
+            className="inline-flex items-center gap-1 rounded-full border border-destructive/20 bg-destructive/10 px-2.5 py-1 text-xs font-semibold text-destructive hover:bg-destructive/20 hover:border-destructive/30 transition-colors disabled:opacity-50"
+          >
+            <Trash2 className="h-3 w-3" />
+            <span>Remove</span>
+          </button>
+        </div>
+      </div>
+    </li>
+  );
+}
+
+function UnassignedEmployeeCard({
+  e,
+  location,
+  isPending,
+  onAssign,
+}: {
+  e: AssignableEmployee;
+  location: GeofenceLocation;
+  isPending: boolean;
+  onAssign: (radius_m?: number | null) => void;
+}) {
+  const [customRadius, setCustomRadius] = useState<string>("");
+
+  const handleAssign = () => {
+    const trimmed = customRadius.trim();
+    const num = trimmed ? parseInt(trimmed, 10) : null;
+    onAssign(num && !isNaN(num) && num > 0 ? num : null);
+  };
+
+  return (
+    <li className="group rounded-xl border border-border bg-card p-3 shadow-sm hover:border-brand/30 hover:shadow-md transition-all">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* Left: Avatar & Identity */}
+        <div className="flex items-center gap-3 min-w-0">
+          <Avatar className="h-9 w-9 border border-border/80 shadow-sm shrink-0">
+            <AvatarImage src={e.avatar_url ?? undefined} alt={e.full_name} />
+            <AvatarFallback className="bg-muted text-muted-foreground text-xs font-bold font-mono">
+              {getInitials(e.full_name)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-sm text-foreground truncate">
+                {e.full_name}
+              </span>
+              {e.emp_code && (
+                <span className="font-mono text-[11px] rounded bg-muted px-1.5 py-0.5 text-muted-foreground border border-border/60">
+                  #{e.emp_code}
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+              {e.department && (
+                <span className="truncate max-w-[150px]">{e.department}</span>
+              )}
+              {e.email && (
+                <>
+                  <span>•</span>
+                  <span className="truncate max-w-[180px] font-mono text-[10px]">
+                    {e.email}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Right: Optional custom radius & Assign button */}
+        <div className="flex items-center gap-2">
+          <div className="hidden sm:inline-flex items-center gap-1 text-[11px] text-muted-foreground">
             <input
               type="number"
               min={10}
               max={10000}
               step={10}
-              placeholder={`${location.radius_m}m default`}
-              value={radiusVal}
-              onChange={(evt) => setRadiusVal(evt.target.value)}
-              onBlur={() => {
-                const trimmed = radiusVal.trim();
-                const num = trimmed ? parseInt(trimmed, 10) : null;
-                if (num !== (e.radius_m ?? null)) {
-                  onRadiusChange(num && !isNaN(num) && num > 0 ? num : null);
-                }
-              }}
-              onKeyDown={(evt) => {
-                if (evt.key === "Enter") {
-                  evt.currentTarget.blur();
-                }
-              }}
-              className="w-28 rounded-lg border border-input bg-background px-2 py-1 text-xs font-mono text-end placeholder:text-muted-foreground/60"
+              placeholder={`${location.radius_m}m`}
+              value={customRadius}
+              onChange={(evt) => setCustomRadius(evt.target.value)}
+              className="w-16 rounded border border-input bg-background px-1.5 py-1 text-xs font-mono text-end placeholder:text-muted-foreground/60"
+              title="Optional custom radius override"
             />
-            <span className="text-[11px] text-muted-foreground">m</span>
+            <span className="font-mono text-[10px]">m</span>
           </div>
+
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={handleAssign}
+            className="inline-flex items-center gap-1 rounded-full bg-gradient-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground shadow-brand hover:opacity-95 transition-opacity disabled:opacity-50"
+          >
+            <UserPlus className="h-3.5 w-3.5" />
+            <span>Assign</span>
+          </button>
         </div>
-      )}
+      </div>
     </li>
   );
 }
 
-function AssignEmployeesModal({ location, onClose, onChanged }: { location: GeofenceLocation; onClose: () => void; onChanged: () => void }) {
+function AssignEmployeesModal({
+  location,
+  onClose,
+  onChanged,
+}: {
+  location: GeofenceLocation;
+  onClose: () => void;
+  onChanged: () => void;
+}) {
   const { t } = useI18n();
   const qc = useQueryClient();
   const listFn = useServerFn(listAssignableEmployees);
   const toggleFn = useServerFn(toggleGeofenceAssignment);
   const updateRadiusFn = useServerFn(updateGeofenceAssignmentRadius);
   const queryKey = ["admin", "geofences", "assignable", location.id] as const;
+
   const { data: employees = [], isLoading } = useQuery({
     queryKey,
     queryFn: () => listFn({ data: { locationId: location.id } }),
   });
 
+  const [activeTab, setActiveTab] = useState<"assigned" | "add">("assigned");
+  const [qAssigned, setQAssigned] = useState("");
+  const [qAdd, setQAdd] = useState("");
+
   const mut = useMutation({
-    mutationFn: (vars: { profileId: string; assign: boolean }) =>
+    mutationFn: (vars: { profileId: string; assign: boolean; radius_m?: number | null }) =>
       toggleFn({ data: { locationId: location.id, ...vars } }),
     onSuccess: (_d, vars) => {
-      toast.success(vars.assign ? "Assigned" : "Removed");
+      toast.success(vars.assign ? "Employee assigned successfully" : "Employee removed from location");
       qc.invalidateQueries({ queryKey });
       onChanged();
     },
-    onError: (e: any) => toast.error(e?.message ?? "Failed"),
+    onError: (e: any) => toast.error(e?.message ?? "Failed to update assignment"),
   });
 
   const radiusMut = useMutation({
     mutationFn: (vars: { profileId: string; radius_m: number | null }) =>
       updateRadiusFn({ data: { locationId: location.id, profileId: vars.profileId, radius_m: vars.radius_m } }),
     onSuccess: () => {
-      toast.success("Radius updated");
+      toast.success("Check-in radius override updated");
       qc.invalidateQueries({ queryKey });
       onChanged();
     },
     onError: (e: any) => toast.error(e?.message ?? "Failed to update radius"),
   });
 
-  const [q, setQ] = useState("");
-  const filtered = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    if (!s) return employees;
-    return employees.filter(
+  const assignedEmployees = useMemo(
+    () => employees.filter((e) => e.assigned),
+    [employees],
+  );
+
+  const unassignedEmployees = useMemo(
+    () => employees.filter((e) => !e.assigned),
+    [employees],
+  );
+
+  const filteredAssigned = useMemo(() => {
+    const s = qAssigned.trim().toLowerCase();
+    if (!s) return assignedEmployees;
+    return assignedEmployees.filter(
       (e) =>
         e.full_name.toLowerCase().includes(s) ||
         (e.emp_code ?? "").toLowerCase().includes(s) ||
-        (e.department ?? "").toLowerCase().includes(s),
+        (e.department ?? "").toLowerCase().includes(s) ||
+        (e.email ?? "").toLowerCase().includes(s),
     );
-  }, [employees, q]);
+  }, [assignedEmployees, qAssigned]);
+
+  const filteredUnassigned = useMemo(() => {
+    const s = qAdd.trim().toLowerCase();
+    if (!s) return unassignedEmployees;
+    return unassignedEmployees.filter(
+      (e) =>
+        e.full_name.toLowerCase().includes(s) ||
+        (e.emp_code ?? "").toLowerCase().includes(s) ||
+        (e.department ?? "").toLowerCase().includes(s) ||
+        (e.email ?? "").toLowerCase().includes(s),
+    );
+  }, [unassignedEmployees, qAdd]);
 
   return (
-    <div className="fixed inset-0 z-[1000] grid place-items-center bg-foreground/40 p-4" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-3xl bg-background p-6 shadow-soft">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-display text-lg font-semibold">{t("assignEmployees")} — {location.name}</h2>
-          <button onClick={onClose} className="rounded-full p-1.5 hover:bg-muted"><X className="h-4 w-4" /></button>
+    <div
+      className="fixed inset-0 z-[1000] grid place-items-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-2xl rounded-2xl border border-border bg-card shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+      >
+        {/* Header */}
+        <div className="border-b border-border/80 bg-muted/30 p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand/10 text-brand">
+                <Users className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="font-display text-lg font-bold text-foreground truncate">
+                    {location.name}
+                  </h2>
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                      location.active
+                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                        : "bg-muted text-muted-foreground border border-border"
+                    }`}
+                  >
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        location.active ? "bg-emerald-500" : "bg-muted-foreground"
+                      }`}
+                    />
+                    {location.active ? "Active" : "Off"}
+                  </span>
+                </div>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1 font-mono">
+                    <MapPin className="h-3 w-3 text-brand" />
+                    {location.radius_m}m zone perimeter
+                  </span>
+                  <span>•</span>
+                  <span className="font-medium text-foreground">
+                    {assignedEmployees.length}{" "}
+                    {assignedEmployees.length === 1 ? "Employee assigned" : "Employees assigned"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          {/* Segmented Tab Navigation */}
+          <div className="mt-4 flex items-center gap-1.5 rounded-xl bg-muted/60 p-1 border border-border/50">
+            <button
+              type="button"
+              onClick={() => setActiveTab("assigned")}
+              className={`flex-1 inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-all ${
+                activeTab === "assigned"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-background/40"
+              }`}
+            >
+              <Users className="h-3.5 w-3.5 text-brand" />
+              <span>Assigned Employees</span>
+              <span
+                className={`rounded-full px-1.5 py-0.2 font-mono text-[11px] font-bold ${
+                  activeTab === "assigned"
+                    ? "bg-brand/10 text-brand"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {assignedEmployees.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("add")}
+              className={`flex-1 inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-all ${
+                activeTab === "add"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-background/40"
+              }`}
+            >
+              <UserPlus className="h-3.5 w-3.5 text-brand" />
+              <span>Add / Assign More</span>
+              <span
+                className={`rounded-full px-1.5 py-0.2 font-mono text-[11px] font-bold ${
+                  activeTab === "add"
+                    ? "bg-brand/10 text-brand"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {unassignedEmployees.length}
+              </span>
+            </button>
+          </div>
         </div>
-        <p className="text-xs text-muted-foreground mb-3">
-          Assign employees and customize their individual allowed check-in radius if different from the location default ({location.radius_m}m).
-        </p>
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder={t("search")}
-          className="mb-3 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
-        />
-        {isLoading && <p className="py-6 text-center text-sm text-muted-foreground"><Loader2 className="mx-auto h-4 w-4 animate-spin" /></p>}
-        <ul className="max-h-[60vh] space-y-2 overflow-y-auto">
-          {filtered.map((e) => (
-            <AssigneeRow
-              key={e.id}
-              e={e}
-              location={location}
-              isPending={mut.isPending || radiusMut.isPending}
-              onToggle={(assign) => mut.mutate({ profileId: e.id, assign })}
-              onRadiusChange={(radius_m) => radiusMut.mutate({ profileId: e.id, radius_m })}
-            />
-          ))}
-          {!isLoading && filtered.length === 0 && (
-            <li className="py-6 text-center text-xs text-muted-foreground">No employees</li>
+
+        {/* Content Body */}
+        <div className="p-5 overflow-y-auto flex-1 space-y-4">
+          {isLoading ? (
+            <div className="py-16 text-center">
+              <Loader2 className="mx-auto h-7 w-7 animate-spin text-brand" />
+              <p className="mt-2 text-xs text-muted-foreground font-medium">
+                Loading employee assignments...
+              </p>
+            </div>
+          ) : activeTab === "assigned" ? (
+            /* TAB 1: ASSIGNED EMPLOYEES */
+            <div className="space-y-3">
+              {/* Search bar inside Assigned */}
+              {assignedEmployees.length > 0 && (
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <input
+                    type="text"
+                    value={qAssigned}
+                    onChange={(e) => setQAssigned(e.target.value)}
+                    placeholder="Search assigned employees by name, ID, or department..."
+                    className="w-full rounded-xl border border-input bg-background pl-9 pr-9 py-2 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand/40"
+                  />
+                  {qAssigned && (
+                    <button
+                      type="button"
+                      onClick={() => setQAssigned("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Empty State */}
+              {assignedEmployees.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-border/80 bg-muted/10 p-8 text-center my-4">
+                  <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-brand/10 text-brand mb-3">
+                    <Users className="h-6 w-6" />
+                  </div>
+                  <h3 className="text-sm font-bold text-foreground">
+                    No employees assigned yet
+                  </h3>
+                  <p className="mt-1 text-xs text-muted-foreground max-w-md mx-auto">
+                    Currently, no employees are assigned to this location. Assign employees so they can check in within this {location.radius_m}m zone.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("add")}
+                    className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-gradient-brand px-4 py-2 text-xs font-semibold text-brand-foreground shadow-brand hover:opacity-95 transition-opacity"
+                  >
+                    <UserPlus className="h-3.5 w-3.5" />
+                    Assign Employees Now
+                  </button>
+                </div>
+              ) : filteredAssigned.length === 0 ? (
+                <div className="rounded-xl border border-border/60 bg-muted/20 p-6 text-center">
+                  <p className="text-xs text-muted-foreground">
+                    No assigned employees found matching <span className="font-semibold text-foreground">"{qAssigned}"</span>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setQAssigned("")}
+                    className="mt-2 text-xs font-semibold text-brand hover:underline"
+                  >
+                    Clear search
+                  </button>
+                </div>
+              ) : (
+                <ul className="space-y-2.5">
+                  {filteredAssigned.map((e) => (
+                    <AssignedEmployeeCard
+                      key={e.id}
+                      e={e}
+                      location={location}
+                      isPending={mut.isPending || radiusMut.isPending}
+                      onRemove={() => mut.mutate({ profileId: e.id, assign: false })}
+                      onRadiusChange={(radius_m) => radiusMut.mutate({ profileId: e.id, radius_m })}
+                    />
+                  ))}
+                </ul>
+              )}
+            </div>
+          ) : (
+            /* TAB 2: ADD / ASSIGN MORE */
+            <div className="space-y-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <input
+                  type="text"
+                  value={qAdd}
+                  onChange={(e) => setQAdd(e.target.value)}
+                  placeholder="Search available employees by name, ID, or department..."
+                  className="w-full rounded-xl border border-input bg-background pl-9 pr-9 py-2 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand/40"
+                />
+                {qAdd && (
+                  <button
+                    type="button"
+                    onClick={() => setQAdd("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {unassignedEmployees.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-border/80 bg-muted/10 p-8 text-center my-4">
+                  <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-500 mb-2" />
+                  <h3 className="text-sm font-bold text-foreground">
+                    All available employees assigned
+                  </h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Every active employee in the organization is already assigned to this geofence location.
+                  </p>
+                </div>
+              ) : filteredUnassigned.length === 0 ? (
+                <div className="rounded-xl border border-border/60 bg-muted/20 p-6 text-center">
+                  <p className="text-xs text-muted-foreground">
+                    No unassigned employees found matching <span className="font-semibold text-foreground">"{qAdd}"</span>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setQAdd("")}
+                    className="mt-2 text-xs font-semibold text-brand hover:underline"
+                  >
+                    Clear search
+                  </button>
+                </div>
+              ) : (
+                <ul className="space-y-2.5">
+                  {filteredUnassigned.map((e) => (
+                    <UnassignedEmployeeCard
+                      key={e.id}
+                      e={e}
+                      location={location}
+                      isPending={mut.isPending}
+                      onAssign={(radius_m) => mut.mutate({ profileId: e.id, assign: true, radius_m })}
+                    />
+                  ))}
+                </ul>
+              )}
+            </div>
           )}
-        </ul>
+        </div>
+
+        {/* Modal Footer */}
+        <div className="border-t border-border/80 bg-muted/20 px-5 py-3 flex items-center justify-between text-xs text-muted-foreground">
+          <span>
+            {assignedEmployees.length}{" "}
+            {assignedEmployees.length === 1 ? "employee assigned" : "employees assigned"}
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-border bg-background px-4 py-1.5 text-xs font-semibold text-foreground hover:bg-muted transition-colors shadow-sm"
+          >
+            Done
+          </button>
+        </div>
       </div>
     </div>
   );

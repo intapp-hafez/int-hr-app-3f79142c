@@ -1,10 +1,11 @@
 import { useState, useMemo } from "react";
-import { Plus, Check, X, Pencil, Trash2, Search, Filter, Layers, FileSpreadsheet } from "lucide-react";
+import { Plus, Check, X, Pencil, Trash2, Search, Filter, Layers, FileSpreadsheet, Download, Upload } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 
 import { listSections, upsertSection, deleteSection, listDepartments } from "@/backend/functions/directory.functions";
+import { downloadTemplate, parseExcelFile } from "@/lib/excel";
 
 type SectionDraft = {
   id?: string;
@@ -80,6 +81,114 @@ export function SectionsManager() {
     });
   }, [sections, deptFilter, searchQuery]);
 
+function getVal(row: Record<string, any>, ...keys: string[]): string | undefined {
+  for (const k of keys) {
+    if (row[k] !== undefined && row[k] !== null && String(row[k]).trim() !== "") {
+      return String(row[k]).trim();
+    }
+    const normalizedK = k.toLowerCase().replace(/[^a-z0-9]/g, "");
+    for (const rowKey of Object.keys(row)) {
+      if (rowKey.toLowerCase().replace(/[^a-z0-9]/g, "") === normalizedK) {
+        if (row[rowKey] !== undefined && row[rowKey] !== null && String(row[rowKey]).trim() !== "") {
+          return String(row[rowKey]).trim();
+        }
+      }
+    }
+  }
+  return undefined;
+}
+
+  function handleDownloadTemplate() {
+    const sampleDept = (departments as any[])?.[0]?.name_en || "Human Resources";
+    downloadTemplate(
+      "levels_template.xlsx",
+      ["Level Name (EN)", "Level Name (AR)", "Department", "Status"],
+      [
+        {
+          "Level Name (EN)": "LEVEL 1 - A+",
+          "Level Name (AR)": "المستوى 1 - A+",
+          "Department": "All Departments (Global)",
+          "Status": "Active",
+        },
+        {
+          "Level Name (EN)": "LEVEL 2 - B+",
+          "Level Name (AR)": "المستوى 2 - B+",
+          "Department": "All Departments (Global)",
+          "Status": "Active",
+        },
+        {
+          "Level Name (EN)": "LEVEL 3 - C+",
+          "Level Name (AR)": "المستوى 3 - C+",
+          "Department": sampleDept,
+          "Status": "Active",
+        },
+      ]
+    );
+  }
+
+  async function handleImport(file: File) {
+    try {
+      const rows = await parseExcelFile<Record<string, any>>(file);
+      if (!rows || rows.length === 0) {
+        toast.error("File is empty or contains no rows");
+        return;
+      }
+      let ok = 0;
+      let fail = 0;
+      const deptList = (departments ?? []) as any[];
+
+      for (const r of rows) {
+        const name_en = getVal(r, "Level Name (EN)", "Level Name EN", "name_en", "name", "title");
+        const name_ar = getVal(r, "Level Name (AR)", "Level Name AR", "name_ar") || name_en;
+        if (!name_en) {
+          fail++;
+          continue;
+        }
+
+        const deptRaw = getVal(r, "Department", "department", "department_name", "dept");
+        let department_id: string | null = null;
+        if (
+          deptRaw &&
+          !["all departments (global)", "global", "all departments", "all", "—", "-", ""].includes(
+            deptRaw.toLowerCase().trim()
+          )
+        ) {
+          const match = deptList.find(
+            (d) =>
+              d.name_en?.toLowerCase().trim() === deptRaw.toLowerCase().trim() ||
+              d.name_ar?.toLowerCase().trim() === deptRaw.toLowerCase().trim() ||
+              (d.code && d.code.toLowerCase().trim() === deptRaw.toLowerCase().trim())
+          );
+          if (match) department_id = match.id;
+        }
+
+        const statusRaw = getVal(r, "Status", "status", "Active", "active");
+        const active =
+          statusRaw !== undefined
+            ? ["active", "true", "yes", "1"].includes(String(statusRaw).toLowerCase().trim())
+            : true;
+
+        try {
+          await mUpsertFn({
+            data: {
+              name_en,
+              name_ar,
+              department_id,
+              active,
+            },
+          });
+          ok++;
+        } catch {
+          fail++;
+        }
+      }
+      qc.invalidateQueries({ queryKey: ["all-sections"] });
+      toast.success(`Imported ${ok} levels${fail > 0 ? `, failed ${fail}` : ""}`);
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  }
+
   async function handleExport() {
     const list = filteredSections;
     if (!list || list.length === 0) {
@@ -133,6 +242,39 @@ export function SectionsManager() {
         )}
       </div>
 
+      {/* Toolbar: Template, Import, Export */}
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          onClick={handleDownloadTemplate}
+          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 text-sm hover:bg-muted"
+        >
+          <Download className="h-4 w-4" /> Download template
+        </button>
+        <label className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 text-sm cursor-pointer hover:bg-muted">
+          <Upload className="h-4 w-4" /> Import from Excel
+          <input
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleImport(f);
+              e.target.value = "";
+            }}
+          />
+        </label>
+        <button
+          onClick={handleExport}
+          disabled={!filteredSections || filteredSections.length === 0}
+          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 text-sm hover:bg-muted disabled:opacity-50"
+        >
+          <FileSpreadsheet className="h-4 w-4" /> Export Excel
+        </button>
+        <span className="ml-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
+          <FileSpreadsheet className="h-3.5 w-3.5" /> .xlsx, .csv supported
+        </span>
+      </div>
+
       {/* Filter and Search Bar */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative min-w-[200px] flex-1 max-w-sm">
@@ -159,13 +301,6 @@ export function SectionsManager() {
             ))}
           </select>
         </div>
-        <button
-          onClick={handleExport}
-          disabled={!filteredSections || filteredSections.length === 0}
-          className="ms-auto inline-flex items-center gap-1.5 rounded-xl border border-border bg-card px-3.5 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
-        >
-          <FileSpreadsheet className="h-4 w-4" /> Export Excel
-        </button>
       </div>
 
       <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">

@@ -58,6 +58,14 @@ export type GpsTelemetry = {
   accuracy_m?: number | null;
   gps_age_ms?: number | null;
   gps_sample_count?: number | null;
+  samples?: Array<{ lat: number; lng: number; accuracy_m?: number | null; timestamp?: number | null }> | null;
+  altitude?: number | null;
+  altitude_accuracy?: number | null;
+  heading?: number | null;
+  speed?: number | null;
+  snapshot_lat?: number | null;
+  snapshot_lng?: number | null;
+  snapshot_accuracy_m?: number | null;
 };
 
 export type Fence = {
@@ -119,17 +127,73 @@ export function evaluatePresence(
   let fenceDistanceM: number | null = null;
   let fenceAllowedM: number | null = null;
 
-  const { lat, lng, accuracy_m, gps_age_ms, gps_sample_count } = gps;
+  const {
+    lat,
+    lng,
+    accuracy_m,
+    gps_age_ms,
+    gps_sample_count,
+    samples,
+    altitude,
+    snapshot_lat,
+    snapshot_lng,
+  } = gps;
   const hasCoords = lat != null && lng != null;
 
-  // ── 1. Stale GPS Fix ─────────────────────────────────────────────────────
+  // ── 1. Cryptographic Face-Location Divergence ───────────────────────────
+  if (snapshot_lat != null && snapshot_lng != null && hasCoords) {
+    const faceDivergenceM = Math.round(distM(snapshot_lat, snapshot_lng, lat!, lng!));
+    if (faceDivergenceM > 150) {
+      signals.push({
+        code: "geo_face_discrepancy",
+        severity: "hard",
+        detail: `${faceDivergenceM}m divergence between face scan and attendance submission`,
+      });
+      reasonCodes.push("geo_face_discrepancy");
+      outcome = "reject";
+    }
+  }
+
+  // ── 2. Mock GPS Micro-Jitter & Coordinate Dispersion ───────────────────
+  if (samples && samples.length >= 3) {
+    const lats = samples.map((s) => s.lat);
+    const lngs = samples.map((s) => s.lng);
+    const latMean = lats.reduce((a, b) => a + b, 0) / lats.length;
+    const lngMean = lngs.reduce((a, b) => a + b, 0) / lngs.length;
+    const latVariance = lats.reduce((a, b) => a + (b - latMean) ** 2, 0) / lats.length;
+    const lngVariance = lngs.reduce((a, b) => a + (b - lngMean) ** 2, 0) / lngs.length;
+
+    // Real satellite GPS has micro-drift across 3 readings; exact zero variance indicates software Mock GPS
+    if (latVariance === 0 && lngVariance === 0) {
+      signals.push({
+        code: "mock_gps_zero_jitter",
+        severity: "hard",
+        detail: "Zero coordinate variance across 3+ samples indicates synthetic/mock provider",
+      });
+      reasonCodes.push("mock_gps_detected");
+      outcome = "reject";
+    }
+  }
+
+  // ── 3. Sensor Altitude Anomalies ─────────────────────────────────────────
+  if (hasCoords && altitude === 0) {
+    signals.push({
+      code: "suspicious_zero_altitude",
+      severity: "warn",
+      detail: "Hardware GPS reported exact 0.0 altitude",
+    });
+    reasonCodes.push("suspicious_zero_altitude");
+    if (outcome === "accept") outcome = "review";
+  }
+
+  // ── 4. Stale GPS Fix ─────────────────────────────────────────────────────
   if (gps_age_ms != null && gps_age_ms > GPS_MAX_AGE_MS) {
     signals.push({ code: "gps_stale", severity: "warn", detail: `${gps_age_ms}ms` });
     reasonCodes.push("gps_stale");
     if (outcome === "accept") outcome = "review";
   }
 
-  // ── 2. Suspiciously perfect accuracy ─────────────────────────────────────
+  // ── 5. Suspiciously perfect accuracy ─────────────────────────────────────
   if (accuracy_m != null && accuracy_m <= GPS_ACCURACY_SUSPICIOUSLY_PERFECT_M) {
     signals.push({ code: "gps_perfect_accuracy", severity: "warn", detail: `${accuracy_m}m` });
     reasonCodes.push("gps_perfect_accuracy");

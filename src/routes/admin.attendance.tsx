@@ -295,24 +295,77 @@ function printTaskActivityPdf(rows: TaskActivityRow[], title: string) {
   w.document.close();
 }
 
-function exportAttendanceCsv(rows: AttendanceRow[]) {
-  const header = ["Employee", "Date", "Check In", "Check Out", "Total", "Branch", "Location", "Status", "Note"];
+function resolveRowLocation(
+  row: AttendanceRow,
+  fences: Fence[] = []
+): { location: string; subLocation?: string } {
+  const inFence = nearestFence(row.lat, row.lng, fences);
+  const outFence = nearestFence(row.out_lat, row.out_lng, fences);
+  const matchedFence = (inFence && inFence.inside) ? inFence : (outFence && outFence.inside) ? outFence : null;
+  const placeCityDistrict = storedPlaceName(row.district, row.city) || storedPlaceName(row.out_district, row.out_city);
+  const checkInPlace = storedPlaceName(row.street, row.district, row.city);
+  const checkOutPlace = storedPlaceName(row.out_street, row.out_district, row.out_city);
+
+  let location: string;
+  let subLocation: string | undefined = undefined;
+
+  if (matchedFence) {
+    location = matchedFence.name;
+    if (placeCityDistrict && placeCityDistrict !== matchedFence.name) {
+      subLocation = placeCityDistrict;
+    }
+  } else if (row.branch && row.branch !== "HQ") {
+    location = row.branch;
+    if (placeCityDistrict && placeCityDistrict !== row.branch) {
+      subLocation = placeCityDistrict;
+    }
+  } else if (placeCityDistrict) {
+    location = placeCityDistrict;
+  } else if (row.free_check) {
+    location = checkInPlace || checkOutPlace || "Free check-in";
+  } else if (checkInPlace || checkOutPlace) {
+    location = checkInPlace || checkOutPlace!;
+  } else {
+    location = row.branch || "—";
+  }
+
+  return { location, subLocation };
+}
+
+function exportAttendanceCsv(
+  rows: AttendanceRow[],
+  fences: Fence[] = []
+) {
+  const header = ["Employee", "Date", "Check In", "Check Out", "Total", "Location", "Detailed Address", "Status", "Note"];
   const esc = (v: string) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-  const lines = [header.join(",")].concat(rows.map((r) => [
-    r.employee_name, formatDate(r.date), format12H(r.in_time), format12H(r.out_time), calcHours(r.in_time, r.out_time),
-    r.branch ?? "", [r.street, r.district, r.city].filter(Boolean).join(", "), r.status, r.note ?? "",
-  ].map(esc).join(",")));
+  const lines = [
+    header.join(","),
+    ...rows.map((r) => {
+      const { location: locName } = resolveRowLocation(r, fences);
+      return [
+        r.employee_name, formatDate(r.date), format12H(r.in_time), format12H(r.out_time), calcHours(r.in_time, r.out_time),
+        locName, [r.street, r.district, r.city].filter(Boolean).join(", "), r.status, r.note ?? "",
+      ].map(esc).join(",");
+    }),
+  ];
   const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url; a.download = `attendance-${new Date().toISOString().slice(0, 10)}.csv`; a.click();
   URL.revokeObjectURL(url);
 }
-function printAttendancePdf(rows: AttendanceRow[], title: string) {
+function printAttendancePdf(
+  rows: AttendanceRow[],
+  title: string,
+  fences: Fence[] = []
+) {
   const w = window.open("", "_blank", "width=900,height=700");
   if (!w) return;
-  const body = rows.map((r) => `<tr><td>${escapeHtml(r.employee_name)}</td><td>${formatDate(r.date)}</td><td>${format12H(r.in_time)}</td><td>${format12H(r.out_time)}</td><td>${calcHours(r.in_time, r.out_time)}</td><td>${escapeHtml(r.branch ?? "")}</td><td>${escapeHtml([r.street, r.district, r.city].filter(Boolean).join(", "))}</td><td>${escapeHtml(r.status)}</td><td>${escapeHtml(r.note ?? "")}</td></tr>`).join("");
-  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;padding:24px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #ddd;padding:6px;text-align:left}th{background:#f5f5f5}@media print{button{display:none}}</style></head><body><h1>${escapeHtml(title)}</h1><table><thead><tr><th>Employee</th><th>Date</th><th>In</th><th>Out</th><th>Total</th><th>Branch</th><th>Location</th><th>Status</th><th>Note</th></tr></thead><tbody>${body || `<tr><td colspan="9" style="text-align:center">No records</td></tr>`}</tbody></table><script>window.onload=()=>window.print()</script></body></html>`);
+  const body = rows.map((r) => {
+    const { location: locName } = resolveRowLocation(r, fences);
+    return `<tr><td>${escapeHtml(r.employee_name)}</td><td>${formatDate(r.date)}</td><td>${format12H(r.in_time)}</td><td>${format12H(r.out_time)}</td><td>${calcHours(r.in_time, r.out_time)}</td><td>${escapeHtml(locName)}</td><td>${escapeHtml([r.street, r.district, r.city].filter(Boolean).join(", "))}</td><td>${escapeHtml(r.status)}</td><td>${escapeHtml(r.note ?? "")}</td></tr>`;
+  }).join("");
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;padding:24px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #ddd;padding:6px;text-align:left}th{background:#f5f5f5}@media print{button{display:none}}</style></head><body><h1>${escapeHtml(title)}</h1><table><thead><tr><th>Employee</th><th>Date</th><th>In</th><th>Out</th><th>Total</th><th>Location</th><th>Address</th><th>Status</th><th>Note</th></tr></thead><tbody>${body || `<tr><td colspan="9" style="text-align:center">No records</td></tr>`}</tbody></table><script>window.onload=()=>window.print()</script></body></html>`);
   w.document.close();
 }
 
@@ -462,17 +515,21 @@ function AdminAttendance() {
   }
   async function exportXlsx() {
     const XLSX = await import("xlsx");
-    const data = rows.map((r) => ({
-      employee_id: r.employee_id,
-      employee: r.employee_name,
-      date: r.date,
-      in_time: format12H(r.in_time),
-      out_time: format12H(r.out_time),
-      total: calcHours(r.in_time, r.out_time),
-      branch: r.branch ?? "",
-      status: r.status,
-      note: r.note ?? "",
-    }));
+    const data = rows.map((r) => {
+      const { location: locName, subLocation } = resolveRowLocation(r, fences);
+      return {
+        employee_id: r.employee_id,
+        employee: r.employee_name,
+        date: r.date,
+        in_time: format12H(r.in_time),
+        out_time: format12H(r.out_time),
+        total: calcHours(r.in_time, r.out_time),
+        location: locName,
+        detailed_address: subLocation || [r.street, r.district, r.city].filter(Boolean).join(", "),
+        status: r.status,
+        note: r.note ?? "",
+      };
+    });
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Attendance");
@@ -585,8 +642,8 @@ function AdminAttendance() {
             <button onClick={() => fileRef.current?.click()} className="inline-flex items-center gap-1.5 rounded-full border border-brand/50 bg-brand/10 px-3.5 py-2 text-sm font-semibold text-brand"><Upload className="h-4 w-4" /> {t("import")}</button>
             <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} className="hidden" />
             <button onClick={exportXlsx} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 text-sm"><Download className="h-4 w-4" /> {t("export")} XLSX</button>
-            <button onClick={() => exportAttendanceCsv(rows)} disabled={!rows.length} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 text-sm disabled:opacity-50"><FileText className="h-4 w-4" /> CSV</button>
-            <button onClick={() => printAttendancePdf(rows, "Attendance")} disabled={!rows.length} className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-3.5 py-2 text-sm font-semibold text-background disabled:opacity-50"><Printer className="h-4 w-4" /> PDF</button>
+            <button onClick={() => exportAttendanceCsv(rows, fences)} disabled={!rows.length} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 text-sm disabled:opacity-50"><FileText className="h-4 w-4" /> CSV</button>
+            <button onClick={() => printAttendancePdf(rows, "Attendance", fences)} disabled={!rows.length} className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-3.5 py-2 text-sm font-semibold text-background disabled:opacity-50"><Printer className="h-4 w-4" /> PDF</button>
             <Button onClick={openAdd} className="rounded-full"><Plus className="h-4 w-4" /> Add</Button>
           </div>
         )}
@@ -647,6 +704,7 @@ function AdminAttendance() {
                 ) : paginatedRows.map((row) => {
                   const checkInPlace = storedPlaceName(row.street, row.district, row.city);
                   const checkOutPlace = storedPlaceName(row.out_street, row.out_district, row.out_city);
+                  const { location: locName, subLocation: locSub } = resolveRowLocation(row, fences);
                   return (
                   <tr key={row.id} className="border-b border-border last:border-b-0 hover:bg-muted/40">
                     <td className="px-4 py-3 font-medium">
@@ -687,9 +745,12 @@ function AdminAttendance() {
                       </div>
                     </td>
                     <td className="px-4 py-3 font-mono tabular-nums">{calcHours(row.in_time, row.out_time)}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 align-top">
                       <div className="flex flex-col">
-                        <span className="text-sm">{row.branch ?? "—"}</span>
+                        <span className="text-sm font-medium">{locName}</span>
+                        {locSub && (
+                          <span className="text-[11px] text-muted-foreground font-sans">{locSub}</span>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-3">

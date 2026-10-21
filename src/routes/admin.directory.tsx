@@ -121,6 +121,23 @@ function SearchBox({ value, onChange, placeholder }: { value: string; onChange: 
   );
 }
 
+function getVal(row: Record<string, any>, ...keys: string[]): string | undefined {
+  for (const k of keys) {
+    if (row[k] !== undefined && row[k] !== null && String(row[k]).trim() !== "") {
+      return String(row[k]).trim();
+    }
+    const normalizedK = k.toLowerCase().replace(/[^a-z0-9]/g, "");
+    for (const rowKey of Object.keys(row)) {
+      if (rowKey.toLowerCase().replace(/[^a-z0-9]/g, "") === normalizedK) {
+        if (row[rowKey] !== undefined && row[rowKey] !== null && String(row[rowKey]).trim() !== "") {
+          return String(row[rowKey]).trim();
+        }
+      }
+    }
+  }
+  return undefined;
+}
+
 function usePaged<T>(items: T[]) {
   const [page, setPage] = useState(1);
   const pageCount = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
@@ -309,7 +326,7 @@ function NamedSection({ kind }: { kind: "departments" | "positions" | "job_grade
   });
   const managers: Array<{ id: string; name: string }> = (mgrQ.data as any)?.managers ?? [];
   const mUpsert = useMutation({
-    mutationFn: (row: { id?: string; name_en: string; name_ar: string; active?: boolean; responsible_person_id?: string | null; code?: string | null; parent_id?: string | null; reports_to_position_id?: string | null }) => upsert({ data: row }),
+    mutationFn: (row: { id?: string; name_en: string; name_ar: string; active?: boolean; responsible_person_id?: string | null; code?: string | null; parent_id?: string | null; reports_to_position_id?: string | null; sections?: string | null }) => upsert({ data: row }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: key });
       toast.success("Saved");
@@ -353,7 +370,58 @@ function NamedSection({ kind }: { kind: "departments" | "positions" | "job_grade
     );
   }
 
-  const headers = ["name_en", "name_ar", "active"];
+  function handleDownloadTemplate() {
+    if (kind === "departments") {
+      downloadTemplate(
+        "departments_template.xlsx",
+        ["Code", "Name (EN)", "Name (AR)", "Sections", "Responsible Person", "Status"],
+        [
+          { "Code": "101", "Name (EN)": "Human Resources", "Name (AR)": "الموارد البشرية", "Sections": "Recruitment, Payroll, Operations", "Responsible Person": managers[0]?.name ?? "", "Status": "Active" },
+          { "Code": "102", "Name (EN)": "Finance", "Name (AR)": "المالية", "Sections": "Accounting, Treasury, Audit", "Responsible Person": "", "Status": "Active" },
+          { "Code": "103", "Name (EN)": "Information Technology", "Name (AR)": "تكنولوجيا المعلومات", "Sections": "Infrastructure, Helpdesk, Security", "Responsible Person": "", "Status": "Active" },
+        ]
+      );
+    } else if (kind === "positions") {
+      downloadTemplate(
+        "positions_template.xlsx",
+        ["Code", "Name (EN)", "Name (AR)", "Reports To", "Status"],
+        [
+          { "Code": "POS-001", "Name (EN)": "Chief Executive Officer", "Name (AR)": "الرئيس التنفيذي", "Reports To": "", "Status": "Active" },
+          { "Code": "POS-002", "Name (EN)": "Human Resources Director", "Name (AR)": "مدير الموارد البشرية", "Reports To": "Chief Executive Officer", "Status": "Active" },
+          { "Code": "POS-003", "Name (EN)": "Software Engineer", "Name (AR)": "مهندس برمجيات", "Reports To": "Chief Executive Officer", "Status": "Active" },
+        ]
+      );
+    } else if (kind === "job_grades") {
+      downloadTemplate(
+        "job_grades_template.xlsx",
+        ["Code", "Name (EN)", "Name (AR)", "Status"],
+        [
+          { "Code": "G01", "Name (EN)": "G01 - Trainee", "Name (AR)": "G01 - متدرب", "Status": "Active" },
+          { "Code": "G02", "Name (EN)": "G02 - Junior Staff", "Name (AR)": "G02 - موظف مبتدئ", "Status": "Active" },
+          { "Code": "G03", "Name (EN)": "G03 - Officer", "Name (AR)": "G03 - مسؤول", "Status": "Active" },
+          { "Code": "G04", "Name (EN)": "G04 - Senior Officer", "Name (AR)": "G04 - مسؤول أول", "Status": "Active" },
+        ]
+      );
+    } else if (kind === "graduations") {
+      downloadTemplate(
+        "graduations_template.xlsx",
+        ["Graduation (EN)", "Graduation (AR)", "Status"],
+        [
+          { "Graduation (EN)": "Bachelor of Science", "Graduation (AR)": "بكالوريوس علوم", "Status": "Active" },
+          { "Graduation (EN)": "Bachelor of Engineering", "Graduation (AR)": "بكالوريوس هندسة", "Status": "Active" },
+        ]
+      );
+    } else if (kind === "majors") {
+      downloadTemplate(
+        "majors_template.xlsx",
+        ["Major (EN)", "Major (AR)", "Status"],
+        [
+          { "Major (EN)": "Computer Science", "Major (AR)": "علوم الحاسب", "Status": "Active" },
+          { "Major (EN)": "Accounting", "Major (AR)": "محاسبة", "Status": "Active" },
+        ]
+      );
+    }
+  }
 
   const sortedData = useMemo(() => {
     const items = [...(q.data ?? [])];
@@ -385,21 +453,98 @@ function NamedSection({ kind }: { kind: "departments" | "positions" | "job_grade
 
   async function handleImport(file: File) {
     try {
-      const rows = await parseExcelFile<{ name_en?: string; name_ar?: string; active?: string | boolean }>(file);
-      let ok = 0; let fail = 0;
+      const rows = await parseExcelFile<Record<string, any>>(file);
+      if (!rows || rows.length === 0) {
+        toast.error("File is empty or contains no rows");
+        return;
+      }
+      let ok = 0;
+      let fail = 0;
+      const allPositions = kind === "positions" ? (q.data ?? []) : [];
+
       for (const r of rows) {
-        const name_en = String(r.name_en ?? "").trim();
-        if (!name_en) { fail++; continue; }
+        const code = getVal(r, "Code", "code", "dept_code", "pos_code", "grade_code");
+        const name_en = getVal(
+          r,
+          "Name (EN)",
+          "name_en",
+          "Name EN",
+          "name",
+          "title",
+          "Graduation (EN)",
+          "Major (EN)"
+        );
+        const name_ar = getVal(
+          r,
+          "Name (AR)",
+          "name_ar",
+          "Name AR",
+          "Graduation (AR)",
+          "Major (AR)"
+        ) || "";
+
+        if (!name_en) {
+          fail++;
+          continue;
+        }
+
+        const statusRaw = getVal(r, "Status", "status", "Active", "active", "is_active");
+        const active =
+          statusRaw !== undefined
+            ? ["active", "true", "yes", "1"].includes(String(statusRaw).toLowerCase().trim())
+            : true;
+
+        let responsible_person_id: string | null = null;
+        let sections: string | null = null;
+        if (isDept) {
+          const respRaw = getVal(r, "Responsible Person", "Responsible", "responsible_person", "manager", "responsible_person_name");
+          if (respRaw) {
+            const foundMgr = managers.find(
+              (m) =>
+                m.name.toLowerCase().trim() === respRaw.toLowerCase().trim() ||
+                (m as any).email?.toLowerCase().trim() === respRaw.toLowerCase().trim()
+            );
+            if (foundMgr) responsible_person_id = foundMgr.id;
+          }
+          const secRaw = getVal(r, "Sections", "sections", "sub_sections", "subsections", "department_sections");
+          if (secRaw) sections = secRaw;
+        }
+
+        let reports_to_position_id: string | null = null;
+        if (kind === "positions") {
+          const repRaw = getVal(r, "Reports To", "reports_to", "reports_to_position", "parent_position");
+          if (repRaw) {
+            const foundPos = allPositions.find(
+              (p: any) =>
+                p.name_en?.toLowerCase().trim() === repRaw.toLowerCase().trim() ||
+                p.name_ar?.toLowerCase().trim() === repRaw.toLowerCase().trim() ||
+                (p.code && p.code.toLowerCase().trim() === repRaw.toLowerCase().trim())
+            );
+            if (foundPos) reports_to_position_id = foundPos.id;
+          }
+        }
+
         try {
-          await mUpsert.mutateAsync({
-            name_en, name_ar: String(r.name_ar ?? "").trim(),
-            active: r.active === false || String(r.active).toLowerCase() === "false" ? false : true,
+          await upsert({
+            data: {
+              name_en,
+              name_ar,
+              active,
+              code: code || null,
+              ...(isDept ? { responsible_person_id, sections } : {}),
+              ...(kind === "positions" ? { reports_to_position_id } : {}),
+            },
           });
           ok++;
-        } catch { fail++; }
+        } catch {
+          fail++;
+        }
       }
-      toast.success(`Imported ${ok}, failed ${fail}`);
-    } catch (e) { toast.error((e as Error).message); }
+      qc.invalidateQueries({ queryKey: key });
+      toast.success(`Imported ${ok} ${kind.replace(/_/g, " ")}${fail > 0 ? `, failed ${fail}` : ""}`);
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
   }
 
   async function handleExport() {
@@ -472,7 +617,7 @@ function NamedSection({ kind }: { kind: "departments" | "positions" | "job_grade
     <div className="space-y-4">
       <SearchBox value={term} onChange={setTerm} placeholder="Search by code or name…" />
       <Toolbar
-        onTemplate={() => downloadTemplate(`${kind}_template.xlsx`, headers, [{ name_en: "Sales", name_ar: "المبيعات", active: true }])}
+        onTemplate={handleDownloadTemplate}
         onImport={handleImport}
         onExport={handleExport}
       />

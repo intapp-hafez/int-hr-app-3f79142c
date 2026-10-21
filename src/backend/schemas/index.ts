@@ -80,6 +80,7 @@ export const NamedRowSchema = z.object({
   code: z.string().max(50).nullable().optional(),
   parent_id: z.string().uuid().nullable().optional(),
   reports_to_position_id: z.string().uuid().nullable().optional(),
+  sections: z.string().nullable().optional(),
 });
 
 export const SubSectionRowSchema = z.object({
@@ -138,6 +139,18 @@ export const AttendanceCheckSchema = z.object({
   biometric_method: z.enum(["face", "fingerprint"]).optional(),
   biometric_distance: z.number().optional().nullable(),
   biometric_token: z.string().max(255).optional().nullable(),
+  altitude: z.number().optional().nullable(),
+  altitude_accuracy: z.number().optional().nullable(),
+  heading: z.number().optional().nullable(),
+  speed: z.number().optional().nullable(),
+  samples: z.array(
+    z.object({
+      lat: z.number(),
+      lng: z.number(),
+      accuracy_m: z.number().optional().nullable(),
+      timestamp: z.number().optional().nullable(),
+    })
+  ).optional().nullable(),
 });
 
 // ── Leaves ────────────────────────────────────────────────

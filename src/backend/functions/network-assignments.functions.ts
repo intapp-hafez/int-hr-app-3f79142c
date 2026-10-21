@@ -150,14 +150,17 @@ export const listEmployeesForAccess = createServerFn({ method: "GET" })
     await assertAdminOrHr(context.supabase, context.userId);
     const { data, error } = await context.supabase
       .from("profiles")
-      .select("id, full_name, email, emp_code, departments:department_id(name_en)")
+      .select("id, full_name, email, phone, emp_code, national_id, departments:department_id(name_en)")
       .order("full_name", { ascending: true })
       .limit(1000);
     if (error) throw new Error(error.message);
     return (data ?? []).map((r: any) => ({
       id: r.id,
       name: r.full_name ?? r.email ?? r.id,
+      email: r.email ?? null,
+      phone: r.phone ?? null,
       emp_code: r.emp_code ?? null,
+      national_id: r.national_id ?? null,
       department: r.departments?.name_en ?? null,
     }));
   });

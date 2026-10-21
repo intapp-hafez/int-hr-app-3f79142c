@@ -110,23 +110,42 @@ function CheckInOutCard() {
     else if (faceNotice.state === "missing") toast.error(faceNotice.title, { description: faceNotice.body });
   }, [faceNotice?.notified, faceNotice?.state, faceNotice?.title, faceNotice?.body, qc]);
 
+  async function getInstantCoords(): Promise<{ lat: number; lng: number; accuracy_m?: number } | null> {
+    if (typeof navigator === "undefined" || !navigator.geolocation) return null;
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy_m: p.coords.accuracy ?? undefined }),
+        () => resolve(null),
+        { timeout: 3500, enableHighAccuracy: true, maximumAge: 5000 },
+      );
+    });
+  }
+
   /**
-   * Collects up to GPS_SAMPLES fresh readings, then returns the most accurate one.
-   * Sends accuracy_m and gps_age_ms to the server for uncertainty-aware evaluation.
+   * Collects up to GPS_SAMPLES fresh readings, then returns the most accurate one
+   * along with the complete samples array and sensor metrics for dispersion analysis.
    */
   async function getCoords(): Promise<{
-    lat?: number; lng?: number;
-    accuracy_m?: number; gps_age_ms?: number; gps_sample_count?: number;
+    lat?: number;
+    lng?: number;
+    accuracy_m?: number;
+    gps_age_ms?: number;
+    gps_sample_count?: number;
+    altitude?: number | null;
+    altitude_accuracy?: number | null;
+    heading?: number | null;
+    speed?: number | null;
+    samples?: Array<{ lat: number; lng: number; accuracy_m?: number | null; timestamp?: number | null }>;
     err?: string;
   }> {
     if (typeof navigator === "undefined" || !navigator.geolocation)
-      return { err: t("geolocNotSupported") };
+      return { err: "تعذر إتمام العملية حاليًا. يرجى التواصل مع الإدارة." };
 
     const GPS_SAMPLES = 3;
-    const SAMPLE_INTERVAL_MS = 1500;
+    const SAMPLE_INTERVAL_MS = 1200;
     const readings: GeolocationPosition[] = [];
 
-    // Collect up to GPS_SAMPLES readings then pick best (lowest accuracy radius)
+    // Collect up to GPS_SAMPLES readings
     await new Promise<void>((resolve) => {
       let gathered = 0;
       const watcher = navigator.geolocation.watchPosition(
@@ -138,26 +157,40 @@ function CheckInOutCard() {
             resolve();
           }
         },
-        () => resolve(), // error → resolve with whatever readings we have
-        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 },
+        () => resolve(),
+        { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 },
       );
-      // Safety timeout: resolve after max wait
-      setTimeout(() => { navigator.geolocation.clearWatch(watcher); resolve(); }, SAMPLE_INTERVAL_MS * GPS_SAMPLES + 2000);
+      setTimeout(() => {
+        navigator.geolocation.clearWatch(watcher);
+        resolve();
+      }, SAMPLE_INTERVAL_MS * GPS_SAMPLES + 1000);
     });
 
     if (readings.length === 0) {
-      // Fallback: single reading
       return new Promise((resolve) => {
         navigator.geolocation.getCurrentPosition(
-          (p) => resolve({
-            lat: p.coords.latitude,
-            lng: p.coords.longitude,
-            accuracy_m: p.coords.accuracy ?? undefined,
-            gps_age_ms: Math.max(0, Date.now() - p.timestamp),
-            gps_sample_count: 1,
-          }),
+          (p) =>
+            resolve({
+              lat: p.coords.latitude,
+              lng: p.coords.longitude,
+              accuracy_m: p.coords.accuracy ?? undefined,
+              gps_age_ms: Math.max(0, Date.now() - p.timestamp),
+              gps_sample_count: 1,
+              altitude: p.coords.altitude ?? null,
+              altitude_accuracy: p.coords.altitudeAccuracy ?? null,
+              heading: p.coords.heading ?? null,
+              speed: p.coords.speed ?? null,
+              samples: [
+                {
+                  lat: p.coords.latitude,
+                  lng: p.coords.longitude,
+                  accuracy_m: p.coords.accuracy ?? null,
+                  timestamp: p.timestamp,
+                },
+              ],
+            }),
           (e) => resolve({ err: e.message }),
-          { timeout: 8000, enableHighAccuracy: true },
+          { timeout: 6000, enableHighAccuracy: true },
         );
       });
     }
@@ -166,12 +199,25 @@ function CheckInOutCard() {
     const best = readings.reduce((a, b) =>
       (b.coords.accuracy ?? Infinity) < (a.coords.accuracy ?? Infinity) ? b : a
     );
+
+    const samples = readings.map((r) => ({
+      lat: r.coords.latitude,
+      lng: r.coords.longitude,
+      accuracy_m: r.coords.accuracy ?? null,
+      timestamp: r.timestamp,
+    }));
+
     return {
       lat: best.coords.latitude,
       lng: best.coords.longitude,
       accuracy_m: best.coords.accuracy ?? undefined,
       gps_age_ms: Math.max(0, Date.now() - best.timestamp),
       gps_sample_count: readings.length,
+      altitude: best.coords.altitude ?? null,
+      altitude_accuracy: best.coords.altitudeAccuracy ?? null,
+      heading: best.coords.heading ?? null,
+      speed: best.coords.speed ?? null,
+      samples,
     };
   }
 
@@ -229,11 +275,11 @@ function CheckInOutCard() {
 
   async function go(kind: "in" | "out") {
     if (isOutsideFence) {
-      toast.error(t("outsideGeofence") || "Outside allowed geofence area");
+      toast.error("تعذر إتمام العملية حاليًا. يرجى التواصل مع الإدارة.");
       return;
     }
     if (!hasFace && !hasFp) {
-      toast.error("Biometric verification is required. Please enroll your face or fingerprint in the Biometrics tab first.");
+      toast.error("يرجى تسجيل القياسات الحيوية أولاً.");
       return;
     }
     if (!bioOk) {
@@ -241,33 +287,42 @@ function CheckInOutCard() {
       return;
     }
     setBusy(kind);
+    const toastId = toast.loading("جاري الاتصال بالسيرفر، برجاء الانتظار...");
     try {
       const coords = await getCoords();
-      if (coords.err) { toast.error(tf("locationError", { msg: coords.err })); }
+      if (coords.err) {
+        toast.error("تعذر إتمام العملية حاليًا. يرجى التواصل مع الإدارة.", { id: toastId });
+        return;
+      }
       let near: typeof nearest = null;
       if (coords.lat != null && coords.lng != null) {
         near = computeNearest(coords.lat, coords.lng);
         setNearest(near);
-        if (near) {
-          if (!near.inside) {
-            toast.error(
-              `${t("outsideGeofence") || "Outside fence"}: ${near.name} (${Math.round(near.distance)} m / ${near.radius} m)`
-            );
-            return;
-          }
-          toast.message(`Inside "${near.name}" (${Math.round(near.distance)} m / ${near.radius} m)`);
+        if (near && !near.inside) {
+          toast.error("تعذر إتمام العملية حاليًا. يرجى التواصل مع الإدارة.", { id: toastId });
+          return;
         }
       }
       const isOnline = typeof navigator !== "undefined" ? navigator.onLine : true;
       const geo = coords.lat != null && coords.lng != null ? await reverseGeocodeCoords(coords.lat, coords.lng) : {};
       const bioMethod: "face" | "fingerprint" = verified.fp ? "fingerprint" : "face";
+      const resolvedBranch =
+        (near && near.inside ? near.name : null) ||
+        (geo.district && geo.city ? `${geo.district}, ${geo.city}` : geo.city || geo.district) ||
+        (meQ.data as any)?.profile?.branch ||
+        "HQ";
       const payload = {
-        branch,
+        branch: resolvedBranch,
         lat: coords.lat,
         lng: coords.lng,
         accuracy_m: coords.accuracy_m ?? null,
         gps_age_ms: coords.gps_age_ms ?? null,
         gps_sample_count: coords.gps_sample_count ?? null,
+        altitude: coords.altitude ?? null,
+        altitude_accuracy: coords.altitude_accuracy ?? null,
+        heading: coords.heading ?? null,
+        speed: coords.speed ?? null,
+        samples: coords.samples ?? null,
         network_ok: isOnline,
         note: note.trim() || undefined,
         device_id: getCurrentDeviceId(),
@@ -278,28 +333,33 @@ function CheckInOutCard() {
         biometric_distance: bioMethod === "face" ? lastDistance : null,
         biometric_token: bioToken,
       };
-      const addr = geo.formatted || [geo.street, geo.district, geo.city].filter(Boolean).join(", ");
       if (kind === "in") {
         const res: any = await inFn({ data: payload });
-        if (res?.blocked) { toast.error(formatBlocked(res)); return; }
+        if (res?.blocked) {
+          toast.error("تعذر إتمام العملية حاليًا. يرجى التواصل مع الإدارة.", { id: toastId });
+          return;
+        }
         if (res?.pending_review) {
-          toast.warning(
-            `Checked in · Pending review${addr ? ` · ${addr}` : ""}`,
-            { description: "Your location could not be fully confirmed. A manager will review your attendance." }
-          );
+          toast.warning("تم تسجيل الحضور · قيد المراجعة", {
+            id: toastId,
+            description: "جاري مراجعة البيانات من قبل الإدارة.",
+          });
         } else {
-          toast.success(`${res?.free_check ? "Checked in (free)" : "Checked in"}${addr ? ` · ${addr}` : ""}`);
+          toast.success("تم تسجيل الحضور بنجاح", { id: toastId });
         }
       } else {
         const res: any = await outFn({ data: payload });
-        if (res?.blocked) { toast.error(formatBlocked(res)); return; }
+        if (res?.blocked) {
+          toast.error("تعذر إتمام العملية حاليًا. يرجى التواصل مع الإدارة.", { id: toastId });
+          return;
+        }
         if (res?.pending_review) {
-          toast.warning(
-            `Checked out · Pending review${addr ? ` · ${addr}` : ""}`,
-            { description: "Your location could not be fully confirmed. A manager will review your check-out." }
-          );
+          toast.warning("تم تسجيل الانصراف · قيد المراجعة", {
+            id: toastId,
+            description: "جاري مراجعة البيانات من قبل الإدارة.",
+          });
         } else {
-          toast.success(`Checked out${addr ? ` · ${addr}` : ""}`);
+          toast.success("تم تسجيل الانصراف بنجاح", { id: toastId });
         }
       }
       setNote("");
@@ -308,7 +368,7 @@ function CheckInOutCard() {
       setBioToken(null);
       qc.invalidateQueries({ queryKey: ["my-attendance"] });
     } catch (e) {
-      toast.error((e as Error).message);
+      toast.error("تعذر إتمام العملية حاليًا. يرجى التواصل مع الإدارة.", { id: toastId });
     } finally {
       setBusy(null);
     }
@@ -324,29 +384,38 @@ function CheckInOutCard() {
         setBioToken(res.token);
       }
       setVerified((v) => ({ ...v, fp: true }));
-      toast.success("Fingerprint verified");
+      toast.success("تم التحقق من البصمة بنجاح");
     } catch (e: any) {
-      toast.error(e?.message ?? "Fingerprint verification failed");
+      toast.error("تعذر إتمام العملية حاليًا. يرجى التواصل مع الإدارة.");
     }
   }
 
   async function handleFaceCapture(descriptor: number[]) {
     try {
       const targetAction = showFace === "out" ? "check_out" : "check_in";
-      const res: any = await verifyFaceFn({ data: { descriptor, action: targetAction } });
+      const snap = await getInstantCoords();
+      const res: any = await verifyFaceFn({
+        data: {
+          descriptor,
+          action: targetAction,
+          snapshot_lat: snap?.lat ?? null,
+          snapshot_lng: snap?.lng ?? null,
+          snapshot_accuracy_m: snap?.accuracy_m ?? null,
+        },
+      });
       if (res.match) {
         setVerified((v) => ({ ...v, face: true }));
         setLastDistance(res.distance ?? null);
         if (res.token) {
           setBioToken(res.token);
         }
-        toast.success(`Face verified (distance ${res.distance?.toFixed(3)})`);
+        toast.success("تم التحقق من الوجه بنجاح");
         setShowFace(null);
       } else {
-        toast.error(`Face did not match${res.distance != null ? ` (distance ${res.distance.toFixed(3)})` : ""}`);
+        toast.error("تعذر إتمام العملية حاليًا. يرجى التواصل مع الإدارة.");
       }
     } catch (e: any) {
-      toast.error(e?.message ?? "Face verification failed");
+      toast.error("تعذر إتمام العملية حاليًا. يرجى التواصل مع الإدارة.");
     }
   }
 

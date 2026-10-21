@@ -38,6 +38,7 @@ export type AdminEmployeeRow = {
   is_insured?: boolean | null;
   bank_name?: string | null;
   bank_account_number?: string | null;
+  national_id?: string | null;
 };
 
 const SORT_COLS = ["emp_code", "id", "full_name", "email", "created_at", "status", "contract_end_date", "contract_remaining"] as const;
@@ -235,18 +236,45 @@ export const listEmployeesAdmin = createServerFn({ method: "POST" })
     let q = supabase
       .from("profiles")
       .select(
-        "id, emp_code, full_name, full_name_ar, gender, cost_center_id, email, phone, department_id, position_id, city, district, status, inactive_reason, avatar_url, created_at, contract_start_date, contract_end_date, contract_cancelled, medical_insurance_number, medical_insurance_type, insurance_number, is_insured",
+        "id, emp_code, full_name, full_name_ar, gender, cost_center_id, email, phone, department_id, position_id, city, district, status, inactive_reason, avatar_url, created_at, contract_start_date, contract_end_date, contract_cancelled, medical_insurance_number, medical_insurance_type, insurance_number, is_insured, national_id",
         { count: "exact" },
       );
 
     if (data.q) {
-      const term = data.q.replace(/[,%]/g, "");
-      const phoneSearch = (formatEgPhone(term) || term).replace(/\s+/g, "%");
-      let orStr = `full_name.ilike.%${term}%,full_name_ar.ilike.%${term}%,email.ilike.%${term}%,phone.ilike.%${term}%,phone.ilike.%${phoneSearch}%`;
-      if (/^\d+$/.test(term)) {
-        orStr += `,emp_code.eq.${term}`;
+      const term = data.q.trim().replace(/[,%]/g, "");
+      if (term) {
+        const clauses: string[] = [
+          `full_name.ilike.%${term}%`,
+          `full_name_ar.ilike.%${term}%`,
+          `email.ilike.%${term}%`,
+          `emp_code.ilike.%${term}%`,
+          `phone.ilike.%${term}%`,
+        ];
+        const digitsOnly = term.replace(/\D/g, "");
+        if (digitsOnly) {
+          if (digitsOnly !== term) {
+            clauses.push(`phone.ilike.%${digitsOnly}%`);
+            clauses.push(`emp_code.ilike.%${digitsOnly}%`);
+          }
+          if (digitsOnly.startsWith("0") && digitsOnly.length > 1) {
+            clauses.push(`phone.ilike.%${digitsOnly.slice(1)}%`);
+          }
+          if (digitsOnly.startsWith("20") && digitsOnly.length > 2) {
+            clauses.push(`phone.ilike.%${digitsOnly.slice(2)}%`);
+          }
+          clauses.push(`national_id.ilike.%${digitsOnly}%`);
+        } else {
+          clauses.push(`national_id.ilike.%${term}%`);
+        }
+        const phoneEg = formatEgPhone(term);
+        if (phoneEg) {
+          clauses.push(`phone.ilike.%${phoneEg.replace(/\s+/g, "%")}%`);
+        }
+        if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(term)) {
+          clauses.push(`id.eq.${term}`);
+        }
+        q = q.or(Array.from(new Set(clauses)).join(","));
       }
-      q = q.or(orStr);
     }
     if (data.departmentId) q = q.eq("department_id", data.departmentId);
     if (data.positionId) q = q.eq("position_id", data.positionId);
@@ -265,7 +293,8 @@ export const listEmployeesAdmin = createServerFn({ method: "POST" })
       pe.message?.includes("full_name_ar") || pe.details?.includes("full_name_ar") ||
       pe.message?.includes("cost_center_id") || pe.details?.includes("cost_center_id") ||
       pe.message?.includes("medical_insurance_number") || pe.details?.includes("medical_insurance_number") ||
-      pe.message?.includes("medical_insurance_type") || pe.details?.includes("medical_insurance_type")
+      pe.message?.includes("medical_insurance_type") || pe.details?.includes("medical_insurance_type") ||
+      pe.message?.includes("national_id") || pe.details?.includes("national_id")
     )) {
       let qFallback = supabase
         .from("profiles")
@@ -274,13 +303,36 @@ export const listEmployeesAdmin = createServerFn({ method: "POST" })
           { count: "exact" },
         );
       if (data.q) {
-        const term = data.q.replace(/[,%]/g, "");
-        const phoneSearch = (formatEgPhone(term) || term).replace(/\s+/g, "%");
-        let orStr = `full_name.ilike.%${term}%,email.ilike.%${term}%,phone.ilike.%${term}%,phone.ilike.%${phoneSearch}%`;
-        if (/^\d+$/.test(term)) {
-          orStr += `,emp_code.eq.${term}`;
+        const term = data.q.trim().replace(/[,%]/g, "");
+        if (term) {
+          const fallbackClauses: string[] = [
+            `full_name.ilike.%${term}%`,
+            `email.ilike.%${term}%`,
+            `emp_code.ilike.%${term}%`,
+            `phone.ilike.%${term}%`,
+          ];
+          const digitsOnly = term.replace(/\D/g, "");
+          if (digitsOnly) {
+            if (digitsOnly !== term) {
+              fallbackClauses.push(`phone.ilike.%${digitsOnly}%`);
+              fallbackClauses.push(`emp_code.ilike.%${digitsOnly}%`);
+            }
+            if (digitsOnly.startsWith("0") && digitsOnly.length > 1) {
+              fallbackClauses.push(`phone.ilike.%${digitsOnly.slice(1)}%`);
+            }
+            if (digitsOnly.startsWith("20") && digitsOnly.length > 2) {
+              fallbackClauses.push(`phone.ilike.%${digitsOnly.slice(2)}%`);
+            }
+          }
+          const phoneEg = formatEgPhone(term);
+          if (phoneEg) {
+            fallbackClauses.push(`phone.ilike.%${phoneEg.replace(/\s+/g, "%")}%`);
+          }
+          if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(term)) {
+            fallbackClauses.push(`id.eq.${term}`);
+          }
+          qFallback = qFallback.or(Array.from(new Set(fallbackClauses)).join(","));
         }
-        qFallback = qFallback.or(orStr);
       }
       if (data.departmentId) qFallback = qFallback.eq("department_id", data.departmentId);
       if (data.positionId) qFallback = qFallback.eq("position_id", data.positionId);
@@ -349,6 +401,7 @@ export const listEmployeesAdmin = createServerFn({ method: "POST" })
       is_insured: p.is_insured ?? false,
       bank_name: (p as any).bank_name ?? null,
       bank_account_number: (p as any).bank_account_number ?? null,
+      national_id: p.national_id ?? null,
       roles: (rolesRows ?? []).filter((r: any) => r.user_id === p.id).map((r: any) => String(r.role)),
     }));
 

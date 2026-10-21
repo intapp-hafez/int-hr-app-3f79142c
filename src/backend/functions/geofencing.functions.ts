@@ -19,6 +19,8 @@ export type AssignableEmployee = {
   department: string | null;
   assigned: boolean;
   radius_m?: number | null;
+  email?: string | null;
+  avatar_url?: string | null;
 };
 
 export const listGeofencesAdmin = createServerFn({ method: "GET" })
@@ -137,10 +139,10 @@ export const listAssignableEmployees = createServerFn({ method: "POST" })
     const [{ data: emps, error: e1 }, assignedRes] = await Promise.all([
       supabase
         .from("profiles")
-        .select("id, full_name, emp_code, departments:department_id(name_en)")
+        .select("id, full_name, emp_code, email, avatar_url, departments:department_id(name_en)")
         .eq("status", "Active")
         .order("full_name", { ascending: true })
-        .limit(500),
+        .limit(1000),
       supabase
         .from("geofence_assignments")
         .select("profile_id, radius_m")
@@ -166,12 +168,31 @@ export const listAssignableEmployees = createServerFn({ method: "POST" })
       assignMap.set(a.profile_id, { radius_m: a.radius_m != null ? Number(a.radius_m) : null });
     }
 
-    return (emps ?? []).map((p: any) => {
+    // Ensure all assigned profiles are fetched even if not in the first 1000 active emps
+    const existingIds = new Set((emps ?? []).map((p: any) => p.id));
+    const missingAssignedIds = assignedRows
+      .map((r: any) => r.profile_id)
+      .filter((id: string) => !existingIds.has(id));
+
+    let extraEmps: any[] = [];
+    if (missingAssignedIds.length > 0) {
+      const { data: extras } = await supabase
+        .from("profiles")
+        .select("id, full_name, emp_code, email, avatar_url, departments:department_id(name_en)")
+        .in("id", missingAssignedIds);
+      extraEmps = extras ?? [];
+    }
+
+    const allEmps = [...(emps ?? []), ...extraEmps];
+
+    return allEmps.map((p: any) => {
       const info = assignMap.get(p.id);
       return {
         id: p.id,
         full_name: p.full_name ?? "—",
         emp_code: p.emp_code ?? null,
+        email: p.email ?? null,
+        avatar_url: p.avatar_url ?? null,
         department: p.departments?.name_en ?? null,
         assigned: !!info,
         radius_m: info ? info.radius_m : null,

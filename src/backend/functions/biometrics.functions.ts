@@ -8,6 +8,9 @@ import { logBiometricEvent } from "@/backend/server/biometric-audit.server";
 const DescriptorSchema = z.object({
   descriptor: z.array(z.number()).length(128),
   action: z.enum(["check_in", "check_out", "attendance"]).optional().default("attendance"),
+  snapshot_lat: z.number().min(-90).max(90).optional().nullable(),
+  snapshot_lng: z.number().min(-180).max(180).optional().nullable(),
+  snapshot_accuracy_m: z.number().nonnegative().optional().nullable(),
 });
 
 function distance(a: number[], b: number[]) {
@@ -95,6 +98,10 @@ export const verifyFace = createServerFn({ method: "POST" })
         method: "face",
         distance: d,
         expires_at: expiresAt,
+        snapshot_lat: data.snapshot_lat ?? null,
+        snapshot_lng: data.snapshot_lng ?? null,
+        snapshot_accuracy_m: data.snapshot_accuracy_m ?? null,
+        snapshot_at: new Date().toISOString(),
       });
     }
     await logBiometricEvent({

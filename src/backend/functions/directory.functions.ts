@@ -94,9 +94,36 @@ export const upsertDepartment = createServerFn({ method: "POST" })
     // Cast: supabase generated types haven't been regenerated to include
     // the new `responsible_person_id` column yet. RLS still enforces
     // admin/HR-only writes server-side.
-    const { error } = await (context.supabase.from("departments") as any).upsert(row);
+    const { data: savedDept, error } = await (context.supabase.from("departments") as any)
+      .upsert(row)
+      .select("id")
+      .single();
     if (error) throw new Error(error.message);
-    return { ok: true };
+
+    if (data.sections && savedDept?.id) {
+      const sectionNames = data.sections
+        .split(/[,;\n]/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      for (const sName of sectionNames) {
+        const { data: existing } = await (context.supabase as any)
+          .from("sub_sections")
+          .select("id")
+          .eq("department_id", savedDept.id)
+          .ilike("name_en", sName)
+          .maybeSingle();
+        if (!existing) {
+          await (context.supabase as any).from("sub_sections").insert({
+            department_id: savedDept.id,
+            name_en: sName,
+            name_ar: sName,
+            active: true,
+          });
+        }
+      }
+    }
+
+    return { ok: true, id: savedDept?.id };
   });
 
 export const deleteDepartment = createServerFn({ method: "POST" })

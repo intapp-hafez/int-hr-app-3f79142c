@@ -1,8 +1,13 @@
 export async function downloadTemplate(filename: string, headers: string[], sample: Record<string, string | number | boolean>[] = []) {
   const XLSX = await import("xlsx");
   const ws = XLSX.utils.json_to_sheet(sample.length ? sample : [headers.reduce((acc, h) => ({ ...acc, [h]: "" }), {})], { header: headers });
+  ws["!cols"] = headers.map((h) => ({
+    wch: Math.max(h.length + 5, 20),
+  }));
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+  const rawSheetName = filename.replace(/\.xlsx$/i, "").replace(/[_-]/g, " ") || "Template";
+  const sheetName = (rawSheetName.charAt(0).toUpperCase() + rawSheetName.slice(1)).slice(0, 31);
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
   XLSX.writeFile(wb, filename);
 }
 
