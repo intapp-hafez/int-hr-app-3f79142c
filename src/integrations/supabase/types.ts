@@ -94,25 +94,33 @@ export type Database = {
       }
       attendance: {
         Row: {
+          accuracy_m: number | null
           branch: string | null
           city: string | null
           created_at: string
           date: string
+          decision: string
           district: string | null
           employee_id: string
           free_check: boolean
+          gps_age_ms: number | null
+          gps_sample_count: number | null
           id: string
           in_time: string | null
           lat: number | null
           lng: number | null
           network_ok: boolean | null
           note: string | null
+          out_accuracy_m: number | null
           out_city: string | null
           out_district: string | null
+          out_gps_age_ms: number | null
           out_lat: number | null
           out_lng: number | null
           out_street: string | null
           out_time: string | null
+          policy_version: number
+          reason_codes: Json | null
           status: string
           street: string | null
           updated_at: string
@@ -120,25 +128,33 @@ export type Database = {
           verified_fp: boolean
         }
         Insert: {
+          accuracy_m?: number | null
           branch?: string | null
           city?: string | null
           created_at?: string
           date?: string
+          decision?: string
           district?: string | null
           employee_id: string
           free_check?: boolean
+          gps_age_ms?: number | null
+          gps_sample_count?: number | null
           id?: string
           in_time?: string | null
           lat?: number | null
           lng?: number | null
           network_ok?: boolean | null
           note?: string | null
+          out_accuracy_m?: number | null
           out_city?: string | null
           out_district?: string | null
+          out_gps_age_ms?: number | null
           out_lat?: number | null
           out_lng?: number | null
           out_street?: string | null
           out_time?: string | null
+          policy_version?: number
+          reason_codes?: Json | null
           status?: string
           street?: string | null
           updated_at?: string
@@ -146,25 +162,33 @@ export type Database = {
           verified_fp?: boolean
         }
         Update: {
+          accuracy_m?: number | null
           branch?: string | null
           city?: string | null
           created_at?: string
           date?: string
+          decision?: string
           district?: string | null
           employee_id?: string
           free_check?: boolean
+          gps_age_ms?: number | null
+          gps_sample_count?: number | null
           id?: string
           in_time?: string | null
           lat?: number | null
           lng?: number | null
           network_ok?: boolean | null
           note?: string | null
+          out_accuracy_m?: number | null
           out_city?: string | null
           out_district?: string | null
+          out_gps_age_ms?: number | null
           out_lat?: number | null
           out_lng?: number | null
           out_street?: string | null
           out_time?: string | null
+          policy_version?: number
+          reason_codes?: Json | null
           status?: string
           street?: string | null
           updated_at?: string
@@ -174,6 +198,93 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "attendance_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      attendance_attempts: {
+        Row: {
+          action: string
+          attendance_id: string | null
+          biometric_method: string | null
+          claimed_accuracy_m: number | null
+          claimed_gps_age_ms: number | null
+          claimed_gps_samples: number | null
+          claimed_lat: number | null
+          claimed_lng: number | null
+          decision: string
+          device_id: string | null
+          employee_id: string
+          fence_allowed_m: number | null
+          fence_distance_m: number | null
+          fence_result: string | null
+          id: string
+          policy_version: number
+          reason_codes: Json | null
+          risk_signals: Json | null
+          server_received_at: string
+          ssid_claimed: string | null
+          travel_speed_kmh: number | null
+        }
+        Insert: {
+          action: string
+          attendance_id?: string | null
+          biometric_method?: string | null
+          claimed_accuracy_m?: number | null
+          claimed_gps_age_ms?: number | null
+          claimed_gps_samples?: number | null
+          claimed_lat?: number | null
+          claimed_lng?: number | null
+          decision: string
+          device_id?: string | null
+          employee_id: string
+          fence_allowed_m?: number | null
+          fence_distance_m?: number | null
+          fence_result?: string | null
+          id?: string
+          policy_version?: number
+          reason_codes?: Json | null
+          risk_signals?: Json | null
+          server_received_at?: string
+          ssid_claimed?: string | null
+          travel_speed_kmh?: number | null
+        }
+        Update: {
+          action?: string
+          attendance_id?: string | null
+          biometric_method?: string | null
+          claimed_accuracy_m?: number | null
+          claimed_gps_age_ms?: number | null
+          claimed_gps_samples?: number | null
+          claimed_lat?: number | null
+          claimed_lng?: number | null
+          decision?: string
+          device_id?: string | null
+          employee_id?: string
+          fence_allowed_m?: number | null
+          fence_distance_m?: number | null
+          fence_result?: string | null
+          id?: string
+          policy_version?: number
+          reason_codes?: Json | null
+          risk_signals?: Json | null
+          server_received_at?: string
+          ssid_claimed?: string | null
+          travel_speed_kmh?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_attempts_attendance_id_fkey"
+            columns: ["attendance_id"]
+            isOneToOne: false
+            referencedRelation: "attendance"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_attempts_employee_id_fkey"
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -204,6 +315,70 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      attendance_review_cases: {
+        Row: {
+          action: string
+          attendance_id: string | null
+          created_at: string
+          employee_id: string
+          id: string
+          reason_codes: Json | null
+          resolved_at: string | null
+          reviewer_id: string | null
+          reviewer_note: string | null
+          risk_signals: Json | null
+          status: string
+        }
+        Insert: {
+          action: string
+          attendance_id?: string | null
+          created_at?: string
+          employee_id: string
+          id?: string
+          reason_codes?: Json | null
+          resolved_at?: string | null
+          reviewer_id?: string | null
+          reviewer_note?: string | null
+          risk_signals?: Json | null
+          status?: string
+        }
+        Update: {
+          action?: string
+          attendance_id?: string | null
+          created_at?: string
+          employee_id?: string
+          id?: string
+          reason_codes?: Json | null
+          resolved_at?: string | null
+          reviewer_id?: string | null
+          reviewer_note?: string | null
+          risk_signals?: Json | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_review_cases_attendance_id_fkey"
+            columns: ["attendance_id"]
+            isOneToOne: false
+            referencedRelation: "attendance"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_review_cases_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_review_cases_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       biometric_audit_log: {
         Row: {
@@ -310,6 +485,62 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "geofence_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      biometric_verification_tokens: {
+        Row: {
+          action: string
+          created_at: string
+          distance: number | null
+          expires_at: string
+          id: string
+          method: string
+          snapshot_accuracy_m: number | null
+          snapshot_at: string | null
+          snapshot_lat: number | null
+          snapshot_lng: number | null
+          token: string
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          distance?: number | null
+          expires_at?: string
+          id?: string
+          method: string
+          snapshot_accuracy_m?: number | null
+          snapshot_at?: string | null
+          snapshot_lat?: number | null
+          snapshot_lng?: number | null
+          token: string
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          distance?: number | null
+          expires_at?: string
+          id?: string
+          method?: string
+          snapshot_accuracy_m?: number | null
+          snapshot_at?: string | null
+          snapshot_lat?: number | null
+          snapshot_lng?: number | null
+          token?: string
+          used_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "biometric_verification_tokens_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
