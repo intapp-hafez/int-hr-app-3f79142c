@@ -12,7 +12,10 @@ import {
   Loader2,
   X,
   Eye,
+  Users,
+  User,
 } from "lucide-react";
+import { EmployeeAdvancesPage } from "@/components/employee/EmployeeAdvancesPage";
 import {
   listTeamAdvances,
   managerDecideAdvance,
@@ -69,11 +72,12 @@ function fmtDate(s: string | null | undefined) {
 }
 
 function ManagerAdvancesPage() {
-  const { t } = useI18n();
+  const { t, isAr } = useI18n();
   const qc = useQueryClient();
   const listFn = useServerFn(listTeamAdvances);
   const decideFn = useServerFn(managerDecideAdvance);
 
+  const [mainTab, setMainTab] = useState<"team" | "personal">("team");
   const [statusFilter, setStatusFilter] = useState("all");
   const [decideModal, setDecideModal] = useState<EmployeeAdvance | null>(null);
   const [decideAction, setDecideAction] = useState<"approved" | "rejected" | "returned">("approved");
@@ -102,24 +106,69 @@ function ManagerAdvancesPage() {
   });
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between">
+    <div className="space-y-6 pb-12">
+      {/* Header & Title with Tab Switcher */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-border/60 pb-5">
         <div>
-          <h1 className="font-display text-2xl font-semibold tracking-tight flex items-center gap-2">
-            <Banknote className="h-6 w-6 text-brand" />
-            Team Advances
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-brand">
+            <Banknote className="h-4 w-4" />
+            <span>{isAr ? "السلف والعهد المالية" : "Advances & Loans"}</span>
+          </div>
+          <h1 className="mt-1 font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+            {mainTab === "team"
+              ? isAr ? "سلف الفريق" : "Team Advances"
+              : isAr ? "سلفي وقروضي الخاصة" : "My Advances & Loans"}
           </h1>
-          <p className="text-sm text-muted-foreground">{t("advancesTeamSubtitle")}</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {mainTab === "team"
+              ? isAr
+                ? "مراجعة واعتماد أو رفض طلبات السلف المقدمة من أعضاء فريقك."
+                : "Review and approve advance requests submitted by your team members."
+              : isAr
+                ? "تقديم طلب سلفة أو قرض شخصي ومتابعة الحدود والموافقات."
+                : "Request an advance or loan for yourself and track approval progress."}
+          </p>
         </div>
-        {pendingCount > 0 && (
-          <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-700 ring-1 ring-amber-200">
-            {pendingCount} pending review
-          </span>
-        )}
+
+        {/* Tab Switcher */}
+        <div className="inline-flex items-center rounded-2xl bg-muted/60 p-1 border border-border/50 text-xs font-medium self-start sm:self-auto shadow-xs">
+          <button
+            type="button"
+            onClick={() => setMainTab("team")}
+            className={`flex items-center gap-2 rounded-xl px-3.5 py-2 transition-all ${
+              mainTab === "team"
+                ? "bg-card font-semibold text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Users className="h-4 w-4" />
+            <span>{isAr ? "سلف الفريق" : "Team Advances"}</span>
+            {pendingCount > 0 && (
+              <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold text-white leading-none">
+                {pendingCount}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setMainTab("personal")}
+            className={`flex items-center gap-2 rounded-xl px-3.5 py-2 transition-all ${
+              mainTab === "personal"
+                ? "bg-card font-semibold text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <User className="h-4 w-4" />
+            <span>{isAr ? "سلفي الخاصة" : "My Advances"}</span>
+          </button>
+        </div>
       </div>
 
-      {/* Filter pills */}
+      {mainTab === "personal" ? (
+        <EmployeeAdvancesPage hideHeader={true} />
+      ) : (
+        <>
+          {/* Filter pills */}
       <div className="flex flex-wrap gap-2">
         {[
           { value: "all", label: "All" },
@@ -320,6 +369,8 @@ function ManagerAdvancesPage() {
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );

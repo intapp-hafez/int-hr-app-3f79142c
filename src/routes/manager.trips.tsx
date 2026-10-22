@@ -1,6 +1,28 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, Play, Check, X, MapPin, Search, History, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Play,
+  Check,
+  X,
+  MapPin,
+  Search,
+  History,
+  ChevronDown,
+  ChevronUp,
+  Compass,
+  Building2,
+  User,
+  Calendar,
+  Clock,
+  Car,
+  FileText,
+  Minus,
+  Sparkles,
+  CheckCircle2,
+  Navigation,
+} from "lucide-react";
 import { toast } from "sonner";
 import { type TaskStatus, type ManagerTrip } from "@/lib/store";
 import { useSession } from "@/lib/auth";
@@ -79,7 +101,7 @@ function ManagerTripsPage() {
   const teamFn = useServerFn(getMyTeam);
   const { data: teamData } = useQuery({
     queryKey: ["manager-team-all"],
-    queryFn: () => teamFn({ data: { page: 1, pageSize: 100, q: "" } }),
+    queryFn: () => teamFn({ data: { page: 1, pageSize: 500, q: "" } }),
     enabled: !!me,
   });
   const team = useMemo(() => teamData?.rows ?? [], [teamData]);
@@ -227,14 +249,30 @@ function TripHistoryList({ history, nameOf }: { history?: ManagerTrip["history"]
   );
 }
 
-function AddTripModal({ me, team, onClose }: { me: string; team: Array<{ id: string; name: string }>; onClose: () => void }) {
-  const { t } = useI18n();
+function AddTripModal({
+  me,
+  team,
+  onClose,
+}: {
+  me: string;
+  team: Array<{
+    id: string;
+    name: string;
+    email?: string;
+    department?: string | null;
+    position?: string | null;
+    avatar_url?: string | null;
+  }>;
+  onClose: () => void;
+}) {
+  const { t, lang } = useI18n();
+  const isAr = lang === "ar";
   const { data: cityData } = useQuery({
     queryKey: ["geo", "cities-districts"],
     queryFn: async () => {
       const [{ data: cities }, { data: districts }] = await Promise.all([
-        supabase.from("cities").select("id, name_en").order("name_en"),
-        supabase.from("districts").select("id, city_id, name_en").order("name_en"),
+        supabase.from("cities").select("id, name_en, name_ar").order("name_en"),
+        supabase.from("districts").select("id, city_id, name_en, name_ar").order("name_en"),
       ]);
       return { cities: cities ?? [], districts: districts ?? [] };
     },
@@ -243,22 +281,7 @@ function AddTripModal({ me, team, onClose }: { me: string; team: Array<{ id: str
   const cities = cityData?.cities ?? [];
   const districts = cityData?.districts ?? [];
 
-  const { data: fallbackEmployees = [] } = useQuery({
-    queryKey: ["active-employees-assignees"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("id, full_name, email")
-        .eq("status", "Active")
-        .order("full_name");
-      return (data ?? []).map((p: any) => ({
-        id: p.id,
-        name: p.full_name || p.email || "Employee",
-      }));
-    },
-    enabled: team.length === 0,
-  });
-  const assigneesList = team.length > 0 ? team : fallbackEmployees;
+  const assigneesList = team;
 
   const [destination, setDestination] = useState("");
   const [address, setAddress] = useState("");
@@ -269,6 +292,9 @@ function AddTripModal({ me, team, onClose }: { me: string; team: Array<{ id: str
   const [purpose, setPurpose] = useState("");
   const [notes, setNotes] = useState("");
   const [assignee, setAssignee] = useState(assigneesList[0]?.id ?? "");
+
+  const [assigneeSearch, setAssigneeSearch] = useState("");
+  const [assigneeMenuOpen, setAssigneeMenuOpen] = useState(false);
 
   useEffect(() => {
     if (!assignee && assigneesList[0]?.id) {
@@ -286,123 +312,646 @@ function AddTripModal({ me, team, onClose }: { me: string; team: Array<{ id: str
   const qc = useQueryClient();
   const createFn = useServerFn(createTrip);
   const [saving, setSaving] = useState(false);
+
+  const selectedEmployee = useMemo(
+    () => assigneesList.find((e) => e.id === assignee),
+    [assigneesList, assignee],
+  );
+
+  const filteredTeam = useMemo(() => {
+    if (!assigneeSearch.trim()) return assigneesList;
+    const q = assigneeSearch.toLowerCase();
+    return assigneesList.filter(
+      (e) =>
+        e.name.toLowerCase().includes(q) ||
+        (e.email && e.email.toLowerCase().includes(q)) ||
+        (e.department && e.department.toLowerCase().includes(q)),
+    );
+  }, [assigneesList, assigneeSearch]);
+
   const submit = async () => {
-    if (!destination.trim()) return toast.error(t("destination"));
-    if (!address.trim()) return toast.error(t("tripAddress"));
-    if (!assignee) return toast.error(t("assignedTo"));
+    if (!destination.trim()) {
+      return toast.error(isAr ? "يرجى تحديد وجهة المأمورية" : "Please enter a destination");
+    }
+    if (!address.trim()) {
+      return toast.error(isAr ? "يرجى إدخال عنوان المأمورية" : "Please enter an address");
+    }
+    if (!assignee) {
+      return toast.error(isAr ? "يرجى اختيار المكلف بالمأمورية" : "Please select an assignee");
+    }
     setSaving(true);
     try {
-      await createFn({ data: {
-        destination: destination.trim(), address: address.trim(), trip_date: date,
-        trip_time: time || null, purpose: purpose.trim() || null, notes: notes.trim() || null,
-        assignee, city: cityId || null, district: district || null,
-        lat: lat ?? null, lng: lng ?? null, radius_m: lat != null ? radius_m : null,
-        overnight_nights: overnightNights, transport_type: transportType || null,
-      } });
+      await createFn({
+        data: {
+          destination: destination.trim(),
+          address: address.trim(),
+          trip_date: date,
+          trip_time: time || null,
+          purpose: purpose.trim() || null,
+          notes: notes.trim() || null,
+          assignee,
+          city: cityId || null,
+          district: district || null,
+          lat: lat ?? null,
+          lng: lng ?? null,
+          radius_m: lat != null ? radius_m : null,
+          overnight_nights: overnightNights,
+          transport_type: transportType || null,
+        },
+      });
       qc.invalidateQueries({ queryKey: ["manager-trips"] });
-      toast.success(t("addTrip"));
+      toast.success(isAr ? "تم حفظ مأمورية العمل بنجاح" : "Trip created successfully");
       onClose();
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to save trip");
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const cityName = cities.find((c: any) => c.id === cityId)?.name_en || destination;
+  const cityName =
+    cities.find((c: any) => c.id === cityId)?.[isAr ? "name_ar" : "name_en"] ||
+    cities.find((c: any) => c.id === cityId)?.name_en ||
+    destination;
+
+  const quickPurposes = isAr
+    ? ["معاينة موقع", "اجتماع عميل", "صيانة طارئة", "تسليم وتشغيل", "فحص دوري"]
+    : ["Site Inspection", "Client Meeting", "Emergency Maintenance", "Delivery & Setup", "Periodic Audit"];
+
+  const transportOptions = [
+    {
+      id: "company_car",
+      label: isAr ? "سيارة الشركة" : "Company Car",
+      sub: isAr ? "سيارة مخصصة للمأمورية" : "Dedicated vehicle",
+      icon: Car,
+    },
+    {
+      id: "expense",
+      label: isAr ? "مصروفات انتقال" : "Travel Expenses",
+      sub: isAr ? "بدل انتقال معتمد" : "Expense reimbursement",
+      icon: Sparkles,
+    },
+    {
+      id: "public",
+      label: isAr ? "مواصلات أخرى" : "Public / Other",
+      sub: isAr ? "قطار / حافلة / تاكسي" : "Transit or taxi",
+      icon: Navigation,
+    },
+  ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-foreground/40 p-4 md:items-center" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="my-auto w-full max-w-xl rounded-3xl bg-background p-5 shadow-soft">
-        <h2 className="mb-4 font-display text-lg font-semibold">{t("addTrip")}</h2>
-        <div className="space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <Field label={t("destination")}><input value={destination} onChange={(e) => setDestination(e.target.value)} className="input" /></Field>
-            <Field label={t("taskCity") ?? "City"}>
-              <select value={cityId} onChange={(e) => { setCityId(e.target.value); setDistrict(""); }} className="input">
-                <option value="">—</option>
-                {cities.map((c: any) => <option key={c.id} value={c.id}>{c.name_en}</option>)}
-              </select>
-            </Field>
-            <Field label={t("rowSiteDistrict")}>
-              <select value={district} onChange={(e) => setDistrict(e.target.value)} className="input" disabled={!cityId}>
-                <option value="">—</option>
-                {districts.filter((d: any) => d.city_id === cityId).map((d: any) => (
-                  <option key={d.id} value={d.name_en}>{d.name_en}</option>
-                ))}
-              </select>
-            </Field>
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="flex gap-2 items-end">
-              <div className="flex-1">
-                <Field label={t("tripAddress")}><input value={address} onChange={(e) => setAddress(e.target.value)} className="input" /></Field>
-              </div>
-              <button type="button" title="Map location" onClick={() => setShowMap(!showMap)} className={`rounded-lg border p-2.5 mb-[1px] ${showMap || lat ? "border-brand bg-brand/10 text-brand" : "border-border bg-card text-muted-foreground"}`}>
-                <MapPin className="h-4 w-4" />
-              </button>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden bg-foreground/40 backdrop-blur-xs p-3 sm:p-4"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="my-auto flex max-h-[92vh] w-full max-w-4xl lg:max-w-5xl flex-col rounded-3xl bg-background border border-border shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+      >
+        {/* ── Modal Header ── */}
+        <div className="flex items-center justify-between border-b border-border/80 px-6 py-3.5 bg-muted/20">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-brand/10 text-brand shadow-xs">
+              <Compass className="h-4.5 w-4.5" />
             </div>
-            <Field label={t("taskDate")}><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input" /></Field>
-            <Field label={t("tripTime")}><input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="input" /></Field>
-          </div>
-          {showMap && (
-            <div className="col-span-12 mt-1">
-              <TaskLocationPicker
-                lat={lat}
-                lng={lng}
-                radius_m={radius_m}
-                cityName={cityName}
-                districtName={district}
-                onChange={async (l, g, r) => {
-                  setLat(l);
-                  setLng(g);
-                  setRadiusM(r ?? 500);
-                  if (l != null && g != null) {
-                    try {
-                      const geo = await reverseGeocodeCoords(l, g);
-                      const autoAddress = geo.detailedAddress || geo.street || geo.formatted;
-                      if (autoAddress) setAddress(autoAddress);
-                    } catch {
-                      // ignore
-                    }
-                  }
-                }}
-              />
+            <div>
+              <h2 className="font-display text-sm sm:text-base font-bold text-foreground">
+                {isAr ? "إضافة مأمورية عمل جديدة" : "Add Business Trip"}
+              </h2>
+              <p className="text-[11px] text-muted-foreground">
+                {isAr
+                  ? "تكليف عضو من الفريق بالمأمورية وتحديد الوجهة والمواعيد والبدلات"
+                  : "Assign team member, schedule, destination and transport logistics"}
+              </p>
             </div>
-          )}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Field label={t("tripPurpose")}><input value={purpose} onChange={(e) => setPurpose(e.target.value)} className="input" /></Field>
-            <Field label={t("assignedTo")}>
-              <select value={assignee} onChange={(e) => setAssignee(e.target.value)} className="input">
-                {assigneesList.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
-              </select>
-            </Field>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Field label="Overnight Nights"><input type="number" min="0" value={overnightNights} onChange={(e) => setOvernightNights(parseInt(e.target.value) || 0)} className="input" /></Field>
-            <Field label="Transport Type">
-              <select value={transportType} onChange={(e) => setTransportType(e.target.value)} className="input">
-                <option value="">—</option>
-                <option value="company_car">Company Car (سيارة الشركة)</option>
-                <option value="expense">Expenses (مصروفات انتقال)</option>
-              </select>
-            </Field>
-          </div>
-          <Field label={t("tripNotes")}><textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="input" /></Field>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
-        <div className="mt-5 flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold">{t("cancel")}</button>
-          <button onClick={submit} disabled={saving} className="disabled:opacity-50 rounded-full bg-gradient-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground shadow-brand">{t("save")}</button>
+
+        {/* ── Form Body with 2-Column Desktop Grid (No side scrollbar) ── */}
+        <div className="flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden p-4 sm:p-5 text-xs">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+            {/* ── Column 1: Core Details, Schedule & Transport ── */}
+            <div className="space-y-4">
+              {/* Card 1: Assignee & Core Details */}
+              <div className="rounded-2xl border border-border/70 bg-card/60 p-3.5 space-y-3">
+                <div className="flex items-center gap-2 font-semibold text-foreground border-b border-border/50 pb-1.5">
+                  <User className="h-3.5 w-3.5 text-brand" />
+                  <span>{isAr ? "المكلف والهدف من المأمورية" : "Assignee & Trip Core"}</span>
+                </div>
+
+                {/* Assignee Combobox */}
+                <div>
+                  <label className="block font-semibold text-foreground mb-1.5">
+                    {isAr ? "المكلف بالمأمورية" : "Assigned Team Member"} <span className="text-destructive">*</span>
+                  </label>
+
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setAssigneeMenuOpen((v) => !v)}
+                      className="w-full flex items-center justify-between rounded-xl border border-input bg-background px-3 py-2 text-start transition-all hover:border-brand/40 focus:outline-hidden focus:ring-2 focus:ring-brand/20"
+                    >
+                      {selectedEmployee ? (
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand font-bold text-xs">
+                            {selectedEmployee.avatar_url ? (
+                              <img
+                                src={selectedEmployee.avatar_url}
+                                alt=""
+                                className="h-full w-full rounded-full object-cover"
+                              />
+                            ) : (
+                              selectedEmployee.name.charAt(0).toUpperCase()
+                            )}
+                          </div>
+                          <div className="min-w-0 truncate">
+                            <p className="font-semibold text-foreground text-xs truncate">
+                              {selectedEmployee.name}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground truncate">
+                              {selectedEmployee.position || selectedEmployee.email || (isAr ? "عضو الفريق" : "Team member")}
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">
+                          {isAr ? "اختر أحد أعضاء الفريق…" : "Select a team member…"}
+                        </span>
+                      )}
+                      <ChevronDown
+                        className={`h-4 w-4 text-muted-foreground shrink-0 ms-2 transition-transform duration-200 ${
+                          assigneeMenuOpen ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+
+                    {assigneeMenuOpen && (
+                      <div className="absolute left-0 right-0 top-full z-30 mt-1.5 rounded-2xl border border-border bg-background shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                        <div className="p-2 border-b border-border/60 bg-muted/30">
+                          <div className="relative">
+                            <Search className="h-3.5 w-3.5 text-muted-foreground absolute start-2.5 top-1/2 -translate-y-1/2" />
+                            <input
+                              autoFocus
+                              value={assigneeSearch}
+                              onChange={(e) => setAssigneeSearch(e.target.value)}
+                              placeholder={isAr ? "بحث بالاسم أو البريد…" : "Search team members…"}
+                              className="w-full bg-background rounded-lg border border-input ps-8 pe-2.5 py-1.5 text-xs focus:outline-hidden"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="max-h-48 overflow-y-auto p-1.5 space-y-1">
+                          {filteredTeam.length === 0 ? (
+                            <p className="p-3 text-center text-muted-foreground">
+                              {assigneesList.length === 0
+                                ? isAr
+                                  ? "لا يوجد أعضاء في فريقك"
+                                  : "No team members assigned"
+                                : isAr
+                                ? "لا توجد نتائج مطابقة"
+                                : "No matching members found"}
+                            </p>
+                          ) : (
+                            filteredTeam.map((emp) => {
+                              const isSelected = emp.id === assignee;
+                              return (
+                                <button
+                                  key={emp.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setAssignee(emp.id);
+                                    setAssigneeMenuOpen(false);
+                                    setAssigneeSearch("");
+                                  }}
+                                  className={`w-full flex items-center justify-between rounded-xl p-2 text-start transition-colors ${
+                                    isSelected
+                                      ? "bg-brand/10 font-semibold text-brand"
+                                      : "hover:bg-muted text-foreground"
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted font-bold text-xs text-foreground">
+                                      {emp.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="min-w-0 truncate">
+                                      <p className="text-xs truncate">{emp.name}</p>
+                                      <p className="text-[10px] text-muted-foreground truncate">
+                                        {emp.position || emp.email}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  {isSelected && <Check className="h-4 w-4 text-brand shrink-0 ms-2" />}
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Destination & Purpose */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block font-semibold text-foreground mb-1">
+                      {isAr ? "وجهة المأمورية / العميل" : "Destination / Site"} <span className="text-destructive">*</span>
+                    </label>
+                    <div className="relative">
+                      <Building2 className="h-3.5 w-3.5 text-muted-foreground absolute start-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        value={destination}
+                        onChange={(e) => setDestination(e.target.value)}
+                        placeholder={isAr ? "مثال: فرع الإسكندرية - مركز البيانات" : "e.g. Alexandria Data Center"}
+                        className="w-full rounded-xl border border-input bg-background ps-9 pe-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-brand/20"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-foreground mb-1">
+                      {isAr ? "الغرض من المأمورية" : "Trip Purpose"}
+                    </label>
+                    <input
+                      value={purpose}
+                      onChange={(e) => setPurpose(e.target.value)}
+                      placeholder={isAr ? "مثال: فحص وتحديث الخوادم" : "e.g. Server maintenance and audit"}
+                      className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-brand/20"
+                    />
+                  </div>
+                </div>
+
+                {/* Quick Purpose Suggestion Chips */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                  <span className="text-[10px] text-muted-foreground me-1 font-medium">
+                    {isAr ? "اقتراحات سريعة:" : "Quick suggestions:"}
+                  </span>
+                  {quickPurposes.map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setPurpose(p)}
+                      className={`rounded-full px-2.5 py-0.5 text-[10px] font-medium border transition-colors ${
+                        purpose === p
+                          ? "border-brand bg-brand/10 text-brand font-semibold"
+                          : "border-border/70 bg-background text-muted-foreground hover:bg-muted hover:text-foreground"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Card 3: Schedule, Overnight & Transport */}
+              <div className="rounded-2xl border border-border/70 bg-card/60 p-4 space-y-4">
+                <div className="flex items-center gap-2 font-semibold text-foreground border-b border-border/50 pb-2">
+                  <Calendar className="h-4 w-4 text-brand" />
+                  <span>{isAr ? "المواعيد والإقامة ووسيلة النقل" : "Schedule, Stay & Transport"}</span>
+                </div>
+
+                {/* Date & Time */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block font-semibold text-foreground mb-1">
+                      {isAr ? "تاريخ السفر" : "Trip Date"} <span className="text-destructive">*</span>
+                    </label>
+                    <div className="relative">
+                      <Calendar className="h-3.5 w-3.5 text-muted-foreground absolute start-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="date"
+                        value={date}
+                        onChange={(e) => setDate(e.target.value)}
+                        className="w-full rounded-xl border border-input bg-background ps-9 pe-3 py-2 text-xs focus:outline-hidden font-medium"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-foreground mb-1">
+                      {isAr ? "وقت الانطلاق" : "Departure Time"}
+                    </label>
+                    <div className="relative">
+                      <Clock className="h-3.5 w-3.5 text-muted-foreground absolute start-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="time"
+                        value={time}
+                        onChange={(e) => setTime(e.target.value)}
+                        className="w-full rounded-xl border border-input bg-background ps-9 pe-3 py-2 text-xs focus:outline-hidden font-medium"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Overnight Nights Stepper */}
+                <div className="rounded-xl border border-input/60 bg-background/60 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <span className="font-semibold text-foreground text-xs block">
+                      {isAr ? "ليالي الإقامة (المبيت)" : "Overnight Nights"}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">
+                      {isAr
+                        ? "حدد عدد ليالي المبيت لاحتساب بدل السفر والإقامة تلقائياً"
+                        : "Sets per-diem allowance & accommodation rate calculation"}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2.5 shrink-0">
+                    <button
+                      type="button"
+                      disabled={overnightNights <= 0}
+                      onClick={() => setOvernightNights((n) => Math.max(0, n - 1))}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-input bg-card text-foreground hover:bg-muted disabled:opacity-30 transition-colors"
+                    >
+                      <Minus className="h-3.5 w-3.5" />
+                    </button>
+                    <div className="flex flex-col items-center min-w-[105px]">
+                      <span className="font-display text-base font-bold text-foreground">
+                        {overnightNights}
+                      </span>
+                      <span className="text-[10px] font-semibold text-brand">
+                        {overnightNights === 0
+                          ? isAr
+                            ? "بدون مبيت (عودة)"
+                            : "Same-day trip"
+                          : overnightNights === 1
+                          ? isAr
+                            ? "ليلة واحدة"
+                            : "1 Night stay"
+                          : isAr
+                          ? `${overnightNights} ليالي إقامة`
+                          : `${overnightNights} Nights stay`}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setOvernightNights((n) => n + 1)}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-input bg-card text-foreground hover:bg-muted transition-colors"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Transport Type Cards */}
+                <div>
+                  <label className="block font-semibold text-foreground mb-1.5">
+                    {isAr ? "وسيلة النقل المعتمدة" : "Transport Type"}
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    {transportOptions.map((opt) => {
+                      const Icon = opt.icon;
+                      const isSelected = transportType === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => setTransportType(isSelected ? "" : opt.id)}
+                          className={`flex flex-col items-start p-3 rounded-xl border text-start transition-all ${
+                            isSelected
+                              ? "border-brand bg-brand/10 shadow-xs"
+                              : "border-input bg-background hover:border-border hover:bg-muted/40"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between w-full mb-1">
+                            <Icon
+                              className={`h-4 w-4 ${isSelected ? "text-brand" : "text-muted-foreground"}`}
+                            />
+                            {isSelected && (
+                              <div className="h-2 w-2 rounded-full bg-brand" />
+                            )}
+                          </div>
+                          <span
+                            className={`font-semibold text-xs ${
+                              isSelected ? "text-brand" : "text-foreground"
+                            }`}
+                          >
+                            {opt.label}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground line-clamp-1 mt-0.5">
+                            {opt.sub}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Column 2: Location, Geofence Map & Notes ── */}
+            <div className="space-y-4">
+              {/* Card 2: Location & Address */}
+              <div className="rounded-2xl border border-border/70 bg-card/60 p-3.5 space-y-3">
+                <div className="flex items-center justify-between border-b border-border/50 pb-1.5">
+                  <div className="flex items-center gap-2 font-semibold text-foreground">
+                    <MapPin className="h-3.5 w-3.5 text-brand" />
+                    <span>{isAr ? "الموقع الجغرافي والعنوان" : "Location & Address"}</span>
+                  </div>
+                  {lat != null && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-semibold text-success">
+                      <CheckCircle2 className="h-3 w-3" />
+                      {isAr ? "إحداثيات محددة" : "GPS Coordinates Set"}
+                    </span>
+                  )}
+                </div>
+
+                {/* City & District */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-semibold text-foreground mb-1">
+                      {isAr ? "المدينة / المحافظة" : "City"}
+                    </label>
+                    <select
+                      value={cityId}
+                      onChange={(e) => {
+                        setCityId(e.target.value);
+                        setDistrict("");
+                      }}
+                      className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs focus:outline-hidden font-medium"
+                    >
+                      <option value="">{isAr ? "— اختر المدينة —" : "— Select City —"}</option>
+                      {cities.map((c: any) => (
+                        <option key={c.id} value={c.id}>
+                          {isAr && c.name_ar ? c.name_ar : c.name_en}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-foreground mb-1">
+                      {isAr ? "الحي / المنطقة" : "District"}
+                    </label>
+                    <select
+                      value={district}
+                      onChange={(e) => setDistrict(e.target.value)}
+                      disabled={!cityId}
+                      className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs focus:outline-hidden disabled:opacity-50 font-medium"
+                    >
+                      <option value="">{isAr ? "— اختر المنطقة —" : "— Select District —"}</option>
+                      {districts
+                        .filter((d: any) => d.city_id === cityId)
+                        .map((d: any) => (
+                          <option key={d.id} value={d.name_en}>
+                            {isAr && d.name_ar ? d.name_ar : d.name_en}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Address with Map Pin Toggle */}
+                <div>
+                  <label className="block font-semibold text-foreground mb-1">
+                    {isAr ? "العنوان التفصيلي" : "Street Address"} <span className="text-destructive">*</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <input
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                        placeholder={
+                          isAr
+                            ? "الشارع ورقم المبنى أو معالم الموقع…"
+                            : "Street name, building number, landmarks…"
+                        }
+                        className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-brand/20"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowMap(!showMap)}
+                      className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition-all ${
+                        showMap || lat != null
+                          ? "border-brand bg-brand/10 text-brand"
+                          : "border-border bg-background hover:bg-muted text-foreground"
+                      }`}
+                    >
+                      <MapPin className="h-3.5 w-3.5" />
+                      <span>{showMap ? (isAr ? "إخفاء الخريطة" : "Hide Map") : (isAr ? "تحديد بالخريطة" : "Pin on Map")}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Unfolded Interactive Map */}
+                {showMap && (
+                  <div className="mt-2 rounded-2xl border border-brand/30 bg-background/50 p-2.5 shadow-inner space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px] text-muted-foreground pb-1">
+                      <span>
+                        {isAr
+                          ? "انقر على الخريطة لتحديد الموقع الجغرافي ونطاق الحضور"
+                          : "Click on map to position geofence destination coordinates"}
+                      </span>
+                      {lat != null && lng != null && (
+                        <span className="font-mono text-[10px] text-brand">
+                          {lat.toFixed(4)}, {lng.toFixed(4)} ({radius_m}m)
+                        </span>
+                      )}
+                    </div>
+                    <TaskLocationPicker
+                      lat={lat}
+                      lng={lng}
+                      radius_m={radius_m}
+                      cityName={cityName}
+                      districtName={district}
+                      onChange={async (l, g, r) => {
+                        setLat(l);
+                        setLng(g);
+                        setRadiusM(r ?? 500);
+                        if (l != null && g != null) {
+                          try {
+                            const geo = await reverseGeocodeCoords(l, g);
+                            const autoAddress =
+                              geo.detailedAddress || geo.street || geo.formatted;
+                            if (autoAddress) setAddress(autoAddress);
+                          } catch {
+                            // ignore
+                          }
+                        }
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Card 4: Notes & Instructions */}
+              <div className="rounded-2xl border border-border/70 bg-card/60 p-3.5 space-y-2">
+                <div className="flex items-center gap-2 font-semibold text-foreground border-b border-border/50 pb-1.5">
+                  <FileText className="h-3.5 w-3.5 text-brand" />
+                  <span>{isAr ? "ملاحظات وتوجيهات المأمورية" : "Special Notes & Instructions"}</span>
+                </div>
+                <textarea
+                  rows={2}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder={
+                    isAr
+                      ? "تعليمات أمنية، تصاريح دخول، مهمات أو معدات يلزم اصطحابها…"
+                      : "Gate pass requirements, safety protocols, equipment checklist…"
+                  }
+                  className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-brand/20 resize-none"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Modal Footer ── */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border/80 px-6 py-3 bg-muted/20">
+          <div className="flex items-center gap-2 text-[11px] text-muted-foreground w-full sm:w-auto truncate">
+            {destination && (
+              <span className="font-semibold text-foreground truncate">
+                📍 {destination}
+              </span>
+            )}
+            {selectedEmployee && (
+              <>
+                <span>•</span>
+                <span className="truncate">👤 {selectedEmployee.name}</span>
+              </>
+            )}
+            {date && (
+              <>
+                <span>•</span>
+                <span>📅 {date}</span>
+              </>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2.5 ms-auto shrink-0 w-full sm:w-auto justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full border border-border bg-card px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted transition-colors"
+            >
+              {t("cancel")}
+            </button>
+            <button
+              type="button"
+              onClick={submit}
+              disabled={saving}
+              className="disabled:opacity-50 inline-flex items-center gap-1.5 rounded-full bg-gradient-brand px-5 py-2 text-xs font-semibold text-brand-foreground shadow-brand hover:opacity-95 transition-opacity"
+            >
+              {saving ? (
+                <span>{isAr ? "جاري الحفظ…" : "Saving…"}</span>
+              ) : (
+                <>
+                  <Check className="h-3.5 w-3.5" />
+                  <span>{isAr ? "حفظ المأمورية" : "Save Changes"}</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block space-y-1.5">
-      <span className="text-xs font-medium text-foreground">{label}</span>
-      {children}
-    </label>
   );
 }

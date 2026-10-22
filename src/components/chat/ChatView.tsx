@@ -371,37 +371,39 @@ export function ChatView({ mode = "admin" }: ChatViewProps) {
                   </div>
                 </div>
 
-                {/* Accept Replies Option Toggle */}
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-2.5 rounded-2xl border border-border bg-background/80 px-3 py-1.5 shadow-xs transition-colors">
-                    <div className="hidden sm:flex flex-col items-end text-end">
-                      <span className="text-xs font-semibold text-foreground">
+                {/* Accept Replies Option Toggle (Admin only) */}
+                {!isManager && (
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2.5 rounded-2xl border border-border bg-background/80 px-3 py-1.5 shadow-xs transition-colors">
+                      <div className="hidden sm:flex flex-col items-end text-end">
+                        <span className="text-xs font-semibold text-foreground">
+                          {t("chatAcceptReplies") || "Accept replies"}
+                        </span>
+                        <span
+                          className={`text-[10px] font-medium ${
+                            activeChannel.allow_replies !== false
+                              ? "text-emerald-600 dark:text-emerald-400"
+                              : "text-amber-600 dark:text-amber-400"
+                          }`}
+                        >
+                          {activeChannel.allow_replies !== false
+                            ? (t("chatRepliesOn") || "Employees can reply")
+                            : (t("chatRepliesOff") || "Replies blocked")}
+                        </span>
+                      </div>
+                      <label htmlFor="accept-replies-switch" className="sr-only">
                         {t("chatAcceptReplies") || "Accept replies"}
-                      </span>
-                      <span
-                        className={`text-[10px] font-medium ${
-                          activeChannel.allow_replies !== false
-                            ? "text-emerald-600 dark:text-emerald-400"
-                            : "text-amber-600 dark:text-amber-400"
-                        }`}
-                      >
-                        {activeChannel.allow_replies !== false
-                          ? (t("chatRepliesOn") || "Employees can reply")
-                          : (t("chatRepliesOff") || "Replies blocked")}
-                      </span>
+                      </label>
+                      <Switch
+                        id="accept-replies-switch"
+                        checked={activeChannel.allow_replies !== false}
+                        onCheckedChange={(checked) => handleToggleReplies(checked)}
+                        disabled={togglingReplies}
+                        aria-label={t("chatAcceptReplies") || "Accept replies"}
+                      />
                     </div>
-                    <label htmlFor="accept-replies-switch" className="sr-only">
-                      {t("chatAcceptReplies") || "Accept replies"}
-                    </label>
-                    <Switch
-                      id="accept-replies-switch"
-                      checked={activeChannel.allow_replies !== false}
-                      onCheckedChange={(checked) => handleToggleReplies(checked)}
-                      disabled={togglingReplies}
-                      aria-label={t("chatAcceptReplies") || "Accept replies"}
-                    />
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Notice banner when replies are disabled */}

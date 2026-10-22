@@ -38,13 +38,18 @@ const statusTone: Record<string, string> = {
   cancelled: "bg-muted text-muted-foreground",
 };
 
-export function LeavesPage() {
+export interface LeavesPageProps {
+  hideHeader?: boolean;
+  defaultTab?: "all" | "leaves" | "permissions";
+}
+
+export function LeavesPage({ hideHeader = false, defaultTab = "all" }: LeavesPageProps = {}) {
   const { t } = useI18n();
   const { tLeaveType, tStatus } = useTranslators();
   const qc = useQueryClient();
 
   // Tab & Modal States
-  const [activeTab, setActiveTab] = useState<"all" | "leaves" | "permissions">("all");
+  const [activeTab, setActiveTab] = useState<"all" | "leaves" | "permissions">(defaultTab);
   const [leaveModalOpen, setLeaveModalOpen] = useState(false);
   const [permModalOpen, setPermModalOpen] = useState(false);
 
@@ -105,24 +110,26 @@ export function LeavesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="font-display text-2xl font-semibold tracking-tight">
-            {activeTab === "leaves"
-              ? t("leaves")
-              : activeTab === "permissions"
-                ? t("employeePermissions")
-                : t("leavesAndPermissions")}
-          </h1>
-          <p className="text-xs text-muted-foreground">
-            {activeTab === "leaves"
-              ? t("daysRemainingYear")
-              : activeTab === "permissions"
-                ? t("permissionPolicyNotice")
-                : t("leavesAndPermissionsSubtitle")}
-          </p>
-        </div>
-      </header>
+      {!hideHeader && (
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="font-display text-2xl font-semibold tracking-tight">
+              {activeTab === "leaves"
+                ? t("leaves")
+                : activeTab === "permissions"
+                  ? t("employeePermissions")
+                  : t("leavesAndPermissions")}
+            </h1>
+            <p className="text-xs text-muted-foreground">
+              {activeTab === "leaves"
+                ? t("daysRemainingYear")
+                : activeTab === "permissions"
+                  ? t("permissionPolicyNotice")
+                  : t("leavesAndPermissionsSubtitle")}
+            </p>
+          </div>
+        </header>
+      )}
 
       {/* Tabs Filter */}
       <div className="flex items-center gap-1 rounded-2xl bg-muted/50 p-1 text-xs font-medium">

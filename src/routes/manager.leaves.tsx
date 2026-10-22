@@ -22,7 +22,9 @@ import {
   Filter,
   Table as TableIcon,
   LayoutGrid,
+  Users,
 } from "lucide-react";
+import { LeavesPage } from "@/components/employee/LeavesPage";
 import {
   listManagerTeamLeaves,
   decideLeave,
@@ -75,6 +77,7 @@ function ManagerTeamLeavesPage() {
   const decideFn = useServerFn(decideLeave);
   const bulkDecideFn = useServerFn(decideLeavesBulk);
 
+  const [mainTab, setMainTab] = useState<"team" | "personal">("team");
   const [filter, setFilter] = useState<FilterType>("pending");
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
@@ -191,37 +194,82 @@ function ManagerTeamLeavesPage() {
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Header & Title */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      {/* Header & Title with Tab Switcher */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-border/60 pb-5">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-brand">
             <CalendarCheck className="h-4 w-4" />
-            <span>{isAr ? "إدارة الفريق" : "Team Management"}</span>
+            <span>{isAr ? "الإجازات والأذونات" : "Leaves & Permissions"}</span>
           </div>
           <h1 className="mt-1 font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-            {isAr ? "إجازات الفريق" : "Team Leaves"}
+            {mainTab === "team"
+              ? isAr ? "إجازات وأذونات الفريق" : "Team Leaves"
+              : isAr ? "طلباتي وإجازاتي الخاصة" : "My Leaves & Permissions"}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {isAr
-              ? "مراجعة واعتماد أو رفض طلبات الإجازات المقدمة من أعضاء فريقك."
-              : "Review, approve, or reject leave requests submitted by your team members."}
+            {mainTab === "team"
+              ? isAr
+                ? "مراجعة واعتماد أو رفض طلبات الإجازات المقدمة من أعضاء فريقك."
+                : "Review, approve, or reject leave requests submitted by your team members."
+              : isAr
+                ? "تقديم طلبات إجازة أو إذن خاص بك ومتابعة الرصيد وحالة الطلبات."
+                : "Submit leave or permission requests for yourself and track status."}
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => refetch()}
-            disabled={isFetching}
-            className="inline-flex items-center gap-2 rounded-xl border border-input bg-card px-3.5 py-2 text-xs font-medium text-foreground shadow-xs transition hover:bg-muted disabled:opacity-50"
-            title={isAr ? "تحديث البيانات" : "Refresh"}
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin text-brand" : "text-muted-foreground"}`} />
-            <span className="hidden sm:inline">{isAr ? "تحديث" : "Refresh"}</span>
-          </button>
+        {/* Tab Switcher & Actions */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="inline-flex items-center rounded-2xl bg-muted/60 p-1 border border-border/50 text-xs font-medium shadow-xs">
+            <button
+              type="button"
+              onClick={() => setMainTab("team")}
+              className={`flex items-center gap-2 rounded-xl px-3.5 py-2 transition-all ${
+                mainTab === "team"
+                  ? "bg-card font-semibold text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Users className="h-4 w-4" />
+              <span>{isAr ? "موافقات الفريق" : "Team Approvals"}</span>
+              {counts.pending > 0 && (
+                <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold text-white leading-none">
+                  {counts.pending}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setMainTab("personal")}
+              className={`flex items-center gap-2 rounded-xl px-3.5 py-2 transition-all ${
+                mainTab === "personal"
+                  ? "bg-card font-semibold text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <User className="h-4 w-4" />
+              <span>{isAr ? "طلباتي الخاصة" : "My Requests"}</span>
+            </button>
+          </div>
+
+          {mainTab === "team" && (
+            <button
+              onClick={() => refetch()}
+              disabled={isFetching}
+              className="inline-flex items-center gap-2 rounded-xl border border-input bg-card px-3.5 py-2 text-xs font-medium text-foreground shadow-xs transition hover:bg-muted disabled:opacity-50"
+              title={isAr ? "تحديث البيانات" : "Refresh"}
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin text-brand" : "text-muted-foreground"}`} />
+              <span className="hidden sm:inline">{isAr ? "تحديث" : "Refresh"}</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* KPI Summary Cards */}
+      {mainTab === "personal" ? (
+        <LeavesPage hideHeader={true} />
+      ) : (
+        <>
+          {/* KPI Summary Cards */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
           {
@@ -843,6 +891,8 @@ function ManagerTeamLeavesPage() {
             );
           })}
         </div>
+      )}
+        </>
       )}
     </div>
   );

@@ -40,9 +40,6 @@ export async function resolveTeamMemberScope(supabase: any, userId: string) {
   if (managedDeptIds.length > 0) {
     conditions.push(`department_id.in.(${managedDeptIds.join(",")})`);
   }
-  if (myProfile?.department_id) {
-    conditions.push(`department_id.eq.${myProfile.department_id}`);
-  }
 
   return {
     isAdmin: false,
@@ -75,7 +72,7 @@ export const getMyTeam = createServerFn({ method: "POST" })
     z
       .object({
         page: z.number().int().min(1).default(1),
-        pageSize: z.number().int().min(1).max(100).default(20),
+        pageSize: z.number().int().min(1).max(1000).default(20),
         q: z.string().max(120).optional().default(""),
       })
       .parse(input ?? {}),

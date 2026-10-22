@@ -34,7 +34,7 @@ function statusClass(s: TaskStatus) {
 }
 
 function ManagerTasksPage() {
-  const { t } = useI18n();
+  const { t, isAr } = useI18n();
   const session = useSession();
   const qc = useQueryClient();
   const me = useMemo(
@@ -44,7 +44,7 @@ function ManagerTasksPage() {
   const teamFn = useServerFn(getMyTeam);
   const { data: teamData } = useQuery({
     queryKey: ["manager-team-all"],
-    queryFn: () => teamFn({ data: { page: 1, pageSize: 100, q: "" } }),
+    queryFn: () => teamFn({ data: { page: 1, pageSize: 500, q: "" } }),
     enabled: !!me,
   });
   const team = useMemo(() => teamData?.rows ?? [], [teamData]);
@@ -185,62 +185,307 @@ function ManagerTasksPage() {
     invalidate();
   };
 
-  const teamWithEmail = team as Array<{ id: string; name: string; email?: string | null }>;
+  const teamWithEmail = team as Array<{ id: string; name: string; email?: string | null; dept?: string; phone?: string }>;
+
+  // Helper date normalizer for Excel (handles Date object, serial numbers, and common string formats)
+  const normalizeExcelDate = (val: any): string | null => {
+    if (val == null || val === "") return null;
+    if (val instanceof Date && !isNaN(val.getTime())) {
+      return val.toISOString().slice(0, 10);
+    }
+    if (typeof val === "number" && val > 20000 && val < 90000) {
+      const jsDate = new Date(Math.round((val - 25569) * 86400 * 1000));
+      if (!isNaN(jsDate.getTime())) return jsDate.toISOString().slice(0, 10);
+    }
+    const s = String(val).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const dmy = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/);
+    if (dmy) {
+      const [, d, m, y] = dmy;
+      return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+    }
+    const ymd = s.match(/^(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})$/);
+    if (ymd) {
+      const [, y, m, d] = ymd;
+      return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+    }
+    return null;
+  };
+
+  // Helper time normalizer for Excel (handles day fractions, HH:MM, and 12h formats)
+  const normalizeExcelTime = (val: any): string | null => {
+    if (val == null || val === "") return null;
+    if (typeof val === "number" && val >= 0 && val < 1) {
+      const totalMinutes = Math.round(val * 24 * 60);
+      const h = Math.floor(totalMinutes / 60);
+      const m = totalMinutes % 60;
+      return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+    }
+    const s = String(val).trim();
+    const tm = s.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*(AM|PM))?$/i);
+    if (tm) {
+      let h = parseInt(tm[1], 10);
+      const m = tm[2];
+      const ampm = tm[4]?.toUpperCase();
+      if (ampm === "PM" && h < 12) h += 12;
+      if (ampm === "AM" && h === 12) h = 0;
+      return `${h.toString().padStart(2, "0")}:${m}`;
+    }
+    return s ? s.slice(0, 8) : null;
+  };
+
+  // Flexible field extractor
+  const getField = (row: Record<string, any>, ...keys: string[]): any => {
+    const normKeys = keys.map((k) => k.toLowerCase().replace(/[\s_-]+/g, ""));
+    for (const [rKey, val] of Object.entries(row)) {
+      const cleanKey = rKey.toLowerCase().replace(/[\s_-]+/g, "");
+      if (normKeys.includes(cleanKey) && val !== "" && val != null) {
+        return val;
+      }
+    }
+    return undefined;
+  };
+
+  const parsePriority = (val: any): TaskPriority => {
+    const s = String(val ?? "").toLowerCase().trim();
+    if (s.includes("high") || s.includes("urgent") || s.includes("عالي") || s.includes("مرتفع") || s.includes("طارئ")) return "high";
+    if (s.includes("low") || s.includes("منخفض") || s.includes("بسيط")) return "low";
+    return "medium";
+  };
+
+  const parseEstimatedHours = (val: any): number | null => {
+    if (val == null || val === "") return null;
+    const n = Number(String(val).replace(/[^\d.]/g, ""));
+    if (Number.isFinite(n) && n >= 0 && n <= 999) return n;
+    return null;
+  };
 
   const downloadTemplate = async () => {
     const XLSX = await import("xlsx");
-    const ws = XLSX.utils.aoa_to_sheet([
-      ["title", "description", "priority", "due_date", "due_time", "city", "district", "address", "estimated_hours", "assignee_emails"],
-      ["Sample task", "Optional description", "medium", new Date().toISOString().slice(0, 10), "09:00", "", "", "", "2", teamWithEmail[0]?.email ?? "employee@example.com"],
-    ]);
-    ws["!cols"] = [{ wch: 24 }, { wch: 32 }, { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 14 }, { wch: 18 }, { wch: 28 }, { wch: 10 }, { wch: 32 }];
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Tasks");
-    XLSX.writeFile(wb, "tasks-template.xlsx");
+
+    const sampleAssignee = teamWithEmail[0]?.email || teamWithEmail[0]?.name || session?.email || "employee@example.com";
+    const sampleAssignee2 = teamWithEmail[1]?.email || teamWithEmail[1]?.name || sampleAssignee;
+    const today = new Date();
+    const d1 = new Date(today); d1.setDate(d1.getDate() + 1);
+    const d2 = new Date(today); d2.setDate(d2.getDate() + 3);
+    const d3 = new Date(today); d3.setDate(d3.getDate() + 7);
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+
+    // Sheet 1: Tasks
+    const tasksWs = XLSX.utils.aoa_to_sheet([
+      ["title", "description", "priority", "due_date", "due_time", "assignee_email_or_name", "estimated_hours", "city", "district", "address"],
+      ["Review quarterly deliverables", "Review task progress and prepare team summary report", "high", fmt(d1), "11:00", sampleAssignee, "4", "Cairo", "Nasr City", "Building 4, Sector 1"],
+      ["Equipment & laptop audit", "Verify laptops and peripherals assigned to department members", "medium", fmt(d2), "14:00", sampleAssignee2, "2", "Cairo", "Maadi", "Tech Center"],
+      ["Update team documentation", "Ensure runbooks and onboarding checklists are up to date", "low", fmt(d3), "17:00", "", "1", "", "", ""],
+    ]);
+    tasksWs["!cols"] = [
+      { wch: 30 },
+      { wch: 45 },
+      { wch: 12 },
+      { wch: 14 },
+      { wch: 10 },
+      { wch: 30 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 18 },
+      { wch: 28 },
+    ];
+    XLSX.utils.book_append_sheet(wb, tasksWs, "Tasks");
+
+    // Sheet 2: Team Members Reference
+    const teamRows = teamWithEmail.length > 0
+      ? teamWithEmail.map((m) => [m.name || "—", m.email || "—", m.dept || "—", m.phone || "—"])
+      : [[session?.name || "Manager", session?.email || "", "Management", ""]];
+    const teamWs = XLSX.utils.aoa_to_sheet([
+      ["Employee Name", "Email", "Department", "Phone"],
+      ...teamRows,
+    ]);
+    teamWs["!cols"] = [{ wch: 26 }, { wch: 32 }, { wch: 20 }, { wch: 18 }];
+    XLSX.utils.book_append_sheet(wb, teamWs, "Team Members");
+
+    // Sheet 3: Field Guide
+    const guideWs = XLSX.utils.aoa_to_sheet([
+      ["Field", "Required?", "Accepted Values / Format", "Example / Notes"],
+      ["title", "Yes", "Text (1-200 characters)", "Prepare customer contract draft"],
+      ["description", "No", "Detailed explanation (up to 2000 chars)", "Include SLA terms and delivery milestones"],
+      ["priority", "No", "'low', 'medium', 'high' (defaults to medium)", "high"],
+      ["due_date", "No", "YYYY-MM-DD or DD/MM/YYYY", fmt(d1)],
+      ["due_time", "No", "HH:MM format", "10:00 or 14:30"],
+      ["assignee_email_or_name", "No", "Employee email or full name from Team sheet. Can specify multiple separated by comma.", sampleAssignee],
+      ["estimated_hours", "No", "Number (0 to 999)", "3.5"],
+      ["city", "No", "City name", "Cairo"],
+      ["district", "No", "District name", "Nasr City"],
+      ["address", "No", "Street or landmark address", "Street 10, Building 5"],
+    ]);
+    guideWs["!cols"] = [{ wch: 24 }, { wch: 14 }, { wch: 45 }, { wch: 40 }];
+    XLSX.utils.book_append_sheet(wb, guideWs, "Instructions");
+
+    XLSX.writeFile(wb, "tasks-import-template.xlsx");
+    toast.success(isAr ? "تم تنزيل نموذج المهام وقائمة الموظفين بنجاح" : "Tasks template downloaded with team reference sheet!");
   };
 
   const handleImportFile = async (file: File) => {
     if (!me) return;
     setImporting(true);
+    const toastId = toast.loading(isAr ? "جاري قراءة واستيراد المهام..." : "Reading and importing tasks from Excel...");
+
     try {
       const XLSX = await import("xlsx");
       const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array" });
-      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const wb = XLSX.read(buf, { type: "array", cellDates: true });
+
+      // Find the Tasks sheet (prefer sheet named "Tasks" or first sheet)
+      const sheetName = wb.SheetNames.find((s) => s.toLowerCase().includes("task")) || wb.SheetNames[0];
+      const sheet = wb.Sheets[sheetName];
+      if (!sheet) throw new Error("No readable sheet found in file");
+
       const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: "" });
-      const byEmail = new Map(teamWithEmail.map((m) => [String(m.email ?? "").toLowerCase(), m.id]));
-      let ok = 0, failed = 0;
-      for (const r of rows) {
-        const title = String(r.title ?? r.Title ?? "").trim();
-        if (!title) { failed++; continue; }
-        const emails = String(r.assignee_emails ?? r.assignees ?? "")
-          .split(/[,;\s]+/).map((s) => s.trim().toLowerCase()).filter(Boolean);
-        const assignees = emails.map((e) => byEmail.get(e)).filter((x): x is string => !!x);
-        if (assignees.length === 0) { failed++; continue; }
-        const priorityRaw = String(r.priority ?? "medium").toLowerCase();
-        const priority = (["low", "medium", "high"].includes(priorityRaw) ? priorityRaw : "medium") as TaskPriority;
+      if (rows.length === 0) {
+        toast.error(isAr ? "ملف الإكسل فارغ ولا يحتوي على صفوف بيانات" : "Excel sheet contains no data rows", { id: toastId });
+        return;
+      }
+
+      // Build comprehensive lookup maps for team members
+      const byEmail = new Map<string, string>();
+      const byName = new Map<string, string>();
+      const byCleanName = new Map<string, string>();
+
+      for (const m of teamWithEmail) {
+        if (m.email) byEmail.set(m.email.toLowerCase().trim(), m.id);
+        if (m.name) {
+          const n = m.name.toLowerCase().trim();
+          byName.set(n, m.id);
+          byCleanName.set(n.replace(/\s+/g, ""), m.id);
+        }
+      }
+      if (me?.id) {
+        if (session?.email) byEmail.set(session.email.toLowerCase().trim(), me.id);
+        if (session?.name) {
+          const n = session.name.toLowerCase().trim();
+          byName.set(n, me.id);
+          byCleanName.set(n.replace(/\s+/g, ""), me.id);
+        }
+      }
+
+      const resolveAssignees = (raw: any): string[] => {
+        if (!raw) return me?.id ? [me.id] : [];
+        const tokens = String(raw)
+          .split(/[,;\n\r]+/)
+          .map((s) => s.trim().toLowerCase())
+          .filter(Boolean);
+
+        const ids: string[] = [];
+        for (const token of tokens) {
+          if (byEmail.has(token)) {
+            ids.push(byEmail.get(token)!);
+            continue;
+          }
+          if (byName.has(token)) {
+            ids.push(byName.get(token)!);
+            continue;
+          }
+          const cleanToken = token.replace(/\s+/g, "");
+          if (byCleanName.has(cleanToken)) {
+            ids.push(byCleanName.get(cleanToken)!);
+            continue;
+          }
+          // Substring match on team names
+          const partial = teamWithEmail.find((m) => m.name?.toLowerCase().includes(token));
+          if (partial) {
+            ids.push(partial.id);
+            continue;
+          }
+          // UUID match
+          if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token)) {
+            ids.push(token);
+          }
+        }
+
+        const unique = Array.from(new Set(ids));
+        if (unique.length === 0 && me?.id) return [me.id];
+        return unique;
+      };
+
+      let ok = 0;
+      const skippedRows: string[] = [];
+
+      for (let idx = 0; idx < rows.length; idx++) {
+        const r = rows[idx];
+        const rowNum = idx + 2;
+
+        const title = String(
+          getField(r, "title", "Title", "task", "Task", "name", "Name", "العنوان", "المهمة", "اسم المهمة") ?? ""
+        ).trim();
+
+        if (!title) {
+          skippedRows.push(`Row ${rowNum} (missing title)`);
+          continue;
+        }
+
+        const description = String(
+          getField(r, "description", "Description", "desc", "details", "الوصف", "التفاصيل") ?? ""
+        ).trim();
+
+        const priorityRaw = getField(r, "priority", "Priority", "الأولوية");
+        const priority = parsePriority(priorityRaw);
+
+        const dueDateRaw = getField(r, "due_date", "Due Date", "dueDate", "date", "تاريخ الاستحقاق", "التاريخ");
+        const dueDate = normalizeExcelDate(dueDateRaw);
+
+        const dueTimeRaw = getField(r, "due_time", "Due Time", "dueTime", "time", "الوقت", "الساعة");
+        const dueTime = normalizeExcelTime(dueTimeRaw);
+
+        const city = String(getField(r, "city", "City", "المدينة") ?? "").trim() || null;
+        const district = String(getField(r, "district", "District", "الحي", "المنطقة") ?? "").trim() || null;
+        const address = String(getField(r, "address", "Address", "العنوان بالتفصيل", "العنوان") ?? "").trim() || null;
+
+        const estRaw = getField(r, "estimated_hours", "Estimated Hours", "estimatedHours", "hours", "الساعات المقدرة", "الساعات");
+        const estimatedHours = parseEstimatedHours(estRaw);
+
+        const assigneeRaw = getField(r, "assignee_email_or_name", "assignee_emails", "assignees", "Assignee", "Assignees", "Employee", "الموظف", "المسؤول", "البريد الإلكتروني");
+        const assignees = resolveAssignees(assigneeRaw);
+
         try {
           await importCreateFn({
             data: {
               title,
-              description: String(r.description ?? "").trim() || undefined,
+              description: description || undefined,
               priority,
-              due_date: String(r.due_date ?? "").trim() || null,
-              due_time: String(r.due_time ?? "").trim() || null,
-              city: String(r.city ?? "").trim() || null,
-              district: String(r.district ?? "").trim() || null,
-              address: String(r.address ?? "").trim() || null,
-              estimated_hours: r.estimated_hours !== "" && r.estimated_hours != null ? Number(r.estimated_hours) : null,
+              due_date: dueDate,
+              due_time: dueTime,
+              city,
+              district,
+              address,
+              estimated_hours: estimatedHours,
               assignees,
             },
           });
           ok++;
-        } catch { failed++; }
+        } catch (err: any) {
+          skippedRows.push(`Row ${rowNum} (${err?.message || "validation error"})`);
+        }
       }
-      toast.success(`Imported ${ok}${failed ? ` • ${failed} failed` : ""}`);
+
+      if (ok > 0) {
+        toast.success(
+          isAr
+            ? `تم استيراد ${ok} مهمة بنجاح!${skippedRows.length ? ` • تم تخطي ${skippedRows.length} صف` : ""}`
+            : `Successfully imported ${ok} task${ok > 1 ? "s" : ""}!${skippedRows.length ? ` • ${skippedRows.length} row(s) skipped` : ""}`,
+          { id: toastId }
+        );
+      } else {
+        toast.error(
+          isAr
+            ? `فشل استيراد المهام: ${skippedRows.slice(0, 2).join(", ")}`
+            : `Failed to import tasks: ${skippedRows.slice(0, 2).join(", ")}`,
+          { id: toastId }
+        );
+      }
+
       invalidate();
     } catch (e: any) {
-      toast.error(e?.message ?? "Import failed");
+      toast.error(e?.message ?? (isAr ? "حدث خطأ أثناء قراءة ملف الإكسل" : "Failed to import Excel file"), { id: toastId });
     } finally {
       setImporting(false);
     }
@@ -248,50 +493,78 @@ function ManagerTasksPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-xl font-semibold">{t("tasks")}</h1>
-          <p className="text-sm text-muted-foreground">{visible.length}</p>
+          <p className="text-sm text-muted-foreground">
+            {visible.length} {isAr ? "مهمة معروضة" : "tasks shown"}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex rounded-full border border-border bg-card p-0.5 text-xs shadow-xs">
+            <button
+              type="button"
+              onClick={() => setView("cards")}
+              className={`inline-flex items-center gap-1 rounded-full px-3 py-1 font-semibold transition ${
+                view === "cards"
+                  ? "bg-gradient-brand text-brand-foreground shadow-brand"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" /> {isAr ? "بطاقات" : "Cards"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setView("table")}
+              className={`inline-flex items-center gap-1 rounded-full px-3 py-1 font-semibold transition ${
+                view === "table"
+                  ? "bg-gradient-brand text-brand-foreground shadow-brand"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <TableIcon className="h-3.5 w-3.5" /> {isAr ? "جدول" : "Table"}
+            </button>
+          </div>
           <button
+            type="button"
             onClick={downloadTemplate}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold hover:bg-muted transition shadow-xs"
+            title={isAr ? "تنزيل نموذج إكسل مع قائمة موظفي الفريق" : "Download Excel template with team member list"}
           >
-            <Download className="h-3.5 w-3.5" /> Template
+            <Download className="h-3.5 w-3.5 text-brand" />
+            <span>{isAr ? "النموذج" : "Template"}</span>
           </button>
-          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold">
-            <Upload className="h-3.5 w-3.5" /> {importing ? "Importing…" : "Import Excel"}
+          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold hover:bg-muted transition shadow-xs">
+            {importing ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-brand" />
+            ) : (
+              <Upload className="h-3.5 w-3.5 text-brand" />
+            )}
+            <span>
+              {importing
+                ? isAr ? "جاري الاستيراد…" : "Importing…"
+                : isAr ? "استيراد إكسل" : "Import Excel"}
+            </span>
             <input
               type="file"
-              accept=".xlsx,.xls"
+              accept=".xlsx,.xls,.csv"
               className="hidden"
               disabled={importing}
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) { handleImportFile(f); e.target.value = ""; } }}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) {
+                  handleImportFile(f);
+                  e.target.value = "";
+                }
+              }}
             />
           </label>
           <button
+            type="button"
             onClick={() => setOpen(true)}
             className="inline-flex items-center gap-1.5 rounded-full bg-gradient-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground shadow-brand hover:opacity-90 transition-opacity"
           >
             <Plus className="h-3.5 w-3.5" /> {t("addTask")}
-          </button>
-        </div>
-      </div>
-
-      <div className="flex justify-end">
-        <div className="inline-flex rounded-full border border-border bg-card p-0.5 text-xs">
-          <button
-            onClick={() => setView("cards")}
-            className={`inline-flex items-center gap-1 rounded-full px-3 py-1 font-semibold ${view === "cards" ? "bg-gradient-brand text-brand-foreground shadow-brand" : "text-muted-foreground"}`}
-          >
-            <LayoutGrid className="h-3.5 w-3.5" /> Cards
-          </button>
-          <button
-            onClick={() => setView("table")}
-            className={`inline-flex items-center gap-1 rounded-full px-3 py-1 font-semibold ${view === "table" ? "bg-gradient-brand text-brand-foreground shadow-brand" : "text-muted-foreground"}`}
-          >
-            <TableIcon className="h-3.5 w-3.5" /> Table
           </button>
         </div>
       </div>
@@ -529,22 +802,7 @@ function ManagerTasksPage() {
 }
 
 function ReassignModal({ team, current, onClose, onSave }: { team: Array<{ id: string; name: string }>; current: string[]; onClose: () => void; onSave: (ids: string[]) => void }) {
-  const { data: fallbackEmployees = [] } = useQuery({
-    queryKey: ["active-employees-assignees"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("id, full_name, email")
-        .eq("status", "Active")
-        .order("full_name");
-      return (data ?? []).map((p: any) => ({
-        id: p.id,
-        name: p.full_name || p.email || "Employee",
-      }));
-    },
-    enabled: team.length === 0,
-  });
-  const assigneesList = team.length > 0 ? team : fallbackEmployees;
+  const assigneesList = team;
   const [sel, setSel] = useState<string[]>(current);
   const toggle = (id: string) => setSel((a) => (a.includes(id) ? a.filter((x) => x !== id) : [...a, id]));
   return (
@@ -608,23 +866,7 @@ function AddTaskModal({
   const isAr = lang === "ar";
   const todayStr = new Date().toISOString().slice(0, 10);
   const createTaskFn = useServerFn(createTask);
-
-  const { data: fallbackEmployees = [] } = useQuery({
-    queryKey: ["active-employees-assignees"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("id, full_name, email")
-        .eq("status", "Active")
-        .order("full_name");
-      return (data ?? []).map((p: any) => ({
-        id: p.id,
-        name: p.full_name || p.email || "Employee",
-      }));
-    },
-    enabled: team.length === 0,
-  });
-  const assigneesList = team.length > 0 ? team : fallbackEmployees;
+  const assigneesList = team;
 
   // ── Cities & Districts from Database ──
   const { data: geoData } = useQuery({
@@ -1026,7 +1268,9 @@ function AddTaskModal({
                   <div className="max-h-36 overflow-y-auto p-1.5 space-y-0.5">
                     {filteredEmployeeList.length === 0 ? (
                       <p className="p-2 text-center text-[11px] text-muted-foreground">
-                        {isAr ? "لا يوجد موظفين مطابقين" : "No matching employees"}
+                        {assigneesList.length === 0
+                          ? (isAr ? "لا يوجد موظفون في فريقك" : "No team members assigned")
+                          : (isAr ? "لا يوجد موظفين مطابقين" : "No matching employees")}
                       </p>
                     ) : (
                       filteredEmployeeList.map((emp) => {

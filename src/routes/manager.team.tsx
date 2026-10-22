@@ -1,12 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Mail, Phone, Search, X, ChevronLeft, ChevronRight, ShieldCheck, AlertTriangle, CheckCircle2, CalendarDays } from "lucide-react";
+import { Mail, Phone, Search, X, ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useStore } from "@/lib/store";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
-import { getMyTeam, checkEmployeeAssignment, getTeamPresence, type TeamMember, type AssignmentCheck } from "@/lib/team.functions";
+import { getMyTeam, getTeamPresence, type TeamMember } from "@/lib/team.functions";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,6 @@ function TeamPage() {
   const { t } = useI18n();
   const tasks = useStore((s) => s.tasks);
   const teamFn = useServerFn(getMyTeam);
-  const checkFn = useServerFn(checkEmployeeAssignment);
   const presenceFn = useServerFn(getTeamPresence);
   const queryClient = useQueryClient();
 
@@ -95,23 +94,7 @@ function TeamPage() {
     setPage(1);
   };
 
-  // Assignment diagnostic
-  const [checkEmail, setCheckEmail] = useState("emp@hr.com");
-  const [checkResult, setCheckResult] = useState<AssignmentCheck | null>(null);
-  const [checkError, setCheckError] = useState<string | null>(null);
-  const [checking, setChecking] = useState(false);
   const [openDaysFor, setOpenDaysFor] = useState<string | null>(null);
-  const runCheck = async () => {
-    setChecking(true); setCheckError(null); setCheckResult(null);
-    try {
-      const res = await checkFn({ data: { email: checkEmail.trim() } });
-      setCheckResult(res);
-    } catch (e) {
-      setCheckError(e instanceof Error ? e.message : "Check failed");
-    } finally {
-      setChecking(false);
-    }
-  };
 
   return (
     <div className="space-y-4">
@@ -157,45 +140,7 @@ function TeamPage() {
         <ManagerTeamTimeDashboard />
       ) : (
         <>
-          <section className="rounded-2xl border border-border bg-card p-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <ShieldCheck className="h-4 w-4 text-brand" />
-          <span className="text-sm font-medium">Verify assignment</span>
-          <Input
-            type="email"
-            value={checkEmail}
-            onChange={(e) => setCheckEmail(e.target.value)}
-            placeholder="employee@email.com"
-            className="h-9 max-w-xs"
-          />
-          <Button size="sm" onClick={runCheck} disabled={checking || !checkEmail.trim()}>
-            {checking ? "Checking…" : "Check"}
-          </Button>
-        </div>
-        {checkError && (
-          <div className="mt-2 flex items-start gap-2 rounded-lg bg-destructive/10 p-2 text-xs text-destructive">
-            <AlertTriangle className="h-4 w-4 shrink-0" /> {checkError}
-          </div>
-        )}
-        {checkResult && checkResult.ok && (
-          <div className="mt-2 flex items-start gap-2 rounded-lg bg-success/10 p-2 text-xs text-success">
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
-            <span><strong>{checkEmail}</strong> is correctly assigned to you (manager_id = your auth.uid()).</span>
-          </div>
-        )}
-        {checkResult && !checkResult.ok && (
-          <div className="mt-2 flex items-start gap-2 rounded-lg bg-destructive/10 p-2 text-xs text-destructive">
-            <AlertTriangle className="h-4 w-4 shrink-0" />
-            <span>
-              {checkResult.reason === "not-found" && <>No profile found for <strong>{checkResult.email}</strong>.</>}
-              {checkResult.reason === "no-manager" && <><strong>{checkResult.email}</strong> has no manager assigned. Set <code>manager_id</code> to your user id (<code>{checkResult.myId}</code>).</>}
-              {checkResult.reason === "different-manager" && <><strong>{checkResult.email}</strong> is assigned to a different manager (<code>{checkResult.managerId}</code>), not you (<code>{checkResult.myId}</code>).</>}
-            </span>
-          </div>
-        )}
-      </section>
-
-      <div className="grid gap-3 rounded-2xl border border-border bg-card p-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid gap-3 rounded-2xl border border-border bg-card p-3 sm:grid-cols-2 lg:grid-cols-5">
         <div className="relative lg:col-span-2">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input

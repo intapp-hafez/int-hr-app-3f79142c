@@ -11,6 +11,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getChatUnreadTotal } from "@/backend/functions/chat.functions";
 import { listManagerTeamLeaves } from "@/backend/functions/leaves.functions";
+import { listTeamAdvances } from "@/backend/functions/advances.functions";
 
 export const Route = createFileRoute("/manager")({
   component: ManagerLayout,
@@ -43,6 +44,18 @@ function ManagerLayout() {
     [leavesData]
   );
 
+  const advancesFn = useServerFn(listTeamAdvances);
+  const { data: advancesData } = useQuery({
+    queryKey: ["manager-advances-badge"],
+    queryFn: () => advancesFn(),
+    refetchInterval: 30000,
+    enabled: !!session,
+  });
+  const pendingAdvancesCount = useMemo(
+    () => (advancesData ?? []).filter((a) => a.status === "pending_manager").length,
+    [advancesData]
+  );
+
   if (typeof window === "undefined") return null;
   if (!ready) return null;
   if (!session) return <Navigate to="/auth" replace />;
@@ -57,8 +70,8 @@ function ManagerLayout() {
     { to: "/manager/chat", icon: MessageSquare, label: t("messagesChat") },
     { to: "/manager/check", icon: LogIn, label: t("checkInOut") },
     { to: "/manager/team", icon: Users, label: t("myTeam") },
-    { to: "/manager/leaves", icon: CalendarCheck, label: t("teamLeaves") ?? "Team Leaves" },
-    { to: "/manager/advances", icon: Banknote, label: t("advancesTitle") },
+    { to: "/manager/leaves", icon: CalendarCheck, label: t("leavesAndPermissions") ?? "Leaves & Permissions" },
+    { to: "/manager/advances", icon: Banknote, label: t("advancesTitle") ?? "Advances & Loans" },
     { to: "/manager/tasks", icon: ListChecks, label: t("tasks") },
     { to: "/manager/trips", icon: RouteIcon, label: t("trips") },
     { to: "/manager/trip-history", icon: History, label: "Trip history" },
@@ -71,7 +84,8 @@ function ManagerLayout() {
     { to: "/manager/chat", icon: MessageSquare, label: t("messagesChat") },
     { to: "/manager/check", icon: LogIn, label: t("checkInOut") },
     { to: "/manager/team", icon: Users, label: t("myTeam") },
-    { to: "/manager/leaves", icon: CalendarCheck, label: t("teamLeaves") ?? "Team Leaves" },
+    { to: "/manager/leaves", icon: CalendarCheck, label: t("leavesAndPermissions") ?? "Leaves & Permissions" },
+    { to: "/manager/advances", icon: Banknote, label: t("advancesTitle") ?? "Advances & Loans" },
     { to: "/manager/tasks", icon: ListChecks, label: t("tasks") },
     { to: "/manager/trips", icon: RouteIcon, label: t("trips") },
     { to: "/manager/trip-history", icon: History, label: "Trip history" },
@@ -94,6 +108,7 @@ function ManagerLayout() {
               const active = isActive(it.to, "exact" in it ? it.exact : false);
               const isChat = it.to === "/manager/chat";
               const isLeaves = it.to === "/manager/leaves";
+              const isAdvances = it.to === "/manager/advances";
 
               return (
                 <Link
@@ -129,6 +144,17 @@ function ManagerLayout() {
                       }`}
                     >
                       {pendingLeavesCount}
+                    </span>
+                  )}
+                  {isAdvances && pendingAdvancesCount > 0 && (
+                    <span
+                      className={`grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[10px] font-bold shadow-sm ${
+                        active
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                          : "bg-amber-500 text-white"
+                      }`}
+                    >
+                      {pendingAdvancesCount}
                     </span>
                   )}
                 </Link>
@@ -174,6 +200,7 @@ function ManagerLayout() {
                 const active = isActive(it.to, "exact" in it ? it.exact : false);
                 const isChat = it.to === "/manager/chat";
                 const isLeaves = it.to === "/manager/leaves";
+                const isAdvances = it.to === "/manager/advances";
 
                 return (
                   <li key={it.to} className="flex-1">
@@ -193,6 +220,11 @@ function ManagerLayout() {
                         {isLeaves && pendingLeavesCount > 0 && (
                           <span className="absolute -end-2 -top-1 grid h-3.5 min-w-3.5 place-items-center rounded-full bg-amber-500 px-1 text-[9px] font-bold text-white shadow-sm">
                             {pendingLeavesCount}
+                          </span>
+                        )}
+                        {isAdvances && pendingAdvancesCount > 0 && (
+                          <span className="absolute -end-2 -top-1 grid h-3.5 min-w-3.5 place-items-center rounded-full bg-amber-500 px-1 text-[9px] font-bold text-white shadow-sm">
+                            {pendingAdvancesCount}
                           </span>
                         )}
                       </div>
