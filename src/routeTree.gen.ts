@@ -91,6 +91,7 @@ import { Route as StaffChatRouteImport } from './routes/staff.chat'
 import { Route as StaffLeavesRouteImport } from './routes/staff.leaves'
 import { Route as StaffNotificationsRouteImport } from './routes/staff.notifications'
 import { Route as StaffProfileRouteImport } from './routes/staff.profile'
+import { Route as StaffTasksRouteImport } from './routes/staff.tasks'
 import { Route as AdminActivityTimelineIdRouteImport } from './routes/admin.activity-timeline.$id'
 import { Route as AdminContractsIndexRouteImport } from './routes/admin.contracts.index'
 import { Route as AdminContractsNotificationsRouteImport } from './routes/admin.contracts.notifications'
@@ -514,6 +515,11 @@ const StaffProfileRoute = StaffProfileRouteImport.update({
   path: '/profile',
   getParentRoute: () => StaffRoute,
 } as any)
+const StaffTasksRoute = StaffTasksRouteImport.update({
+  id: '/tasks',
+  path: '/tasks',
+  getParentRoute: () => StaffRoute,
+} as any)
 const AdminActivityTimelineIdRoute = AdminActivityTimelineIdRouteImport.update({
   id: '/activity-timeline/$id',
   path: '/activity-timeline/$id',
@@ -641,6 +647,7 @@ export interface FileRoutesByFullPath {
   '/staff/leaves': typeof StaffLeavesRoute
   '/staff/notifications': typeof StaffNotificationsRoute
   '/staff/profile': typeof StaffProfileRoute
+  '/staff/tasks': typeof StaffTasksRoute
   '/admin/': typeof AdminIndexRoute
   '/employee/': typeof EmployeeIndexRoute
   '/finance/': typeof FinanceIndexRoute
@@ -727,6 +734,7 @@ export interface FileRoutesByTo {
   '/staff/leaves': typeof StaffLeavesRoute
   '/staff/notifications': typeof StaffNotificationsRoute
   '/staff/profile': typeof StaffProfileRoute
+  '/staff/tasks': typeof StaffTasksRoute
   '/admin': typeof AdminIndexRoute
   '/employee': typeof EmployeeIndexRoute
   '/finance': typeof FinanceIndexRoute
@@ -821,6 +829,7 @@ export interface FileRoutesById {
   '/staff/leaves': typeof StaffLeavesRoute
   '/staff/notifications': typeof StaffNotificationsRoute
   '/staff/profile': typeof StaffProfileRoute
+  '/staff/tasks': typeof StaffTasksRoute
   '/admin/': typeof AdminIndexRoute
   '/employee/': typeof EmployeeIndexRoute
   '/finance/': typeof FinanceIndexRoute
@@ -916,6 +925,7 @@ export interface FileRouteTypes {
     | '/staff/leaves'
     | '/staff/notifications'
     | '/staff/profile'
+    | '/staff/tasks'
     | '/admin/'
     | '/employee/'
     | '/finance/'
@@ -1002,6 +1012,7 @@ export interface FileRouteTypes {
     | '/staff/leaves'
     | '/staff/notifications'
     | '/staff/profile'
+    | '/staff/tasks'
     | '/admin'
     | '/employee'
     | '/finance'
@@ -1095,6 +1106,7 @@ export interface FileRouteTypes {
     | '/staff/leaves'
     | '/staff/notifications'
     | '/staff/profile'
+    | '/staff/tasks'
     | '/admin/'
     | '/employee/'
     | '/finance/'
@@ -1699,6 +1711,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StaffProfileRouteImport
       parentRoute: typeof StaffRoute
     }
+    '/staff/tasks': {
+      id: '/staff/tasks'
+      path: '/tasks'
+      fullPath: '/staff/tasks'
+      preLoaderRoute: typeof StaffTasksRouteImport
+      parentRoute: typeof StaffRoute
+    }
     '/admin/activity-timeline/$id': {
       id: '/admin/activity-timeline/$id'
       path: '/activity-timeline/$id'
@@ -1988,6 +2007,7 @@ interface StaffRouteChildren {
   StaffLeavesRoute: typeof StaffLeavesRoute
   StaffNotificationsRoute: typeof StaffNotificationsRoute
   StaffProfileRoute: typeof StaffProfileRoute
+  StaffTasksRoute: typeof StaffTasksRoute
   StaffIndexRoute: typeof StaffIndexRoute
 }
 
@@ -1997,6 +2017,7 @@ const StaffRouteChildren: StaffRouteChildren = {
   StaffLeavesRoute: StaffLeavesRoute,
   StaffNotificationsRoute: StaffNotificationsRoute,
   StaffProfileRoute: StaffProfileRoute,
+  StaffTasksRoute: StaffTasksRoute,
   StaffIndexRoute: StaffIndexRoute,
 }
 

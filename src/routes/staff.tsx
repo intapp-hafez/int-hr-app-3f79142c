@@ -1,5 +1,6 @@
 import { createFileRoute, Outlet, Link, useRouterState, Navigate } from "@tanstack/react-router";
-import { Home, Clock, CalendarDays, User, Bell, MessageSquare } from "lucide-react";
+import { Home, ClipboardCheck, FileText, User, Bell, MessageSquare } from "lucide-react";
+import logo from "@/assets/int-logo.png";
 import { AppLogo } from "@/components/AppLogo";
 import { LanguageToggle, useI18n } from "@/lib/i18n";
 import { useSession, useAuthReady } from "@/lib/auth";
@@ -57,11 +58,37 @@ function StaffLayout() {
   }
 
   const items = [
-    { to: "/staff", icon: Home, label: t("dashboard") },
-    { to: "/staff/attendance", icon: Clock, label: t("attendance") },
-    { to: "/staff/leaves", icon: CalendarDays, label: t("leaves") },
-    { to: "/staff/profile", icon: User, label: "Profile" },
-  ] as const;
+    {
+      to: "/staff",
+      icon: Home,
+      label: t("dashboard"),
+      isActive: (p: string) => p === "/staff",
+    },
+    {
+      to: "/staff/tasks",
+      icon: ClipboardCheck,
+      label: t("tasks"),
+      isActive: (p: string) => p.startsWith("/staff/tasks"),
+    },
+    {
+      to: "/staff/attendance",
+      isCenter: true,
+      label: t("attendance"),
+      isActive: (p: string) => p.startsWith("/staff/attendance"),
+    },
+    {
+      to: "/staff/leaves",
+      icon: FileText,
+      label: t("leaveRequests") || "الطلبات",
+      isActive: (p: string) => p.startsWith("/staff/leaves"),
+    },
+    {
+      to: "/staff/profile",
+      icon: User,
+      label: t("profile") || "الملف الشخصي",
+      isActive: (p: string) => p.startsWith("/staff/profile"),
+    },
+  ];
 
   return (
     <div dir={dir} className="min-h-screen bg-muted/40">
@@ -102,20 +129,77 @@ function StaffLayout() {
           <Outlet />
         </main>
 
-        <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md border-t border-border bg-background/95 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 backdrop-blur">
-          <ul className="flex items-center justify-between">
+        {/* Mobile Bottom Navbar (Aligned with mobile app style) */}
+        <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md border-t border-border/60 bg-card/95 dark:bg-[#181a1f]/95 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 backdrop-blur-xl shadow-2xl">
+          <ul className="flex items-end justify-between">
             {items.map((it) => {
-              const active = path === it.to;
+              const active = it.isActive(path);
+
+              if (it.isCenter) {
+                return (
+                  <li key={it.to} className="flex-1">
+                    <Link
+                      to={it.to}
+                      className="group relative -mt-6 flex flex-col items-center justify-center transition-all active:scale-95"
+                    >
+                      {/* Raised circular emblem with company logo */}
+                      <div
+                        className={`relative flex h-14 w-14 items-center justify-center rounded-full bg-white p-2.5 shadow-xl ring-4 transition-all duration-200 ${
+                          active
+                            ? "ring-brand shadow-brand/30 shadow-lg"
+                            : "ring-card dark:ring-[#181a1f] shadow-black/30 group-hover:ring-brand/40"
+                        }`}
+                      >
+                        <img
+                          src={logo}
+                          alt="INT-HR"
+                          className="h-full w-full object-contain transition-transform duration-200 group-hover:scale-105"
+                        />
+                      </div>
+                      <span
+                        className={`mt-1 text-[11px] font-medium tracking-tight transition-colors ${
+                          active ? "font-bold text-brand" : "text-muted-foreground group-hover:text-foreground"
+                        }`}
+                      >
+                        {it.label}
+                      </span>
+                      {active ? (
+                        <span className="mt-0.5 h-0.5 w-7 rounded-full bg-brand" />
+                      ) : (
+                        <span className="mt-0.5 h-0.5 w-7 bg-transparent" />
+                      )}
+                    </Link>
+                  </li>
+                );
+              }
+
               return (
                 <li key={it.to} className="flex-1">
                   <Link
                     to={it.to}
-                    className={`mx-auto flex flex-col items-center gap-1 rounded-xl px-2 py-1.5 text-[11px] font-medium transition-colors ${
-                      active ? "text-brand" : "text-muted-foreground hover:text-foreground"
-                    }`}
+                    className="group flex flex-col items-center justify-center py-1 transition-all active:scale-95"
                   >
-                    <it.icon className={`h-5 w-5 ${active ? "stroke-[2.5]" : ""}`} />
-                    <span>{it.label}</span>
+                    <div className="relative flex items-center justify-center">
+                      <it.icon
+                        className={`h-[22px] w-[22px] transition-all duration-200 ${
+                          active
+                            ? "stroke-[2.2] text-brand"
+                            : "stroke-[1.75] text-muted-foreground group-hover:text-foreground"
+                        }`}
+                      />
+                    </div>
+                    <span
+                      className={`mt-1 text-[11px] font-medium tracking-tight transition-colors ${
+                        active ? "font-bold text-brand" : "text-muted-foreground group-hover:text-foreground"
+                      }`}
+                    >
+                      {it.label}
+                    </span>
+                    {active ? (
+                      <span className="mt-0.5 h-0.5 w-7 rounded-full bg-brand" />
+                    ) : (
+                      <span className="mt-0.5 h-0.5 w-7 bg-transparent" />
+                    )}
                   </Link>
                 </li>
               );

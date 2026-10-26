@@ -30,7 +30,7 @@ function statusClass(s: TaskStatus) {
   return "bg-warning/10 text-warning";
 }
 
-function EmployeeTasksPage() {
+export function EmployeeTasksPage() {
   const { t } = useI18n();
   const session = useSession();
   const employees = useStore((s) => s.employees);
