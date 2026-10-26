@@ -116,9 +116,16 @@ ALTER TABLE public.attendance ENABLE ROW LEVEL SECURITY;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.attendance TO authenticated;
 GRANT ALL ON public.attendance TO service_role;
 
--- Prevent direct unverified attendance creation by employees (handled via commit_biometric_attendance)
+-- Allow employees to record and update their own attendance
 DROP POLICY IF EXISTS "att self insert" ON public.attendance;
+CREATE POLICY "att self insert" ON public.attendance
+  FOR INSERT TO authenticated
+  WITH CHECK (employee_id = auth.uid());
+
 DROP POLICY IF EXISTS "att self update" ON public.attendance;
+CREATE POLICY "att self update" ON public.attendance
+  FOR UPDATE TO authenticated
+  USING (employee_id = auth.uid());
 
 -- Staff and Admin management policies for manual overrides and review
 DROP POLICY IF EXISTS "att staff insert" ON public.attendance;
@@ -144,12 +151,14 @@ CREATE POLICY "att read scope" ON public.attendance FOR SELECT TO authenticated 
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'biometric_verification_tokens') THEN
-    REVOKE INSERT, UPDATE, DELETE ON public.biometric_verification_tokens FROM authenticated, anon;
+    GRANT SELECT, INSERT, UPDATE, DELETE ON public.biometric_verification_tokens TO authenticated;
+    GRANT ALL ON public.biometric_verification_tokens TO service_role;
+    ALTER TABLE public.biometric_verification_tokens ENABLE ROW LEVEL SECURITY;
     DROP POLICY IF EXISTS "users manage own biometric tokens" ON public.biometric_verification_tokens;
     DROP POLICY IF EXISTS "users read own biometric tokens" ON public.biometric_verification_tokens;
-    CREATE POLICY "users read own biometric tokens" ON public.biometric_verification_tokens
-      FOR SELECT TO authenticated
-      USING (user_id = auth.uid());
+    CREATE POLICY "users manage own biometric tokens" ON public.biometric_verification_tokens
+      FOR ALL TO authenticated
+      USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
   END IF;
 END $$;
 
