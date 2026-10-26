@@ -96,21 +96,50 @@ ALTER TABLE public.employee_devices
 ALTER TABLE public.biometric_audit_log 
   ADD COLUMN IF NOT EXISTS metadata jsonb;
 
--- 6. Hardening RLS on Direct REST tables (Zero-Trust boundary)
+-- 6. Hardening RLS on face_descriptors (Self-management per user & Admin/HR view)
 ALTER TABLE public.face_descriptors ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "users manage own face" ON public.face_descriptors;
-DROP POLICY IF EXISTS "users read own face" ON public.face_descriptors;
-REVOKE INSERT, UPDATE, DELETE, SELECT ON public.face_descriptors FROM authenticated, anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.face_descriptors TO authenticated;
 GRANT ALL ON public.face_descriptors TO service_role;
 
+DROP POLICY IF EXISTS "users manage own face" ON public.face_descriptors;
+CREATE POLICY "users manage own face" ON public.face_descriptors
+  FOR ALL TO authenticated
+  USING (user_id = auth.uid()) 
+  WITH CHECK (user_id = auth.uid());
+
+DROP POLICY IF EXISTS "admin hr view face" ON public.face_descriptors;
+CREATE POLICY "admin hr view face" ON public.face_descriptors
+  FOR SELECT TO authenticated
+  USING (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'hr'));
+
 ALTER TABLE public.attendance ENABLE ROW LEVEL SECURITY;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.attendance TO authenticated;
+GRANT ALL ON public.attendance TO service_role;
+
+-- Prevent direct unverified attendance creation by employees (handled via commit_biometric_attendance)
 DROP POLICY IF EXISTS "att self insert" ON public.attendance;
 DROP POLICY IF EXISTS "att self update" ON public.attendance;
+
+-- Staff and Admin management policies for manual overrides and review
 DROP POLICY IF EXISTS "att staff insert" ON public.attendance;
+CREATE POLICY "att staff insert" ON public.attendance FOR INSERT TO authenticated WITH CHECK (
+  public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'hr')
+);
+
 DROP POLICY IF EXISTS "att staff update" ON public.attendance;
-REVOKE INSERT, UPDATE, DELETE ON public.attendance FROM authenticated, anon;
-GRANT SELECT ON public.attendance TO authenticated;
-GRANT ALL ON public.attendance TO service_role;
+CREATE POLICY "att staff update" ON public.attendance FOR UPDATE TO authenticated USING (
+  public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'hr')
+);
+
+DROP POLICY IF EXISTS "att staff delete" ON public.attendance;
+CREATE POLICY "att staff delete" ON public.attendance FOR DELETE TO authenticated USING (
+  public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'hr')
+);
+
+DROP POLICY IF EXISTS "att read scope" ON public.attendance;
+CREATE POLICY "att read scope" ON public.attendance FOR SELECT TO authenticated USING (
+  employee_id = auth.uid() OR public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'hr') OR public.has_role(auth.uid(), 'manager')
+);
 
 DO $$
 BEGIN
