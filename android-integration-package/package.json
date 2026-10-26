@@ -1,0 +1,31 @@
+{
+  "name": "int-hr-employee-android-integration",
+  "version": "1.1.0",
+  "description": "INT-HR Employee Portal integration package for Android (React + Capacitor 7)",
+  "type": "module",
+  "scripts": {
+    "test": "node --loader ts-node/esm src/tests/employee-integration.test.ts"
+  },
+  "dependencies": {
+    "@aparajita/capacitor-biometric-auth": "^7.0.0",
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/device": "^7.0.0",
+    "@capacitor/geolocation": "^7.0.0",
+    "@capacitor/preferences": "^7.0.0",
+    "@simplewebauthn/browser": "^10.0.0",
+    "@simplewebauthn/server": "^10.0.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "@tanstack/react-query": "^5.56.2",
+    "@tanstack/react-router": "^1.58.0",
+    "@tanstack/react-start": "^1.58.0",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.446.0",
+    "tailwind-merge": "^2.5.2",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.5.5",
+    "typescript": "^5.6.2"
+  }
+}
