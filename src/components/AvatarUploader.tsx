@@ -59,7 +59,13 @@ export function AvatarUploader({
     await persist(dataUrl);
   }
 
-  const dim = size === "lg" ? "h-20 w-20" : "h-14 w-14";
+  const isLg = size === "lg";
+  const dim = isLg ? "h-20 w-20" : "h-14 w-14";
+  const uploadBtnDim = isLg ? "h-6 w-6" : "h-5 w-5";
+  const uploadIconDim = isLg ? "h-3 w-3" : "h-2.5 w-2.5";
+  const removeBtnDim = isLg ? "h-5 w-5" : "h-4.5 w-4.5";
+  const removeIconDim = isLg ? "h-2.5 w-2.5" : "h-2 w-2";
+  const ringCls = isLg ? "ring-2" : "ring-1.5";
 
   return (
     <div className={`relative inline-block ${className ?? ""}`}>
@@ -72,9 +78,9 @@ export function AvatarUploader({
             onClick={() => ref.current?.click()}
             disabled={busy}
             title="Upload avatar"
-            className="absolute -bottom-1 -end-1 grid h-7 w-7 place-items-center rounded-full bg-gradient-brand text-brand-foreground shadow-brand ring-2 ring-background disabled:opacity-60"
+            className={`absolute -bottom-0.5 -end-0.5 grid ${uploadBtnDim} place-items-center rounded-full bg-gradient-brand text-brand-foreground shadow-sm ${ringCls} ring-background transition-transform active:scale-90 hover:scale-105 disabled:opacity-60`}
           >
-            <Upload className="h-3.5 w-3.5" />
+            <Upload className={uploadIconDim} />
           </button>
           {localUrl && (
             <button
@@ -82,9 +88,9 @@ export function AvatarUploader({
               onClick={() => persist(null)}
               disabled={busy}
               title="Remove avatar"
-              className="absolute -top-1 -end-1 grid h-6 w-6 place-items-center rounded-full bg-destructive text-destructive-foreground shadow-soft ring-2 ring-background disabled:opacity-60"
+              className={`absolute -top-0.5 -end-0.5 grid ${removeBtnDim} place-items-center rounded-full bg-destructive text-destructive-foreground shadow-sm ${ringCls} ring-background transition-transform active:scale-90 hover:scale-105 disabled:opacity-60`}
             >
-              <X className="h-3 w-3" />
+              <X className={removeIconDim} />
             </button>
           )}
         </>
