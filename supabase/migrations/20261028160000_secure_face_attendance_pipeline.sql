@@ -92,6 +92,10 @@ REVOKE ALL ON public.attendance_idempotency_records FROM anon, authenticated;
 ALTER TABLE public.employee_devices
   ADD COLUMN IF NOT EXISTS public_key text DEFAULT NULL;
 
+-- Add device_id tracking to attendance table
+ALTER TABLE public.attendance
+  ADD COLUMN IF NOT EXISTS device_id text DEFAULT NULL;
+
 -- 5. Align biometric_audit_log schema with metadata column
 ALTER TABLE public.biometric_audit_log 
   ADD COLUMN IF NOT EXISTS metadata jsonb;
@@ -496,8 +500,8 @@ BEGIN
     RETURN v_error_res;
   END IF;
 
-  IF p_accuracy IS NULL OR p_accuracy < 0.0 OR p_accuracy > 50.0 THEN
-    v_error_res := jsonb_build_object('ok', false, 'code', 'LOW_ACCURACY_LOCATION', 'message', 'Location accuracy must be non-negative and <= 50m.');
+  IF p_accuracy IS NOT NULL AND (p_accuracy < 0.0 OR p_accuracy > 150.0) THEN
+    v_error_res := jsonb_build_object('ok', false, 'code', 'LOW_ACCURACY_LOCATION', 'message', 'Location accuracy must be non-negative and <= 150m.');
     IF p_idempotency_key IS NOT NULL AND length(trim(p_idempotency_key)) > 0 THEN
       UPDATE public.attendance_idempotency_records SET status = 'failed', response_payload = v_error_res, updated_at = v_server_now WHERE idempotency_key = p_idempotency_key;
     END IF;
@@ -505,9 +509,9 @@ BEGIN
   END IF;
 
   IF p_location_time IS NULL 
-     OR (v_server_now - p_location_time) > interval '30 seconds' 
-     OR (p_location_time - v_server_now) > interval '10 seconds' THEN
-    v_error_res := jsonb_build_object('ok', false, 'code', 'STALE_LOCATION', 'message', 'Location timestamp is stale or desynchronized (max age 30s).');
+     OR (v_server_now - p_location_time) > interval '120 seconds' 
+     OR (p_location_time - v_server_now) > interval '60 seconds' THEN
+    v_error_res := jsonb_build_object('ok', false, 'code', 'STALE_LOCATION', 'message', 'Location timestamp is stale or desynchronized (max age 120s).');
     IF p_idempotency_key IS NOT NULL AND length(trim(p_idempotency_key)) > 0 THEN
       UPDATE public.attendance_idempotency_records SET status = 'failed', response_payload = v_error_res, updated_at = v_server_now WHERE idempotency_key = p_idempotency_key;
     END IF;
@@ -547,7 +551,7 @@ BEGIN
     END IF;
   END IF;
 
-  -- 5. Server-Side Geofence Enforcement (Strict Policy: Workplace Geofence Required)
+  -- 5. Server-Side Geofence Enforcement (Free check if no assigned geofences)
   FOR v_geo IN
     SELECT gl.name, gl.lat, gl.lng, gl.radius_m
     FROM public.geofence_assignments ga
@@ -568,21 +572,15 @@ BEGIN
   END LOOP;
 
   IF v_geofence_count = 0 THEN
-    v_error_res := jsonb_build_object(
-      'ok', false,
-      'code', 'NO_ASSIGNED_GEOFENCE',
-      'message', 'No active workplace geofence configured for this employee. Contact HR/Admin.'
-    );
-    IF p_idempotency_key IS NOT NULL AND length(trim(p_idempotency_key)) > 0 THEN
-      UPDATE public.attendance_idempotency_records SET status = 'failed', response_payload = v_error_res, updated_at = v_server_now WHERE idempotency_key = p_idempotency_key;
-    END IF;
-    RETURN v_error_res;
-  END IF;
-
-  IF NOT v_inside_geofence THEN
+    -- Free Check: Employee has no assigned geofences (any location is accepted)
+    v_inside_geofence := true;
+    v_matched_branch := 'remote';
+  ELSIF NOT v_inside_geofence THEN
     v_error_res := jsonb_build_object(
       'ok', false, 
       'code', 'GEOFENCE_VIOLATION', 
+      'message', 'Current GPS location is outside all assigned workplace geofences.'
+    ); 
       'message', 'Current GPS location is outside all assigned workplace geofences.'
     );
     IF p_idempotency_key IS NOT NULL AND length(trim(p_idempotency_key)) > 0 THEN

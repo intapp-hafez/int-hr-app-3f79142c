@@ -179,13 +179,15 @@ function EmployeeLayout() {
                     className="group flex flex-col items-center justify-center py-1 transition-all active:scale-95"
                   >
                     <div className="relative flex items-center justify-center">
-                      <it.icon
-                        className={`h-[22px] w-[22px] transition-all duration-200 ${
-                          active
-                            ? "stroke-[2.2] text-brand"
-                            : "stroke-[1.75] text-muted-foreground group-hover:text-foreground"
-                        }`}
-                      />
+                      {it.icon && (
+                        <it.icon
+                          className={`h-[22px] w-[22px] transition-all duration-200 ${
+                            active
+                              ? "stroke-[2.2] text-brand"
+                              : "stroke-[1.75] text-muted-foreground group-hover:text-foreground"
+                          }`}
+                        />
+                      )}
                     </div>
                     <span
                       className={`mt-1 text-[11px] font-medium tracking-tight transition-colors ${

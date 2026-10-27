@@ -67,10 +67,20 @@ export const deleteFace = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/**
+ * @deprecated Attendance verification MUST use the server-side Edge Function
+ * `biometric-auth` (begin-verification -> verify-face -> commit-attendance).
+ * Browser-executed verifyFace cannot validate challenge liveness or provide authoritative proof.
+ */
 export const verifyFace = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => DescriptorSchema.parse(i))
   .handler(async ({ data, context }) => {
+    if (data.action === "attendance") {
+      throw new Error(
+        "Attendance verification via client-side verifyFace is deprecated. Use Edge Function biometric-auth."
+      );
+    }
     const { data: row, error } = await context.supabase
       .from("face_descriptors")
       .select("descriptor")

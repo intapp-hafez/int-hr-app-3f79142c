@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { LogIn, LogOut, MapPin, Plus, X, Wifi, WifiOff, Radio, ShieldCheck, ListChecks } from "lucide-react";
-import { checkIn, checkOut, listMyAttendance, listMyAccess } from "@/backend/functions/attendance.functions";
+import { listMyAttendance, listMyAccess } from "@/backend/functions/attendance.functions";
 import { listMyDevices } from "@/backend/functions/devices.functions";
 import { listTasks } from "@/backend/functions/tasks.functions";
 import { mapTaskRow, type TaskRow } from "@/lib/task-mapping";
@@ -14,10 +14,18 @@ import { getMe } from "@/backend/functions/auth.functions";
 import { submitLeave, listMyLeaves, cancelLeave } from "@/backend/functions/leaves.functions";
 import { Fingerprint, ScanFace } from "lucide-react";
 import {
-  listMyBiometrics, verifyFace,
+  listMyBiometrics,
   webauthnAuthOptionsForSelf, webauthnAuthVerifyForSelf,
 } from "@/backend/functions/biometrics.functions";
-import { FaceCapture } from "@/components/biometrics/FaceCapture";
+// Server-side challenge capture — replaces local liveness + local verifyFace()
+import { FaceChallengeCapture, type FaceChallengeResult } from "@/components/biometrics/FaceChallengeCapture";
+import {
+  commitAttendance,
+  makeIdempotencyKey,
+  BiometricApiError,
+  type AttendanceAction,
+  type GpsSample,
+} from "@/lib/biometric-challenge";
 import { syncMyFaceEnrollmentNotice } from "@/backend/functions/face-enrollment-notices.functions";
 import { useI18n } from "@/lib/i18n";
 import { DateRangeField } from "@/components/ui/date-input";
@@ -46,14 +54,11 @@ function CheckPage() {
 function CheckInOutCard() {
   const qc = useQueryClient();
   const { t, tf, formatBlocked } = useI18n();
-  const inFn = useServerFn(checkIn);
-  const outFn = useServerFn(checkOut);
   const attFn = useServerFn(listMyAttendance);
   const accessFn = useServerFn(listMyAccess);
   const bioFn = useServerFn(listMyBiometrics);
   const devicesFn = useServerFn(listMyDevices);
   const meFn = useServerFn(getMe);
-  const verifyFaceFn = useServerFn(verifyFace);
   const fpOptsFn = useServerFn(webauthnAuthOptionsForSelf);
   const fpVerifyFn = useServerFn(webauthnAuthVerifyForSelf);
   const meQ = useQuery({ queryKey: ["me"], queryFn: () => meFn() });
@@ -63,12 +68,14 @@ function CheckInOutCard() {
   const devQ = useQuery({ queryKey: ["my-devices"], queryFn: () => devicesFn() });
   const [busy, setBusy] = useState<"in" | "out" | null>(null);
   const [note, setNote] = useState("");
-  const [branch, setBranch] = useState("HQ");
   const [nearest, setNearest] = useState<{ name: string; distance: number; radius: number; inside: boolean } | null>(null);
   const [showFace, setShowFace] = useState<null | "in" | "out">(null);
+  // Server-side proof returned by Edge Function after successful challenge
   const [verified, setVerified] = useState<{ face: boolean; fp: boolean }>({ face: false, fp: false });
-  const [lastDistance, setLastDistance] = useState<number | null>(null);
-  const [bioToken, setBioToken] = useState<string | null>(null);
+  const [verificationProof, setVerificationProof] = useState<string | null>(null);
+  const [proofExpiresAt, setProofExpiresAt] = useState<string | null>(null);
+  // Snapshot GPS captured just before face scan (sent to Edge Function)
+  const [snapCoords, setSnapCoords] = useState<{ lat: number; lng: number; accuracy_m?: number } | null>(null);
 
   const hasFace = !!bioQ.data?.face;
   const hasFp = (bioQ.data?.fingerprints?.length ?? 0) > 0;
@@ -286,89 +293,95 @@ function CheckInOutCard() {
       toast.error(t("verifyBiometricFirst") || "Please verify your biometrics before proceeding.");
       return;
     }
+
+    // Guard: proof must still be valid (TTL 2 min)
+    if (verificationProof && proofExpiresAt && new Date(proofExpiresAt) < new Date()) {
+      toast.error("انتهت صلاحية التحقق. يرجى مسح الوجه مرة أخرى.");
+      setVerified({ face: false, fp: false });
+      setVerificationProof(null);
+      setProofExpiresAt(null);
+      return;
+    }
+
     setBusy(kind);
     const toastId = toast.loading("جاري الاتصال بالسيرفر، برجاء الانتظار...");
     try {
+      // Collect 3 fresh GPS samples
       const coords = await getCoords();
       if (coords.err) {
         toast.error("تعذر إتمام العملية حاليًا. يرجى التواصل مع الإدارة.", { id: toastId });
         return;
       }
+
       let near: typeof nearest = null;
       if (coords.lat != null && coords.lng != null) {
         near = computeNearest(coords.lat, coords.lng);
         setNearest(near);
+        // Client-side pre-check (server will re-evaluate authoritatively)
         if (near && !near.inside) {
           toast.error("تعذر إتمام العملية حاليًا. يرجى التواصل مع الإدارة.", { id: toastId });
           return;
         }
       }
-      const isOnline = typeof navigator !== "undefined" ? navigator.onLine : true;
-      const geo = coords.lat != null && coords.lng != null ? await reverseGeocodeCoords(coords.lat, coords.lng) : {};
-      const bioMethod: "face" | "fingerprint" = verified.fp ? "fingerprint" : "face";
-      const resolvedBranch =
-        (near && near.inside ? near.name : null) ||
-        (geo.district && geo.city ? `${geo.district}, ${geo.city}` : geo.city || geo.district) ||
-        (meQ.data as any)?.profile?.branch ||
-        "HQ";
-      const payload = {
-        branch: resolvedBranch,
-        lat: coords.lat,
-        lng: coords.lng,
-        accuracy_m: coords.accuracy_m ?? null,
-        gps_age_ms: coords.gps_age_ms ?? null,
-        gps_sample_count: coords.gps_sample_count ?? null,
-        altitude: coords.altitude ?? null,
-        altitude_accuracy: coords.altitude_accuracy ?? null,
-        heading: coords.heading ?? null,
-        speed: coords.speed ?? null,
-        samples: coords.samples ?? null,
-        network_ok: isOnline,
-        note: note.trim() || undefined,
-        device_id: getCurrentDeviceId(),
-        city: geo.city,
-        district: geo.district,
-        street: geo.street,
-        biometric_method: bioMethod,
-        biometric_distance: bioMethod === "face" ? lastDistance : null,
-        biometric_token: bioToken,
-      };
-      if (kind === "in") {
-        const res: any = await inFn({ data: payload });
-        if (res?.blocked) {
-          toast.error("تعذر إتمام العملية حاليًا. يرجى التواصل مع الإدارة.", { id: toastId });
-          return;
-        }
-        if (res?.pending_review) {
-          toast.warning("تم تسجيل الحضور · قيد المراجعة", {
-            id: toastId,
-            description: "جاري مراجعة البيانات من قبل الإدارة.",
-          });
-        } else {
-          toast.success("تم تسجيل الحضور بنجاح", { id: toastId });
-        }
-      } else {
-        const res: any = await outFn({ data: payload });
-        if (res?.blocked) {
-          toast.error("تعذر إتمام العملية حاليًا. يرجى التواصل مع الإدارة.", { id: toastId });
-          return;
-        }
-        if (res?.pending_review) {
-          toast.warning("تم تسجيل الانصراف · قيد المراجعة", {
-            id: toastId,
-            description: "جاري مراجعة البيانات من قبل الإدارة.",
-          });
-        } else {
-          toast.success("تم تسجيل الانصراف بنجاح", { id: toastId });
-        }
-      }
+
+      const deviceId = getCurrentDeviceId();
+      const action: AttendanceAction = kind === "in" ? "check_in" : "check_out";
+      const idempotencyKey = makeIdempotencyKey(action);
+
+      // Pick the best GPS fix for the location object
+      const bestLat = coords.lat ?? 0;
+      const bestLng = coords.lng ?? 0;
+      const capturedAt = new Date().toISOString();
+
+      const samples: GpsSample[] = (coords.samples ?? []).map((s) => ({
+        lat: s.lat,
+        lng: s.lng,
+        accuracy_m: s.accuracy_m ?? null,
+        timestamp: s.timestamp ?? null,
+      }));
+
+      // ── Submit to Edge Function — all policy decisions are server-side ──
+      const res = await commitAttendance({
+        request_action: action,
+        verification_proof: verificationProof ?? "",
+        device_id: deviceId,
+        idempotency_key: idempotencyKey,
+        location: {
+          lat: bestLat,
+          lng: bestLng,
+          accuracy_meters: coords.accuracy_m ?? null,
+          captured_at: capturedAt,
+        },
+        samples,
+        device_signature: null, // TODO: Android Keystore signature — null for PWA
+      });
+
+      // Reset biometric state after successful commit
       setNote("");
       setVerified({ face: false, fp: false });
-      setLastDistance(null);
-      setBioToken(null);
+      setVerificationProof(null);
+      setProofExpiresAt(null);
+      setSnapCoords(null);
       qc.invalidateQueries({ queryKey: ["my-attendance"] });
-    } catch (e) {
-      toast.error("تعذر إتمام العملية حاليًا. يرجى التواصل مع الإدارة.", { id: toastId });
+
+      if (res.pending_review) {
+        const label = kind === "in" ? "الحضور" : "الانصراف";
+        toast.warning(`تم تسجيل ${label} · قيد المراجعة`, {
+          id: toastId,
+          description: "جاري مراجعة البيانات من قبل الإدارة.",
+        });
+      } else {
+        toast.success(
+          kind === "in" ? "تم تسجيل الحضور بنجاح" : "تم تسجيل الانصراف بنجاح",
+          { id: toastId },
+        );
+      }
+    } catch (e: any) {
+      const msg =
+        e instanceof BiometricApiError
+          ? e.message
+          : "تعذر إتمام العملية حاليًا. يرجى التواصل مع الإدارة.";
+      toast.error(msg, { id: toastId });
     } finally {
       setBusy(null);
     }
@@ -381,7 +394,7 @@ function CheckInOutCard() {
       const assertion = await startAuthentication({ optionsJSON: options as any });
       const res: any = await fpVerifyFn({ data: { response: assertion } });
       if (res?.token) {
-        setBioToken(res.token);
+        setVerificationProof(res.token);
       }
       setVerified((v) => ({ ...v, fp: true }));
       toast.success("تم التحقق من البصمة بنجاح");
@@ -390,33 +403,16 @@ function CheckInOutCard() {
     }
   }
 
-  async function handleFaceCapture(descriptor: number[]) {
-    try {
-      const targetAction = showFace === "out" ? "check_out" : "check_in";
-      const snap = await getInstantCoords();
-      const res: any = await verifyFaceFn({
-        data: {
-          descriptor,
-          action: targetAction,
-          snapshot_lat: snap?.lat ?? null,
-          snapshot_lng: snap?.lng ?? null,
-          snapshot_accuracy_m: snap?.accuracy_m ?? null,
-        },
-      });
-      if (res.match) {
-        setVerified((v) => ({ ...v, face: true }));
-        setLastDistance(res.distance ?? null);
-        if (res.token) {
-          setBioToken(res.token);
-        }
-        toast.success("تم التحقق من الوجه بنجاح");
-        setShowFace(null);
-      } else {
-        toast.error("تعذر إتمام العملية حاليًا. يرجى التواصل مع الإدارة.");
-      }
-    } catch (e: any) {
-      toast.error("تعذر إتمام العملية حاليًا. يرجى التواصل مع الإدارة.");
-    }
+  /**
+   * Called by FaceChallengeCapture when the Edge Function returns a valid
+   * verification_proof. The proof is stored and used in commitAttendance().
+   */
+  async function handleFaceChallengeSuccess(result: FaceChallengeResult) {
+    setVerificationProof(result.verification_proof);
+    setProofExpiresAt(result.expires_at);
+    setVerified((v) => ({ ...v, face: true }));
+    toast.success("تم التحقق من الوجه بنجاح");
+    setShowFace(null);
   }
 
   return (
@@ -528,7 +524,15 @@ function CheckInOutCard() {
         </p>
       )}
       {showFace && (
-        <FaceCapture mode="verify" onCapture={handleFaceCapture} onClose={() => setShowFace(null)} />
+        <FaceChallengeCapture
+          action={showFace === "out" ? "check_out" : "check_in"}
+          deviceId={getCurrentDeviceId()}
+          snapshotLat={snapCoords?.lat ?? null}
+          snapshotLng={snapCoords?.lng ?? null}
+          snapshotAccuracyM={snapCoords?.accuracy_m ?? null}
+          onSuccess={handleFaceChallengeSuccess}
+          onClose={() => setShowFace(null)}
+        />
       )}
     </section>
   );

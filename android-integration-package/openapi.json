@@ -1,0 +1,286 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "INT-HR Biometric & Attendance Server-Side API",
+    "version": "2.0.0",
+    "description": "Authoritative contract for Android & Web clients connecting to Supabase Edge Function `biometric-auth`. All biometric verification, challenge generation, anti-spoofing liveness checks, proof minting, and attendance decisions execute entirely server-side."
+  },
+  "servers": [
+    {
+      "url": "https://{projectRef}.supabase.co/functions/v1/biometric-auth",
+      "description": "Supabase Edge Function endpoint"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "paths": {
+    "/": {
+      "post": {
+        "summary": "Dispatcher for Biometric Auth Actions",
+        "description": "Routes actions: `begin-verification`, `verify-face`, `commit-attendance`, and `register-device-key`.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  { "$ref": "#/components/schemas/BeginVerificationRequest" },
+                  { "$ref": "#/components/schemas/VerifyFaceRequest" },
+                  { "$ref": "#/components/schemas/CommitAttendanceRequest" },
+                  { "$ref": "#/components/schemas/RegisterDeviceKeyRequest" }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    { "$ref": "#/components/schemas/BeginVerificationResponse" },
+                    { "$ref": "#/components/schemas/VerifyFaceResponse" },
+                    { "$ref": "#/components/schemas/CommitAttendanceResponse" },
+                    { "$ref": "#/components/schemas/RegisterDeviceKeyResponse" }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or liveness error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized / invalid JWT",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "403": {
+            "description": "Face mismatch, device not approved, or signature invalid",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "409": {
+            "description": "Challenge expired, already used, or replay detected",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "429": {
+            "description": "Max attempts exceeded or rate limit active",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Supabase authenticated employee JWT token"
+      }
+    },
+    "schemas": {
+      "BeginVerificationRequest": {
+        "type": "object",
+        "required": ["action", "challenge_action", "device_id"],
+        "properties": {
+          "action": { "type": "string", "enum": ["begin-verification"] },
+          "challenge_action": { "type": "string", "enum": ["check_in", "check_out"] },
+          "device_id": { "type": "string", "description": "UUID or stable hardware ID of the registered employee device" }
+        }
+      },
+      "BeginVerificationResponse": {
+        "type": "object",
+        "required": ["ok", "challenge_id", "challenge_action", "challenge_type", "expected_sequence", "expires_at"],
+        "properties": {
+          "ok": { "type": "boolean", "example": true },
+          "challenge_id": { "type": "string", "format": "uuid" },
+          "challenge_action": { "type": "string", "enum": ["check_in", "check_out"] },
+          "challenge_type": { "type": "string", "example": "visual_3pose_entropy" },
+          "expected_sequence": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Ordered pseudo-random prompt steps, e.g. ['front', 'turn_right', 'smile']",
+            "example": ["front", "turn_right", "smile"]
+          },
+          "expires_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "VisualKeyframe": {
+        "type": "object",
+        "required": ["step", "t", "image_b64"],
+        "properties": {
+          "step": { "type": "string", "description": "Pose step matching expected_sequence, e.g. 'front'" },
+          "t": { "type": "integer", "description": "Capture timestamp in epoch milliseconds" },
+          "image_b64": { "type": "string", "description": "Data URI format: 'data:image/jpeg;base64,...'" }
+        }
+      },
+      "VerifyFaceRequest": {
+        "type": "object",
+        "required": ["action", "challenge_id", "device_id", "descriptor", "visual_keyframes"],
+        "properties": {
+          "action": { "type": "string", "enum": ["verify-face"] },
+          "challenge_id": { "type": "string", "format": "uuid" },
+          "device_id": { "type": "string" },
+          "descriptor": {
+            "type": "array",
+            "items": { "type": "number" },
+            "minItems": 128,
+            "maxItems": 128,
+            "description": "128 finite floats extracted from final camera frame using face-api.js"
+          },
+          "visual_keyframes": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/VisualKeyframe" },
+            "minItems": 3,
+            "description": "Captured frames corresponding to challenge steps for server-side binary validation"
+          },
+          "snapshot_lat": { "type": ["number", "null"] },
+          "snapshot_lng": { "type": ["number", "null"] },
+          "snapshot_accuracy_m": { "type": ["number", "null"] }
+        }
+      },
+      "VerifyFaceResponse": {
+        "type": "object",
+        "required": ["ok", "verification_proof", "expires_at"],
+        "properties": {
+          "ok": { "type": "boolean", "example": true },
+          "verification_proof": {
+            "type": "string",
+            "description": "High-entropy server-minted token starting with 'vp_'. Valid for 2 minutes."
+          },
+          "expires_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "GpsSample": {
+        "type": "object",
+        "required": ["lat", "lng"],
+        "properties": {
+          "lat": { "type": "number" },
+          "lng": { "type": "number" },
+          "accuracy_m": { "type": ["number", "null"] },
+          "timestamp": { "type": ["integer", "null"] }
+        }
+      },
+      "AttendanceLocation": {
+        "type": "object",
+        "required": ["lat", "lng", "captured_at"],
+        "properties": {
+          "lat": { "type": "number" },
+          "lng": { "type": "number" },
+          "accuracy_meters": { "type": ["number", "null"] },
+          "captured_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "CommitAttendanceRequest": {
+        "type": "object",
+        "required": ["action", "request_action", "verification_proof", "device_id", "idempotency_key", "location", "samples"],
+        "properties": {
+          "action": { "type": "string", "enum": ["commit-attendance"] },
+          "request_action": { "type": "string", "enum": ["check_in", "check_out"] },
+          "verification_proof": { "type": "string" },
+          "device_id": { "type": "string" },
+          "idempotency_key": { "type": "string", "description": "Client-generated unique UUID to prevent double submissions" },
+          "location": { "$ref": "#/components/schemas/AttendanceLocation" },
+          "samples": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/GpsSample" },
+            "minItems": 3,
+            "description": "At least 3 successive GPS samples recorded by device"
+          },
+          "device_signature": {
+            "type": ["string", "null"],
+            "description": "ECDSA P-256 signature over '{userId}:{action}:{deviceId}:{proof}:{lat}:{lng}:{captured_at}' using Android Keystore"
+          }
+        }
+      },
+      "CommitAttendanceResponse": {
+        "type": "object",
+        "required": ["ok", "attendance_id", "action", "server_time", "decision", "pending_review"],
+        "properties": {
+          "ok": { "type": "boolean", "example": true },
+          "attendance_id": { "type": "string", "format": "uuid" },
+          "action": { "type": "string", "enum": ["check_in", "check_out"] },
+          "server_time": { "type": "string", "format": "date-time" },
+          "decision": { "type": "string", "enum": ["APPROVED", "PENDING_REVIEW"] },
+          "pending_review": { "type": "boolean" },
+          "review_reason": { "type": ["string", "null"] }
+        }
+      },
+      "RegisterDeviceKeyRequest": {
+        "type": "object",
+        "required": ["action", "device_id", "public_key_jwk"],
+        "properties": {
+          "action": { "type": "string", "enum": ["register-device-key"] },
+          "device_id": { "type": "string" },
+          "public_key_jwk": {
+            "type": "object",
+            "description": "JWK formatted ECDSA P-256 public key generated in secure hardware"
+          }
+        }
+      },
+      "RegisterDeviceKeyResponse": {
+        "type": "object",
+        "required": ["ok", "message"],
+        "properties": {
+          "ok": { "type": "boolean", "example": true },
+          "message": { "type": "string" }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": ["ok", "code", "error"],
+        "properties": {
+          "ok": { "type": "boolean", "example": false },
+          "code": {
+            "type": "string",
+            "enum": [
+              "INVALID_PAYLOAD",
+              "UNAUTHORIZED",
+              "DEVICE_NOT_APPROVED",
+              "DEVICE_SIGNATURE_REQUIRED",
+              "DEVICE_SIGNATURE_INVALID",
+              "CHALLENGE_INVALID_OR_CONSUMED",
+              "LIVENESS_FAILED",
+              "TEMPLATE_NOT_ENROLLED",
+              "FACE_MISMATCH",
+              "MAX_ATTEMPTS_EXCEEDED",
+              "PROOF_EXPIRED_OR_INVALID",
+              "OUTSIDE_GEOFENCE",
+              "MOCK_LOCATION_DETECTED",
+              "RATE_LIMITED",
+              "DB_ERROR"
+            ]
+          },
+          "error": { "type": "string" }
+        }
+      }
+    }
+  }
+}

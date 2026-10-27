@@ -229,6 +229,32 @@ function verifyVisualKeyframesLiveness(
   return { valid: true };
 }
 
+// ── Convert ASN.1 DER ECDSA signature (standard in Android Java) to IEEE P1363 (WebCrypto)
+function derToP1363(der: Uint8Array): Uint8Array {
+  if (der.length === 64) return der; // already IEEE P1363
+  if (der[0] !== 0x30) return der;   // unknown or non-DER
+
+  let offset = 2;
+  if (der[1] & 0x80) offset += (der[1] & 0x7f);
+
+  if (der[offset] !== 0x02) return der;
+  const rLen = der[offset + 1];
+  let r = der.subarray(offset + 2, offset + 2 + rLen);
+  offset += 2 + rLen;
+
+  if (der[offset] !== 0x02) return der;
+  const sLen = der[offset + 1];
+  let s = der.subarray(offset + 2, offset + 2 + sLen);
+
+  while (r.length > 32 && r[0] === 0) r = r.subarray(1);
+  while (s.length > 32 && s[0] === 0) s = s.subarray(1);
+
+  const raw = new Uint8Array(64);
+  raw.set(r, 32 - r.length);
+  raw.set(s, 64 - s.length);
+  return raw;
+}
+
 // ── Cryptographic Asymmetric Device Signature Verification ─────────────────
 async function verifyDeviceSignature(
   publicKeyStr: string,
@@ -238,7 +264,7 @@ async function verifyDeviceSignature(
   try {
     const dataBytes = new TextEncoder().encode(dataString);
     const sigBinary = atob(signatureB64);
-    const sigBytes = new Uint8Array(sigBinary.length);
+    let sigBytes = new Uint8Array(sigBinary.length);
     for (let i = 0; i < sigBinary.length; i++) sigBytes[i] = sigBinary.charCodeAt(i);
 
     let cleanKey = publicKeyStr
@@ -291,10 +317,15 @@ async function verifyDeviceSignature(
       return { valid: false, reason: "Unsupported or unparseable public key format." };
     }
 
+    let finalSig = sigBytes;
+    if (typeof hashAlgorithm === "object" && hashAlgorithm.name === "ECDSA") {
+      finalSig = derToP1363(sigBytes);
+    }
+
     const isValid = await crypto.subtle.verify(
       hashAlgorithm,
       key,
-      sigBytes,
+      finalSig,
       dataBytes
     );
 
