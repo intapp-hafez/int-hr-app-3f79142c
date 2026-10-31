@@ -134,6 +134,7 @@ function StaffLayout() {
           <ul className="flex items-end justify-between">
             {items.map((it) => {
               const active = it.isActive(path);
+              const Icon = it.icon;
 
               if (it.isCenter) {
                 return (
@@ -180,8 +181,8 @@ function StaffLayout() {
                     className="group flex flex-col items-center justify-center py-1 transition-all active:scale-95"
                   >
                     <div className="relative flex items-center justify-center">
-                      {it.icon && (
-                        <it.icon
+                      {Icon && (
+                        <Icon
                           className={`h-[22px] w-[22px] transition-all duration-200 ${
                             active
                               ? "stroke-[2.2] text-brand"
