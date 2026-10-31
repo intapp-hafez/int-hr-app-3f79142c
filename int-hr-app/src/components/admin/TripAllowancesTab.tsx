@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { rateCells } from "@/lib/shared-settings-sync";
 import {
   Loader2,
   MapPin,
@@ -20,7 +21,7 @@ import {
 export function TripAllowancesTab() {
   const qc = useQueryClient();
   const [term, setTerm] = useState("");
-  const [cells, setCells] = useState<Record<string, string>>({});
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["trip-allowance-matrix"],
@@ -50,12 +51,7 @@ export function TripAllowancesTab() {
 
   const key = (l: string, p: string) => `${l}:${p}`;
 
-  useEffect(() => {
-    if (!data) return;
-    const next: Record<string, string> = {};
-    for (const p of data.policies) next[key(p.geofence_location_id, p.position_id)] = String(p.nightly_rate ?? "");
-    setCells(next);
-  }, [data]);
+  const cells = useMemo(() => rateCells(data?.policies ?? [], drafts), [data?.policies, drafts]);
 
   const original = useMemo(() => {
     const m: Record<string, { id: string; rate: string }> = {};
@@ -68,13 +64,13 @@ export function TripAllowancesTab() {
   );
 
   const save = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (changes: Record<string, string>) => {
       const posName = new Map((data?.positions ?? []).map((p: any) => [p.id, p.name_en]));
       const toDelete: string[] = [];
       const toUpsert: any[] = [];
-      for (const k of dirtyKeys) {
+      for (const k of Object.keys(changes)) {
         const [locId, posId] = k.split(":");
-        const raw = (cells[k] ?? "").trim();
+        const raw = changes[k].trim();
         const existing = original[k];
         if (raw === "") {
           if (existing) toDelete.push(existing.id);
@@ -98,8 +94,14 @@ export function TripAllowancesTab() {
         const { error } = await (supabase as any).from("trip_allowance_policies").upsert(toUpsert);
         if (error) throw new Error(error.message);
       }
+      return changes;
     },
-    onSuccess: () => {
+    onSuccess: (saved) => {
+      setDrafts((current) => {
+        const next = { ...current };
+        for (const k of Object.keys(saved)) if (next[k] === saved[k]) delete next[k];
+        return next;
+      });
       toast.success("Trip allowances saved");
       qc.invalidateQueries({ queryKey: ["trip-allowance-matrix"] });
     },
@@ -198,7 +200,7 @@ export function TripAllowancesTab() {
             />
           </div>
           <button
-            onClick={() => save.mutate()}
+            onClick={() => save.mutate(Object.fromEntries(dirtyKeys.map((k) => [k, cells[k] ?? ""])))}
             disabled={dirtyKeys.length === 0 || save.isPending}
             className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-gradient-brand px-4 text-sm font-semibold text-brand-foreground shadow-brand disabled:opacity-50"
           >
@@ -267,7 +269,15 @@ export function TripAllowancesTab() {
                             min={0}
                             value={cells[k] ?? ""}
                             placeholder="—"
-                            onChange={(e) => setCells({ ...cells, [k]: e.target.value })}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setDrafts((current) => {
+                                const next = { ...current };
+                                if (value === (original[k]?.rate ?? "")) delete next[k];
+                                else next[k] = value;
+                                return next;
+                              });
+                            }}
                             className={`h-8 w-24 rounded-lg border bg-background px-2 text-sm outline-none focus:ring-2 focus:ring-ring ${dirty ? "border-brand" : "border-input"}`}
                           />
                         </td>

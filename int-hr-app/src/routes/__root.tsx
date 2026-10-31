@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 import { LanguageProvider } from "@/lib/i18n";
 import { Toaster } from "@/components/ui/sonner";
+import { SharedSettingsSync } from "@/components/SharedSettingsSync";
 
 function NotFoundComponent() {
   return (
@@ -81,6 +82,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <LanguageProvider>
         <AuthSessionWatcher />
+        <SharedSettingsSync />
         <Outlet />
         <Toaster position="top-center" richColors />
       </LanguageProvider>
