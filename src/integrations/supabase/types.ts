@@ -100,6 +100,7 @@ export type Database = {
           created_at: string
           date: string
           decision: string
+          device_id: string | null
           district: string | null
           employee_id: string
           free_check: boolean
@@ -134,6 +135,7 @@ export type Database = {
           created_at?: string
           date?: string
           decision?: string
+          device_id?: string | null
           district?: string | null
           employee_id: string
           free_check?: boolean
@@ -168,6 +170,7 @@ export type Database = {
           created_at?: string
           date?: string
           decision?: string
+          device_id?: string | null
           district?: string | null
           employee_id?: string
           free_check?: boolean
@@ -316,6 +319,50 @@ export type Database = {
         }
         Relationships: []
       }
+      attendance_idempotency_records: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          idempotency_key: string
+          request_hash: string
+          response_payload: Json
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          idempotency_key: string
+          request_hash?: string
+          response_payload?: Json
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          idempotency_key?: string
+          request_hash?: string
+          response_payload?: Json
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_idempotency_records_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       attendance_review_cases: {
         Row: {
           action: string
@@ -390,6 +437,7 @@ export type Database = {
           event: string
           id: string
           ip_address: string | null
+          metadata: Json | null
           method: string
           reason: string | null
           success: boolean
@@ -405,6 +453,7 @@ export type Database = {
           event: string
           id?: string
           ip_address?: string | null
+          metadata?: Json | null
           method: string
           reason?: string | null
           success?: boolean
@@ -420,6 +469,7 @@ export type Database = {
           event?: string
           id?: string
           ip_address?: string | null
+          metadata?: Json | null
           method?: string
           reason?: string | null
           success?: boolean
@@ -429,6 +479,56 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "biometric_audit_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      biometric_challenges: {
+        Row: {
+          action: string
+          attempt_count: number
+          challenge_type: string
+          created_at: string
+          device_id: string
+          expected_sequence: Json
+          expires_at: string
+          id: string
+          max_attempts: number
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          attempt_count?: number
+          challenge_type?: string
+          created_at?: string
+          device_id: string
+          expected_sequence: Json
+          expires_at: string
+          id?: string
+          max_attempts?: number
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          attempt_count?: number
+          challenge_type?: string
+          created_at?: string
+          device_id?: string
+          expected_sequence?: Json
+          expires_at?: string
+          id?: string
+          max_attempts?: number
+          used_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "biometric_challenges_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -485,6 +585,57 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "geofence_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      biometric_verification_proofs: {
+        Row: {
+          action: string
+          challenge_id: string
+          created_at: string
+          device_id: string
+          expires_at: string
+          id: string
+          proof_hash: string
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          challenge_id: string
+          created_at?: string
+          device_id: string
+          expires_at: string
+          id?: string
+          proof_hash: string
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          challenge_id?: string
+          created_at?: string
+          device_id?: string
+          expires_at?: string
+          id?: string
+          proof_hash?: string
+          used_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "biometric_verification_proofs_challenge_id_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: false
+            referencedRelation: "biometric_challenges"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "biometric_verification_proofs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1512,6 +1663,7 @@ export type Database = {
           last_checkout: string | null
           last_seen_at: string | null
           os: string | null
+          public_key: string | null
           status: string
           updated_at: string
           user_agent: string | null
@@ -1536,6 +1688,7 @@ export type Database = {
           last_checkout?: string | null
           last_seen_at?: string | null
           os?: string | null
+          public_key?: string | null
           status?: string
           updated_at?: string
           user_agent?: string | null
@@ -1560,6 +1713,7 @@ export type Database = {
           last_checkout?: string | null
           last_seen_at?: string | null
           os?: string | null
+          public_key?: string | null
           status?: string
           updated_at?: string
           user_agent?: string | null
@@ -4765,6 +4919,21 @@ export type Database = {
         Args: { _descriptor: Json; _email: string }
         Returns: Json
       }
+      commit_biometric_attendance: {
+        Args: {
+          p_accuracy: number
+          p_action: string
+          p_device_id: string
+          p_idempotency_key: string
+          p_lat: number
+          p_lng: number
+          p_location_time: string
+          p_proof_hash: string
+          p_request_hash: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       fn_euclidean_distance: { Args: { a: Json; b: Json }; Returns: number }
       get_staff_employee_names: {
         Args: { p_employee_ids?: string[] }
@@ -4806,6 +4975,36 @@ export type Database = {
       is_chat_channel_member: {
         Args: { p_channel_id: string; p_user_id: string }
         Returns: boolean
+      }
+      mint_biometric_proof: {
+        Args: {
+          p_challenge_id: string
+          p_device_id: string
+          p_expires_at: string
+          p_proof_hash: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      record_challenge_failure: {
+        Args: {
+          p_challenge_id: string
+          p_code?: string
+          p_device_id: string
+          p_reason: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      request_biometric_challenge: {
+        Args: {
+          p_action: string
+          p_device_id: string
+          p_expected_sequence: Json
+          p_expires_in_seconds?: number
+          p_user_id: string
+        }
+        Returns: Json
       }
       security_scan_exec: { Args: { _sql: string }; Returns: undefined }
       security_scan_query: { Args: { _sql: string }; Returns: Json[] }
