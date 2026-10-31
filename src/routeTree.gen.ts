@@ -36,6 +36,7 @@ import { Route as AdminFaceNotificationsRouteImport } from './routes/admin.face-
 import { Route as AdminGeofencingRouteImport } from './routes/admin.geofencing'
 import { Route as AdminHolidayTypesRouteImport } from './routes/admin.holiday-types'
 import { Route as AdminHolidaysRouteImport } from './routes/admin.holidays'
+import { Route as AdminKpiEvaluationsRouteImport } from './routes/admin.kpi-evaluations'
 import { Route as AdminKpisRouteImport } from './routes/admin.kpis'
 import { Route as AdminLatePenaltiesRouteImport } from './routes/admin.late-penalties'
 import { Route as AdminLeavesRouteImport } from './routes/admin.leaves'
@@ -77,6 +78,7 @@ import { Route as ManagerIndexRouteImport } from './routes/manager.index'
 import { Route as ManagerAdvancesRouteImport } from './routes/manager.advances'
 import { Route as ManagerChatRouteImport } from './routes/manager.chat'
 import { Route as ManagerCheckRouteImport } from './routes/manager.check'
+import { Route as ManagerKpiEvaluationsRouteImport } from './routes/manager.kpi-evaluations'
 import { Route as ManagerLeavesRouteImport } from './routes/manager.leaves'
 import { Route as ManagerNotificationsRouteImport } from './routes/manager.notifications'
 import { Route as ManagerProfileRouteImport } from './routes/manager.profile'
@@ -236,6 +238,11 @@ const AdminHolidayTypesRoute = AdminHolidayTypesRouteImport.update({
 const AdminHolidaysRoute = AdminHolidaysRouteImport.update({
   id: '/holidays',
   path: '/holidays',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminKpiEvaluationsRoute = AdminKpiEvaluationsRouteImport.update({
+  id: '/kpi-evaluations',
+  path: '/kpi-evaluations',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminKpisRoute = AdminKpisRouteImport.update({
@@ -445,6 +452,11 @@ const ManagerCheckRoute = ManagerCheckRouteImport.update({
   path: '/check',
   getParentRoute: () => ManagerRoute,
 } as any)
+const ManagerKpiEvaluationsRoute = ManagerKpiEvaluationsRouteImport.update({
+  id: '/kpi-evaluations',
+  path: '/kpi-evaluations',
+  getParentRoute: () => ManagerRoute,
+} as any)
 const ManagerLeavesRoute = ManagerLeavesRouteImport.update({
   id: '/leaves',
   path: '/leaves',
@@ -596,6 +608,7 @@ export interface FileRoutesByFullPath {
   '/admin/geofencing': typeof AdminGeofencingRoute
   '/admin/holiday-types': typeof AdminHolidayTypesRoute
   '/admin/holidays': typeof AdminHolidaysRoute
+  '/admin/kpi-evaluations': typeof AdminKpiEvaluationsRoute
   '/admin/kpis': typeof AdminKpisRoute
   '/admin/late-penalties': typeof AdminLatePenaltiesRoute
   '/admin/leaves': typeof AdminLeavesRoute
@@ -634,6 +647,7 @@ export interface FileRoutesByFullPath {
   '/manager/advances': typeof ManagerAdvancesRoute
   '/manager/chat': typeof ManagerChatRoute
   '/manager/check': typeof ManagerCheckRoute
+  '/manager/kpi-evaluations': typeof ManagerKpiEvaluationsRoute
   '/manager/leaves': typeof ManagerLeavesRoute
   '/manager/notifications': typeof ManagerNotificationsRoute
   '/manager/profile': typeof ManagerProfileRoute
@@ -683,6 +697,7 @@ export interface FileRoutesByTo {
   '/admin/geofencing': typeof AdminGeofencingRoute
   '/admin/holiday-types': typeof AdminHolidayTypesRoute
   '/admin/holidays': typeof AdminHolidaysRoute
+  '/admin/kpi-evaluations': typeof AdminKpiEvaluationsRoute
   '/admin/kpis': typeof AdminKpisRoute
   '/admin/late-penalties': typeof AdminLatePenaltiesRoute
   '/admin/leaves': typeof AdminLeavesRoute
@@ -721,6 +736,7 @@ export interface FileRoutesByTo {
   '/manager/advances': typeof ManagerAdvancesRoute
   '/manager/chat': typeof ManagerChatRoute
   '/manager/check': typeof ManagerCheckRoute
+  '/manager/kpi-evaluations': typeof ManagerKpiEvaluationsRoute
   '/manager/leaves': typeof ManagerLeavesRoute
   '/manager/notifications': typeof ManagerNotificationsRoute
   '/manager/profile': typeof ManagerProfileRoute
@@ -778,6 +794,7 @@ export interface FileRoutesById {
   '/admin/geofencing': typeof AdminGeofencingRoute
   '/admin/holiday-types': typeof AdminHolidayTypesRoute
   '/admin/holidays': typeof AdminHolidaysRoute
+  '/admin/kpi-evaluations': typeof AdminKpiEvaluationsRoute
   '/admin/kpis': typeof AdminKpisRoute
   '/admin/late-penalties': typeof AdminLatePenaltiesRoute
   '/admin/leaves': typeof AdminLeavesRoute
@@ -816,6 +833,7 @@ export interface FileRoutesById {
   '/manager/advances': typeof ManagerAdvancesRoute
   '/manager/chat': typeof ManagerChatRoute
   '/manager/check': typeof ManagerCheckRoute
+  '/manager/kpi-evaluations': typeof ManagerKpiEvaluationsRoute
   '/manager/leaves': typeof ManagerLeavesRoute
   '/manager/notifications': typeof ManagerNotificationsRoute
   '/manager/profile': typeof ManagerProfileRoute
@@ -874,6 +892,7 @@ export interface FileRouteTypes {
     | '/admin/geofencing'
     | '/admin/holiday-types'
     | '/admin/holidays'
+    | '/admin/kpi-evaluations'
     | '/admin/kpis'
     | '/admin/late-penalties'
     | '/admin/leaves'
@@ -912,6 +931,7 @@ export interface FileRouteTypes {
     | '/manager/advances'
     | '/manager/chat'
     | '/manager/check'
+    | '/manager/kpi-evaluations'
     | '/manager/leaves'
     | '/manager/notifications'
     | '/manager/profile'
@@ -961,6 +981,7 @@ export interface FileRouteTypes {
     | '/admin/geofencing'
     | '/admin/holiday-types'
     | '/admin/holidays'
+    | '/admin/kpi-evaluations'
     | '/admin/kpis'
     | '/admin/late-penalties'
     | '/admin/leaves'
@@ -999,6 +1020,7 @@ export interface FileRouteTypes {
     | '/manager/advances'
     | '/manager/chat'
     | '/manager/check'
+    | '/manager/kpi-evaluations'
     | '/manager/leaves'
     | '/manager/notifications'
     | '/manager/profile'
@@ -1055,6 +1077,7 @@ export interface FileRouteTypes {
     | '/admin/geofencing'
     | '/admin/holiday-types'
     | '/admin/holidays'
+    | '/admin/kpi-evaluations'
     | '/admin/kpis'
     | '/admin/late-penalties'
     | '/admin/leaves'
@@ -1093,6 +1116,7 @@ export interface FileRouteTypes {
     | '/manager/advances'
     | '/manager/chat'
     | '/manager/check'
+    | '/manager/kpi-evaluations'
     | '/manager/leaves'
     | '/manager/notifications'
     | '/manager/profile'
@@ -1324,6 +1348,13 @@ declare module '@tanstack/react-router' {
       path: '/holidays'
       fullPath: '/admin/holidays'
       preLoaderRoute: typeof AdminHolidaysRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/kpi-evaluations': {
+      id: '/admin/kpi-evaluations'
+      path: '/kpi-evaluations'
+      fullPath: '/admin/kpi-evaluations'
+      preLoaderRoute: typeof AdminKpiEvaluationsRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/kpis': {
@@ -1613,6 +1644,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ManagerCheckRouteImport
       parentRoute: typeof ManagerRoute
     }
+    '/manager/kpi-evaluations': {
+      id: '/manager/kpi-evaluations'
+      path: '/kpi-evaluations'
+      fullPath: '/manager/kpi-evaluations'
+      preLoaderRoute: typeof ManagerKpiEvaluationsRouteImport
+      parentRoute: typeof ManagerRoute
+    }
     '/manager/leaves': {
       id: '/manager/leaves'
       path: '/leaves'
@@ -1843,6 +1881,7 @@ interface AdminRouteChildren {
   AdminGeofencingRoute: typeof AdminGeofencingRoute
   AdminHolidayTypesRoute: typeof AdminHolidayTypesRoute
   AdminHolidaysRoute: typeof AdminHolidaysRoute
+  AdminKpiEvaluationsRoute: typeof AdminKpiEvaluationsRoute
   AdminKpisRoute: typeof AdminKpisRoute
   AdminLatePenaltiesRoute: typeof AdminLatePenaltiesRoute
   AdminLeavesRoute: typeof AdminLeavesRoute
@@ -1886,6 +1925,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminGeofencingRoute: AdminGeofencingRoute,
   AdminHolidayTypesRoute: AdminHolidayTypesRoute,
   AdminHolidaysRoute: AdminHolidaysRoute,
+  AdminKpiEvaluationsRoute: AdminKpiEvaluationsRoute,
   AdminKpisRoute: AdminKpisRoute,
   AdminLatePenaltiesRoute: AdminLatePenaltiesRoute,
   AdminLeavesRoute: AdminLeavesRoute,
@@ -1972,6 +2012,7 @@ interface ManagerRouteChildren {
   ManagerAdvancesRoute: typeof ManagerAdvancesRoute
   ManagerChatRoute: typeof ManagerChatRoute
   ManagerCheckRoute: typeof ManagerCheckRoute
+  ManagerKpiEvaluationsRoute: typeof ManagerKpiEvaluationsRoute
   ManagerLeavesRoute: typeof ManagerLeavesRoute
   ManagerNotificationsRoute: typeof ManagerNotificationsRoute
   ManagerProfileRoute: typeof ManagerProfileRoute
@@ -1987,6 +2028,7 @@ const ManagerRouteChildren: ManagerRouteChildren = {
   ManagerAdvancesRoute: ManagerAdvancesRoute,
   ManagerChatRoute: ManagerChatRoute,
   ManagerCheckRoute: ManagerCheckRoute,
+  ManagerKpiEvaluationsRoute: ManagerKpiEvaluationsRoute,
   ManagerLeavesRoute: ManagerLeavesRoute,
   ManagerNotificationsRoute: ManagerNotificationsRoute,
   ManagerProfileRoute: ManagerProfileRoute,

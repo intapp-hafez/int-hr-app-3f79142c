@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, Link, useRouterState, Navigate } from "@tanstack/react-router";
 import { useMemo } from "react";
-import { Home, Users, ListChecks, Route as RouteIcon, LogOut, LogIn, UserCircle, Banknote, MessageSquare, CalendarCheck, History } from "lucide-react";
+import { Award, Home, Users, ListChecks, Route as RouteIcon, LogOut, LogIn, UserCircle, Banknote, MessageSquare, CalendarCheck, History } from "lucide-react";
 import { AppLogo } from "@/components/AppLogo";
 import { LanguageToggle, useI18n } from "@/lib/i18n";
 import { useSession, useAuthReady, signOut } from "@/lib/auth";
@@ -70,6 +70,7 @@ function ManagerLayout() {
     { to: "/manager/chat", icon: MessageSquare, label: t("messagesChat") },
     { to: "/manager/check", icon: LogIn, label: t("checkInOut") },
     { to: "/manager/team", icon: Users, label: t("myTeam") },
+    { to: "/manager/kpi-evaluations", icon: Award, label: t("kpiEvaluations") || "KPI Evaluations" },
     { to: "/manager/leaves", icon: CalendarCheck, label: t("leavesAndPermissions") ?? "Leaves & Permissions" },
     { to: "/manager/advances", icon: Banknote, label: t("advancesTitle") ?? "Advances & Loans" },
     { to: "/manager/tasks", icon: ListChecks, label: t("tasks") },
@@ -84,6 +85,7 @@ function ManagerLayout() {
     { to: "/manager/chat", icon: MessageSquare, label: t("messagesChat") },
     { to: "/manager/check", icon: LogIn, label: t("checkInOut") },
     { to: "/manager/team", icon: Users, label: t("myTeam") },
+    { to: "/manager/kpi-evaluations", icon: Award, label: t("kpiEvaluations") || "KPI Evaluations" },
     { to: "/manager/leaves", icon: CalendarCheck, label: t("leavesAndPermissions") ?? "Leaves & Permissions" },
     { to: "/manager/advances", icon: Banknote, label: t("advancesTitle") ?? "Advances & Loans" },
     { to: "/manager/tasks", icon: ListChecks, label: t("tasks") },
@@ -195,7 +197,7 @@ function ManagerLayout() {
 
           {/* Mobile bottom nav */}
           <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-3xl border-t border-border bg-background/95 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 backdrop-blur lg:hidden">
-            <ul className="flex items-center justify-between">
+            <ul className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
               {mobileItems.map((it) => {
                 const active = isActive(it.to, "exact" in it ? it.exact : false);
                 const isChat = it.to === "/manager/chat";
@@ -203,7 +205,7 @@ function ManagerLayout() {
                 const isAdvances = it.to === "/manager/advances";
 
                 return (
-                  <li key={it.to} className="flex-1">
+                  <li key={it.to} className="shrink-0 min-w-[56px]">
                     <Link
                       to={it.to}
                       className={`relative mx-auto flex flex-col items-center gap-1 rounded-xl px-2 py-1.5 text-[11px] font-medium transition-colors ${

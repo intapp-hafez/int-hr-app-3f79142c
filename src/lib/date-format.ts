@@ -212,6 +212,20 @@ export function todayISO(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
 
+/** Add or subtract whole days from an ISO yyyy-mm-dd date. */
+export function shiftIsoDate(iso: string, days: number): string {
+  if (!iso || !isIsoDate(iso.slice(0, 10))) {
+    return todayISO();
+  }
+  const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
+  const utc = Date.UTC(y, m - 1, d + days);
+  const next = new Date(utc);
+  const ny = next.getUTCFullYear();
+  const nm = String(next.getUTCMonth() + 1).padStart(2, "0");
+  const nd = String(next.getUTCDate()).padStart(2, "0");
+  return `${ny}-${nm}-${nd}`;
+}
+
 /** Convert a Date (local calendar day) to ISO yyyy-mm-dd without UTC drift. */
 export function toISODate(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;

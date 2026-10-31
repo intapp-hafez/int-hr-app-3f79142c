@@ -370,7 +370,7 @@ function printAttendancePdf(
 }
 
 function AdminAttendance() {
-  const { t } = useI18n();
+  const { t, isAr } = useI18n();
   const qc = useQueryClient();
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
@@ -668,10 +668,27 @@ function AdminAttendance() {
 
         <TabsContent value="records" className="space-y-5">
           <div className="flex flex-wrap items-end gap-2 rounded-2xl border border-border bg-card p-3">
-        <label className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
-          <span>Date (dd-mm-yyyy)</span>
-          <DateInput value={dateFilter} onChange={setDateFilter} aria-label="Date (dd-mm-yyyy)" className="w-40" />
-        </label>
+        <div className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
+          <div className="flex items-center justify-between">
+            <span>{isAr ? "التاريخ (dd-mm-yyyy)" : "Date (dd-mm-yyyy)"}</span>
+            {dateFilter !== todayIso && (
+              <button
+                type="button"
+                onClick={() => setDateFilter(todayIso)}
+                className="text-[10px] font-medium text-brand hover:underline cursor-pointer"
+              >
+                {isAr ? "اليوم" : "Today"}
+              </button>
+            )}
+          </div>
+          <DateInput
+            value={dateFilter}
+            onChange={setDateFilter}
+            showSteppers
+            aria-label={isAr ? "التاريخ (dd-mm-yyyy)" : "Date (dd-mm-yyyy)"}
+            className="w-40"
+          />
+        </div>
         <label className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
           <span>{t("filterEmployee")}</span>
           <select value={empFilter} onChange={(e) => setEmpFilter(e.target.value)} className="rounded-lg border border-input bg-background px-2 py-1.5 text-sm">
@@ -679,7 +696,7 @@ function AdminAttendance() {
             {employees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
           </select>
         </label>
-        <span className="ml-auto text-xs text-muted-foreground">{rows.length} records</span>
+        <span className="ms-auto text-xs text-muted-foreground">{rows.length} {isAr ? "سجل" : "records"}</span>
           </div>
 
           <div className="overflow-hidden rounded-3xl border border-border bg-card">
@@ -854,7 +871,7 @@ function AdminAttendance() {
             </span>
           </label>
           <label className="inline-flex items-center gap-1.5 text-muted-foreground">
-            <span>Refresh</span>
+            <span>{isAr ? "تحديث" : "Refresh"}</span>
             <select
               value={refreshSec}
               onChange={(e) => setRefreshSec(Number(e.target.value))}
@@ -868,8 +885,8 @@ function AdminAttendance() {
               <option value={60}>1m</option>
             </select>
           </label>
-          <div className="ml-auto inline-flex items-center gap-2 text-muted-foreground">
-            <span>Zoom</span>
+          <div className="ms-auto inline-flex items-center gap-2 text-muted-foreground">
+            <span>{isAr ? "تكبير" : "Zoom"}</span>
             <button onClick={() => setMapZoom((z) => Math.max(3, z - 1))} className="grid h-6 w-6 place-items-center rounded-md border border-input bg-background font-bold">−</button>
             <input type="range" min={3} max={18} value={mapZoom} onChange={(e) => setMapZoom(Number(e.target.value))} className="w-32 accent-brand" />
             <button onClick={() => setMapZoom((z) => Math.min(18, z + 1))} className="grid h-6 w-6 place-items-center rounded-md border border-input bg-background font-bold">+</button>

@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, Link, useRouterState, Navigate, useNavigate } from "@tanstack/react-router";
 import { useState, useRef, useEffect, useMemo } from "react";
-import { LayoutDashboard, Users, MapPin, Clock, CalendarDays, FileBarChart2, ScrollText, Menu, X, Bell, Search, Wallet, Settings, FileSignature, Shield, Building2, KeyRound, Calculator, UserCog, Network, StickyNote, Banknote, Plane, BarChart3, MessageSquare , Smartphone, Printer, ShieldAlert, ArrowLeft, Navigation, PanelLeftClose, PanelLeftOpen, ChevronDown, Sliders } from "lucide-react";
+import { Award, LayoutDashboard, Users, MapPin, Clock, CalendarDays, FileBarChart2, ScrollText, Menu, X, Bell, Search, Wallet, Settings, FileSignature, Shield, Building2, KeyRound, Calculator, UserCog, Network, StickyNote, Banknote, Plane, BarChart3, MessageSquare , Smartphone, Printer, ShieldAlert, ArrowLeft, Navigation, PanelLeftClose, PanelLeftOpen, ChevronDown, Sliders } from "lucide-react";
 import { NotificationsBell } from "@/components/admin/NotificationsBell";
 import { AppLogo } from "@/components/AppLogo";
 import { UserMenu } from "@/components/UserMenu";
@@ -131,6 +131,7 @@ function AdminLayout() {
         items: [
           { to: "/admin/employees", icon: Users, label: t("employees") || "Employees", page: "employees" },
           { to: "/admin/contracts", icon: FileSignature, label: t("contracts") || "Contracts", page: "contracts" },
+          { to: "/admin/kpi-evaluations", icon: Award, label: t("kpiEvaluations") || "KPI Evaluations", page: "kpi-evaluations" },
         ],
       },
     },
@@ -265,7 +266,7 @@ function AdminLayout() {
               className="rounded-lg p-1.5 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
               title={dir === "rtl" ? "طي الشريط الجانبي" : "Collapse sidebar"}
             >
-              <PanelLeftClose className="h-4 w-4" />
+              <PanelLeftClose className="h-4 w-4 rtl:rotate-180" />
             </button>
           )}
         </div>
@@ -510,7 +511,7 @@ function AdminLayout() {
               className="hidden lg:inline-flex rounded-lg p-1.5 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
               title={collapsed ? (dir === "rtl" ? "توسيع الشريط الجانبي" : "Expand sidebar") : (dir === "rtl" ? "طي الشريط الجانبي" : "Collapse sidebar")}
             >
-              {collapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+              {collapsed ? <PanelLeftOpen className="h-5 w-5 rtl:rotate-180" /> : <PanelLeftClose className="h-5 w-5 rtl:rotate-180" />}
             </button>
             <GlobalSearch />
           </div>
@@ -564,6 +565,7 @@ function getPageSlugForPath(path: string): string | null {
   if (path.startsWith("/admin/shifts")) return "shifts";
   if (path.startsWith("/admin/holiday-types")) return "holiday-types";
   if (path.startsWith("/admin/holidays")) return "holidays";
+  if (path.startsWith("/admin/kpi-evaluations")) return "kpi-evaluations";
   if (path.startsWith("/admin/kpis")) return "kpis";
   if (path.startsWith("/admin/allowances")) return "allowances";
   if (path.startsWith("/admin/late-penalties")) return "late-penalties";

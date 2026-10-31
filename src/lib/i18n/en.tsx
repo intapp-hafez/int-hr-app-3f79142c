@@ -287,6 +287,7 @@ export const ui = {
   dailyRate: "Daily Rate",
   kpi: "KPI",
   kpis: "KPIs",
+  kpiEvaluations: "KPI Evaluations",
   attendanceRecords: "Attendance Records",
   requestsSummary: "Requests (Leaves, Permissions, loans)",
   targetValue: "Target value",

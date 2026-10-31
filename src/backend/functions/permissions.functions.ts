@@ -19,6 +19,7 @@ export const PERMISSION_PAGES = [
   { slug: "allowances", label: "Allowances", category: "finance", path: "/admin/allowances", icon: "Calculator" },
   { slug: "late-penalties", label: "Late Penalties", category: "finance", path: "/admin/late-penalties", icon: "AlertTriangle" },
   { slug: "targets-overtime", label: "Targets / Overtime", category: "finance", path: "/admin/targets-overtime", icon: "TrendingUp" },
+  { slug: "kpi-evaluations", label: "KPI Evaluations", category: "core_hr", path: "/admin/kpi-evaluations", icon: "Award" },
   { slug: "kpis", label: "KPIs", category: "finance", path: "/admin/kpis", icon: "BarChart3" },
   { slug: "geofencing", label: "Geofencing", category: "operations", path: "/admin/geofencing", icon: "MapPin" },
   { slug: "networks", label: "Networks & Devices", category: "operations", path: "/admin/networks", icon: "Network" },

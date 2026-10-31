@@ -288,6 +288,7 @@ export const ui: Record<UiKey, string> = {
   dailyRate: "الراتب اليومي",
   kpi: "مؤشر الأداء",
   kpis: "مؤشرات الأداء",
+  kpiEvaluations: "تقييمات مؤشرات الأداء",
   attendanceRecords: "سجل الحضور",
   requestsSummary: "الطلبات (إجازات، أذونات، سلف)",
   targetValue: "قيمة الهدف",
