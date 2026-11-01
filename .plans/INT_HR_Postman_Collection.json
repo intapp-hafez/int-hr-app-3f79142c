@@ -1,0 +1,883 @@
+{
+  "info": {
+    "_postman_id": "c8e1927d-789a-4c28-98f5-b28392019482",
+    "name": "INT HR System API Collection",
+    "description": "Complete, production-ready Postman Collection for the INT HR application. Covers all TanStack Start server functions, Supabase Edge Functions, and REST endpoints for Auth, Attendance, Biometrics, Leaves, Payroll, Solaf (Advances), and the new 3-Layer Quarterly KPI & Performance Evaluation module.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5173",
+      "type": "string",
+      "description": "App base URL (TanStack Start Server Functions)"
+    },
+    {
+      "key": "supabase_url",
+      "value": "https://hydakxwzpfzwolencnmp.supabase.co",
+      "type": "string",
+      "description": "Remote Supabase project API URL"
+    },
+    {
+      "key": "jwt_token",
+      "value": "YOUR_SUPABASE_JWT_ACCESS_TOKEN",
+      "type": "string",
+      "description": "Bearer authentication token for the signed-in user"
+    },
+    {
+      "key": "supabase_anon_key",
+      "value": "YOUR_SUPABASE_ANON_KEY",
+      "type": "string",
+      "description": "Public client publishable anon key"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Authentication & Profile",
+      "description": "Supabase identity authentication, user role extraction, and employee profile inspection.",
+      "item": [
+        {
+          "name": "Supabase Sign-In (Get JWT Token)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "apikey",
+                "value": "{{supabase_anon_key}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@int.com\",\n  \"password\": \"YourPassword123!\"\n}"
+            },
+            "url": {
+              "raw": "{{supabase_url}}/auth/v1/token?grant_type=password",
+              "host": [
+                "{{supabase_url}}"
+              ],
+              "path": [
+                "auth",
+                "v1",
+                "token"
+              ],
+              "query": [
+                {
+                  "key": "grant_type",
+                  "value": "password"
+                }
+              ]
+            },
+            "description": "Authenticates with Supabase Auth and returns an access_token JWT."
+          }
+        },
+        {
+          "name": "Get Current User & Roles (getMe)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/getMe",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "getMe"
+              ]
+            },
+            "description": "Extracts session and returns current user ID, email, emp_code, and active database roles from public.user_roles."
+          }
+        },
+        {
+          "name": "Get Full Profile Details (getMyProfileDetails)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/_server/getMyProfileDetails",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "getMyProfileDetails"
+              ]
+            },
+            "description": "Returns employee profile including bilingual position, department, direct manager, and base salary."
+          }
+        },
+        {
+          "name": "Change Account Password (Admin Only)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"targetUserId\": \"00000000-0000-0000-0000-000000000000\",\n    \"newPassword\": \"NewSecurePassword2026!\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/changeAccountPassword",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "changeAccountPassword"
+              ]
+            },
+            "description": "Allows Admin to change password for any account using the deployed isolated send-smtp-email service."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Employees & Organization",
+      "description": "Employee master directory, department structures, position levels, and manager reporting lines.",
+      "item": [
+        {
+          "name": "List Employees (Admin / HR Paginated)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"page\": 1,\n    \"pageSize\": 15,\n    \"search\": \"Ahmed\",\n    \"departmentId\": null,\n    \"status\": \"active\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/listEmployeesAdmin",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "listEmployeesAdmin"
+              ]
+            },
+            "description": "Returns paginated list of employee profiles with department, position, and status filters."
+          }
+        },
+        {
+          "name": "Get Manager Direct Team (getMyTeam)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/getMyTeam",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "getMyTeam"
+              ]
+            },
+            "description": "Returns direct reporting team members and department subordinates for the calling manager."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Attendance & Biometric Verification",
+      "description": "GPS geofence attendance check-in/out, biometric liveness challenges, and anti-spoofing verification.",
+      "item": [
+        {
+          "name": "Generate Biometric Challenge Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"deviceId\": \"android_pixel_8_hw_id_98234\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/createBiometricChallenge",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "createBiometricChallenge"
+              ]
+            },
+            "description": "Generates a single-use cryptographic verification token (120-second TTL) and liveness gesture requirement."
+          }
+        },
+        {
+          "name": "Attendance Check-In (GPS + Biometrics)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"latitude\": 30.0444,\n    \"longitude\": 31.2357,\n    \"accuracy\": 8.5,\n    \"verificationToken\": \"token_from_challenge_endpoint\",\n    \"selfieBase64\": \"data:image/jpeg;base64,/9j/4AAQSkZJRg...\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/checkInAttendance",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "checkInAttendance"
+              ]
+            },
+            "description": "Executes anti-spoofing checks, verifies geofence radius, and records check-in punch in attendance_logs."
+          }
+        },
+        {
+          "name": "Attendance Check-Out",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"latitude\": 30.0444,\n    \"longitude\": 31.2357,\n    \"accuracy\": 9,\n    \"verificationToken\": \"token_from_challenge_endpoint\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/checkOutAttendance",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "checkOutAttendance"
+              ]
+            },
+            "description": "Logs departure punch for the employee."
+          }
+        },
+        {
+          "name": "List Attendance Logs (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"startDate\": \"2026-11-01\",\n    \"endDate\": \"2026-11-30\",\n    \"departmentId\": null,\n    \"page\": 1,\n    \"pageSize\": 25\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/listAttendanceLogsAdmin",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "listAttendanceLogsAdmin"
+              ]
+            },
+            "description": "Returns paginated attendance punches with geofence and verification status."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Leaves & Vacations",
+      "description": "Leave applications, balance inquiries, and manager/HR approval workflows.",
+      "item": [
+        {
+          "name": "Get My Leave Balances",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"year\": 2026\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/getMyLeaveBalances",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "getMyLeaveBalances"
+              ]
+            },
+            "description": "Returns annual, sick, and casual leave balances, used days, and remaining quotas."
+          }
+        },
+        {
+          "name": "Submit Leave Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"leaveTypeId\": \"00000000-0000-0000-0000-000000000000\",\n    \"startDate\": \"2026-11-10\",\n    \"endDate\": \"2026-11-12\",\n    \"reason\": \"Attending annual professional training conference\",\n    \"attachmentUrl\": null\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/submitLeaveRequest",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "submitLeaveRequest"
+              ]
+            },
+            "description": "Submits a new vacation request and locks requested days in pending balance."
+          }
+        },
+        {
+          "name": "Review Leave Request (Manager / HR)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"requestId\": \"00000000-0000-0000-0000-000000000000\",\n    \"action\": \"approve\",\n    \"rejectionReason\": null\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/reviewLeaveRequest",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "reviewLeaveRequest"
+              ]
+            },
+            "description": "Approve or reject leave request. Deducts balance upon final approval."
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Payroll & Solaf (Advances)",
+      "description": "Employee advance loans (Solaf), installment schedules, and monthly payroll calculations.",
+      "item": [
+        {
+          "name": "Apply for Advance / Loan (Solaf)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"amount\": 5000,\n    \"repaymentMonths\": 5,\n    \"deductionStartDate\": \"2026-12-01\",\n    \"reason\": \"Urgent family medical expenses\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/applyAdvance",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "applyAdvance"
+              ]
+            },
+            "description": "Applies for an advance loan. Validates requested amount against annual_advance_limit."
+          }
+        },
+        {
+          "name": "Approve Advance Request (Finance / Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"advanceId\": \"00000000-0000-0000-0000-000000000000\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/approveAdvance",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "approveAdvance"
+              ]
+            },
+            "description": "Formally approves loan and generates monthly schedule in advance_installments."
+          }
+        },
+        {
+          "name": "Run Monthly Payroll Batch",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"month\": 11,\n    \"year\": 2026,\n    \"departmentId\": null\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/runMonthlyPayroll",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "runMonthlyPayroll"
+              ]
+            },
+            "description": "Computes base salaries + allowances - advances - penalties - unpaid leaves."
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. KPI & Performance Evaluations (Quarterly)",
+      "description": "3-Layer Criteria Catalog (Common 40%, Role 60%, Custom), Q1-Q4 Quarterly Evaluations, and HR Approval Queue.",
+      "item": [
+        {
+          "name": "List Criteria Catalog (listKpiCriteria)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"layer\": \"all\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/listKpiCriteria",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "listKpiCriteria"
+              ]
+            },
+            "description": "Fetches active KPI criteria catalog filtered by layer ('all', 'common', 'role', 'custom')."
+          }
+        },
+        {
+          "name": "Save KPI Criterion (Admin / HR)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"code\": \"KPI-108\",\n    \"name_en\": \"System Commissioning & Startup Accuracy\",\n    \"name_ar\": \"دقة تشغيل وبدء تشغيل الأنظمة\",\n    \"category_en\": \"Commissioning & Programming\",\n    \"category_ar\": \"التشغيل والبرمجة\",\n    \"layer\": \"role\",\n    \"default_weight\": 0.1,\n    \"default_target\": 0.9,\n    \"unit\": \"%\",\n    \"how_measured_en\": \"% of systems passing startup on first test\",\n    \"how_measured_ar\": \"نسبة الأنظمة التي تجتاز التشغيل من أول فحص\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/saveKpiCriterion",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "saveKpiCriterion"
+              ]
+            },
+            "description": "Adds or updates a criterion in the catalog with bilingual naming, default weights, and measurement method."
+          }
+        },
+        {
+          "name": "Get Quarterly Evaluation (getQuarterlyEvaluation)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"employeeId\": \"00000000-0000-0000-0000-000000000000\",\n    \"year\": 2026,\n    \"quarter\": \"q1\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/getQuarterlyEvaluation",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "getQuarterlyEvaluation"
+              ]
+            },
+            "description": "Returns quarterly header, status ('draft', 'submitted', 'returned', 'approved'), return_reason, and scored items."
+          }
+        },
+        {
+          "name": "Save / Submit Quarterly Evaluation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"employeeId\": \"00000000-0000-0000-0000-000000000000\",\n    \"year\": 2026,\n    \"quarter\": \"q1\",\n    \"items\": [\n      {\n        \"criterionId\": \"00000000-0000-0000-0000-000000000001\",\n        \"actualValue\": 0.95,\n        \"comments\": \"Completed all scheduled site milestones on plan.\"\n      },\n      {\n        \"criterionId\": \"00000000-0000-0000-0000-000000000002\",\n        \"actualValue\": 0.92,\n        \"comments\": \"Zero major consultant snag rejections.\"\n      }\n    ],\n    \"notes\": {\n      \"strengths\": \"Exceptional site discipline and fast cable termination delivery.\",\n      \"growthAreas\": \"Improve integration timing with HVAC interface trip tests.\",\n      \"recommendations\": \"Recommend Cisco Certified Network Associate (CCNA) certification.\"\n    },\n    \"submitToHr\": true\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/saveQuarterlyEvaluation",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "saveQuarterlyEvaluation"
+              ]
+            },
+            "description": "Saves draft or submits quarterly review. Server enforces score formula: achievement = min(1, actual/target), score = sum(achv * weight * 100)."
+          }
+        },
+        {
+          "name": "Review Quarterly Evaluation - APPROVE (HR Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"evaluation_id\": \"00000000-0000-0000-0000-000000000000\",\n    \"action\": \"approve\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/reviewQuarterlyEvaluation",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "reviewQuarterlyEvaluation"
+              ]
+            },
+            "description": "Formally approves quarterly review. Locks evaluation and updates employee profile."
+          }
+        },
+        {
+          "name": "Review Quarterly Evaluation - RETURN FOR REVISION (Mandatory Reason)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"evaluation_id\": \"00000000-0000-0000-0000-000000000000\",\n    \"action\": \"return\",\n    \"return_reason\": \"Please re-verify the Q1 installation pass rate and clarify the HVAC snag justification before final submission.\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/reviewQuarterlyEvaluation",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "reviewQuarterlyEvaluation"
+              ]
+            },
+            "description": "Rejects submission and returns to manager for corrections. Enforces mandatory return_reason >= 5 chars."
+          }
+        },
+        {
+          "name": "List Pending Approvals Queue (listPendingApprovals)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"year\": 2026,\n    \"quarter\": \"all\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/listPendingApprovals",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "listPendingApprovals"
+              ]
+            },
+            "description": "Returns the queue of submitted quarterly evaluations waiting for HR review and sign-off."
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. System Settings & Security Audit",
+      "description": "Anti-spoofing security toggles, biometric thresholds, and tamper-proof audit trail streams.",
+      "item": [
+        {
+          "name": "Get Biometric Security Settings",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/getSecuritySettings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "getSecuritySettings"
+              ]
+            },
+            "description": "Returns active biometric thresholds, lockout minutes, and mock-GPS blocking flags."
+          }
+        },
+        {
+          "name": "Update Security Settings (Admin Only)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"requireBiometrics\": true,\n    \"requireGeofencing\": true,\n    \"blockMockLocations\": true,\n    \"faceMatchThreshold\": 0.88,\n    \"maxFailedAttempts\": 3,\n    \"lockoutDurationMinutes\": 15\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/updateSecuritySettings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "updateSecuritySettings"
+              ]
+            },
+            "description": "Configures system-wide anti-spoofing defense thresholds."
+          }
+        },
+        {
+          "name": "Get Security Audit Logs",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"page\": 1,\n    \"pageSize\": 50,\n    \"entityName\": \"kpi_quarterly_evaluations\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/getAuditLogs",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "getAuditLogs"
+              ]
+            },
+            "description": "Fetches immutable audit log records with actor, action, timestamp, IP, and diff snapshots."
+          }
+        }
+      ]
+    }
+  ]
+}
