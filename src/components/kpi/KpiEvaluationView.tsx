@@ -22,9 +22,20 @@ import {
   Check,
   AlertCircle,
   Filter,
+  Loader2,
+  Send,
+  ShieldCheck,
+  Trash2,
+  Clock,
+  CheckCheck,
+  X,
+  ExternalLink,
+  Plus,
+  Pencil,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useSession } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
@@ -32,6 +43,8 @@ import {
   LIGHT_CURRENT_ENGINEER_KPIS,
   KPI_CATEGORIES,
   KPI_CATEGORIES_AR,
+  DEFAULT_KPI_DISCIPLINES,
+  KpiDiscipline,
   KpiMetricDefinition,
   KpiRowState,
   createEmptyEvaluationState,
@@ -42,9 +55,31 @@ import {
   getRatingFromScore,
   RATING_SCALE,
 } from "@/lib/kpi/light-current-kpi.data";
-import { exportKpiEvaluationToExcel } from "@/lib/kpi/kpi-excel-export";
+import {
+  exportKpiEvaluationToExcel,
+  exportAllKpiEvaluationsToExcel,
+  AllEvaluationsExportRow,
+} from "@/lib/kpi/kpi-excel-export";
 import { listEmployeesAdmin } from "@/backend/functions/employees.functions";
 import { getMyTeam } from "@/lib/team.functions";
+import {
+  getKpiEvaluation,
+  listKpiEvaluations,
+  saveKpiEvaluation,
+  updateKpiEvaluationStatus,
+  deleteKpiEvaluation,
+  listPendingApprovals,
+  reviewQuarterlyEvaluation,
+  listKpiCriteria,
+  saveKpiCriterion,
+  archiveKpiCriterion,
+  listKpiTemplates,
+  saveKpiTemplate,
+  publishKpiTemplate,
+  getQuarterlyEvaluation,
+  saveQuarterlyEvaluation,
+  KpiEvaluationRecord,
+} from "@/backend/functions/kpi-evaluations.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,6 +89,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -64,6 +100,7 @@ interface KpiEvaluationViewProps {
 export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
   const { t, isAr, dir } = useI18n();
   const session = useSession();
+  const queryClient = useQueryClient();
 
   // Selected Evaluation Meta
   const currentYear = new Date().getFullYear();
@@ -73,6 +110,14 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
     session?.name || (role === "manager" ? (isAr ? "المدير المباشر" : "Direct Manager") : (isAr ? "مهندس الإشراف / HR" : "Engineering Lead / HR"))
   );
   const [status, setStatus] = useState<"Draft" | "Submitted" | "Reviewed" | "Approved">("Draft");
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [mainTab, setMainTab] = useState<string>("all-employees");
+  const [empSearch, setEmpSearch] = useState<string>("");
+  const [deptFilter, setDeptFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [tierFilter, setTierFilter] = useState<string>("all");
+  const [pageSize, setPageSize] = useState<number>(15);
+  const [currentPage, setCurrentPage] = useState<number>(1);
   const [activeQuarterFilter, setActiveQuarterFilter] = useState<"all" | "q1" | "q2" | "q3" | "q4">("all");
   const [notes, setNotes] = useState({
     strengths: "",
@@ -83,6 +128,120 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
   // State for all 17 KPIs
   const [kpiState, setKpiState] = useState<Record<number, KpiRowState>>(createEmptyEvaluationState);
   const [infoModalKpi, setInfoModalKpi] = useState<KpiMetricDefinition | null>(null);
+  const [isEvaluationsListOpen, setIsEvaluationsListOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+
+  // ── DYNAMIC ENGINEERING DISCIPLINES WITH LOCALSTORAGE PERSISTENCE ──
+  const [disciplines, setDisciplines] = useState<KpiDiscipline[]>(() => {
+    try {
+      const saved = localStorage.getItem("kpi_evaluation_disciplines");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      /* fallback */
+    }
+    return DEFAULT_KPI_DISCIPLINES;
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("kpi_evaluation_disciplines", JSON.stringify(disciplines));
+    } catch {
+      /* ignore */
+    }
+  }, [disciplines]);
+
+  const [isDisciplineModalOpen, setIsDisciplineModalOpen] = useState(false);
+  const [editingDiscipline, setEditingDiscipline] = useState<KpiDiscipline | null>(null);
+  const [disciplineForm, setDisciplineForm] = useState<{
+    name: string;
+    name_ar: string;
+    weight: number;
+  }>({ name: "", name_ar: "", weight: 10 });
+
+  const totalDisciplinesWeight = useMemo(() => {
+    return disciplines.reduce((acc, d) => acc + d.weight, 0);
+  }, [disciplines]);
+
+  const handleOpenAddDiscipline = () => {
+    setEditingDiscipline(null);
+    setDisciplineForm({ name: "", name_ar: "", weight: 10 });
+    setIsDisciplineModalOpen(true);
+  };
+
+  const handleOpenEditDiscipline = (disc: KpiDiscipline) => {
+    setEditingDiscipline(disc);
+    setDisciplineForm({
+      name: disc.name,
+      name_ar: disc.name_ar,
+      weight: Number((disc.weight * 100).toFixed(1)),
+    });
+    setIsDisciplineModalOpen(true);
+  };
+
+  const handleSaveDiscipline = () => {
+    const name = disciplineForm.name.trim();
+    const name_ar = disciplineForm.name_ar.trim();
+    const weightNum = Number(disciplineForm.weight);
+
+    if (!name) {
+      toast.error(isAr ? "يرجى إدخال اسم التخصص باللغة الإنجليزية" : "Please enter discipline name in English");
+      return;
+    }
+    if (!name_ar) {
+      toast.error(isAr ? "يرجى إدخال اسم التخصص باللغة العربية" : "Please enter discipline name in Arabic");
+      return;
+    }
+    if (isNaN(weightNum) || weightNum <= 0 || weightNum > 100) {
+      toast.error(isAr ? "يرجى إدخال نسبة وزن صحيحة بين 1% و 100%" : "Please enter a valid weight percentage between 1% and 100%");
+      return;
+    }
+
+    const weight = weightNum / 100;
+
+    if (editingDiscipline) {
+      setDisciplines((prev) =>
+        prev.map((d) =>
+          d.id === editingDiscipline.id
+            ? { ...d, name, name_ar, weight }
+            : d
+        )
+      );
+      toast.success(isAr ? `تم تحديث تخصص "${name_ar}" بنجاح` : `Discipline "${name}" updated successfully`);
+    } else {
+      const newId = `disc_${Date.now()}`;
+      const newDisc: KpiDiscipline = {
+        id: newId,
+        name,
+        name_ar,
+        weight,
+        isDefault: false,
+      };
+      setDisciplines((prev) => [...prev, newDisc]);
+      toast.success(isAr ? `تمت إضافة تخصص "${name_ar}" بنجاح` : `Added new discipline "${name}"`);
+    }
+
+    setIsDisciplineModalOpen(false);
+  };
+
+  const handleDeleteDiscipline = (id: string) => {
+    const target = disciplines.find((d) => d.id === id);
+    if (!target) return;
+    setDisciplines((prev) => prev.filter((d) => d.id !== id));
+    toast.success(isAr ? `تم حذف تخصص "${target.name_ar}"` : `Deleted discipline "${target.name}"`);
+  };
+
+  const handleResetDisciplines = () => {
+    setDisciplines(DEFAULT_KPI_DISCIPLINES);
+    try {
+      localStorage.removeItem("kpi_evaluation_disciplines");
+    } catch {
+      /* ignore */
+    }
+    toast.success(isAr ? "تمت استعادة التخصصات الهندسية الافتراضية" : "Reset to default engineering disciplines");
+  };
 
   // Load Employees based on Role (Manager sees team, Admin/HR sees all)
   const isManagerMode = role === "manager";
@@ -118,9 +277,9 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
       position: e.position || (isAr ? "مهندس تيار خفيف" : "Light Current Engineer"),
       department: e.department || (isAr ? "الإدارة الهندسية" : "Engineering"),
     }));
-  }, [isManagerMode, adminEmpsData, managerTeamData, isAr]);
+  }, [isManagerMode, managerTeamData, adminEmpsData, isAr]);
 
-  // Set default selected employee
+  // Set default selected employee once employees load
   useEffect(() => {
     if (employeesList.length > 0 && !selectedEmpId) {
       setSelectedEmpId(employeesList[0].id);
@@ -130,75 +289,468 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
   const currentEmployee = useMemo(() => {
     return employeesList.find((e) => e.id === selectedEmpId) || {
       id: selectedEmpId,
-      name: isAr ? "م. أحمد حسن" : "Eng. Ahmed Hassan",
-      code: "ENG-042",
-      position: isAr ? "مهندس موقع تيار خفيف" : "Junior ELV / Light Current Site Engineer",
+      name: isAr ? "غير محدد" : "Unspecified",
+      code: "",
+      position: isAr ? "مهندس موقع تيار خفيف" : "Junior ELV Site Engineer",
       department: isAr ? "الإدارة الهندسية" : "Engineering",
     };
   }, [employeesList, selectedEmpId, isAr]);
 
-  // LocalStorage Draft persistence
-  const storageKey = `kpi_eval_${currentEmployee.id}_${selectedYear}`;
+  // Server Functions for Backend Sync
+  const getEvalFn = useServerFn(getKpiEvaluation);
+  const listEvalsFn = useServerFn(listKpiEvaluations);
+  const saveEvalFn = useServerFn(saveKpiEvaluation);
+  const updateStatusFn = useServerFn(updateKpiEvaluationStatus);
+  const deleteEvalFn = useServerFn(deleteKpiEvaluation);
+  const listPendingFn = useServerFn(listPendingApprovals);
+  const reviewQuarterlyFn = useServerFn(reviewQuarterlyEvaluation);
+  const listCriteriaFn = useServerFn(listKpiCriteria);
+  const saveCriterionFn = useServerFn(saveKpiCriterion);
+  const archiveCriterionFn = useServerFn(archiveKpiCriterion);
+  const listTemplatesFn = useServerFn(listKpiTemplates);
+  const saveTemplateFn = useServerFn(saveKpiTemplate);
+  const publishTemplateFn = useServerFn(publishKpiTemplate);
+  const getQuarterlyFn = useServerFn(getQuarterlyEvaluation);
+  const saveQuarterlyFn = useServerFn(saveQuarterlyEvaluation);
 
-  useEffect(() => {
-    if (!currentEmployee.id) return;
-    try {
-      const saved = localStorage.getItem(storageKey);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.state) setKpiState(parsed.state);
-        if (parsed.status) setStatus(parsed.status);
-        if (parsed.evaluatorName) setEvaluatorName(parsed.evaluatorName);
-        if (parsed.notes) setNotes(parsed.notes);
-      } else {
-        setKpiState(createEmptyEvaluationState());
-      }
-    } catch {
-      /* ignore */
-    }
-  }, [storageKey, currentEmployee.id]);
+  // ── PENDING APPROVALS QUERY ──
+  const { data: pendingApprovals = [], refetch: refetchPending, isLoading: isLoadingPending } = useQuery({
+    queryKey: ["kpi-pending-approvals", selectedYear],
+    queryFn: () => listPendingFn({ data: { year: selectedYear } }),
+    enabled: !!session,
+  });
 
-  const saveDraft = () => {
+  // ── CRITERIA CATALOG QUERY ──
+  const { data: kpiCriteria = [], refetch: refetchCriteria, isLoading: isLoadingCriteria } = useQuery({
+    queryKey: ["kpi-criteria-catalog"],
+    queryFn: () => listCriteriaFn({ data: { layer: "all" } }),
+    enabled: !!session,
+  });
+
+  // ── TEMPLATES QUERY ──
+  const { data: kpiTemplates = [], refetch: refetchTemplates, isLoading: isLoadingTemplates } = useQuery({
+    queryKey: ["kpi-templates"],
+    queryFn: () => listTemplatesFn({ data: {} }),
+    enabled: !!session,
+  });
+
+  // State for Pending Approvals & Reviews
+  const [pendingQuarterFilter, setPendingQuarterFilter] = useState<"all" | "q1" | "q2" | "q3" | "q4">("all");
+  const [returnModalOpen, setReturnModalOpen] = useState(false);
+  const [selectedPendingItem, setSelectedPendingItem] = useState<any | null>(null);
+  const [returnReason, setReturnReason] = useState("");
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+
+  // State for Criteria Management
+  const [criteriaLayerFilter, setCriteriaLayerFilter] = useState<"all" | "common" | "role" | "custom">("all");
+  const [criterionModalOpen, setCriterionModalOpen] = useState(false);
+  const [editingCriterion, setEditingCriterion] = useState<any | null>(null);
+  const [criterionForm, setCriterionForm] = useState({
+    code: "",
+    name_en: "",
+    name_ar: "",
+    category_en: "Installation & Technical Execution",
+    category_ar: "التنفيذ الفني والتركيبات",
+    layer: "role" as "common" | "role" | "custom",
+    weight: 5,
+    target: 95,
+    unit: "%",
+    how_measured_en: "",
+    how_measured_ar: "",
+  });
+
+  // Quarterly Evaluation Scorecard State
+  const [activeQuarterStep, setActiveQuarterStep] = useState<"q1" | "q2" | "q3" | "q4">("q1");
+  const [activeScorecardQuarter, setActiveScorecardQuarter] = useState<"q1" | "q2" | "q3" | "q4">("q1");
+  const [quarterStatuses, setQuarterStatuses] = useState<Record<string, { status: string; returnReason?: string; score?: number }>>({
+    q1: { status: "draft" },
+    q2: { status: "draft" },
+    q3: { status: "draft" },
+    q4: { status: "draft" },
+  });
+
+  // ── QUARTERLY APPROVAL & RETURN HANDLERS ──
+  const handleApprovePending = async (item: any) => {
     try {
-      localStorage.setItem(
-        storageKey,
-        JSON.stringify({
-          state: kpiState,
-          status,
-          evaluatorName,
-          notes,
-          savedAt: new Date().toISOString(),
-        })
-      );
-      toast.success(isAr ? "تم حفظ مسودة التقييم محلياً بنجاح" : "Evaluation draft saved locally");
-    } catch {
-      toast.error(isAr ? "تعذر حفظ المسودة" : "Failed to save draft");
+      setIsSubmittingReview(true);
+      await reviewQuarterlyFn({
+        data: {
+          evaluation_id: item.id,
+          action: "approve",
+        },
+      });
+      toast.success(isAr ? "تم اعتماد التقييم بنجاح" : "Quarterly evaluation approved");
+      refetchPending();
+      queryClient.invalidateQueries({ queryKey: ["kpi-evaluations"] });
+    } catch (err: any) {
+      toast.error(err.message || (isAr ? "فشل اعتماد التقييم" : "Failed to approve evaluation"));
+    } finally {
+      setIsSubmittingReview(false);
     }
   };
 
-  const loadSampleData = () => {
-    const mock = createMockEvaluationState();
-    setKpiState(mock);
-    setNotes({
-      strengths: isAr
-        ? "تفانٍ كبير في العمل الميداني خلال اختبارات تكامل أنظمة التيار الخفيف بموقع المشروع. إتقان ممتاز لشبكات كاميرات المراقبة وبروتوكولات التحكم في الدخول."
-        : "High dedication during ELV integration tests on Site A. Strong command of CCTV networking and Access Control protocols.",
-      growthAreas: isAr
-        ? "تعزيز سرعة التنسيق وإغلاق مشكلات مسارات الكابلات المشتركة مع فرق الأعمال الكهربائية."
-        : "Further enhance cross-discipline closeout velocity with Electrical teams on cable tray coordination.",
-      recommendations: isAr
-        ? "يوصى بحضور دورات متقدمة في Honeywell EBI وشهادة شبكات Cisco CCNA خلال الربع القادم."
-        : "Recommend advanced Honeywell/Cisco CCNA training for Q3.",
+  const handleOpenReturnModal = (item: any) => {
+    setSelectedPendingItem(item);
+    setReturnReason("");
+    setReturnModalOpen(true);
+  };
+
+  const handleConfirmReturn = async () => {
+    if (!selectedPendingItem) return;
+    if (returnReason.trim().length < 5) {
+      toast.error(isAr ? "يرجى كتابة سبب الإعادة بالتفصيل (5 أحرف على الأقل)" : "Please specify a detailed return reason (at least 5 characters)");
+      return;
+    }
+    try {
+      setIsSubmittingReview(true);
+      await reviewQuarterlyFn({
+        data: {
+          evaluation_id: selectedPendingItem.id,
+          action: "return",
+          return_reason: returnReason.trim(),
+        },
+      });
+      toast.warning(isAr ? "تمت إعادة التقييم إلى المُقيّم للمراجعة" : "Evaluation returned for revision");
+      setReturnModalOpen(false);
+      setSelectedPendingItem(null);
+      setReturnReason("");
+      refetchPending();
+      queryClient.invalidateQueries({ queryKey: ["kpi-evaluations"] });
+    } catch (err: any) {
+      toast.error(err.message || (isAr ? "فشل إعادة التقييم" : "Failed to return evaluation"));
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
+
+  // ── CRITERIA CATALOG HANDLERS ──
+  const handleOpenAddCriterion = () => {
+    setEditingCriterion(null);
+    setCriterionForm({
+      code: `KPI-${Math.floor(100 + Math.random() * 900)}`,
+      name_en: "",
+      name_ar: "",
+      category_en: "Installation & Technical Execution",
+      category_ar: "التنفيذ الفني والتركيبات",
+      layer: "role",
+      weight: 5,
+      target: 95,
+      unit: "%",
+      how_measured_en: "",
+      how_measured_ar: "",
     });
-    toast.success(isAr ? "تم تحميل بيانات تجريبية واقعية لمعاينة الحسابات" : "Loaded realistic evaluation data for preview");
+    setCriterionModalOpen(true);
   };
 
-  const resetForm = () => {
-    setKpiState(createEmptyEvaluationState());
-    setNotes({ strengths: "", growthAreas: "", recommendations: "" });
-    setStatus("Draft");
-    toast.info(isAr ? "تمت إعادة تعيين بطاقة التقييم إلى نموذج فارغ" : "Scorecard reset to blank state");
+  const handleOpenEditCriterion = (crit: any) => {
+    setEditingCriterion(crit);
+    setCriterionForm({
+      code: crit.code || "",
+      name_en: crit.name_en || "",
+      name_ar: crit.name_ar || "",
+      category_en: crit.category_en || "",
+      category_ar: crit.category_ar || "",
+      layer: crit.layer || "role",
+      weight: crit.default_weight ? Math.round(crit.default_weight * 100) : 5,
+      target: crit.default_target ? Math.round(crit.default_target * 100) : 90,
+      unit: crit.unit || "%",
+      how_measured_en: crit.how_measured_en || "",
+      how_measured_ar: crit.how_measured_ar || "",
+    });
+    setCriterionModalOpen(true);
   };
+
+  const handleSaveCriterion = async () => {
+    if (!criterionForm.name_en.trim() || !criterionForm.name_ar.trim()) {
+      toast.error(isAr ? "يرجى إدخال اسم المعيار باللغتين" : "Please provide criterion name in both languages");
+      return;
+    }
+    try {
+      await saveCriterionFn({
+        data: {
+          id: editingCriterion?.id,
+          code: criterionForm.code,
+          name_en: criterionForm.name_en.trim(),
+          name_ar: criterionForm.name_ar.trim(),
+          category_en: criterionForm.category_en,
+          category_ar: criterionForm.category_ar,
+          layer: criterionForm.layer,
+          default_weight: criterionForm.weight / 100,
+          default_target: criterionForm.target / 100,
+          unit: criterionForm.unit,
+          how_measured_en: criterionForm.how_measured_en.trim() || undefined,
+          how_measured_ar: criterionForm.how_measured_ar.trim() || undefined,
+        },
+      });
+      toast.success(isAr ? "تم حفظ المعيار بنجاح" : "Criterion saved successfully");
+      setCriterionModalOpen(false);
+      refetchCriteria();
+    } catch (err: any) {
+      toast.error(err.message || (isAr ? "فشل حفظ المعيار" : "Failed to save criterion"));
+    }
+  };
+
+  const handleArchiveCriterion = async (id: string) => {
+    try {
+      await archiveCriterionFn({ data: { id } });
+      toast.info(isAr ? "تمت أرشفة المعيار" : "Criterion archived");
+      refetchCriteria();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to archive criterion");
+    }
+  };
+
+  // Load Existing Evaluation from Supabase
+  const { data: serverRecord, isLoading: isFetchingEval } = useQuery({
+    queryKey: ["kpi-evaluation", selectedEmpId, selectedYear],
+    queryFn: () => getEvalFn({ data: { employeeId: selectedEmpId, year: selectedYear } }),
+    enabled: !!selectedEmpId && !!selectedYear,
+  });
+
+  // Load all evaluations for this year to populate the evaluations list
+  const { data: annualEvaluations = [] } = useQuery({
+    queryKey: ["kpi-evaluations-list", selectedYear],
+    queryFn: () => listEvalsFn({ data: { year: selectedYear } }),
+    enabled: !!selectedYear,
+  });
+
+  // Sync state when serverRecord arrives
+  useEffect(() => {
+    if (serverRecord && serverRecord.scores) {
+      const incomingState = createEmptyEvaluationState();
+      Object.entries(serverRecord.scores).forEach(([key, val]: [string, any]) => {
+        const id = Number(key);
+        if (incomingState[id]) {
+          incomingState[id] = {
+            id,
+            targetAnnual: val.targetAnnual ?? incomingState[id].targetAnnual,
+            q1: val.q1 ?? incomingState[id].q1,
+            q2: val.q2 ?? incomingState[id].q2,
+            q3: val.q3 ?? incomingState[id].q3,
+            q4: val.q4 ?? incomingState[id].q4,
+            annualScore: val.annualScore ?? null,
+          };
+        }
+      });
+      setKpiState(incomingState);
+      if (serverRecord.notes) {
+        setNotes({
+          strengths: serverRecord.notes.strengths || "",
+          growthAreas: serverRecord.notes.growthAreas || "",
+          recommendations: serverRecord.notes.recommendations || "",
+        });
+      }
+      if (serverRecord.evaluator_name) {
+        setEvaluatorName(serverRecord.evaluator_name);
+      }
+      if (serverRecord.status) {
+        const capStatus = (serverRecord.status.charAt(0).toUpperCase() + serverRecord.status.slice(1)) as any;
+        setStatus(capStatus);
+      }
+      setHasUnsavedChanges(false);
+    } else if (serverRecord === null && selectedEmpId) {
+      setKpiState(createEmptyEvaluationState());
+      setNotes({ strengths: "", growthAreas: "", recommendations: "" });
+      setStatus("Draft");
+      setHasUnsavedChanges(false);
+    }
+  }, [serverRecord, selectedEmpId]);
+
+  // Calculate live summary totals
+  const summaryTotals = useMemo(() => {
+    let q1Sum = 0;
+    let q2Sum = 0;
+    let q3Sum = 0;
+    let q4Sum = 0;
+    let annualWeightedSum = 0;
+
+    let q1Count = 0;
+    let q2Count = 0;
+    let q3Count = 0;
+    let q4Count = 0;
+
+    for (const kpi of LIGHT_CURRENT_ENGINEER_KPIS) {
+      const row = kpiState[kpi.id];
+      if (!row) continue;
+
+      if (typeof row.q1.score === "number") {
+        q1Sum += row.q1.score;
+        q1Count++;
+      }
+      if (typeof row.q2.score === "number") {
+        q2Sum += row.q2.score;
+        q2Count++;
+      }
+      if (typeof row.q3.score === "number") {
+        q3Sum += row.q3.score;
+        q3Count++;
+      }
+      if (typeof row.q4.score === "number") {
+        q4Sum += row.q4.score;
+        q4Count++;
+      }
+      if (typeof row.annualScore === "number") {
+        annualWeightedSum += row.annualScore;
+      }
+    }
+
+    return {
+      q1Sum,
+      q2Sum,
+      q3Sum,
+      q4Sum,
+      annualWeightedSum,
+      hasData: q1Count > 0 || q2Count > 0 || q3Count > 0 || q4Count > 0,
+    };
+  }, [kpiState]);
+
+  const ratingTier = useMemo(() => {
+    return getRatingFromScore(summaryTotals.annualWeightedSum, summaryTotals.hasData);
+  }, [summaryTotals.annualWeightedSum, summaryTotals.hasData]);
+
+  // Dynamic Category stats using disciplines
+  const categoryStats = useMemo(() => {
+    return disciplines.map((disc) => {
+      const catKpis = LIGHT_CURRENT_ENGINEER_KPIS.filter(
+        (k) =>
+          k.category === disc.name ||
+          k.category_ar === disc.name_ar ||
+          (disc.isDefault && (k.category === disc.name || KPI_CATEGORIES_AR[k.category] === disc.name_ar))
+      );
+      const totalWeight = disc.weight;
+
+      let earnedScore = 0;
+      catKpis.forEach((k) => {
+        const row = kpiState[k.id];
+        if (row && row.annualScore !== null) {
+          earnedScore += row.annualScore;
+        }
+      });
+
+      const percentage = totalWeight > 0 ? Math.round((earnedScore / totalWeight) * 100) : 0;
+
+      return {
+        id: disc.id,
+        name: disc.name,
+        name_ar: disc.name_ar,
+        totalWeight,
+        earnedScore,
+        percentage,
+        kpiCount: catKpis.length,
+        isDefault: disc.isDefault ?? false,
+        discipline: disc,
+      };
+    });
+  }, [disciplines, kpiState]);
+
+  // Mutations
+  const saveMutation = useMutation({
+    mutationFn: async (payload: {
+      targetStatus: "draft" | "submitted" | "reviewed" | "approved";
+    }) => {
+      const serializedScores: Record<string, any> = {};
+      Object.entries(kpiState).forEach(([key, val]) => {
+        serializedScores[String(key)] = {
+          targetAnnual: val.targetAnnual,
+          q1: val.q1,
+          q2: val.q2,
+          q3: val.q3,
+          q4: val.q4,
+          annualScore: val.annualScore,
+        };
+      });
+
+      const summaryPayload = {
+        totalScore: Number(((summaryTotals.annualWeightedSum || 0) * 100).toFixed(2)),
+        rating: (ratingTier.tier as any) || "N/A",
+        categories: categoryStats.map((c) => ({
+          category: c.name,
+          weight: c.totalWeight,
+          maxScore: c.totalWeight * 100,
+          actualScore: c.earnedScore * 100,
+          percentage: c.percentage,
+        })),
+      };
+
+      return saveEvalFn({
+        data: {
+          employeeId: selectedEmpId,
+          year: selectedYear,
+          templateType: "light_current_engineer",
+          evaluatorName,
+          status: payload.targetStatus,
+          scores: serializedScores,
+          summary: summaryPayload,
+          notes,
+        },
+      });
+    },
+    onSuccess: (res, vars) => {
+      setHasUnsavedChanges(false);
+      const capStatus = (vars.targetStatus.charAt(0).toUpperCase() + vars.targetStatus.slice(1)) as any;
+      setStatus(capStatus);
+      queryClient.invalidateQueries({ queryKey: ["kpi-evaluation", selectedEmpId, selectedYear] });
+      queryClient.invalidateQueries({ queryKey: ["kpi-evaluations-list", selectedYear] });
+
+      if (vars.targetStatus === "draft") {
+        toast.success(isAr ? "تم حفظ مسودة التقييم في السحابة بنجاح" : "Evaluation draft saved to cloud");
+      } else if (vars.targetStatus === "submitted") {
+        toast.success(isAr ? "تم إرسال التقييم بنجاح لمراجعة الموارد البشرية" : "Evaluation submitted for HR review");
+      } else if (vars.targetStatus === "approved") {
+        toast.success(isAr ? "تم اعتماد التقييم السنوي رسمياً" : "Annual KPI evaluation officially approved");
+      } else {
+        toast.success(isAr ? "تم تحديث حالة التقييم بنجاح" : "Evaluation status updated successfully");
+      }
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || (isAr ? "تعذر حفظ التقييم على الخادم" : "Failed to save evaluation to server"));
+    },
+  });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async (targetStatus: "draft" | "submitted" | "reviewed" | "approved") => {
+      if (!serverRecord?.id) throw new Error("Please save the evaluation first");
+      return updateStatusFn({
+        data: {
+          id: serverRecord.id,
+          status: targetStatus,
+        },
+      });
+    },
+    onSuccess: (_, targetStatus) => {
+      const capStatus = (targetStatus.charAt(0).toUpperCase() + targetStatus.slice(1)) as any;
+      setStatus(capStatus);
+      queryClient.invalidateQueries({ queryKey: ["kpi-evaluation", selectedEmpId, selectedYear] });
+      queryClient.invalidateQueries({ queryKey: ["kpi-evaluations-list", selectedYear] });
+      toast.success(
+        targetStatus === "approved"
+          ? isAr ? "تم اعتماد التقييم السنوي رسمياً" : "Evaluation finalized and approved"
+          : isAr ? "تم تحديث حالة التقييم" : "Evaluation status updated"
+      );
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || (isAr ? "تعذر تحديث الحالة" : "Failed to update status"));
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      if (!serverRecord?.id) return;
+      return deleteEvalFn({ data: { id: serverRecord.id } });
+    },
+    onSuccess: () => {
+      setDeleteConfirmOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["kpi-evaluation", selectedEmpId, selectedYear] });
+      queryClient.invalidateQueries({ queryKey: ["kpi-evaluations-list", selectedYear] });
+      resetForm();
+      toast.success(isAr ? "تم حذف التقييم بنجاح" : "Evaluation deleted successfully");
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || (isAr ? "تعذر حذف التقييم" : "Failed to delete evaluation"));
+    },
+  });
+
+  const isLocked = status === "Approved";
 
   // Cell Value Updates
   const handleActualChange = (
@@ -206,6 +758,11 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
     quarter: "q1" | "q2" | "q3" | "q4",
     rawValue: string
   ) => {
+    if (isLocked) {
+      toast.warning(isAr ? "التقييم معتمد ومقفل رسمياً ولا يمكن تعديله" : "This evaluation is approved and locked");
+      return;
+    }
+
     const kpi = LIGHT_CURRENT_ENGINEER_KPIS.find((k) => k.id === kpiId);
     if (!kpi) return;
 
@@ -226,6 +783,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
     setKpiState((prev) => {
       const row = prev[kpiId] || {
         id: kpiId,
+        targetAnnual: kpi.target,
         q1: { actual: null, achievement: null, score: null },
         q2: { actual: null, achievement: null, score: null },
         q3: { actual: null, achievement: null, score: null },
@@ -249,109 +807,241 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
 
       return { ...prev, [kpiId]: updatedRow };
     });
+
+    setHasUnsavedChanges(true);
   };
 
-  // Calculations across the entire sheet
-  const summaryTotals = useMemo(() => {
-    let q1Score = 0;
-    let q2Score = 0;
-    let q3Score = 0;
-    let q4Score = 0;
-    let annualWeightedSum = 0;
-
-    let q1Count = 0;
-    let q2Count = 0;
-    let q3Count = 0;
-    let q4Count = 0;
-
-    for (const kpi of LIGHT_CURRENT_ENGINEER_KPIS) {
-      const row = kpiState[kpi.id];
-      if (row) {
-        if (typeof row.q1.score === "number") {
-          q1Score += row.q1.score;
-          q1Count++;
-        }
-        if (typeof row.q2.score === "number") {
-          q2Score += row.q2.score;
-          q2Count++;
-        }
-        if (typeof row.q3.score === "number") {
-          q3Score += row.q3.score;
-          q3Count++;
-        }
-        if (typeof row.q4.score === "number") {
-          q4Score += row.q4.score;
-          q4Count++;
-        }
-        if (typeof row.annualScore === "number") {
-          annualWeightedSum += row.annualScore;
-        }
-      }
+  const loadSampleData = () => {
+    if (isLocked) {
+      toast.warning(isAr ? "التقييم معتمد ومقفل رسمياً" : "This evaluation is locked");
+      return;
     }
-
-    return {
-      q1Score,
-      q2Score,
-      q3Score,
-      q4Score,
-      annualWeightedSum,
-      hasData: q1Count > 0 || q2Count > 0 || q3Count > 0 || q4Count > 0,
-    };
-  }, [kpiState]);
-
-  const ratingTier = useMemo(() => {
-    return getRatingFromScore(summaryTotals.hasData ? summaryTotals.annualWeightedSum : null);
-  }, [summaryTotals]);
-
-  // Category Summaries for Progress Bars
-  const categoryStats = useMemo(() => {
-    return KPI_CATEGORIES.map((catName) => {
-      const catKpis = LIGHT_CURRENT_ENGINEER_KPIS.filter((k) => k.category === catName);
-      const totalWeight = catKpis.reduce((acc, k) => acc + k.weight, 0);
-      let earnedScore = 0;
-
-      for (const k of catKpis) {
-        const row = kpiState[k.id];
-        if (row && typeof row.annualScore === "number") {
-          earnedScore += row.annualScore;
-        }
-      }
-
-      const percentage = totalWeight > 0 ? (earnedScore / totalWeight) * 100 : 0;
-      return {
-        name: catName,
-        name_ar: KPI_CATEGORIES_AR[catName] || catName,
-        totalWeight,
-        earnedScore,
-        percentage: Math.min(100, Math.round(percentage)),
-      };
+    const mock = createMockEvaluationState();
+    setKpiState(mock);
+    setNotes({
+      strengths: isAr
+        ? "تفانٍ كبير في العمل الميداني خلال اختبارات تكامل أنظمة التيار الخفيف بموقع المشروع. إتقان ممتاز لشبكات كاميرات المراقبة وبروتوكولات التحكم في الدخول."
+        : "High dedication during ELV integration tests on Site A. Strong command of CCTV networking and Access Control protocols.",
+      growthAreas: isAr
+        ? "تعزيز سرعة التنسيق وإغلاق مشكلات مسارات الكابلات المشتركة مع فرق الأعمال الكهربائية."
+        : "Further enhance cross-discipline closeout velocity with Electrical teams on cable tray coordination.",
+      recommendations: isAr
+        ? "يوصى بحضور دورات متقدمة في Honeywell EBI وشهادة شبكات Cisco CCNA خلال الربع القادم."
+        : "Recommend advanced Honeywell/Cisco CCNA training for Q3.",
     });
-  }, [kpiState]);
+    setHasUnsavedChanges(true);
+    toast.success(isAr ? "تم تحميل بيانات تجريبية واقعية لمعاينة الحسابات" : "Loaded realistic evaluation data for preview");
+  };
 
-  const fmtPercent = (val: number | null | undefined, decimals = 1) => {
-    if (val === null || val === undefined || isNaN(val)) return "—";
+  const resetForm = () => {
+    if (isLocked) {
+      toast.warning(isAr ? "التقييم معتمد ومقفل رسمياً" : "This evaluation is locked");
+      return;
+    }
+    setKpiState(createEmptyEvaluationState());
+    setNotes({ strengths: "", growthAreas: "", recommendations: "" });
+    setStatus("Draft");
+    setHasUnsavedChanges(true);
+    toast.info(isAr ? "تمت إعادة تعيين بطاقة التقييم إلى نموذج فارغ" : "Scorecard reset to blank state");
+  };
+
+  // Format Helpers
+  const fmtPercent = (val: number | null | undefined, decimals = 1): string => {
+    if (val === null || val === undefined) return "—";
     return `${(val * 100).toFixed(decimals)}%`;
   };
 
-  const handleExport = () => {
-    exportKpiEvaluationToExcel(kpiState, {
+  const fmtRawScore = (val: number | null | undefined): string => {
+    if (val === null || val === undefined) return "—";
+    return `${(val * 100).toFixed(2)}%`;
+  };
+
+  // ── ALL EMPLOYEES DIRECTORY WITH EVALUATIONS ──
+  const employeesWithEvaluations = useMemo(() => {
+    return employeesList.map((emp, index) => {
+      const ev = annualEvaluations.find(
+        (e: any) => e.employee_id === emp.id && Number(e.evaluation_year) === Number(selectedYear)
+      );
+
+      let q1Sum: number | null = null;
+      let q2Sum: number | null = null;
+      let q3Sum: number | null = null;
+      let q4Sum: number | null = null;
+      let hasQ1 = false, hasQ2 = false, hasQ3 = false, hasQ4 = false;
+
+      if (ev?.scores) {
+        let q1 = 0, q2 = 0, q3 = 0, q4 = 0;
+        Object.values(ev.scores).forEach((item: any) => {
+          if (item?.q1?.score != null) { q1 += item.q1.score; hasQ1 = true; }
+          if (item?.q2?.score != null) { q2 += item.q2.score; hasQ2 = true; }
+          if (item?.q3?.score != null) { q3 += item.q3.score; hasQ3 = true; }
+          if (item?.q4?.score != null) { q4 += item.q4.score; hasQ4 = true; }
+        });
+        if (hasQ1) q1Sum = q1;
+        if (hasQ2) q2Sum = q2;
+        if (hasQ3) q3Sum = q3;
+        if (hasQ4) q4Sum = q4;
+      }
+
+      const totalScore = ev?.summary?.totalScore != null
+        ? Number(ev.summary.totalScore)
+        : (hasQ1 || hasQ2 || hasQ3 || hasQ4
+          ? Math.round(((q1Sum || 0) + (q2Sum || 0) + (q3Sum || 0) + (q4Sum || 0)) * 1000) / 10
+          : null);
+
+      const ratingObj = totalScore != null ? getRatingFromScore(totalScore / 100, true) : null;
+      const rating = ev?.summary?.rating || (ratingObj ? (isAr ? ratingObj.tier_ar : ratingObj.tier) : null);
+      const evStatus = ev ? (ev.status || "draft").toLowerCase() : "not_started";
+      const evaluator = ev?.evaluator_name || null;
+      const approvedAt = ev?.approved_at || null;
+
+      return {
+        index: index + 1,
+        id: emp.id,
+        name: emp.name,
+        code: emp.code,
+        department: emp.department,
+        position: emp.position,
+        evaluationId: ev?.id || null,
+        hasEvaluation: !!ev,
+        q1Score: q1Sum,
+        q2Score: q2Sum,
+        q3Score: q3Sum,
+        q4Score: q4Sum,
+        totalScore,
+        rating,
+        ratingTier: ratingObj,
+        status: evStatus,
+        evaluator,
+        approvedAt,
+      };
+    });
+  }, [employeesList, annualEvaluations, selectedYear, isAr]);
+
+  const uniqueDepartments = useMemo(() => {
+    const set = new Set<string>();
+    employeesList.forEach((e) => {
+      if (e.department) set.add(e.department);
+    });
+    return Array.from(set);
+  }, [employeesList]);
+
+  const filteredEmployeesWithEvaluations = useMemo(() => {
+    return employeesWithEvaluations.filter((item) => {
+      if (empSearch.trim()) {
+        const query = empSearch.toLowerCase().trim();
+        const matchName = item.name.toLowerCase().includes(query);
+        const matchCode = item.code.toLowerCase().includes(query);
+        const matchPos = item.position.toLowerCase().includes(query);
+        const matchDept = item.department.toLowerCase().includes(query);
+        if (!matchName && !matchCode && !matchPos && !matchDept) return false;
+      }
+
+      if (deptFilter !== "all" && item.department !== deptFilter) {
+        return false;
+      }
+
+      if (statusFilter !== "all") {
+        if (statusFilter === "not_started" && item.status !== "not_started") return false;
+        if (statusFilter !== "not_started" && item.status !== statusFilter) return false;
+      }
+
+      if (tierFilter !== "all" && item.ratingTier?.tier !== tierFilter) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [employeesWithEvaluations, empSearch, deptFilter, statusFilter, tierFilter]);
+
+  // Reset pagination when search or filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [empSearch, deptFilter, statusFilter, tierFilter, selectedYear, pageSize]);
+
+  const totalEmployeesCount = filteredEmployeesWithEvaluations.length;
+  const totalPages = Math.max(1, Math.ceil(totalEmployeesCount / pageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+
+  const paginatedEmployees = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filteredEmployeesWithEvaluations.slice(start, start + pageSize);
+  }, [filteredEmployeesWithEvaluations, safeCurrentPage, pageSize]);
+
+  const startIndex = totalEmployeesCount > 0 ? (safeCurrentPage - 1) * pageSize + 1 : 0;
+  const endIndex = Math.min(safeCurrentPage * pageSize, totalEmployeesCount);
+
+  const evaluationsStats = useMemo(() => {
+    const total = employeesWithEvaluations.length;
+    const evaluated = employeesWithEvaluations.filter((e) => e.hasEvaluation).length;
+    const approved = employeesWithEvaluations.filter((e) => e.status === "approved").length;
+    const submitted = employeesWithEvaluations.filter((e) => e.status === "submitted").length;
+    const draft = employeesWithEvaluations.filter((e) => e.status === "draft").length;
+
+    const evaluatedScores = employeesWithEvaluations
+      .map((e) => e.totalScore)
+      .filter((s) => s !== null && s > 0);
+
+    const avgScore = evaluatedScores.length > 0
+      ? (evaluatedScores.reduce((a, b) => a + b, 0) / evaluatedScores.length).toFixed(1)
+      : null;
+
+    return { total, evaluated, approved, submitted, draft, avgScore };
+  }, [employeesWithEvaluations]);
+
+  const handleExportAllToExcel = () => {
+    const exportRows: AllEvaluationsExportRow[] = filteredEmployeesWithEvaluations.map((item, idx) => ({
+      index: idx + 1,
+      code: item.code || "—",
+      name: item.name,
+      department: item.department || "—",
+      position: item.position || "—",
+      q1: item.q1Score !== null ? (item.q1Score * 100).toFixed(1) + "%" : "—",
+      q2: item.q2Score !== null ? (item.q2Score * 100).toFixed(1) + "%" : "—",
+      q3: item.q3Score !== null ? (item.q3Score * 100).toFixed(1) + "%" : "—",
+      q4: item.q4Score !== null ? (item.q4Score * 100).toFixed(1) + "%" : "—",
+      total: item.totalScore !== null ? item.totalScore.toFixed(1) + "%" : "—",
+      rating: item.rating || "—",
+      status:
+        item.status === "approved"
+          ? isAr ? "معتمد" : "Approved"
+          : item.status === "submitted"
+          ? isAr ? "مقدم للمراجعة" : "Submitted"
+          : item.status === "reviewed"
+          ? isAr ? "تمت المراجعة" : "Reviewed"
+          : item.status === "draft"
+          ? isAr ? "مسودة" : "Draft"
+          : isAr ? "لم يبدأ" : "Not Started",
+      evaluator: item.evaluator || "—",
+      approvedDate: item.approvedAt ? new Date(item.approvedAt).toLocaleDateString() : "—",
+    }));
+
+    exportAllKpiEvaluationsToExcel({
+      year: selectedYear,
+      rows: exportRows,
+      companyName: isAr ? "شركة إنترجريتد تكنيكس" : "Integrated Technics",
+    });
+    toast.success(isAr ? "تم تصدير سجل تقييمات الموظفين بنجاح" : "Exported all KPI evaluations to Excel");
+  };
+
+  const handleExportCurrent = async () => {
+    await exportKpiEvaluationToExcel({
       employeeName: currentEmployee.name,
+      employeeCode: currentEmployee.code || "",
       evaluatorName,
+      evaluationState: kpiState,
+      notes,
       year: selectedYear,
       department: currentEmployee.department,
       jobTitle: currentEmployee.position,
     });
-    toast.success(isAr ? "تم تصدير ملف الإكسيل بنجاح" : "Excel scorecard exported");
-  };
-
-  const handlePrint = () => {
-    window.print();
+    toast.success(isAr ? "تم تصدير ملف الإكسيل بنجاح" : "KPI scorecard exported to Excel");
   };
 
   return (
-    <div dir={dir} className="space-y-6 pb-12 print:p-0 print:space-y-4">
-      {/* Top Banner / Breadcrumb */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-border bg-card p-6 shadow-sm print:hidden">
+    <div dir={dir} className="space-y-6 pb-16 print:p-0 print:space-y-4">
+      {/* Top Header Card */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-border/80 pb-5">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-semibold text-brand">
@@ -366,8 +1056,9 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                 : isAr ? "بوابة الإدارة العامة" : "Admin Portal"}
             </Badge>
           </div>
-          <h1 className="font-display text-2xl font-bold tracking-tight text-foreground">
+          <h1 className="font-display text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
             {isAr ? "التقييم السنوي لمؤشرات الأداء" : "Annual KPI Evaluation"}
+            {isFetchingEval && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
           </h1>
           <p className="text-sm text-muted-foreground">
             {isAr
@@ -378,35 +1069,130 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
 
         {/* Global Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={loadSampleData} className="rounded-xl gap-1.5 cursor-pointer">
+          {/* Evaluations Directory Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsEvaluationsListOpen(true)}
+            className="rounded-xl gap-1.5 cursor-pointer relative"
+          >
+            <Layers className="h-4 w-4 text-brand" />
+            <span>{isAr ? "سجل التقييمات" : "Evaluations Directory"}</span>
+            {annualEvaluations.length > 0 && (
+              <Badge variant="secondary" className="px-1.5 py-0 text-[10px] font-mono">
+                {annualEvaluations.length}
+              </Badge>
+            )}
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadSampleData}
+            disabled={isLocked}
+            className="rounded-xl gap-1.5 cursor-pointer"
+          >
             <Sparkles className="h-4 w-4 text-brand" /> {isAr ? "بيانات تجريبية" : "Sample Data"}
           </Button>
-          <Button variant="outline" size="sm" onClick={saveDraft} className="rounded-xl gap-1.5 cursor-pointer">
-            <Save className="h-4 w-4" /> {isAr ? "حفظ المسودة" : "Save Draft"}
+
+          {/* Save Draft Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => saveMutation.mutate({ targetStatus: "draft" })}
+            disabled={saveMutation.isPending || isLocked}
+            className="rounded-xl gap-1.5 cursor-pointer"
+          >
+            {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            <span>{isAr ? "حفظ كمسودة" : "Save Draft"}</span>
           </Button>
-          <Button variant="outline" size="sm" onClick={handleExport} className="rounded-xl gap-1.5 cursor-pointer">
-            <FileSpreadsheet className="h-4 w-4 text-emerald-600" /> {isAr ? "تصدير إكسيل" : "Export Excel"}
+
+          {/* Submit / Approve Workflow Buttons */}
+          {status === "Draft" && (
+            <Button
+              size="sm"
+              onClick={() => saveMutation.mutate({ targetStatus: "submitted" })}
+              disabled={saveMutation.isPending}
+              className="rounded-xl gap-1.5 bg-blue-600 hover:bg-blue-700 text-white cursor-pointer shadow-xs"
+            >
+              <Send className="h-4 w-4" />
+              <span>{isAr ? "إرسال للمراجعة" : "Submit Review"}</span>
+            </Button>
+          )}
+
+          {status === "Submitted" && (role === "admin" || role === "hr") && (
+            <Button
+              size="sm"
+              onClick={() => updateStatusMutation.mutate("approved")}
+              disabled={updateStatusMutation.isPending}
+              className="rounded-xl gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-xs"
+            >
+              <ShieldCheck className="h-4 w-4" />
+              <span>{isAr ? "اعتماد رسمي نهائي" : "Final Approve"}</span>
+            </Button>
+          )}
+
+          {status === "Approved" && (role === "admin" || role === "hr") && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => updateStatusMutation.mutate("draft")}
+              disabled={updateStatusMutation.isPending}
+              className="rounded-xl gap-1.5 text-amber-600 border-amber-500/30 hover:bg-amber-50 dark:hover:bg-amber-950/20 cursor-pointer"
+            >
+              <Clock className="h-4 w-4" />
+              <span>{isAr ? "إلغاء القفل للتعديل" : "Unlock for Edit"}</span>
+            </Button>
+          )}
+
+          {/* Excel Export Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportCurrent}
+            className="rounded-xl gap-1.5 cursor-pointer"
+          >
+            <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+            <span className="hidden sm:inline">{isAr ? "تصدير إكسيل" : "Export Excel"}</span>
           </Button>
-          <Button variant="outline" size="sm" onClick={handlePrint} className="rounded-xl gap-1.5 cursor-pointer">
-            <Printer className="h-4 w-4" /> {isAr ? "طباعة / PDF" : "Print / PDF"}
+
+          {/* Print Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.print()}
+            className="rounded-xl gap-1.5 cursor-pointer print:hidden"
+          >
+            <Printer className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="sm" onClick={resetForm} className="rounded-xl text-muted-foreground cursor-pointer" title={isAr ? "إعادة تعيين" : "Reset"}>
-            <RefreshCw className="h-4 w-4" />
-          </Button>
+
+          {/* Delete Button (admin only) */}
+          {role === "admin" && serverRecord?.id && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setDeleteConfirmOpen(true)}
+              className="rounded-xl text-destructive hover:bg-destructive/10 cursor-pointer"
+              title={isAr ? "حذف التقييم" : "Delete Evaluation"}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Target Employee & Evaluation Context Card */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 rounded-3xl border border-border bg-card p-5 shadow-sm">
+      {/* Employee Selector & Metadata Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 rounded-3xl border border-border bg-card/60 shadow-xs print:border-none print:p-0">
         {/* Employee Selector */}
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 md:col-span-2">
           <Label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-            <User className="h-3.5 w-3.5" /> {isAr ? "الموظف المُراد تقييمه" : "Employee Being Evaluated"}
+            <User className="h-3.5 w-3.5" /> {isAr ? "الموظف المُراد تقييمه" : "Target Employee"}
           </Label>
           <select
             value={selectedEmpId}
             onChange={(e) => setSelectedEmpId(e.target.value)}
-            className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-brand"
+            disabled={isLocked}
+            className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-brand disabled:opacity-75 cursor-pointer"
           >
             {employeesList.map((emp) => (
               <option key={emp.id} value={emp.id}>
@@ -424,7 +1210,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
           <select
             value={selectedYear}
             onChange={(e) => setSelectedYear(Number(e.target.value))}
-            className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-brand"
+            className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-brand cursor-pointer"
           >
             <option value={currentYear}>{currentYear} {isAr ? "(السنة الحالية)" : "(Current Year)"}</option>
             <option value={currentYear - 1}>{currentYear - 1}</option>
@@ -435,147 +1221,43 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
         {/* Evaluator Name */}
         <div className="space-y-1.5">
           <Label className="text-xs font-semibold text-muted-foreground">
-            {isAr ? "المُقيِّم (المهندس المسؤول / المدير / HR)" : "Evaluator (Lead / Manager / HR)"}
+            {isAr ? "المُقيِّم" : "Evaluator Name"}
           </Label>
           <Input
             value={evaluatorName}
             onChange={(e) => setEvaluatorName(e.target.value)}
-            placeholder={isAr ? "اسم المُقيِّم بالكامل" : "Evaluator Full Name"}
-            className="rounded-xl h-9.5 text-sm"
+            disabled={isLocked}
+            className="rounded-xl text-sm"
           />
-        </div>
-
-        {/* Status */}
-        <div className="space-y-1.5">
-          <Label className="text-xs font-semibold text-muted-foreground">{isAr ? "حالة التقييم" : "Evaluation Status"}</Label>
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value as any)}
-            className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-brand"
-          >
-            <option value="Draft">{isAr ? "مسودة (قيد الإعداد)" : "Draft (In Progress)"}</option>
-            <option value="Submitted">{isAr ? "تم الإرسال للمراجعة" : "Submitted for Review"}</option>
-            <option value="Reviewed">{isAr ? "تمت المراجعة من الإدارة" : "Reviewed by Management"}</option>
-            <option value="Approved">{isAr ? "معتمد ونهائي" : "Approved & Finalized"}</option>
-          </select>
-        </div>
-      </div>
-
-      {/* KPI Overview Summary Dashboard (Top Tier) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Main Final Score Card (4 Cols) */}
-        <div className="lg:col-span-4 rounded-3xl border border-border bg-gradient-to-br from-card to-muted/30 p-6 shadow-sm flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                {isAr ? "النتيجة السنوية الإجمالية" : "Overall Annual Score"}
-              </span>
-              <Badge className={`border text-xs px-2.5 py-0.5 font-semibold ${ratingTier.badgeClass}`}>
-                {isAr ? ratingTier.tier_ar : ratingTier.tier}
-              </Badge>
-            </div>
-            <div className="mt-4 flex items-baseline gap-3">
-              <span className="font-display text-5xl font-extrabold tracking-tight tabular-nums text-foreground">
-                {summaryTotals.hasData ? fmtPercent(summaryTotals.annualWeightedSum, 1) : "0.0%"}
-              </span>
-              <span className="text-sm font-semibold text-muted-foreground">
-                {isAr ? "/ 100% المستهدف" : "/ 100% Target"}
-              </span>
-            </div>
-            <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
-              {isAr ? ratingTier.description_ar : ratingTier.description}
-            </p>
-          </div>
-
-          <div className="mt-6 pt-4 border-t border-border/60">
-            <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
-              <span>{isAr ? "نسبة الإنجاز والتقدم الكلي" : "Overall Achievement Progress"}</span>
-              <span className="font-mono font-medium text-foreground">
-                {fmtPercent(summaryTotals.annualWeightedSum, 1)}
-              </span>
-            </div>
-            <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
-              <div
-                className="h-full rounded-full transition-all duration-500 ease-out"
-                style={{
-                  width: `${Math.min(100, (summaryTotals.annualWeightedSum || 0) * 100)}%`,
-                  backgroundColor: ratingTier.color,
-                }}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Quarterly Progression Cards (4 Cols) */}
-        <div className="lg:col-span-4 grid grid-cols-2 gap-3">
-          {[
-            { q: "Q1", q_ar: "الربع 1", score: summaryTotals.q1Score, label: isAr ? "يناير – مارس" : "Jan – Mar" },
-            { q: "Q2", q_ar: "الربع 2", score: summaryTotals.q2Score, label: isAr ? "أبريل – يونيو" : "Apr – Jun" },
-            { q: "Q3", q_ar: "الربع 3", score: summaryTotals.q3Score, label: isAr ? "يوليو – سبتمبر" : "Jul – Sep" },
-            { q: "Q4", q_ar: "الربع 4", score: summaryTotals.q4Score, label: isAr ? "أكتوبر – ديسمبر" : "Oct – Dec" },
-          ].map((item) => (
-            <div
-              key={item.q}
-              className={`rounded-2xl border p-4 flex flex-col justify-between transition-all ${
-                activeQuarterFilter === item.q.toLowerCase()
-                  ? "border-brand bg-brand/5 ring-1 ring-brand"
-                  : "border-border bg-card hover:bg-muted/30"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-sm text-foreground">{isAr ? item.q_ar : item.q}</span>
-                <span className="text-[10px] text-muted-foreground">{item.label}</span>
-              </div>
-              <div className="mt-3">
-                <div className="text-xl font-bold font-mono tabular-nums text-foreground">
-                  {fmtPercent(item.score, 1)}
-                </div>
-                <span className="text-[11px] text-muted-foreground">
-                  {isAr ? "الدرجة الموزونة للربع" : "Quarter Weighted"}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Rating Scale Reference Guide (4 Cols) */}
-        <div className="lg:col-span-4 rounded-3xl border border-border bg-card p-5 shadow-sm space-y-3">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            {isAr ? "مستويات التقييم الرسمية" : "Official Performance Tiers"}
-          </h3>
-          <div className="space-y-1.5 text-xs">
-            {RATING_SCALE.map((tier) => (
-              <div
-                key={tier.tier}
-                className={`flex items-center justify-between p-2 rounded-xl border transition-all ${
-                  ratingTier.tier === tier.tier
-                    ? "border-brand bg-brand/10 font-semibold"
-                    : "border-transparent hover:bg-muted/40"
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <span
-                    className="h-2.5 w-2.5 rounded-full shrink-0"
-                    style={{ backgroundColor: tier.color }}
-                  />
-                  <span>{isAr ? tier.tier_ar : tier.tier}</span>
-                </div>
-                <span className="font-mono text-muted-foreground text-[11px]">
-                  {fmtPercent(tier.minScore, 0)}
-                  {tier.minScore < 0.9 ? ` – ${fmtPercent(tier.minScore + 0.14, 0)}` : "+"}
-                </span>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
 
       {/* Main Tabs Navigation */}
-      <Tabs defaultValue="scorecard" className="space-y-4">
+      <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
-          <TabsList className="rounded-2xl p-1 bg-muted/60">
+          <TabsList className="h-auto w-full sm:w-auto rounded-2xl p-1 bg-muted/60 flex overflow-x-auto no-scrollbar gap-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <TabsTrigger value="all-employees" className="rounded-xl px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer">
+              <Users className="h-4 w-4" />
+              <span>{isAr ? "سجل جميع الموظفين" : "All Employees Evaluations"}</span>
+              <Badge variant="secondary" className="px-1.5 py-0 text-[10px] font-mono">
+                {employeesWithEvaluations.length}
+              </Badge>
+            </TabsTrigger>
             <TabsTrigger value="scorecard" className="rounded-xl px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer">
               <FileSpreadsheet className="h-4 w-4" /> {isAr ? "بطاقة التقييم" : "Evaluation Scorecard"}
+            </TabsTrigger>
+            <TabsTrigger value="pending-approvals" className="rounded-xl px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer">
+              <Clock className="h-4 w-4 text-amber-500" />
+              <span>{isAr ? "المعاملات المعلقة" : "Pending Approvals"}</span>
+              {pendingApprovals.length > 0 && (
+                <Badge className="bg-amber-500 text-white px-1.5 py-0 text-[10px] font-mono">
+                  {pendingApprovals.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="templates-criteria" className="rounded-xl px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer">
+              <Award className="h-4 w-4 text-brand" />
+              <span>{isAr ? "القوالب والمعايير" : "Templates & Criteria"}</span>
             </TabsTrigger>
             <TabsTrigger value="guidelines" className="rounded-xl px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer">
               <HelpCircle className="h-4 w-4" /> {isAr ? "دليل مؤشرات الأداء والتعريفات" : "KPI Overview & Definitions"}
@@ -589,29 +1271,445 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
           </TabsList>
 
           {/* Quick Quarter Filter on Scorecard view */}
-          <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-xl border border-border text-xs print:hidden">
-            <span className="px-2 font-medium text-muted-foreground flex items-center gap-1">
-              <Filter className="h-3 w-3" /> {isAr ? "عرض:" : "View:"}
-            </span>
-            {(["all", "q1", "q2", "q3", "q4"] as const).map((q) => (
-              <button
-                key={q}
-                type="button"
-                onClick={() => setActiveQuarterFilter(q)}
-                className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all cursor-pointer ${
-                  activeQuarterFilter === q
-                    ? "bg-card text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {q === "all" ? (isAr ? "الكل" : "ALL") : q.toUpperCase()}
-              </button>
-            ))}
-          </div>
+          {mainTab === "scorecard" && (
+            <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-xl border border-border text-xs print:hidden">
+              <span className="px-2 font-medium text-muted-foreground flex items-center gap-1">
+                <Filter className="h-3 w-3" /> {isAr ? "عرض:" : "View:"}
+              </span>
+              {(["all", "q1", "q2", "q3", "q4"] as const).map((q) => (
+                <button
+                  key={q}
+                  type="button"
+                  onClick={() => setActiveQuarterFilter(q)}
+                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all cursor-pointer ${
+                    activeQuarterFilter === q
+                      ? "bg-card text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {q === "all" ? (isAr ? "الكل" : "ALL") : q.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
+
+        {/* ── TAB 0: ALL EMPLOYEES EVALUATIONS DIRECTORY ── */}
+        <TabsContent value="all-employees" className="space-y-4">
+          {/* Top Metric Overview Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="rounded-2xl border border-border bg-card p-4 shadow-2xs space-y-1">
+              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+                {isAr ? "إجمالي الكادر" : "Total Employees"}
+              </span>
+              <div className="flex items-baseline justify-between">
+                <span className="font-display text-2xl font-bold text-foreground">
+                  {evaluationsStats.total}
+                </span>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-card p-4 shadow-2xs space-y-1">
+              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+                {isAr ? "تم تقييمهم" : "Evaluated"}
+              </span>
+              <div className="flex items-baseline justify-between">
+                <span className="font-display text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  {evaluationsStats.evaluated}
+                </span>
+                <span className="text-xs text-muted-foreground font-mono">
+                  {evaluationsStats.total > 0
+                    ? Math.round((evaluationsStats.evaluated / evaluationsStats.total) * 100)
+                    : 0}%
+                </span>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-card p-4 shadow-2xs space-y-1">
+              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+                {isAr ? "معتمد رسمياً" : "Officially Approved"}
+              </span>
+              <div className="flex items-baseline justify-between">
+                <span className="font-display text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                  {evaluationsStats.approved}
+                </span>
+                <ShieldCheck className="h-4 w-4 text-emerald-600" />
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-card p-4 shadow-2xs space-y-1">
+              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+                {isAr ? "متوسط الدرجة السنوية" : "Average Score"}
+              </span>
+              <div className="flex items-baseline justify-between">
+                <span className="font-display text-2xl font-bold text-brand">
+                  {evaluationsStats.avgScore ? `${evaluationsStats.avgScore}%` : "—"}
+                </span>
+                <Award className="h-4 w-4 text-brand" />
+              </div>
+            </div>
+          </div>
+
+          {/* Filters & Export Bar */}
+          <div className="rounded-3xl border border-border bg-card p-4 shadow-2xs space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="font-display text-sm font-bold text-foreground">
+                  {isAr ? `سجل تقييمات الموظفين لعام ${selectedYear}` : `Staff KPI Scorecards Directory — Year ${selectedYear}`}
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  {isAr
+                    ? "قائمة شاملة بنتائج الأرباع الأربعة والدرجة الإجمالية وحالة التقييم لكل موظف."
+                    : "Complete quarterly scorecards, annual percentages, and sign-off statuses."}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(Number(e.target.value))}
+                  className="rounded-xl border border-input bg-background px-3 py-1.5 text-xs font-semibold shadow-2xs focus:ring-1 focus:ring-brand cursor-pointer"
+                >
+                  <option value={currentYear}>{currentYear}</option>
+                  <option value={currentYear - 1}>{currentYear - 1}</option>
+                  <option value={currentYear + 1}>{currentYear + 1}</option>
+                </select>
+
+                <Button
+                  size="sm"
+                  onClick={handleExportAllToExcel}
+                  className="rounded-xl gap-1.5 text-xs h-8 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold cursor-pointer shadow-xs"
+                >
+                  <FileSpreadsheet className="h-3.5 w-3.5" />
+                  <span>{isAr ? "تصدير إكسيل" : "Export Excel"}</span>
+                </Button>
+              </div>
+            </div>
+
+            {/* Filter controls row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1 border-t border-border/60">
+              {/* Search input */}
+              <div className="relative">
+                <Search className="absolute start-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  value={empSearch}
+                  onChange={(e) => setEmpSearch(e.target.value)}
+                  placeholder={isAr ? "بحث بالاسم، الكود، الوظيفة..." : "Search name, code, position..."}
+                  className="rounded-xl ps-9 text-xs h-9"
+                />
+              </div>
+
+              {/* Department filter */}
+              <select
+                value={deptFilter}
+                onChange={(e) => setDeptFilter(e.target.value)}
+                className="rounded-xl border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-2xs focus:ring-1 focus:ring-brand h-9 cursor-pointer"
+              >
+                <option value="all">{isAr ? "جميع الأقسام" : "All Departments"}</option>
+                {uniqueDepartments.map((dept) => (
+                  <option key={dept} value={dept}>{dept}</option>
+                ))}
+              </select>
+
+              {/* Status filter */}
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="rounded-xl border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-2xs focus:ring-1 focus:ring-brand h-9 cursor-pointer"
+              >
+                <option value="all">{isAr ? "جميع الحالات" : "All Statuses"}</option>
+                <option value="approved">{isAr ? "معتمد" : "Approved"}</option>
+                <option value="submitted">{isAr ? "مقدم للمراجعة" : "Submitted"}</option>
+                <option value="draft">{isAr ? "مسودة" : "Draft"}</option>
+                <option value="not_started">{isAr ? "لم يبدأ بعد" : "Not Started"}</option>
+              </select>
+
+              {/* Tier filter */}
+              <select
+                value={tierFilter}
+                onChange={(e) => setTierFilter(e.target.value)}
+                className="rounded-xl border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-2xs focus:ring-1 focus:ring-brand h-9 cursor-pointer"
+              >
+                <option value="all">{isAr ? "جميع مستويات التقييم" : "All Rating Tiers"}</option>
+                {RATING_SCALE.map((r) => (
+                  <option key={r.tier} value={r.tier}>
+                    {isAr ? r.tier_ar : r.tier} (≥ {(r.minScore * 100).toFixed(0)}%)
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Evaluations Master Table */}
+          <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-xs">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs border-collapse">
+                <thead className="bg-muted/60 text-muted-foreground uppercase text-[10px] tracking-wider font-semibold border-b border-border">
+                  <tr>
+                    <th className="px-3 py-3 text-start w-8">#</th>
+                    <th className="px-3 py-3 text-start min-w-[200px]">{isAr ? "الموظف" : "Employee"}</th>
+                    <th className="px-3 py-3 text-start">{isAr ? "القسم والمسمى" : "Position & Dept"}</th>
+                    <th className="px-3 py-3 text-center bg-blue-500/5 text-blue-700 dark:text-blue-300 w-16">Q1</th>
+                    <th className="px-3 py-3 text-center bg-emerald-500/5 text-emerald-700 dark:text-emerald-300 w-16">Q2</th>
+                    <th className="px-3 py-3 text-center bg-amber-500/5 text-amber-700 dark:text-amber-300 w-16">Q3</th>
+                    <th className="px-3 py-3 text-center bg-purple-500/5 text-purple-700 dark:text-purple-300 w-16">Q4</th>
+                    <th className="px-3 py-3 text-center bg-muted/80 font-bold w-20">{isAr ? "المجموع" : "Total"}</th>
+                    <th className="px-3 py-3 text-center w-28">{isAr ? "التقدير" : "Rating"}</th>
+                    <th className="px-3 py-3 text-center w-24">{isAr ? "الحالة" : "Status"}</th>
+                    <th className="px-3 py-3 text-start">{isAr ? "المُقيّم" : "Evaluator"}</th>
+                    <th className="px-3 py-3 text-center w-20">{isAr ? "الإجراء" : "Action"}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {paginatedEmployees.length === 0 ? (
+                    <tr>
+                      <td colSpan={12} className="px-4 py-8 text-center text-muted-foreground text-xs">
+                        {isAr ? "لا يوجد موظفون مطابقون لشروط البحث المحددة" : "No employees match current filter criteria"}
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedEmployees.map((item) => {
+                      const isCurrent = item.id === selectedEmpId;
+                      return (
+                        <tr
+                          key={item.id}
+                          className={`hover:bg-muted/30 transition-colors ${
+                            isCurrent ? "bg-brand/5 font-medium" : ""
+                          }`}
+                        >
+                          <td className="px-3 py-3 text-muted-foreground font-mono">{item.index}</td>
+                          <td className="px-3 py-3">
+                            <div className="flex items-center gap-2">
+                              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand/10 text-brand font-bold text-[11px] shrink-0">
+                                {item.name.slice(0, 2).toUpperCase()}
+                              </div>
+                              <div className="min-w-0">
+                                <span className="font-semibold text-foreground truncate block">{item.name}</span>
+                                {item.code && (
+                                  <span className="font-mono text-[10px] text-muted-foreground">{item.code}</span>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-3 py-3 text-muted-foreground">
+                            <span className="text-foreground font-medium block">{item.position}</span>
+                            <span className="text-[10px]">{item.department}</span>
+                          </td>
+                          <td className="px-3 py-3 text-center font-mono bg-blue-500/5 text-blue-700 dark:text-blue-300">
+                            {item.q1Score !== null ? `${(item.q1Score * 100).toFixed(1)}%` : "—"}
+                          </td>
+                          <td className="px-3 py-3 text-center font-mono bg-emerald-500/5 text-emerald-700 dark:text-emerald-300">
+                            {item.q2Score !== null ? `${(item.q2Score * 100).toFixed(1)}%` : "—"}
+                          </td>
+                          <td className="px-3 py-3 text-center font-mono bg-amber-500/5 text-amber-700 dark:text-amber-300">
+                            {item.q3Score !== null ? `${(item.q3Score * 100).toFixed(1)}%` : "—"}
+                          </td>
+                          <td className="px-3 py-3 text-center font-mono bg-purple-500/5 text-purple-700 dark:text-purple-300">
+                            {item.q4Score !== null ? `${(item.q4Score * 100).toFixed(1)}%` : "—"}
+                          </td>
+                          <td className="px-3 py-3 text-center font-mono font-bold bg-muted/60 text-foreground">
+                            {item.totalScore !== null ? `${item.totalScore.toFixed(1)}%` : "—"}
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            {item.ratingTier ? (
+                              <Badge className={`text-[10px] px-2 py-0.5 font-semibold ${item.ratingTier.badgeClass}`}>
+                                {isAr ? item.ratingTier.tier_ar : item.ratingTier.tier}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground font-mono">—</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            {item.status === "approved" ? (
+                              <Badge className="bg-emerald-600 text-white text-[10px] px-2 py-0.5 font-semibold">
+                                {isAr ? "معتمد" : "Approved"}
+                              </Badge>
+                            ) : item.status === "submitted" ? (
+                              <Badge className="bg-blue-600 text-white text-[10px] px-2 py-0.5 font-semibold">
+                                {isAr ? "مقدم" : "Submitted"}
+                              </Badge>
+                            ) : item.status === "draft" ? (
+                              <Badge variant="outline" className="text-[10px] px-2 py-0.5 text-muted-foreground">
+                                {isAr ? "مسودة" : "Draft"}
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-[10px] px-2 py-0.5 text-muted-foreground">
+                                {isAr ? "لم يبدأ" : "Not Started"}
+                              </Badge>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 text-muted-foreground text-[11px]">
+                            {item.evaluator || "—"}
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            <Button
+                              variant={item.hasEvaluation ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => {
+                                setSelectedEmpId(item.id);
+                                setMainTab("scorecard");
+                              }}
+                              className={`h-7 text-xs rounded-xl px-2.5 cursor-pointer ${
+                                item.hasEvaluation ? "bg-brand text-brand-foreground hover:bg-brand/90" : ""
+                              }`}
+                            >
+                              {item.hasEvaluation ? (isAr ? "فتح" : "Open") : (isAr ? "تقييم" : "Evaluate")}
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Controls Footer */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border/70 p-3.5 bg-muted/20 text-xs">
+              {/* Range summary */}
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <span>
+                  {isAr
+                    ? `عرض ${startIndex} إلى ${endIndex} من أصل ${totalEmployeesCount} موظف`
+                    : `Showing ${startIndex} to ${endIndex} of ${totalEmployeesCount} employees`}
+                </span>
+                <span className="text-border">|</span>
+                <div className="flex items-center gap-1.5">
+                  <span>{isAr ? "لكل صفحة:" : "Rows:"}</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => setPageSize(Number(e.target.value))}
+                    className="rounded-xl border border-input bg-background px-2.5 py-1 text-xs font-semibold shadow-2xs focus:ring-1 focus:ring-brand cursor-pointer"
+                  >
+                    {[15, 25, 50, 100].map((sz) => (
+                      <option key={sz} value={sz}>{sz}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Navigation pagination pills */}
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={safeCurrentPage <= 1}
+                  className="h-8 rounded-xl px-2.5 text-xs cursor-pointer"
+                >
+                  {isAr ? "السابق" : "Previous"}
+                </Button>
+
+                <div className="flex items-center gap-1 font-mono font-semibold">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, idx) => {
+                    let pageNum = idx + 1;
+                    if (totalPages > 5 && safeCurrentPage > 3) {
+                      pageNum = safeCurrentPage - 2 + idx;
+                      if (pageNum > totalPages) pageNum = totalPages - (4 - idx);
+                    }
+                    const isCur = pageNum === safeCurrentPage;
+                    return (
+                      <button
+                        key={pageNum}
+                        type="button"
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`h-8 w-8 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          isCur
+                            ? "bg-brand text-white shadow-xs"
+                            : "border border-border bg-card text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                  {totalPages > 5 && safeCurrentPage < totalPages - 2 && (
+                    <span className="px-1 text-muted-foreground">...</span>
+                  )}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safeCurrentPage >= totalPages}
+                  className="h-8 rounded-xl px-2.5 text-xs cursor-pointer"
+                >
+                  {isAr ? "التالي" : "Next"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </TabsContent>
 
         {/* ── TAB 1: FULL SCORECARD TABLE ── */}
         <TabsContent value="scorecard" className="space-y-4">
+          {/* Quarter Workflow Switcher & Status Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-card border border-border shadow-2xs">
+            <div className="flex items-center gap-1.5 overflow-x-auto">
+              <span className="text-xs font-bold text-muted-foreground me-1 flex items-center gap-1">
+                <Clock className="h-3.5 w-3.5 text-brand" />
+                {isAr ? "الربع الجاري:" : "Active Quarter:"}
+              </span>
+              {(["q1", "q2", "q3", "q4"] as const).map((q) => {
+                const qLabel = q.toUpperCase();
+                const qPeriod = q === "q1" ? (isAr ? "يناير - مارس" : "Jan - Mar")
+                  : q === "q2" ? (isAr ? "أبريل - يونيو" : "Apr - Jun")
+                  : q === "q3" ? (isAr ? "يوليو - سبتمبر" : "Jul - Sep")
+                  : (isAr ? "أكتوبر - ديسمبر" : "Oct - Dec");
+                const isSelected = activeScorecardQuarter === q;
+                return (
+                  <button
+                    key={q}
+                    type="button"
+                    onClick={() => {
+                      setActiveScorecardQuarter(q);
+                      setActiveQuarterFilter(q);
+                    }}
+                    className={`rounded-xl px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                      isSelected
+                        ? "bg-brand text-white shadow-xs"
+                        : "border border-border bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground"
+                    }`}
+                  >
+                    <span>{qLabel}</span>
+                    <span className="text-[10px] font-normal opacity-80">({qPeriod})</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="font-mono text-xs">
+                {isAr ? "إجمالي الوزن:" : "Total Weight:"} 100.0%
+              </Badge>
+              {activeQuarterFilter !== "all" && (
+                <button
+                  type="button"
+                  onClick={() => setActiveQuarterFilter("all")}
+                  className="text-xs text-brand font-semibold hover:underline cursor-pointer"
+                >
+                  {isAr ? "عرض جميع الأرباع" : "Show All Quarters"}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Returned for Revision Notice Banner */}
+          {status.toLowerCase() === "returned" && (
+            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 shrink-0 text-amber-600 mt-0.5" />
+              <div className="space-y-1">
+                <h4 className="font-bold text-xs">
+                  {isAr ? "تمت إعادة هذا التقييم للمراجعة والتعديل" : "Evaluation Returned for Revision"}
+                </h4>
+                <p className="text-xs leading-relaxed">
+                  {notes.growthAreas || (isAr ? "يرجى مراجعة وتدقيق نسب الإنجاز الميدانية وإعادة تقديمها للاعتماد." : "Please re-verify the site achievement values and re-submit for formal approval.")}
+                </p>
+              </div>
+            </div>
+          )}
           <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-xs border-collapse">
@@ -684,48 +1782,60 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                       </>
                     )}
 
-                    {/* Annual Score Column */}
-                    <th className="px-3 py-3 text-center bg-muted/80 text-foreground w-24">
-                      {isAr ? "الدرجة السنوية" : "Annual Score"}
+                    {/* Annual Summary Columns */}
+                    <th className="px-3 py-3 text-center bg-muted/80 font-bold w-20">
+                      {isAr ? "المتوسط السنوي" : "Annual Avg"}
                     </th>
+                    <th className="px-2 py-3 text-center w-8 print:hidden"></th>
                   </tr>
                 </thead>
 
                 <tbody className="divide-y divide-border">
-                  {KPI_CATEGORIES.map((category) => {
+                  {disciplines.map((disc) => {
                     const categoryKpis = LIGHT_CURRENT_ENGINEER_KPIS.filter(
-                      (k) => k.category === category
+                      (k) =>
+                        k.category === disc.name ||
+                        k.category_ar === disc.name_ar ||
+                        (disc.isDefault && (k.category === disc.name || KPI_CATEGORIES_AR[k.category] === disc.name_ar))
                     );
-                    const catWeight = categoryKpis.reduce((acc, k) => acc + k.weight, 0);
+                    const categoryWeight = disc.weight;
 
                     return (
-                      <React.Fragment key={category}>
-                        {/* Category Header Bar */}
+                      <React.Fragment key={disc.id || disc.name}>
+                        {/* Category Header Row */}
                         <tr className="bg-muted/40 font-semibold text-foreground">
-                          <td
-                            colSpan={
-                              4 +
-                              (activeQuarterFilter === "all"
-                                ? 12
-                                : 3) +
-                              1
-                            }
-                            className="px-4 py-2.5 text-start font-display text-[11px] tracking-wide"
-                          >
-                            <span className="text-brand font-bold me-2">●</span>
-                            {isAr ? KPI_CATEGORIES_AR[category] || category : category}
-                            <span className="ms-2 text-[10px] font-normal text-muted-foreground">
-                              {isAr
-                                ? `(وزن الفئة: ${(catWeight * 100).toFixed(1)}%)`
-                                : `(Category Weight: ${(catWeight * 100).toFixed(1)}%)`}
-                            </span>
+                          <td colSpan={19} className="px-4 py-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs uppercase tracking-wider text-brand font-bold">
+                                  {isAr ? disc.name_ar : disc.name}
+                                </span>
+                                {!disc.isDefault && (
+                                  <Badge variant="outline" className="text-[9px] px-1.5 py-0 font-medium text-brand border-brand/30">
+                                    {isAr ? "مخصص" : "Custom"}
+                                  </Badge>
+                                )}
+                              </div>
+                              <span className="font-mono text-[11px] text-muted-foreground">
+                                {isAr ? `وزن الفئة: ${fmtPercent(categoryWeight, 1)}` : `Category Weight: ${fmtPercent(categoryWeight, 1)}`}
+                              </span>
+                            </div>
                           </td>
                         </tr>
 
-                        {/* KPI Metric Rows */}
+                        {categoryKpis.length === 0 && (
+                          <tr>
+                            <td colSpan={19} className="px-4 py-3 text-center text-xs text-muted-foreground italic bg-muted/10">
+                              {isAr ? "لا توجد معايير مقترنة بهذا التخصص حالياً" : "No KPIs currently assigned to this discipline"}
+                            </td>
+                          </tr>
+                        )}
+
+                        {/* KPI Rows */}
                         {categoryKpis.map((kpi) => {
                           const row = kpiState[kpi.id] || {
                             id: kpi.id,
+                            targetAnnual: kpi.target,
                             q1: { actual: null, achievement: null, score: null },
                             q2: { actual: null, achievement: null, score: null },
                             q3: { actual: null, achievement: null, score: null },
@@ -734,161 +1844,132 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                           };
 
                           return (
-                            <tr
-                              key={kpi.id}
-                              className="hover:bg-muted/20 transition-colors group"
-                            >
-                              <td className="px-3 py-2 text-muted-foreground font-mono text-center">
+                            <tr key={kpi.id} className="hover:bg-muted/20 transition-colors">
+                              <td className="px-3 py-2 text-muted-foreground font-mono font-medium text-center">
                                 {kpi.id}
                               </td>
-
-                              {/* KPI Name with Info Popover */}
-                              <td className="px-3 py-2 font-medium text-foreground">
-                                <div className="flex items-center gap-1.5">
-                                  <span>{isAr ? kpi.name_ar : kpi.name}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => setInfoModalKpi(kpi)}
-                                    title={isAr ? "عرض تعريف المؤشر وطريقة قياسه" : "View metric definition & measurement method"}
-                                    className="text-muted-foreground hover:text-brand transition-colors p-0.5 cursor-pointer"
-                                  >
-                                    <Info className="h-3.5 w-3.5" />
-                                  </button>
+                              <td className="px-3 py-2">
+                                <div className="space-y-0.5">
+                                  <div className="font-semibold text-foreground leading-snug">
+                                    {isAr ? kpi.name_ar : kpi.name}
+                                  </div>
+                                  <p className="text-[11px] text-muted-foreground line-clamp-1">
+                                    {isAr ? kpi.definition_ar : kpi.definition}
+                                  </p>
                                 </div>
-                                <span className="text-[10px] text-muted-foreground block truncate max-w-xs">
-                                  {isAr ? kpi.inputHint_ar : kpi.inputHint}
-                                </span>
                               </td>
-
-                              {/* Weight % */}
-                              <td className="px-3 py-2 text-center font-mono tabular-nums text-muted-foreground">
+                              <td className="px-3 py-2 text-center font-mono font-medium">
                                 {fmtPercent(kpi.weight, 1)}
                               </td>
-
-                              {/* Target % */}
-                              <td className="px-3 py-2 text-center font-mono tabular-nums font-semibold text-foreground">
+                              <td className="px-3 py-2 text-center font-mono font-semibold text-muted-foreground">
                                 {fmtPercent(kpi.target, 0)}
                               </td>
 
-                              {/* Q1 */}
+                              {/* Q1 Inputs & Scores */}
                               {(activeQuarterFilter === "all" || activeQuarterFilter === "q1") && (
                                 <>
-                                  <td className="px-2 py-1.5 text-center bg-blue-500/[0.02]">
-                                    <input
+                                  <td className="px-1 py-1 text-center bg-blue-500/5">
+                                    <Input
                                       type="text"
-                                      placeholder="—"
-                                      value={
-                                        row.q1.actual !== null
-                                          ? kpi.inputType === "rating_5"
-                                            ? `${(row.q1.actual * 5).toFixed(1)}/5`
-                                            : `${Math.round(row.q1.actual * 100)}%`
-                                          : ""
-                                      }
-                                      onChange={(e) =>
-                                        handleActualChange(kpi.id, "q1", e.target.value)
-                                      }
-                                      className="w-16 mx-auto rounded-lg border border-input bg-background px-2 py-1 text-center font-mono text-xs tabular-nums focus:border-brand focus:ring-1 focus:ring-brand"
+                                      disabled={isLocked}
+                                      value={row.q1.actual !== null ? (kpi.inputType === "rating_5" ? (row.q1.actual * 5).toFixed(1) : `${(row.q1.actual * 100).toFixed(0)}%`) : ""}
+                                      onChange={(e) => handleActualChange(kpi.id, "q1", e.target.value)}
+                                      placeholder={kpi.inputType === "rating_5" ? "1-5" : "%"}
+                                      className="h-7 w-16 text-center font-mono text-xs mx-auto p-1 rounded-lg"
                                     />
                                   </td>
-                                  <td className="px-2 py-1.5 text-center font-mono tabular-nums text-[11px] bg-blue-500/[0.02] text-muted-foreground">
+                                  <td className="px-2 py-2 text-center font-mono bg-blue-500/5">
                                     {fmtPercent(row.q1.achievement, 0)}
                                   </td>
-                                  <td className="px-2 py-1.5 text-center font-mono tabular-nums font-semibold bg-blue-500/[0.02] text-blue-600 dark:text-blue-400">
-                                    {fmtPercent(row.q1.score, 2)}
+                                  <td className="px-2 py-2 text-center font-mono font-bold bg-blue-500/5 text-blue-700 dark:text-blue-300">
+                                    {fmtRawScore(row.q1.score)}
                                   </td>
                                 </>
                               )}
 
-                              {/* Q2 */}
+                              {/* Q2 Inputs & Scores */}
                               {(activeQuarterFilter === "all" || activeQuarterFilter === "q2") && (
                                 <>
-                                  <td className="px-2 py-1.5 text-center bg-emerald-500/[0.02]">
-                                    <input
+                                  <td className="px-1 py-1 text-center bg-emerald-500/5">
+                                    <Input
                                       type="text"
-                                      placeholder="—"
-                                      value={
-                                        row.q2.actual !== null
-                                          ? kpi.inputType === "rating_5"
-                                            ? `${(row.q2.actual * 5).toFixed(1)}/5`
-                                            : `${Math.round(row.q2.actual * 100)}%`
-                                          : ""
-                                      }
-                                      onChange={(e) =>
-                                        handleActualChange(kpi.id, "q2", e.target.value)
-                                      }
-                                      className="w-16 mx-auto rounded-lg border border-input bg-background px-2 py-1 text-center font-mono text-xs tabular-nums focus:border-brand focus:ring-1 focus:ring-brand"
+                                      disabled={isLocked}
+                                      value={row.q2.actual !== null ? (kpi.inputType === "rating_5" ? (row.q2.actual * 5).toFixed(1) : `${(row.q2.actual * 100).toFixed(0)}%`) : ""}
+                                      onChange={(e) => handleActualChange(kpi.id, "q2", e.target.value)}
+                                      placeholder={kpi.inputType === "rating_5" ? "1-5" : "%"}
+                                      className="h-7 w-16 text-center font-mono text-xs mx-auto p-1 rounded-lg"
                                     />
                                   </td>
-                                  <td className="px-2 py-1.5 text-center font-mono tabular-nums text-[11px] bg-emerald-500/[0.02] text-muted-foreground">
+                                  <td className="px-2 py-2 text-center font-mono bg-emerald-500/5">
                                     {fmtPercent(row.q2.achievement, 0)}
                                   </td>
-                                  <td className="px-2 py-1.5 text-center font-mono tabular-nums font-semibold bg-emerald-500/[0.02] text-emerald-600 dark:text-emerald-400">
-                                    {fmtPercent(row.q2.score, 2)}
+                                  <td className="px-2 py-2 text-center font-mono font-bold bg-emerald-500/5 text-emerald-700 dark:text-emerald-300">
+                                    {fmtRawScore(row.q2.score)}
                                   </td>
                                 </>
                               )}
 
-                              {/* Q3 */}
+                              {/* Q3 Inputs & Scores */}
                               {(activeQuarterFilter === "all" || activeQuarterFilter === "q3") && (
                                 <>
-                                  <td className="px-2 py-1.5 text-center bg-amber-500/[0.02]">
-                                    <input
+                                  <td className="px-1 py-1 text-center bg-amber-500/5">
+                                    <Input
                                       type="text"
-                                      placeholder="—"
-                                      value={
-                                        row.q3.actual !== null
-                                          ? kpi.inputType === "rating_5"
-                                            ? `${(row.q3.actual * 5).toFixed(1)}/5`
-                                            : `${Math.round(row.q3.actual * 100)}%`
-                                          : ""
-                                      }
-                                      onChange={(e) =>
-                                        handleActualChange(kpi.id, "q3", e.target.value)
-                                      }
-                                      className="w-16 mx-auto rounded-lg border border-input bg-background px-2 py-1 text-center font-mono text-xs tabular-nums focus:border-brand focus:ring-1 focus:ring-brand"
+                                      disabled={isLocked}
+                                      value={row.q3.actual !== null ? (kpi.inputType === "rating_5" ? (row.q3.actual * 5).toFixed(1) : `${(row.q3.actual * 100).toFixed(0)}%`) : ""}
+                                      onChange={(e) => handleActualChange(kpi.id, "q3", e.target.value)}
+                                      placeholder={kpi.inputType === "rating_5" ? "1-5" : "%"}
+                                      className="h-7 w-16 text-center font-mono text-xs mx-auto p-1 rounded-lg"
                                     />
                                   </td>
-                                  <td className="px-2 py-1.5 text-center font-mono tabular-nums text-[11px] bg-amber-500/[0.02] text-muted-foreground">
+                                  <td className="px-2 py-2 text-center font-mono bg-amber-500/5">
                                     {fmtPercent(row.q3.achievement, 0)}
                                   </td>
-                                  <td className="px-2 py-1.5 text-center font-mono tabular-nums font-semibold bg-amber-500/[0.02] text-amber-600 dark:text-amber-400">
-                                    {fmtPercent(row.q3.score, 2)}
+                                  <td className="px-2 py-2 text-center font-mono font-bold bg-amber-500/5 text-amber-700 dark:text-amber-300">
+                                    {fmtRawScore(row.q3.score)}
                                   </td>
                                 </>
                               )}
 
-                              {/* Q4 */}
+                              {/* Q4 Inputs & Scores */}
                               {(activeQuarterFilter === "all" || activeQuarterFilter === "q4") && (
                                 <>
-                                  <td className="px-2 py-1.5 text-center bg-purple-500/[0.02]">
-                                    <input
+                                  <td className="px-1 py-1 text-center bg-purple-500/5">
+                                    <Input
                                       type="text"
-                                      placeholder="—"
-                                      value={
-                                        row.q4.actual !== null
-                                          ? kpi.inputType === "rating_5"
-                                            ? `${(row.q4.actual * 5).toFixed(1)}/5`
-                                            : `${Math.round(row.q4.actual * 100)}%`
-                                          : ""
-                                      }
-                                      onChange={(e) =>
-                                        handleActualChange(kpi.id, "q4", e.target.value)
-                                      }
-                                      className="w-16 mx-auto rounded-lg border border-input bg-background px-2 py-1 text-center font-mono text-xs tabular-nums focus:border-brand focus:ring-1 focus:ring-brand"
+                                      disabled={isLocked}
+                                      value={row.q4.actual !== null ? (kpi.inputType === "rating_5" ? (row.q4.actual * 5).toFixed(1) : `${(row.q4.actual * 100).toFixed(0)}%`) : ""}
+                                      onChange={(e) => handleActualChange(kpi.id, "q4", e.target.value)}
+                                      placeholder={kpi.inputType === "rating_5" ? "1-5" : "%"}
+                                      className="h-7 w-16 text-center font-mono text-xs mx-auto p-1 rounded-lg"
                                     />
                                   </td>
-                                  <td className="px-2 py-1.5 text-center font-mono tabular-nums text-[11px] bg-purple-500/[0.02] text-muted-foreground">
+                                  <td className="px-2 py-2 text-center font-mono bg-purple-500/5">
                                     {fmtPercent(row.q4.achievement, 0)}
                                   </td>
-                                  <td className="px-2 py-1.5 text-center font-mono tabular-nums font-semibold bg-purple-500/[0.02] text-purple-600 dark:text-purple-400">
-                                    {fmtPercent(row.q4.score, 2)}
+                                  <td className="px-2 py-2 text-center font-mono font-bold bg-purple-500/5 text-purple-700 dark:text-purple-300">
+                                    {fmtRawScore(row.q4.score)}
                                   </td>
                                 </>
                               )}
 
-                              {/* Annual Score */}
-                              <td className="px-3 py-2 text-center font-mono tabular-nums font-bold bg-muted/30 text-foreground">
-                                {fmtPercent(row.annualScore, 2)}
+                              {/* Annual Score Column */}
+                              <td className="px-3 py-2 text-center font-mono font-extrabold bg-muted/60 text-foreground">
+                                {fmtRawScore(row.annualScore)}
+                              </td>
+
+                              {/* Info Dialog Trigger */}
+                              <td className="px-2 py-2 text-center print:hidden">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setInfoModalKpi(kpi)}
+                                  className="h-6 w-6 rounded-lg text-muted-foreground hover:text-foreground cursor-pointer"
+                                  title={isAr ? "معلومات وطريقة قياس المؤشر" : "Metric Measurement & Definition"}
+                                >
+                                  <Info className="h-3.5 w-3.5" />
+                                </Button>
                               </td>
                             </tr>
                           );
@@ -896,154 +1977,196 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                       </React.Fragment>
                     );
                   })}
-                </tbody>
 
-                {/* Table Footer Total Row */}
-                <tfoot className="border-t-2 border-border bg-muted/80 font-bold text-foreground">
-                  <tr>
-                    <td colSpan={2} className="px-4 py-3 text-start uppercase tracking-wider text-xs">
-                      {isAr ? "إجمالي الأوزان والنتائج السنوية" : "Total Annual Weights & Scores"}
+                  {/* Summary Footer Row */}
+                  <tr className="bg-muted font-bold text-foreground border-t-2 border-border">
+                    <td colSpan={4} className="px-4 py-3 text-end uppercase tracking-wider text-xs">
+                      {isAr ? "المجموع الموزون والنتيجة السنوية العامة:" : "Total Weighted Annual Performance Score:"}
                     </td>
-                    <td className="px-3 py-3 text-center font-mono text-xs">100.0%</td>
-                    <td className="px-3 py-3 text-center text-muted-foreground">—</td>
 
+                    {/* Q1 Total */}
                     {(activeQuarterFilter === "all" || activeQuarterFilter === "q1") && (
-                      <>
-                        <td className="px-2 py-3 text-center text-muted-foreground">—</td>
-                        <td className="px-2 py-3 text-center text-muted-foreground">—</td>
-                        <td className="px-2 py-3 text-center font-mono text-xs text-blue-700 dark:text-blue-300">
-                          {fmtPercent(summaryTotals.q1Score, 2)}
-                        </td>
-                      </>
+                      <td colSpan={3} className="px-3 py-3 text-center font-mono text-sm bg-blue-500/10 text-blue-700 dark:text-blue-300">
+                        {fmtPercent(summaryTotals.q1Sum, 2)}
+                      </td>
                     )}
 
+                    {/* Q2 Total */}
                     {(activeQuarterFilter === "all" || activeQuarterFilter === "q2") && (
-                      <>
-                        <td className="px-2 py-3 text-center text-muted-foreground">—</td>
-                        <td className="px-2 py-3 text-center text-muted-foreground">—</td>
-                        <td className="px-2 py-3 text-center font-mono text-xs text-emerald-700 dark:text-emerald-300">
-                          {fmtPercent(summaryTotals.q2Score, 2)}
-                        </td>
-                      </>
+                      <td colSpan={3} className="px-3 py-3 text-center font-mono text-sm bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+                        {fmtPercent(summaryTotals.q2Sum, 2)}
+                      </td>
                     )}
 
+                    {/* Q3 Total */}
                     {(activeQuarterFilter === "all" || activeQuarterFilter === "q3") && (
-                      <>
-                        <td className="px-2 py-3 text-center text-muted-foreground">—</td>
-                        <td className="px-2 py-3 text-center text-muted-foreground">—</td>
-                        <td className="px-2 py-3 text-center font-mono text-xs text-amber-700 dark:text-amber-300">
-                          {fmtPercent(summaryTotals.q3Score, 2)}
-                        </td>
-                      </>
+                      <td colSpan={3} className="px-3 py-3 text-center font-mono text-sm bg-amber-500/10 text-amber-700 dark:text-amber-300">
+                        {fmtPercent(summaryTotals.q3Sum, 2)}
+                      </td>
                     )}
 
+                    {/* Q4 Total */}
                     {(activeQuarterFilter === "all" || activeQuarterFilter === "q4") && (
-                      <>
-                        <td className="px-2 py-3 text-center text-muted-foreground">—</td>
-                        <td className="px-2 py-3 text-center text-muted-foreground">—</td>
-                        <td className="px-2 py-3 text-center font-mono text-xs text-purple-700 dark:text-purple-300">
-                          {fmtPercent(summaryTotals.q4Score, 2)}
-                        </td>
-                      </>
+                      <td colSpan={3} className="px-3 py-3 text-center font-mono text-sm bg-purple-500/10 text-purple-700 dark:text-purple-300">
+                        {fmtPercent(summaryTotals.q4Sum, 2)}
+                      </td>
                     )}
 
-                    <td className="px-3 py-3 text-center font-mono text-sm font-extrabold text-foreground bg-muted">
-                      {fmtPercent(summaryTotals.annualWeightedSum, 2)}
+                    {/* Annual Weighted Total */}
+                    <td className="px-3 py-3 text-center font-mono text-base font-extrabold bg-brand text-white shadow-xs">
+                      {summaryTotals.hasData ? fmtPercent(summaryTotals.annualWeightedSum, 2) : "—"}
                     </td>
+
+                    <td className="print:hidden"></td>
                   </tr>
-                </tfoot>
+                </tbody>
               </table>
             </div>
           </div>
         </TabsContent>
 
-        {/* ── TAB 2: METRIC GUIDELINES (KPI OVERVIEW) ── */}
+        {/* ── TAB 2: GUIDELINES & DEFINITIONS ── */}
         <TabsContent value="guidelines" className="space-y-4">
-          <div className="rounded-3xl border border-border bg-card p-6 shadow-sm space-y-5">
-            <div>
-              <h2 className="font-display text-lg font-bold text-foreground">
-                {isAr ? "دليل مؤشرات الأداء وطريقة القياس" : "KPI Overview & Measurement Directory"}
-              </h2>
-              <p className="text-xs text-muted-foreground">
-                {isAr
-                  ? "التعريفات الهندسية الرسمية، قواعد القياس، ومعايير الفحص من واقع المعيار المعتمد."
-                  : "Complete engineering definitions, measurement rules, and evaluation criteria from the official standard."}
-              </p>
-            </div>
+          <div className="rounded-3xl border border-border bg-card p-6 shadow-sm space-y-4">
+            <h2 className="font-display text-lg font-bold text-foreground">
+              {isAr ? "دليل معايير تقييم مهندس موقع التيار الخفيف" : "Junior ELV Site Engineer KPI Framework Guidelines"}
+            </h2>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {isAr
+                ? "تم استخلاص هذه المعايير الـ 17 من بطاقة التقييم المعتمدة بشركة إنترجريتد تكنيكس. تنقسم الأوزان إلى 8 تخصصات فنية وسلوكية، ويتم حساب النتيجة السنوية كمتوسط نواتج الأرباع الأربعة."
+                : "The 17 verified KPIs are extracted from the verified Integrated Technics site scorecard template. The annual score is an average across quarters."}
+            </p>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
               {LIGHT_CURRENT_ENGINEER_KPIS.map((kpi) => (
-                <div
-                  key={kpi.id}
-                  className="rounded-2xl border border-border p-4 hover:border-brand/40 transition-colors bg-muted/10 space-y-2.5"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <span className="text-[10px] font-semibold text-brand uppercase tracking-wider">
-                        {isAr ? kpi.category_ar : kpi.category}
-                      </span>
-                      <h4 className="font-semibold text-sm text-foreground">
-                        #{kpi.id}. {isAr ? kpi.name_ar : kpi.name}
-                      </h4>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <Badge variant="outline" className="text-[11px] font-mono">
-                        {isAr ? `الوزن: ${fmtPercent(kpi.weight, 1)}` : `Weight: ${fmtPercent(kpi.weight, 1)}`}
-                      </Badge>
-                      <Badge variant="secondary" className="text-[11px] font-mono">
-                        {isAr ? `الهدف: ${fmtPercent(kpi.target, 0)}` : `Target: ${fmtPercent(kpi.target, 0)}`}
-                      </Badge>
-                    </div>
+                <div key={kpi.id} className="p-3.5 rounded-2xl border border-border bg-muted/10 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs text-foreground">#{kpi.id}. {isAr ? kpi.name_ar : kpi.name}</span>
+                    <Badge variant="outline" className="text-[10px] font-mono">
+                      {isAr ? `الوزن: ${fmtPercent(kpi.weight, 1)}` : `Weight: ${fmtPercent(kpi.weight, 1)}`}
+                    </Badge>
                   </div>
-
-                  <div className="text-xs space-y-1.5 text-muted-foreground">
-                    <p>
-                      <strong className="text-foreground font-medium">{isAr ? "التعريف:" : "Definition:"}</strong>{" "}
-                      {isAr ? kpi.definition_ar : kpi.definition}
-                    </p>
-                    <p className="rounded-xl bg-card p-2.5 border border-border/60">
-                      <strong className="text-foreground font-medium">{isAr ? "طريقة القياس:" : "How it is measured:"}</strong>{" "}
-                      {isAr ? kpi.howMeasured_ar : kpi.howMeasured}
-                    </p>
-                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-snug">
+                    {isAr ? kpi.definition_ar : kpi.definition}
+                  </p>
+                  <p className="text-[10px] text-brand/80 font-medium">
+                    {isAr ? `طريقة القياس: ${kpi.howMeasured_ar}` : `Measurement: ${kpi.howMeasured}`}
+                  </p>
                 </div>
               ))}
             </div>
           </div>
         </TabsContent>
 
-        {/* ── TAB 3: CATEGORY BREAKDOWN ── */}
+        {/* ── TAB 3: CATEGORY BREAKDOWN (ADD, EDIT, DELETE CAPABILITIES) ── */}
         <TabsContent value="categories" className="space-y-4">
           <div className="rounded-3xl border border-border bg-card p-6 shadow-sm space-y-6">
-            <div>
-              <h2 className="font-display text-lg font-bold text-foreground">
-                {isAr ? "توزيع الأداء حسب التخصص الهندسي" : "Performance by Engineering Discipline"}
-              </h2>
-              <p className="text-xs text-muted-foreground">
-                {isAr
-                  ? "توزيع الدرجات الموزونة المحققة في كل مجال من مجالات كفاءة مهندس الموقع."
-                  : "Distribution of weighted scores achieved across each core engineering competency area."}
-              </p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="font-display text-lg font-bold text-foreground">
+                    {isAr ? "توزيع الأداء حسب التخصص الهندسي" : "Performance by Engineering Discipline"}
+                  </h2>
+                  <Badge
+                    variant={Math.abs(totalDisciplinesWeight - 1.0) < 0.005 ? "secondary" : "outline"}
+                    className={`text-xs font-mono font-semibold ${
+                      Math.abs(totalDisciplinesWeight - 1.0) < 0.005
+                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                        : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                    }`}
+                  >
+                    {isAr
+                      ? `إجمالي الأوزان: ${(totalDisciplinesWeight * 100).toFixed(1)}%`
+                      : `Total Weight: ${(totalDisciplinesWeight * 100).toFixed(1)}%`}
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {isAr
+                    ? "توزيع الدرجات الموزونة المحققة في كل مجال من مجالات كفاءة مهندس الموقع مع إمكانية إضافة وتعديل التخصصات والأوزان."
+                    : "Distribution of weighted scores achieved across each core engineering competency area with options to add and edit disciplines."}
+                </p>
+              </div>
+
+              {/* Action Buttons: Add Discipline & Reset to Defaults */}
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleResetDisciplines}
+                  className="rounded-xl gap-1 text-xs cursor-pointer"
+                  title={isAr ? "استعادة التخصصات الافتراضية" : "Reset Disciplines to Default"}
+                >
+                  <RotateCcw className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="hidden sm:inline">{isAr ? "استعادة الافتراضي" : "Reset"}</span>
+                </Button>
+
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleOpenAddDiscipline}
+                  className="rounded-xl gap-1.5 text-xs bg-brand text-white hover:bg-brand/90 font-semibold cursor-pointer shadow-xs"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>{isAr ? "إضافة تخصص جديد" : "Add Discipline"}</span>
+                </Button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {categoryStats.map((cat) => (
                 <div
-                  key={cat.name}
-                  className="rounded-2xl border border-border bg-muted/10 p-4 space-y-3"
+                  key={cat.id || cat.name}
+                  className="group relative rounded-2xl border border-border bg-muted/10 hover:border-brand/40 hover:bg-muted/20 p-4 space-y-3 transition-all shadow-2xs"
                 >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-bold text-sm text-foreground">{isAr ? cat.name_ar : cat.name}</h4>
-                      <span className="text-xs text-muted-foreground">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <h4 className="font-bold text-sm text-foreground">{isAr ? cat.name_ar : cat.name}</h4>
+                        {!cat.isDefault && (
+                          <Badge variant="outline" className="text-[9px] px-1.5 py-0 font-medium text-brand border-brand/30">
+                            {isAr ? "مخصص" : "Custom"}
+                          </Badge>
+                        )}
+                      </div>
+                      <span className="text-xs text-muted-foreground block">
                         {isAr
                           ? `وزن الفئة: ${(cat.totalWeight * 100).toFixed(1)}%`
                           : `Category Weight: ${(cat.totalWeight * 100).toFixed(1)}%`}
                       </span>
                     </div>
-                    <span className="font-mono text-sm font-bold text-foreground">
-                      {(cat.earnedScore * 100).toFixed(1)}% / {(cat.totalWeight * 100).toFixed(1)}%
-                    </span>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span className="font-mono text-sm font-bold text-foreground me-1.5">
+                        {(cat.earnedScore * 100).toFixed(1)}% / {(cat.totalWeight * 100).toFixed(1)}%
+                      </span>
+
+                      {/* Edit Button */}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleOpenEditDiscipline(cat.discipline)}
+                        className="h-7 w-7 rounded-lg text-muted-foreground hover:text-foreground hover:bg-background cursor-pointer"
+                        title={isAr ? "تعديل هذا التخصص" : "Edit Discipline"}
+                      >
+                        <Pencil className="h-3.5 w-3.5 text-brand" />
+                      </Button>
+
+                      {/* Delete Button (for custom disciplines) */}
+                      {!cat.isDefault && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteDiscipline(cat.id)}
+                          className="h-7 w-7 rounded-lg text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10 cursor-pointer"
+                          title={isAr ? "حذف التخصص" : "Delete Discipline"}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
 
                   <div className="space-y-1">
@@ -1081,59 +2204,65 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
               </h2>
               <p className="text-xs text-muted-foreground">
                 {isAr
-                  ? "توصيات المدير المباشر، مجالات التطوير، والاعتمادات."
-                  : "Manager recommendations, development milestones, and approvals."}
+                  ? "توثيق نقاط القوة، فرص التحسين المستمر، والتوصيات التدريبية المعتمدة رسمياً."
+                  : "Document strengths, coaching development areas, and official sign-offs."}
               </p>
             </div>
 
             <div className="space-y-4">
+              {/* Strengths */}
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">
-                  {isAr ? "1. نقاط القوة الفنية وأبرز الإنجازات الميدانية بالموقع" : "1. Key Technical Strengths & Notable Site Deliveries"}
+                <Label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  {isAr ? "أبرز نقاط القوة والإنجازات الميدانية:" : "Major Site Strengths & Key Achievements:"}
                 </Label>
                 <textarea
+                  rows={3}
+                  disabled={isLocked}
                   value={notes.strengths}
-                  onChange={(e) => setNotes({ ...notes, strengths: e.target.value })}
-                  rows={3}
-                  placeholder={
-                    isAr
-                      ? "تفاصيل التشغيل الناجح للأنظمة، الربط والتكامل المتميز، أو الاستجابة السريعة لطوارئ الموقع..."
-                      : "Detail successful system commissioning, flawless integrations, or emergency site response..."
-                  }
+                  onChange={(e) => {
+                    setNotes((prev) => ({ ...prev, strengths: e.target.value }));
+                    setHasUnsavedChanges(true);
+                  }}
+                  placeholder={isAr ? "اكتب تفاصيل إنجازات المهندس..." : "Detail specific technical wins..."}
                   className="w-full rounded-xl border border-input bg-background p-3 text-xs leading-relaxed focus:border-brand focus:ring-1 focus:ring-brand"
                 />
               </div>
 
+              {/* Growth Areas */}
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">
-                  {isAr ? "2. مجالات التطوير الفني وتحسين الالتزام بالجدول الزمني" : "2. Areas for Technical Development & Schedule Optimization"}
+                <Label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                  <AlertCircle className="h-4 w-4 text-amber-600" />
+                  {isAr ? "مجالات التحسين والتطوير المستمر:" : "Priority Growth & Improvement Areas:"}
                 </Label>
                 <textarea
+                  rows={3}
+                  disabled={isLocked}
                   value={notes.growthAreas}
-                  onChange={(e) => setNotes({ ...notes, growthAreas: e.target.value })}
-                  rows={3}
-                  placeholder={
-                    isAr
-                      ? "تفاصيل المجالات المحتاجة لتوجيه: قراءة المخططات التنفيذية، سرعة معالجة الأعطال، التوثيق..."
-                      : "Detail areas needing coaching: shop drawing reading, faster fault clearance, documentation..."
-                  }
+                  onChange={(e) => {
+                    setNotes((prev) => ({ ...prev, growthAreas: e.target.value }));
+                    setHasUnsavedChanges(true);
+                  }}
+                  placeholder={isAr ? "حدد مجالات العمل التي تتطلب تطوير..." : "Identify tasks requiring development..."}
                   className="w-full rounded-xl border border-input bg-background p-3 text-xs leading-relaxed focus:border-brand focus:ring-1 focus:ring-brand"
                 />
               </div>
 
+              {/* Recommendations */}
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">
-                  {isAr ? "3. الشهادات والدورات الموصى بها وخطة النمو للدورة القادمة" : "3. Recommended Certifications & Growth Plan for Next Cycle"}
+                <Label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                  <TrendingUp className="h-4 w-4 text-brand" />
+                  {isAr ? "التوصيات التدريبية والشهادات المهنية المعتمدة:" : "Recommended Training, Certifications & Milestones:"}
                 </Label>
                 <textarea
-                  value={notes.recommendations}
-                  onChange={(e) => setNotes({ ...notes, recommendations: e.target.value })}
                   rows={3}
-                  placeholder={
-                    isAr
-                      ? "مثال: دورات متقدمة في أنظمة Honeywell EBI أو Genetec أو Cisco CCNA أو NFPA 72..."
-                      : "E.g., Milestone courses on Honeywell EBI, Genetec Security Center, Cisco CCNA, NFPA 72..."
-                  }
+                  disabled={isLocked}
+                  value={notes.recommendations}
+                  onChange={(e) => {
+                    setNotes((prev) => ({ ...prev, recommendations: e.target.value }));
+                    setHasUnsavedChanges(true);
+                  }}
+                  placeholder={isAr ? "الدورات الموصى بها (Honeywell, Cisco, Schneider...)" : "Specific training milestones..."}
                   className="w-full rounded-xl border border-input bg-background p-3 text-xs leading-relaxed focus:border-brand focus:ring-1 focus:ring-brand"
                 />
               </div>
@@ -1181,6 +2310,369 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
             </div>
           </div>
         </TabsContent>
+
+        {/* ── TAB: PENDING APPROVALS (HR ADMIN & MANAGERS) ── */}
+        <TabsContent value="pending-approvals" className="space-y-4">
+          <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-sm space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-600">
+                    <Clock className="h-3.5 w-3.5" />
+                    {isAr ? "معاملات الاعتماد والتدقيق" : "Quarterly Review Queue"}
+                  </span>
+                  <Badge className="bg-amber-500 text-white text-[10px] font-mono px-2 py-0.5">
+                    {pendingApprovals.length} {isAr ? "بانتظار الإجراء" : "Pending Action"}
+                  </Badge>
+                </div>
+                <h2 className="font-display text-lg font-bold text-foreground mt-1">
+                  {isAr ? "طلبات اعتماد تقييمات الأداء الربع سنوية" : "Quarterly Evaluation Approval Requests"}
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  {isAr
+                    ? "مراجعة تقييمات الأداء الربع سنوية المقدمة من المشرفين والمديرين لاعتمادها رسمياً أو إعادتها للمراجعة مع ذكر السبب."
+                    : "Review submitted quarterly evaluations from direct supervisors. Approve formally or return for revision with feedback."}
+                </p>
+              </div>
+
+              {/* Quarter Filter Chips */}
+              <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-2xl border border-border text-xs shrink-0">
+                {(["all", "q1", "q2", "q3", "q4"] as const).map((q) => (
+                  <button
+                    key={q}
+                    type="button"
+                    onClick={() => setPendingQuarterFilter(q)}
+                    className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                      pendingQuarterFilter === q
+                        ? "bg-card text-foreground shadow-xs"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {q === "all" ? (isAr ? "الكل" : "All") : q.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* List / Table of Pending Approvals */}
+            {isLoadingPending ? (
+              <div className="p-12 text-center text-xs text-muted-foreground flex flex-col items-center gap-2">
+                <Loader2 className="h-6 w-6 animate-spin text-brand" />
+                <span>{isAr ? "جارٍ تحميل المعاملات المعلقة..." : "Loading pending approvals..."}</span>
+              </div>
+            ) : pendingApprovals.length === 0 ? (
+              <div className="p-12 text-center rounded-2xl border border-dashed border-border bg-muted/20 space-y-2">
+                <ShieldCheck className="h-8 w-8 text-emerald-500 mx-auto" />
+                <h3 className="font-semibold text-sm text-foreground">
+                  {isAr ? "لا توجد أي تقييمات معلقة بانتظار الاعتماد" : "No Pending Approvals"}
+                </h3>
+                <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                  {isAr
+                    ? "تمت مراجعة واعتماد كافة التقييمات المقدمة لعام " + selectedYear
+                    : "All quarterly submissions for year " + selectedYear + " have been reviewed and approved."}
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-border rounded-2xl border border-border overflow-hidden bg-card">
+                {pendingApprovals
+                  .filter((item: any) => pendingQuarterFilter === "all" || (item.quarter || "").toLowerCase() === pendingQuarterFilter)
+                  .map((item: any) => {
+                    const empName = item.employee?.full_name || (isAr ? "موظف" : "Employee");
+                    const empCode = item.employee?.emp_code;
+                    const position = item.employee?.position?.name_en || (isAr ? "مهندس موقع" : "Site Engineer");
+                    const dept = item.employee?.department?.name_en || (isAr ? "الهندسة" : "Engineering");
+                    const quarterUpper = (item.quarter || "q1").toUpperCase();
+                    const score = Number(item.total_score ?? 0);
+                    const rating = getRatingFromScore(score / 100, true);
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-muted/30 transition-colors"
+                      >
+                        {/* Employee & Quarter Info */}
+                        <div className="flex items-start gap-3">
+                          <div className="h-10 w-10 rounded-2xl bg-brand/10 text-brand font-bold text-xs flex items-center justify-center shrink-0 uppercase">
+                            {empName.slice(0, 2)}
+                          </div>
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-sm text-foreground">{empName}</span>
+                              {empCode && (
+                                <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0">
+                                  {empCode}
+                                </Badge>
+                              )}
+                              <Badge className="bg-brand text-brand-foreground text-[10px] font-bold px-2 py-0">
+                                {quarterUpper} {item.evaluation_year}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {position} • {dept}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {isAr ? "المُقيّم: " : "Submitted by: "}
+                              <strong className="text-foreground">{item.evaluator_name || "Manager"}</strong>
+                              {item.submitted_at && (
+                                <span className="ms-2 font-mono text-[10px]">
+                                  ({new Date(item.submitted_at).toLocaleDateString()})
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Score & Actions */}
+                        <div className="flex flex-wrap items-center gap-3 justify-between md:justify-end">
+                          <div className="text-start md:text-end pe-2">
+                            <div className="font-mono font-extrabold text-sm text-foreground">
+                              {score.toFixed(1)}%
+                            </div>
+                            <span className="text-[10px] font-medium text-muted-foreground">
+                              {isAr ? rating.tier_ar : rating.tier}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedEmpId(item.employee_id);
+                                setMainTab("scorecard");
+                              }}
+                              className="h-8 rounded-xl text-xs gap-1 cursor-pointer"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+                              <span>{isAr ? "عرض التفاصيل" : "Scorecard"}</span>
+                            </Button>
+
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenReturnModal(item)}
+                              disabled={isSubmittingReview}
+                              className="h-8 rounded-xl text-xs gap-1 border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 cursor-pointer"
+                            >
+                              <RotateCcw className="h-3.5 w-3.5" />
+                              <span>{isAr ? "إعادة للتعديل" : "Return"}</span>
+                            </Button>
+
+                            <Button
+                              size="sm"
+                              onClick={() => handleApprovePending(item)}
+                              disabled={isSubmittingReview}
+                              className="h-8 rounded-xl text-xs gap-1 bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer shadow-xs"
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                              <span>{isAr ? "اعتماد رسمي" : "Approve"}</span>
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* ── TAB: TEMPLATES & CRITERIA CATALOG ── */}
+        <TabsContent value="templates-criteria" className="space-y-4">
+          <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-semibold text-brand">
+                    <Award className="h-3.5 w-3.5" />
+                    {isAr ? "مصفوفة المعايير والقوالب" : "KPI Criteria & Templates"}
+                  </span>
+                  <Badge variant="outline" className="text-[10px] font-mono">
+                    {kpiCriteria.length} {isAr ? "معياراً مسجلاً" : "Criteria"}
+                  </Badge>
+                </div>
+                <h2 className="font-display text-lg font-bold text-foreground mt-1">
+                  {isAr ? "إدارة مصفوفة ومعايير تقييم الأداء المؤسسي" : "Evaluation Criteria Catalog & Template Rules"}
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  {isAr
+                    ? "توزيع أوزان التقييم المعتمد: 40% معايير عامة للشركة، و60% معايير تخصصية فنية وفق المنصب."
+                    : "Standard evaluation framework: 40% Company-wide Common Criteria, 60% Position-Specific Technical Criteria."}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={handleOpenAddCriterion}
+                  size="sm"
+                  className="rounded-2xl gap-1.5 bg-brand text-brand-foreground hover:bg-brand/90 cursor-pointer shadow-xs"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>{isAr ? "إضافة معيار جديد" : "Add Criterion"}</span>
+                </Button>
+              </div>
+            </div>
+
+            {/* Architecture 3-Layer Weight Summary Banner */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+              <div className="p-4 rounded-2xl border border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-900/40 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-blue-700 dark:text-blue-400">
+                    {isAr ? "1. المعايير العامة للشركة" : "1. Company Common Layer"}
+                  </span>
+                  <Badge className="bg-blue-600 text-white font-mono text-[10px]">40.0%</Badge>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {isAr
+                    ? "الانضباط والمواعيد، السلوك المهني والسياسات، العمل الجماعي، والمبادرة والمسؤولية."
+                    : "Attendance & punctuality, code of conduct, teamwork, initiative & ownership."}
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl border border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/20 dark:border-emerald-900/40 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                    {isAr ? "2. معايير التخصص والمنصب" : "2. Position / Role Layer"}
+                  </span>
+                  <Badge className="bg-emerald-600 text-white font-mono text-[10px]">60.0%</Badge>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {isAr
+                    ? "الكفاءات الفنية الميدانية لكل مسمى وظيفي (مصفوفة الـ 17 مؤشراً لمهندسي التيار الخفيف)."
+                    : "Field competencies tailored to job role (e.g. 17 technical KPIs for ELV Engineers)."}
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl border border-brand/30 bg-brand/5 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-brand">
+                    {isAr ? "3. مجموع الأوزان المستهدف" : "3. Target Weight Validation"}
+                  </span>
+                  <Badge className="bg-brand text-brand-foreground font-mono text-[10px]">100.0%</Badge>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {isAr
+                    ? "التحقق الصارم من توازن الأوزان المئوية لتساوي دائماً 100% بدقة قبل اعتماد القوالب."
+                    : "Strict mathematical enforcement ensuring sum of all category weights equals exactly 100%."}
+                </p>
+              </div>
+            </div>
+
+            {/* Filter by Layer */}
+            <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2">
+              <div className="flex items-center gap-1.5 bg-muted/60 p-1 rounded-2xl border border-border text-xs">
+                {(["all", "common", "role", "custom"] as const).map((layer) => (
+                  <button
+                    key={layer}
+                    type="button"
+                    onClick={() => setCriteriaLayerFilter(layer)}
+                    className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                      criteriaLayerFilter === layer
+                        ? "bg-card text-foreground shadow-xs"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {layer === "all"
+                      ? isAr ? "كل المعايير" : "All Layers"
+                      : layer === "common"
+                      ? isAr ? "عامة (40%)" : "Common (40%)"
+                      : layer === "role"
+                      ? isAr ? "تخصصية (60%)" : "Role Specific (60%)"
+                      : isAr ? "مخصصة" : "Custom"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Criteria Catalog Table */}
+            {isLoadingCriteria ? (
+              <div className="p-12 text-center text-xs text-muted-foreground flex flex-col items-center gap-2">
+                <Loader2 className="h-6 w-6 animate-spin text-brand" />
+                <span>{isAr ? "جارٍ تحميل دليل المعايير..." : "Loading criteria..."}</span>
+              </div>
+            ) : (
+              <div className="divide-y divide-border rounded-2xl border border-border overflow-hidden bg-card">
+                {kpiCriteria
+                  .filter((crit: any) => criteriaLayerFilter === "all" || crit.layer === criteriaLayerFilter)
+                  .map((crit: any) => {
+                    const weightPct = crit.default_weight ? (crit.default_weight * 100).toFixed(1) : "—";
+                    const targetPct = crit.default_target ? (crit.default_target * 100).toFixed(0) : "—";
+
+                    return (
+                      <div
+                        key={crit.id}
+                        className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-muted/30 transition-colors"
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0">
+                              {crit.code}
+                            </Badge>
+                            <span className="font-bold text-xs text-foreground">
+                              {isAr ? crit.name_ar : crit.name_en}
+                            </span>
+                            <Badge
+                              className={`text-[10px] px-2 py-0 ${
+                                crit.layer === "common"
+                                  ? "bg-blue-600 text-white"
+                                  : crit.layer === "role"
+                                  ? "bg-emerald-600 text-white"
+                                  : "bg-purple-600 text-white"
+                              }`}
+                            >
+                              {crit.layer === "common"
+                                ? isAr ? "معيار عام" : "Common"
+                                : crit.layer === "role"
+                                ? isAr ? "معيار تخصصي" : "Role"
+                                : isAr ? "مخصص" : "Custom"}
+                            </Badge>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground">
+                            {isAr ? crit.category_ar : crit.category_en}
+                            {crit.how_measured_en && (
+                              <span className="ms-2 text-muted-foreground/80">
+                                • {isAr ? crit.how_measured_ar : crit.how_measured_en}
+                              </span>
+                            )}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-3 shrink-0">
+                          <div className="text-end font-mono text-xs">
+                            <span className="text-muted-foreground">{isAr ? "الوزن:" : "Weight:"} </span>
+                            <strong className="text-foreground">{weightPct}%</strong>
+                            <span className="ms-2 text-muted-foreground">{isAr ? "الهدف:" : "Target:"} </span>
+                            <strong className="text-emerald-600">{targetPct}%</strong>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleOpenEditCriterion(crit)}
+                              className="h-7 w-7 p-0 rounded-lg text-muted-foreground hover:text-brand cursor-pointer"
+                              title={isAr ? "تعديل" : "Edit"}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleArchiveCriterion(crit.id)}
+                              className="h-7 w-7 p-0 rounded-lg text-muted-foreground hover:text-rose-600 cursor-pointer"
+                              title={isAr ? "أرشفة" : "Archive"}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+        </TabsContent>
       </Tabs>
 
       {/* Metric Detail Info Dialog */}
@@ -1218,6 +2710,462 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
               <p className="text-muted-foreground leading-relaxed">
                 {isAr ? infoModalKpi?.howMeasured_ar : infoModalKpi?.howMeasured}
               </p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Evaluations Directory Dialog */}
+      <Dialog open={isEvaluationsListOpen} onOpenChange={setIsEvaluationsListOpen}>
+        <DialogContent className="sm:max-w-2xl rounded-3xl max-h-[85vh] overflow-y-auto" dir={dir}>
+          <DialogHeader>
+            <div className="flex items-center gap-2 text-brand">
+              <Layers className="h-5 w-5" />
+              <DialogTitle className="font-display text-lg font-bold">
+                {isAr ? `سجل تقييمات الأداء السنوية — عام ${selectedYear}` : `Annual KPI Evaluations Directory — Year ${selectedYear}`}
+              </DialogTitle>
+            </div>
+          </DialogHeader>
+
+          <div className="space-y-3 pt-2">
+            <div className="divide-y divide-border rounded-2xl border border-border overflow-hidden">
+              {annualEvaluations.length === 0 ? (
+                <div className="p-8 text-center text-xs text-muted-foreground">
+                  {isAr ? `لم يتم تسجيل أي تقييمات لعام ${selectedYear} حتى الآن` : `No evaluations saved for year ${selectedYear} yet.`}
+                </div>
+              ) : (
+                annualEvaluations.map((ev: any) => {
+                  const empName = ev.employee?.full_name || ev.employee?.name || (isAr ? "موظف" : "Employee");
+                  const empCode = ev.employee?.emp_code;
+                  const dept = ev.employee?.department?.name_en || ev.employee?.department?.name_ar;
+                  const score = Number(ev.summary?.totalScore ?? 0);
+                  const rating = ev.summary?.rating || "—";
+                  const evStatus = (ev.status || "draft").toLowerCase();
+                  const isSelected = ev.employee_id === selectedEmpId;
+
+                  return (
+                    <div
+                      key={ev.id}
+                      className={`flex items-center justify-between p-3.5 transition-colors ${
+                        isSelected ? "bg-brand/5 font-medium" : "hover:bg-muted/40"
+                      }`}
+                    >
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-xs text-foreground">{empName}</span>
+                          {empCode && (
+                            <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0">
+                              {empCode}
+                            </Badge>
+                          )}
+                          {isSelected && (
+                            <Badge className="bg-brand text-brand-foreground text-[10px] px-1.5 py-0">
+                              {isAr ? "المعروض حالياً" : "Current"}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground">
+                          {dept || (isAr ? "الإدارة الهندسية" : "Engineering")}
+                          {ev.evaluator_name && ` • ${isAr ? "المُقيّم:" : "By:"} ${ev.evaluator_name}`}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <div className="text-end">
+                          <div className="font-mono font-bold text-xs text-foreground">
+                            {score.toFixed(1)}%
+                          </div>
+                          <span className="text-[10px] text-muted-foreground">{rating}</span>
+                        </div>
+
+                        {evStatus === "approved" ? (
+                          <Badge className="bg-emerald-600 text-white text-[10px] px-2 py-0.5">
+                            {isAr ? "معتمد" : "Approved"}
+                          </Badge>
+                        ) : evStatus === "submitted" ? (
+                          <Badge className="bg-blue-600 text-white text-[10px] px-2 py-0.5">
+                            {isAr ? "مقدم" : "Submitted"}
+                          </Badge>
+                        ) : evStatus === "reviewed" ? (
+                          <Badge className="bg-purple-600 text-white text-[10px] px-2 py-0.5">
+                            {isAr ? "تمت المراجعة" : "Reviewed"}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px] px-2 py-0.5 text-muted-foreground">
+                            {isAr ? "مسودة" : "Draft"}
+                          </Badge>
+                        )}
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedEmpId(ev.employee_id);
+                            setIsEvaluationsListOpen(false);
+                          }}
+                          className="h-7 text-xs rounded-lg px-2 text-brand hover:text-brand cursor-pointer"
+                        >
+                          {isAr ? "فتح" : "Open"}
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="sm:max-w-md rounded-3xl" dir={dir}>
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-destructive flex items-center gap-2">
+              <Trash2 className="h-5 w-5" />
+              {isAr ? "تأكيد حذف التقييم" : "Confirm Delete Evaluation"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 text-xs pt-2">
+            <p className="text-muted-foreground">
+              {isAr
+                ? `هل أنت متأكد من رغبتك في حذف بطاقة تقييم ${currentEmployee.name} لعام ${selectedYear} نهائياً من قاعدة البيانات؟`
+                : `Are you sure you want to permanently delete the evaluation for ${currentEmployee.name} (${selectedYear})?`}
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setDeleteConfirmOpen(false)}
+                className="rounded-xl cursor-pointer"
+              >
+                {isAr ? "إلغاء" : "Cancel"}
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => deleteMutation.mutate()}
+                disabled={deleteMutation.isPending}
+                className="rounded-xl gap-1.5 cursor-pointer"
+              >
+                {deleteMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isAr ? "نعم، حذف نهائي" : "Delete Permanently"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add / Edit Engineering Discipline Modal */}
+      <Dialog open={isDisciplineModalOpen} onOpenChange={setIsDisciplineModalOpen}>
+        <DialogContent className="sm:max-w-md rounded-3xl" dir={dir}>
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-foreground flex items-center gap-2">
+              {editingDiscipline ? <Pencil className="h-4 w-4 text-brand" /> : <Plus className="h-4 w-4 text-brand" />}
+              {isAr
+                ? editingDiscipline
+                  ? "تعديل التخصص الهندسي ومجال الكفاءة"
+                  : "إضافة تخصص هندسي / مجال كفاءة جديد"
+                : editingDiscipline
+                ? "Edit Engineering Discipline"
+                : "Add New Engineering Discipline"}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 pt-2 text-xs">
+            {/* Discipline Name (English) */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-foreground">
+                {isAr ? "اسم التخصص (بالإنجليزية)" : "Discipline Name (English)"}
+              </Label>
+              <Input
+                value={disciplineForm.name}
+                onChange={(e) => setDisciplineForm((prev) => ({ ...prev, name: e.target.value }))}
+                placeholder="e.g. Cybersecurity & IoT Solutions"
+                className="rounded-xl text-xs"
+              />
+            </div>
+
+            {/* Discipline Name (Arabic) */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-foreground">
+                {isAr ? "اسم التخصص (بالعربية)" : "Discipline Name (Arabic)"}
+              </Label>
+              <Input
+                value={disciplineForm.name_ar}
+                onChange={(e) => setDisciplineForm((prev) => ({ ...prev, name_ar: e.target.value }))}
+                placeholder="مثال: حلول الأمن السيبراني وإنترنت الأشياء"
+                dir="rtl"
+                className="rounded-xl text-xs text-right"
+              />
+            </div>
+
+            {/* Category Target Weight (%) */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold text-foreground">
+                  {isAr ? "وزن التخصص من الإجمالي (%)" : "Category Weight (%)"}
+                </Label>
+                <span className="font-mono text-[11px] text-muted-foreground">
+                  {isAr ? "الوزن الحالي: " : "Current: "}{disciplineForm.weight}%
+                </span>
+              </div>
+              <div className="relative">
+                <Input
+                  type="number"
+                  step="0.5"
+                  min="0.5"
+                  max="100"
+                  value={disciplineForm.weight}
+                  onChange={(e) => setDisciplineForm((prev) => ({ ...prev, weight: parseFloat(e.target.value) || 0 }))}
+                  className="rounded-xl text-xs pe-8"
+                />
+                <span className="absolute end-3 top-2.5 text-xs font-bold text-muted-foreground">%</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                {isAr
+                  ? "الوزن المئوي المسند لهذا التخصص الهندسي في تقييم الأداء السنوي العام (المجموع الإجمالي المستهدف 100%)."
+                  : "Assigned weight % of this discipline toward total annual evaluation score (target 100%)."}
+              </p>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsDisciplineModalOpen(false)}
+                className="rounded-xl cursor-pointer"
+              >
+                {isAr ? "إلغاء" : "Cancel"}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleSaveDiscipline}
+                className="rounded-xl bg-brand text-white hover:bg-brand/90 cursor-pointer shadow-xs"
+              >
+                {editingDiscipline
+                  ? isAr ? "حفظ التعديلات" : "Save Changes"
+                  : isAr ? "إضافة التخصص" : "Add Discipline"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* Return for Revision Modal Dialog (Mandatory Reason) */}
+      <Dialog open={returnModalOpen} onOpenChange={setReturnModalOpen}>
+        <DialogContent className="sm:max-w-md rounded-3xl" dir={dir}>
+          <DialogHeader>
+            <div className="flex items-center gap-2 text-amber-600">
+              <RotateCcw className="h-5 w-5" />
+              <DialogTitle className="text-base font-bold font-display">
+                {isAr ? "إعادة التقييم للمراجعة والتعديل" : "Return Evaluation for Revision"}
+              </DialogTitle>
+            </div>
+          </DialogHeader>
+
+          <div className="space-y-4 pt-2 text-xs">
+            <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 space-y-1">
+              <p className="font-semibold">
+                {isAr ? "تنبيه مسار الاعتماد الإداري:" : "Evaluation Workflow Notice:"}
+              </p>
+              <p className="leading-relaxed">
+                {isAr
+                  ? "سيتم رفض الاعتماد مؤقتاً وإعادة بطاقة التقييم إلى المُقيّم مع تدوين السبب لإجراء التصحيحات اللازمة وإعادة تقديمها."
+                  : "This will temporarily reject the submission and return the evaluation to the evaluator with your notes so they can correct and resubmit."}
+              </p>
+            </div>
+
+            {selectedPendingItem && (
+              <div className="p-2.5 rounded-xl border border-border bg-muted/30 text-xs">
+                <strong>{isAr ? "الموظف:" : "Employee:"}</strong> {selectedPendingItem.employee?.full_name || "Employee"} •{" "}
+                <span className="font-mono uppercase font-bold text-brand">
+                  {(selectedPendingItem.quarter || "q1").toUpperCase()} {selectedPendingItem.evaluation_year}
+                </span>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-foreground flex items-center justify-between">
+                <span>{isAr ? "سبب الإعادة وملاحظات المراجعة (إلزامي):" : "Mandatory Return Reason & Guidance:"}</span>
+                <span className="text-[10px] text-muted-foreground font-normal">
+                  {returnReason.length} / 5 {isAr ? "أحرف على الأقل" : "chars min"}
+                </span>
+              </Label>
+              <textarea
+                rows={4}
+                value={returnReason}
+                onChange={(e) => setReturnReason(e.target.value)}
+                placeholder={
+                  isAr
+                    ? "يرجى توضيح النقاط المطلوب تعديلها (مثال: يرجى مراجعة نسبة الإنجاز في بند السلامة وتوضيح مبررات التأخير في Q1)..."
+                    : "Specify required adjustments (e.g., please re-verify testing pass rates and clarify the Q1 commissioning timeline)..."
+                }
+                className="w-full rounded-2xl border border-input bg-background p-3 text-xs leading-relaxed focus:border-brand focus:ring-1 focus:ring-brand"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setReturnModalOpen(false)}
+                className="rounded-xl cursor-pointer"
+              >
+                {isAr ? "إلغاء" : "Cancel"}
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleConfirmReturn}
+                disabled={returnReason.trim().length < 5 || isSubmittingReview}
+                className="rounded-xl bg-amber-600 text-white hover:bg-amber-700 cursor-pointer shadow-xs gap-1.5"
+              >
+                {isSubmittingReview && <Loader2 className="h-4 w-4 animate-spin" />}
+                <RotateCcw className="h-3.5 w-3.5" />
+                <span>{isAr ? "تأكيد الإعادة للمُقيّم" : "Confirm Return"}</span>
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add / Edit Criterion Dialog */}
+      <Dialog open={criterionModalOpen} onOpenChange={setCriterionModalOpen}>
+        <DialogContent className="sm:max-w-lg rounded-3xl" dir={dir}>
+          <DialogHeader>
+            <div className="flex items-center gap-2 text-brand">
+              <Award className="h-5 w-5" />
+              <DialogTitle className="text-base font-bold font-display">
+                {editingCriterion
+                  ? isAr ? "تعديل معيار التقييم" : "Edit KPI Criterion"
+                  : isAr ? "إضافة معيار تقييم جديد" : "Add New KPI Criterion"}
+              </DialogTitle>
+            </div>
+          </DialogHeader>
+
+          <div className="space-y-3.5 pt-2 text-xs">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">{isAr ? "رمز المعيار" : "Code"}</Label>
+                <Input
+                  value={criterionForm.code}
+                  onChange={(e) => setCriterionForm((prev) => ({ ...prev, code: e.target.value }))}
+                  placeholder="e.g. KPI-101"
+                  className="rounded-xl text-xs font-mono"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">{isAr ? "مستوى المعيار (الطبقة)" : "Criterion Layer"}</Label>
+                <select
+                  value={criterionForm.layer}
+                  onChange={(e) => setCriterionForm((prev) => ({ ...prev, layer: e.target.value as any }))}
+                  className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold"
+                >
+                  <option value="common">{isAr ? "معيار عام للشركة (40%)" : "Common Company Layer (40%)"}</option>
+                  <option value="role">{isAr ? "معيار تخصصي للمنصب (60%)" : "Position / Role Layer (60%)"}</option>
+                  <option value="custom">{isAr ? "معيار إضافي مخصص" : "Custom Criterion"}</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs font-semibold">{isAr ? "اسم المعيار (بالإنجليزية)" : "Name (English)"}</Label>
+              <Input
+                value={criterionForm.name_en}
+                onChange={(e) => setCriterionForm((prev) => ({ ...prev, name_en: e.target.value }))}
+                placeholder="e.g. On-Time Cable Pulling & Termination"
+                className="rounded-xl text-xs"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs font-semibold">{isAr ? "اسم المعيار (بالعربية)" : "Name (Arabic)"}</Label>
+              <Input
+                value={criterionForm.name_ar}
+                onChange={(e) => setCriterionForm((prev) => ({ ...prev, name_ar: e.target.value }))}
+                placeholder="مثال: دقة تمديد وإنهاء الكابلات في المواعيد المحددة"
+                dir="rtl"
+                className="rounded-xl text-xs text-right"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">{isAr ? "التصنيف (بالإنجليزية)" : "Category (English)"}</Label>
+                <Input
+                  value={criterionForm.category_en}
+                  onChange={(e) => setCriterionForm((prev) => ({ ...prev, category_en: e.target.value }))}
+                  className="rounded-xl text-xs"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">{isAr ? "التصنيف (بالعربية)" : "Category (Arabic)"}</Label>
+                <Input
+                  value={criterionForm.category_ar}
+                  onChange={(e) => setCriterionForm((prev) => ({ ...prev, category_ar: e.target.value }))}
+                  dir="rtl"
+                  className="rounded-xl text-xs text-right"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">{isAr ? "الوزن الافتراضي (%)" : "Weight (%)"}</Label>
+                <Input
+                  type="number"
+                  step="0.5"
+                  min="0.5"
+                  max="100"
+                  value={criterionForm.weight}
+                  onChange={(e) => setCriterionForm((prev) => ({ ...prev, weight: parseFloat(e.target.value) || 0 }))}
+                  className="rounded-xl text-xs"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">{isAr ? "الهدف الافتراضي (%)" : "Target (%)"}</Label>
+                <Input
+                  type="number"
+                  step="1"
+                  min="1"
+                  max="100"
+                  value={criterionForm.target}
+                  onChange={(e) => setCriterionForm((prev) => ({ ...prev, target: parseFloat(e.target.value) || 0 }))}
+                  className="rounded-xl text-xs"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">{isAr ? "وحدة القياس" : "Unit"}</Label>
+                <Input
+                  value={criterionForm.unit}
+                  onChange={(e) => setCriterionForm((prev) => ({ ...prev, unit: e.target.value }))}
+                  placeholder="%, count, scale"
+                  className="rounded-xl text-xs font-mono"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCriterionModalOpen(false)}
+                className="rounded-xl cursor-pointer"
+              >
+                {isAr ? "إلغاء" : "Cancel"}
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleSaveCriterion}
+                className="rounded-xl bg-brand text-brand-foreground hover:bg-brand/90 cursor-pointer shadow-xs"
+              >
+                {editingCriterion ? (isAr ? "حفظ التعديلات" : "Save Changes") : (isAr ? "إضافة المعيار" : "Add Criterion")}
+              </Button>
             </div>
           </div>
         </DialogContent>

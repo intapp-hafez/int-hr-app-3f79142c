@@ -287,7 +287,7 @@ export const ui: Record<UiKey, string> = {
   netPay: "صافي الراتب",
   dailyRate: "الراتب اليومي",
   kpi: "مؤشر الأداء",
-  kpis: "مؤشرات الأداء",
+  kpis: "الأداء ومؤشرات الأداء (KPIs)",
   kpiEvaluations: "تقييمات مؤشرات الأداء",
   attendanceRecords: "سجل الحضور",
   requestsSummary: "الطلبات (إجازات، أذونات، سلف)",

@@ -20,6 +20,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useI18n, useTranslators } from "@/lib/i18n";
 import { getMe } from "@/backend/functions/auth.functions";
+import { getMyKpiEvaluation } from "@/backend/functions/kpi-evaluations.functions";
 import { listMyAttendance } from "@/backend/functions/attendance.functions";
 import { listMyLeaves } from "@/backend/functions/leaves.functions";
 import { listHolidays } from "@/backend/functions/holidays.functions";
@@ -31,6 +32,7 @@ import { formatDate } from "@/lib/date-format";
 
 export function EmployeeDashboard() {
   const { t, lang } = useI18n();
+  const session = useSession();
   const { tName, tDept, tBranch, tHoliday } = useTranslators();
   const [now, setNow] = useState(new Date());
   const [showKpiModal, setShowKpiModal] = useState(false);
@@ -44,8 +46,38 @@ export function EmployeeDashboard() {
   const attQ = useQuery({ queryKey: ["my-attendance"], queryFn: () => attFn() });
   const lvQ = useQuery({ queryKey: ["my-leaves"], queryFn: () => lvFn() });
   const holQ = useQuery({ queryKey: ["holidays"], queryFn: () => holFn() });
+  const getMyKpiFn = useServerFn(getMyKpiEvaluation);
+  const currentYear = new Date().getFullYear();
+  const { data: myKpiEval } = useQuery({
+    queryKey: ["my-kpi-evaluation", currentYear],
+    queryFn: () => getMyKpiFn({ data: { year: currentYear } }),
+    enabled: !!session,
+  });
 
-  const session = useSession();
+  const kpiQuarterly = useMemo(() => {
+    const scores = (myKpiEval?.scores as Record<string, any>) || {};
+    let q1 = 0, q2 = 0, q3 = 0, q4 = 0;
+    let hasQ1 = false, hasQ2 = false, hasQ3 = false, hasQ4 = false;
+
+    Object.values(scores).forEach((item: any) => {
+      if (item?.q1?.score !== null && item?.q1?.score !== undefined) { q1 += item.q1.score; hasQ1 = true; }
+      if (item?.q2?.score !== null && item?.q2?.score !== undefined) { q2 += item.q2.score; hasQ2 = true; }
+      if (item?.q3?.score !== null && item?.q3?.score !== undefined) { q3 += item.q3.score; hasQ3 = true; }
+      if (item?.q4?.score !== null && item?.q4?.score !== undefined) { q4 += item.q4.score; hasQ4 = true; }
+    });
+
+    const total = myKpiEval?.summary?.totalScore ?? (hasQ1 || hasQ2 || hasQ3 || hasQ4 ? ((q1 + q2 + q3 + q4) * 100) : null);
+    return {
+      q1: hasQ1 ? `${(q1 * 100).toFixed(1)}%` : "—",
+      q2: hasQ2 ? `${(q2 * 100).toFixed(1)}%` : "—",
+      q3: hasQ3 ? `${(q3 * 100).toFixed(1)}%` : "—",
+      q4: hasQ4 ? `${(q4 * 100).toFixed(1)}%` : "—",
+      total: total !== null ? `${Number(total).toFixed(1)}%` : null,
+      rating: myKpiEval?.summary?.rating || null,
+      status: myKpiEval?.status || null,
+    };
+  }, [myKpiEval]);
+
   const employees = useStore((s) => s.employees);
   const currentEmpId = useStore((s) => s.currentEmployeeId);
   const meId = session?.employeeId ?? employees.find((e) => e.name === session?.name)?.id ?? currentEmpId;
@@ -227,29 +259,28 @@ export function EmployeeDashboard() {
           </div>
         </Link>
 
-        {/* 5 - KPIS (Hot Rose / Fuchsia) */}
-        <button
-          type="button"
-          onClick={() => setShowKpiModal(true)}
-          className="group relative flex flex-col justify-between text-start overflow-hidden rounded-2xl border border-rose-500/30 bg-gradient-to-br from-rose-500/15 via-pink-500/5 to-card p-4 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-rose-500/60 hover:shadow-md hover:shadow-rose-500/10 active:scale-[0.98]"
+        {/* 5 - Performance and KPIs (Hot Rose / Fuchsia) */}
+        <Link
+          to="/employee/kpis"
+          className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-rose-500/30 bg-gradient-to-br from-rose-500/15 via-pink-500/5 to-card p-4 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-rose-500/60 hover:shadow-md hover:shadow-rose-500/10 active:scale-[0.98]"
         >
           <div className="flex items-start justify-between w-full">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-rose-500 text-white shadow-md shadow-rose-500/30">
               <TrendingUp className="h-5 w-5" />
             </div>
-            <span className="inline-flex items-center rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] font-semibold text-rose-700 dark:text-rose-300 border border-rose-500/30">
-              {monthStats.attendanceRate}%
+            <span className="inline-flex items-center rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] font-semibold text-rose-700 dark:text-rose-300 border border-rose-500/30 font-mono">
+              {kpiQuarterly.total || `${monthStats.attendanceRate}%`}
             </span>
           </div>
           <div className="mt-4 w-full">
             <h3 className="font-display text-sm font-semibold text-foreground group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors">
-              {t("kpis")}
+              {lang === "ar" ? "الأداء ومؤشرات الأداء" : "Performance and KPIs"}
             </h3>
             <p className="mt-0.5 text-[11px] text-muted-foreground truncate">
-              {lang === "ar" ? "الأداء والأهداف" : "Performance & Goals"}
+              {kpiQuarterly.total ? (lang === "ar" ? `التقييم السنوي: ${kpiQuarterly.total}` : `Annual Score: ${kpiQuarterly.total}`) : (lang === "ar" ? "مصفوفة الأداء الربع سنوية" : "Quarterly Scorecard & Review")}
             </p>
           </div>
-        </button>
+        </Link>
 
         {/* 6 - More (Ocean Teal / Cyan) */}
         <Link
@@ -275,6 +306,70 @@ export function EmployeeDashboard() {
         </Link>
       </section>
 
+      {/* Performance & KPIs Quarterly Breakdown Card */}
+      <section className="rounded-2xl border border-rose-500/25 bg-gradient-to-br from-card via-card to-rose-500/5 p-4 shadow-xs space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500 text-white shadow-xs">
+              <Award className="h-4 w-4" />
+            </div>
+            <div>
+              <h2 className="font-display text-sm font-semibold text-foreground">
+                {lang === "ar" ? "الأداء ومؤشرات الأداء (KPIs)" : "Performance and KPIs"}
+              </h2>
+              <p className="text-[11px] text-muted-foreground">
+                {lang === "ar" ? `تقييم عام ${currentYear} — النتائج الربع سنوية` : `Year ${currentYear} Evaluation — Quarterly Scores`}
+              </p>
+            </div>
+          </div>
+
+          <Link
+            to="/employee/kpis"
+            className="inline-flex items-center gap-1 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:underline"
+          >
+            <span>{lang === "ar" ? "عرض التفاصيل" : "View Details"}</span>
+            <ArrowUpRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+
+        {/* 4 Quarters Pill Grid: Q1, Q2, Q3, Q4 with individual values and clickable redirects */}
+        <div className="grid grid-cols-4 gap-2 pt-1">
+          {[
+            { q: "q1", label: "Q1", label_ar: "الربع 1", val: kpiQuarterly.q1 },
+            { q: "q2", label: "Q2", label_ar: "الربع 2", val: kpiQuarterly.q2 },
+            { q: "q3", label: "Q3", label_ar: "الربع 3", val: kpiQuarterly.q3 },
+            { q: "q4", label: "Q4", label_ar: "الربع 4", val: kpiQuarterly.q4 },
+          ].map((item) => (
+            <Link
+              key={item.q}
+              to="/employee/kpis"
+              className="flex flex-col items-center justify-center p-2 rounded-xl border border-border/80 bg-background/80 hover:bg-rose-500/10 hover:border-rose-500/40 transition-all text-center group active:scale-95"
+            >
+              <span className="text-[10px] font-bold text-muted-foreground uppercase group-hover:text-rose-600">
+                {lang === "ar" ? item.label_ar : item.label}
+              </span>
+              <span className="font-mono text-xs font-extrabold text-foreground mt-0.5">
+                {item.val}
+              </span>
+            </Link>
+          ))}
+        </div>
+
+        {/* Bottom status & overall summary */}
+        <div className="flex items-center justify-between pt-1 border-t border-border/60 text-xs">
+          <span className="text-muted-foreground">
+            {kpiQuarterly.rating ? (
+              <span className="font-medium text-foreground">{kpiQuarterly.rating}</span>
+            ) : (
+              <span>{lang === "ar" ? "قائمة الـ 17 مؤشراً المعتمدة" : "17 Certified Engineering KPIs"}</span>
+            )}
+          </span>
+          <span className="font-mono font-bold text-rose-600 dark:text-rose-400">
+            {kpiQuarterly.total ? (lang === "ar" ? `المجموع السنوي: ${kpiQuarterly.total}` : `Annual: ${kpiQuarterly.total}`) : (lang === "ar" ? "بانتظار الاعتماد" : "Scorecard Active")}
+          </span>
+        </div>
+      </section>
+
       {/* KPI Details Modal */}
       <Dialog open={showKpiModal} onOpenChange={setShowKpiModal}>
         <DialogContent className="sm:max-w-md rounded-3xl">
@@ -282,7 +377,7 @@ export function EmployeeDashboard() {
             <div className="flex items-center gap-2 text-brand">
               <TrendingUp className="h-5 w-5" />
               <DialogTitle className="font-display text-lg font-semibold">
-                {lang === "ar" ? "مؤشرات الأداء (KPIs)" : "Performance & KPIs"}
+                {lang === "ar" ? "الأداء ومؤشرات الأداء (KPIs)" : "Performance and KPIs"}
               </DialogTitle>
             </div>
             <p className="text-xs text-muted-foreground">

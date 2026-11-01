@@ -286,7 +286,7 @@ export const ui = {
   netPay: "Net Pay",
   dailyRate: "Daily Rate",
   kpi: "KPI",
-  kpis: "KPIs",
+  kpis: "Performance and KPIs",
   kpiEvaluations: "KPI Evaluations",
   attendanceRecords: "Attendance Records",
   requestsSummary: "Requests (Leaves, Permissions, loans)",

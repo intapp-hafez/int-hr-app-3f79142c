@@ -51,6 +51,7 @@ export type MyProfileDetails = {
   national_id: string | null;
   department: string | null;
   position: string | null;
+  position_ar?: string | null;
   manager: string | null;
   salary_mode: string | null;
   salary_amount: number | null;
@@ -75,7 +76,7 @@ export const getMyProfileDetails = createServerFn({ method: "GET" })
         ? supabase.from("departments").select("name_en").eq("id", p.department_id).maybeSingle()
         : Promise.resolve({ data: null }),
       p.position_id
-        ? supabase.from("positions").select("name_en").eq("id", p.position_id).maybeSingle()
+        ? supabase.from("positions").select("name_en, name_ar").eq("id", p.position_id).maybeSingle()
         : Promise.resolve({ data: null }),
       p.manager_id
         ? supabase.from("profiles").select("full_name").eq("id", p.manager_id).maybeSingle()
@@ -98,7 +99,8 @@ export const getMyProfileDetails = createServerFn({ method: "GET" })
       email: p.email ?? null,
       national_id: p.national_id ?? null,
       department: (dept as { name_en?: string } | null)?.name_en ?? null,
-      position: (pos as { name_en?: string } | null)?.name_en ?? null,
+      position: (pos as { name_en?: string; name_ar?: string } | null)?.name_en ?? null,
+      position_ar: (pos as { name_en?: string; name_ar?: string } | null)?.name_ar ?? null,
       manager: (mgr as { full_name?: string } | null)?.full_name ?? null,
       salary_mode: p.salary_mode ?? null,
       salary_amount: salaryAmount != null ? Number(salaryAmount) : null,

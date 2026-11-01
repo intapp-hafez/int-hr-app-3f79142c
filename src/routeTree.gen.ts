@@ -61,6 +61,7 @@ import { Route as EmployeeAttendanceRouteImport } from './routes/employee.attend
 import { Route as EmployeeBiometricsRouteImport } from './routes/employee.biometrics'
 import { Route as EmployeeChatRouteImport } from './routes/employee.chat'
 import { Route as EmployeeCheckRouteImport } from './routes/employee.check'
+import { Route as EmployeeKpisRouteImport } from './routes/employee.kpis'
 import { Route as EmployeeLeavesRouteImport } from './routes/employee.leaves'
 import { Route as EmployeeMessagesRouteImport } from './routes/employee.messages'
 import { Route as EmployeeNotificationsRouteImport } from './routes/employee.notifications'
@@ -367,6 +368,11 @@ const EmployeeCheckRoute = EmployeeCheckRouteImport.update({
   path: '/check',
   getParentRoute: () => EmployeeRoute,
 } as any)
+const EmployeeKpisRoute = EmployeeKpisRouteImport.update({
+  id: '/kpis',
+  path: '/kpis',
+  getParentRoute: () => EmployeeRoute,
+} as any)
 const EmployeeLeavesRoute = EmployeeLeavesRouteImport.update({
   id: '/leaves',
   path: '/leaves',
@@ -632,6 +638,7 @@ export interface FileRoutesByFullPath {
   '/employee/biometrics': typeof EmployeeBiometricsRoute
   '/employee/chat': typeof EmployeeChatRoute
   '/employee/check': typeof EmployeeCheckRoute
+  '/employee/kpis': typeof EmployeeKpisRoute
   '/employee/leaves': typeof EmployeeLeavesRoute
   '/employee/messages': typeof EmployeeMessagesRoute
   '/employee/notifications': typeof EmployeeNotificationsRoute
@@ -721,6 +728,7 @@ export interface FileRoutesByTo {
   '/employee/biometrics': typeof EmployeeBiometricsRoute
   '/employee/chat': typeof EmployeeChatRoute
   '/employee/check': typeof EmployeeCheckRoute
+  '/employee/kpis': typeof EmployeeKpisRoute
   '/employee/leaves': typeof EmployeeLeavesRoute
   '/employee/messages': typeof EmployeeMessagesRoute
   '/employee/notifications': typeof EmployeeNotificationsRoute
@@ -818,6 +826,7 @@ export interface FileRoutesById {
   '/employee/biometrics': typeof EmployeeBiometricsRoute
   '/employee/chat': typeof EmployeeChatRoute
   '/employee/check': typeof EmployeeCheckRoute
+  '/employee/kpis': typeof EmployeeKpisRoute
   '/employee/leaves': typeof EmployeeLeavesRoute
   '/employee/messages': typeof EmployeeMessagesRoute
   '/employee/notifications': typeof EmployeeNotificationsRoute
@@ -916,6 +925,7 @@ export interface FileRouteTypes {
     | '/employee/biometrics'
     | '/employee/chat'
     | '/employee/check'
+    | '/employee/kpis'
     | '/employee/leaves'
     | '/employee/messages'
     | '/employee/notifications'
@@ -1005,6 +1015,7 @@ export interface FileRouteTypes {
     | '/employee/biometrics'
     | '/employee/chat'
     | '/employee/check'
+    | '/employee/kpis'
     | '/employee/leaves'
     | '/employee/messages'
     | '/employee/notifications'
@@ -1101,6 +1112,7 @@ export interface FileRouteTypes {
     | '/employee/biometrics'
     | '/employee/chat'
     | '/employee/check'
+    | '/employee/kpis'
     | '/employee/leaves'
     | '/employee/messages'
     | '/employee/notifications'
@@ -1523,6 +1535,13 @@ declare module '@tanstack/react-router' {
       path: '/check'
       fullPath: '/employee/check'
       preLoaderRoute: typeof EmployeeCheckRouteImport
+      parentRoute: typeof EmployeeRoute
+    }
+    '/employee/kpis': {
+      id: '/employee/kpis'
+      path: '/kpis'
+      fullPath: '/employee/kpis'
+      preLoaderRoute: typeof EmployeeKpisRouteImport
       parentRoute: typeof EmployeeRoute
     }
     '/employee/leaves': {
@@ -1957,6 +1976,7 @@ interface EmployeeRouteChildren {
   EmployeeBiometricsRoute: typeof EmployeeBiometricsRoute
   EmployeeChatRoute: typeof EmployeeChatRoute
   EmployeeCheckRoute: typeof EmployeeCheckRoute
+  EmployeeKpisRoute: typeof EmployeeKpisRoute
   EmployeeLeavesRoute: typeof EmployeeLeavesRoute
   EmployeeMessagesRoute: typeof EmployeeMessagesRoute
   EmployeeNotificationsRoute: typeof EmployeeNotificationsRoute
@@ -1972,6 +1992,7 @@ const EmployeeRouteChildren: EmployeeRouteChildren = {
   EmployeeBiometricsRoute: EmployeeBiometricsRoute,
   EmployeeChatRoute: EmployeeChatRoute,
   EmployeeCheckRoute: EmployeeCheckRoute,
+  EmployeeKpisRoute: EmployeeKpisRoute,
   EmployeeLeavesRoute: EmployeeLeavesRoute,
   EmployeeMessagesRoute: EmployeeMessagesRoute,
   EmployeeNotificationsRoute: EmployeeNotificationsRoute,

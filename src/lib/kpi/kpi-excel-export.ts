@@ -170,3 +170,108 @@ export function exportKpiEvaluationToExcel(
   XLSX.writeFile(wb, fileName);
 }
 
+
+
+export interface AllEvaluationsExportRow {
+  index: number;
+  code: string;
+  name: string;
+  department: string;
+  position: string;
+  q1: string;
+  q2: string;
+  q3: string;
+  q4: string;
+  total: string;
+  rating: string;
+  status: string;
+  evaluator: string;
+  approvedDate: string;
+}
+
+export function exportAllKpiEvaluationsToExcel(
+  items: AllEvaluationsExportRow[],
+  year: number | string,
+  isAr = false
+) {
+  const wb = XLSX.utils.book_new();
+
+  const title = isAr
+    ? `شركة إنترجريتد تكنيكس — التقرير السنوي لتقييم مؤشرات الأداء (عام ${year})`
+    : `INTEGRATED TECHNICS — Annual KPI Performance Evaluations Summary (${year})`;
+
+  const headers = isAr
+    ? [
+        "#",
+        "كود الموظف",
+        "اسم الموظف",
+        "القسم",
+        "المسمى الوظيفي",
+        "الربع 1",
+        "الربع 2",
+        "الربع 3",
+        "الربع 4",
+        "المجموع السنوي",
+        "مستوى التقييم",
+        "الحالة",
+        "المُقيِّم",
+        "تاريخ الاعتماد",
+      ]
+    : [
+        "#",
+        "Employee Code",
+        "Full Name",
+        "Department",
+        "Position",
+        "Q1",
+        "Q2",
+        "Q3",
+        "Q4",
+        "Annual Total",
+        "Rating Tier",
+        "Status",
+        "Evaluator",
+        "Approval Date",
+      ];
+
+  const rows = items.map((it) => [
+    it.index,
+    it.code,
+    it.name,
+    it.department,
+    it.position,
+    it.q1,
+    it.q2,
+    it.q3,
+    it.q4,
+    it.total,
+    it.rating,
+    it.status,
+    it.evaluator,
+    it.approvedDate,
+  ]);
+
+  const aoa = [[title], [], headers, ...rows];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+  ws["!cols"] = [
+    { wch: 6 },
+    { wch: 14 },
+    { wch: 28 },
+    { wch: 22 },
+    { wch: 28 },
+    { wch: 10 },
+    { wch: 10 },
+    { wch: 10 },
+    { wch: 10 },
+    { wch: 14 },
+    { wch: 22 },
+    { wch: 14 },
+    { wch: 22 },
+    { wch: 16 },
+  ];
+
+  XLSX.utils.book_append_sheet(wb, ws, isAr ? "تقييمات الأداء" : "All Evaluations");
+  const fileName = `All_Employees_KPI_Evaluations_${year}.xlsx`;
+  XLSX.writeFile(wb, fileName);
+}

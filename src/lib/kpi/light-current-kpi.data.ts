@@ -46,6 +46,25 @@ export interface KpiCategorySummary {
   percentage: number;
 }
 
+export interface KpiDiscipline {
+  id: string;
+  name: string;
+  name_ar: string;
+  weight: number; // e.g. 0.10 for 10%
+  isDefault?: boolean;
+}
+
+export const DEFAULT_KPI_DISCIPLINES: KpiDiscipline[] = [
+  { id: "installation", name: "Installation & Technical Execution", name_ar: "التنفيذ الفني والتركيبات", weight: 0.10, isDefault: true },
+  { id: "commissioning", name: "Commissioning & System Programming", name_ar: "التشغيل والبرمجة", weight: 0.15, isDefault: true },
+  { id: "integration", name: "System Integration", name_ar: "تكامل الأنظمة", weight: 0.15, isDefault: true },
+  { id: "troubleshooting", name: "Troubleshooting & Testing", name_ar: "استكشاف الأعطال والاختبار", weight: 0.15, isDefault: true },
+  { id: "reporting", name: "Reporting & Support", name_ar: "التقارير والدعم الفني", weight: 0.10, isDefault: true },
+  { id: "coordination", name: "Cross-Discipline Coordination", name_ar: "التنسيق بين التخصصات", weight: 0.10, isDefault: true },
+  { id: "development", name: "Professional Development", name_ar: "التطوير المهني", weight: 0.10, isDefault: true },
+  { id: "soft_skills", name: "Soft Skills / Behavioral Competencies", name_ar: "المهارات الشخصية والسلوكية", weight: 0.15, isDefault: true },
+];
+
 export const KPI_CATEGORIES = [
   "Installation & Technical Execution",
   "Commissioning & System Programming",
@@ -475,17 +494,17 @@ export const RATING_SCALE: PerformanceRating[] = [
   },
 ];
 
-export function getRatingFromScore(score: number | null): PerformanceRating {
-  if (score === null || isNaN(score)) {
+export function getRatingFromScore(score: number | null, hasData = true): PerformanceRating {
+  if (score === null || isNaN(score) || !hasData || score === 0) {
     return {
-      tier: "Unsatisfactory",
-      tier_ar: "غير متوفر",
+      tier: "Pending Evaluation",
+      tier_ar: "بانتظار التقييم",
       minScore: 0,
       color: "#94a3b8",
       badgeClass: "bg-muted text-muted-foreground border-border",
       bgClass: "bg-muted/30",
       description: "No evaluation entered yet.",
-      description_ar: "لم يتم إدخال بيانات التقييم بعد.",
+      description_ar: "لم يتم رصد نتائج التقييم بعد.",
     };
   }
   for (const rating of RATING_SCALE) {

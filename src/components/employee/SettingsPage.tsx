@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useI18n, useTranslators, LanguageToggle } from "@/lib/i18n";
-import { ChevronRight, Globe, Bell, MapPin, Wifi, Lock, LogOut, Smartphone, Check, ChevronDown, Shield, Signal, CircleDot, X, Eye, EyeOff, CalendarDays, MessageSquare, IdCard, User, Phone, Mail, Building2, UserCog, Wallet, FileSignature, CalendarClock, Fingerprint, Banknote, Clock } from "lucide-react";
+import { ChevronRight, Globe, Bell, MapPin, Wifi, Lock, LogOut, Smartphone, Check, ChevronDown, Shield, Signal, CircleDot, X, Eye, EyeOff, CalendarDays, MessageSquare, IdCard, User, Phone, Mail, Building2, UserCog, Briefcase, Fingerprint, Banknote, Clock } from "lucide-react";
 import { InstallButton } from "@/components/InstallButton";
 import {
   useStore,
@@ -41,6 +41,7 @@ export function SettingsPage() {
   const realProfile = realMe?.profile as { id?: string; full_name?: string | null; email?: string | null; avatar_url?: string | null; emp_code?: string | null } | undefined;
   const detailsFn = useServerFn(getMyProfileDetails);
   const { data: details } = useQuery({ queryKey: ["me", "details"], queryFn: () => detailsFn(), staleTime: 30_000 });
+  const displayPosition = (lang === "ar" && details?.position_ar ? details.position_ar : details?.position) || (me as any)?.position || null;
   const locations = useStore((s) => s.locations);
   const networks = useStore((s) => s.networks);
   const [deviceId, setDeviceId] = useState("");
@@ -167,7 +168,7 @@ export function SettingsPage() {
           )}
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">{realProfile?.full_name ?? me?.name ?? realProfile?.email}</p>
-            <p className="truncate text-xs text-muted-foreground">{realProfile?.email ?? `${me?.id} • ${tDept(me?.dept)}`}</p>
+            <p className="truncate text-xs text-muted-foreground">{displayPosition ? `${displayPosition} • ` : ""}{realProfile?.email ?? `${me?.id} • ${tDept(me?.dept)}`}</p>
             {realProfile?.emp_code && (
               <p className="mt-1 inline-block rounded-md bg-muted px-2 py-0.5 font-mono text-[11px] font-semibold text-foreground">
                 {realProfile.emp_code}
@@ -187,34 +188,14 @@ export function SettingsPage() {
           onToggle={() => setOpenProfile((v) => !v)}
         >
           <dl className="divide-y divide-border">
-            <ProfileRow icon={IdCard} label="Employee code" value={details?.emp_code} mono />
-            <ProfileRow icon={User} label="Full name" value={details?.full_name} />
-            <ProfileRow icon={Phone} label="Phone" value={details?.phone} />
-            <ProfileRow icon={Mail} label="Email" value={details?.email} />
-            <ProfileRow icon={IdCard} label="National ID" value={details?.national_id} mono />
-            <ProfileRow icon={Building2} label="Department" value={details?.department} />
-            <ProfileRow icon={UserCog} label="Manager" value={details?.manager} />
-            <ProfileRow
-              icon={Wallet}
-              label="Salary"
-              value={
-                details?.salary_amount != null
-                  ? `${details.salary_amount.toLocaleString()} EGP${details.salary_mode ? ` (${details.salary_mode})` : ""}`
-                  : null
-              }
-            />
-            <ProfileRow icon={FileSignature} label="Contract" value={details?.contract_type} />
-            <ProfileRow
-              icon={CalendarClock}
-              label="Contract remaining"
-              value={
-                details?.contract_remaining_days == null
-                  ? null
-                  : details.contract_remaining_days < 0
-                    ? `Expired ${Math.abs(details.contract_remaining_days)} day(s) ago`
-                    : `${details.contract_remaining_days} day(s)`
-              }
-            />
+            <ProfileRow icon={IdCard} label={lang === "ar" ? "كود الموظف" : "Employee code"} value={details?.emp_code} mono />
+            <ProfileRow icon={User} label={lang === "ar" ? "الاسم الكامل" : "Full name"} value={details?.full_name} />
+            <ProfileRow icon={Phone} label={lang === "ar" ? "رقم الهاتف" : "Phone"} value={details?.phone} />
+            <ProfileRow icon={Mail} label={lang === "ar" ? "البريد الإلكتروني" : "Email"} value={details?.email} />
+            <ProfileRow icon={IdCard} label={lang === "ar" ? "الرقم القومي" : "National ID"} value={details?.national_id} mono />
+            <ProfileRow icon={Building2} label={lang === "ar" ? "القسم" : "Department"} value={details?.department} />
+            <ProfileRow icon={Briefcase} label={lang === "ar" ? "المسمى الوظيفي" : "Position"} value={displayPosition} />
+            <ProfileRow icon={UserCog} label={lang === "ar" ? "المدير المباشر" : "Manager"} value={details?.manager} />
           </dl>
         </ExpandableRow>
       </section>
