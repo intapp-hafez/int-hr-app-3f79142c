@@ -1,8 +1,8 @@
 {
   "info": {
-    "_postman_id": "c8e1927d-789a-4c28-98f5-b28392019482",
-    "name": "INT HR System API Collection",
-    "description": "Complete, production-ready Postman Collection for the INT HR application. Covers all TanStack Start server functions, Supabase Edge Functions, and REST endpoints for Auth, Attendance, Biometrics, Leaves, Payroll, Solaf (Advances), and the new 3-Layer Quarterly KPI & Performance Evaluation module.",
+    "_postman_id": "int-hr-platform-v2-full-api-collection",
+    "name": "INT HR Platform API - Complete Server Functions Collection",
+    "description": "Complete and exhaustive Postman collection for the INT HR Management System (TanStack Start server functions & Supabase Edge Functions). Includes full request schemas, input payloads, authentication tokens, and headers for Employees, Geofencing, Biometrics, Attendance, Leaves, Advances/Solaf, Permissions, Contracts, Custody, KPIs, Tasks, Trips, Payroll, and Security.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -10,49 +10,79 @@
       "key": "base_url",
       "value": "http://localhost:5173",
       "type": "string",
-      "description": "App base URL (TanStack Start Server Functions)"
+      "description": "Application host (local dev server or production deployment)"
     },
     {
       "key": "supabase_url",
       "value": "https://hydakxwzpfzwolencnmp.supabase.co",
       "type": "string",
-      "description": "Remote Supabase project API URL"
-    },
-    {
-      "key": "jwt_token",
-      "value": "YOUR_SUPABASE_JWT_ACCESS_TOKEN",
-      "type": "string",
-      "description": "Bearer authentication token for the signed-in user"
+      "description": "Supabase project REST and Auth base URL"
     },
     {
       "key": "supabase_anon_key",
-      "value": "YOUR_SUPABASE_ANON_KEY",
+      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5ZGFreHd6cGZ6d29sZW5jbm1wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYwNTI1NjcsImV4cCI6MjA2MTYyODU2N30.ZkHlX30H3N7_lF9rD6_V5PzW8xK7J3Y5t8Xb4p9o3",
       "type": "string",
-      "description": "Public client publishable anon key"
+      "description": "Supabase anonymous public API key"
+    },
+    {
+      "key": "jwt_token",
+      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "type": "string",
+      "description": "Authenticated user JWT access token passed in Authorization: Bearer header"
+    },
+    {
+      "key": "sample_employee_id",
+      "value": "00000000-0000-0000-0000-000000000001",
+      "type": "string",
+      "description": "Sample Employee Profile UUID"
+    },
+    {
+      "key": "sample_geofence_id",
+      "value": "00000000-0000-0000-0000-000000000002",
+      "type": "string",
+      "description": "Sample Geofence Location UUID"
+    },
+    {
+      "key": "sample_leave_id",
+      "value": "00000000-0000-0000-0000-000000000003",
+      "type": "string",
+      "description": "Sample Leave Request UUID"
+    },
+    {
+      "key": "sample_advance_id",
+      "value": "00000000-0000-0000-0000-000000000004",
+      "type": "string",
+      "description": "Sample Advance Request UUID"
     }
   ],
   "item": [
     {
-      "name": "1. Authentication & Profile",
-      "description": "Supabase identity authentication, user role extraction, and employee profile inspection.",
+      "name": "1. Authentication & RBAC",
       "item": [
         {
-          "name": "Supabase Sign-In (Get JWT Token)",
+          "name": "Supabase Auth - Login (Password)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/json",
+                "type": "text"
               },
               {
                 "key": "apikey",
-                "value": "{{supabase_anon_key}}"
+                "value": "{{supabase_anon_key}}",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"admin@int.com\",\n  \"password\": \"YourPassword123!\"\n}"
+              "raw": "{\n  \"email\": \"admin@inthr.com\",\n  \"password\": \"SecurePassword123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{supabase_url}}/auth/v1/token?grant_type=password",
@@ -71,26 +101,80 @@
                 }
               ]
             },
-            "description": "Authenticates with Supabase Auth and returns an access_token JWT."
-          }
+            "description": "Authenticate directly with Supabase Auth using email and password to receive access_token and refresh_token."
+          },
+          "response": []
         },
         {
-          "name": "Get Current User & Roles (getMe)",
+          "name": "Supabase Auth - Refresh Token",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/json",
+                "type": "text"
               },
               {
-                "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
+                "key": "apikey",
+                "value": "{{supabase_anon_key}}",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{}"
+              "raw": "{\n  \"refresh_token\": \"your-refresh-token-here\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{supabase_url}}/auth/v1/token?grant_type=refresh_token",
+              "host": [
+                "{{supabase_url}}"
+              ],
+              "path": [
+                "auth",
+                "v1",
+                "token"
+              ],
+              "query": [
+                {
+                  "key": "grant_type",
+                  "value": "refresh_token"
+                }
+              ]
+            },
+            "description": "Refresh expired session JWT using refresh token."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Current User Profile (getMe)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{base_url}}/_server/getMe",
@@ -102,19 +186,35 @@
                 "getMe"
               ]
             },
-            "description": "Extracts session and returns current user ID, email, emp_code, and active database roles from public.user_roles."
-          }
+            "description": "Fetches the current authenticated user profile, employee code, active status, and primary role."
+          },
+          "response": []
         },
         {
-          "name": "Get Full Profile Details (getMyProfileDetails)",
+          "name": "Get My Profile Full Details (getMyProfileDetails)",
           "request": {
-            "method": "GET",
+            "method": "POST",
             "header": [
               {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
                 "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
               }
             ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
             "url": {
               "raw": "{{base_url}}/_server/getMyProfileDetails",
               "host": [
@@ -125,459 +225,3721 @@
                 "getMyProfileDetails"
               ]
             },
-            "description": "Returns employee profile including bilingual position, department, direct manager, and base salary."
-          }
+            "description": "Fetches detailed employee profile, company department, job position, city, and settings."
+          },
+          "response": []
         },
         {
-          "name": "Change Account Password (Admin Only)",
+          "name": "Assign Role to User (assignRole)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/json",
+                "type": "text"
               },
               {
                 "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"data\": {\n    \"targetUserId\": \"00000000-0000-0000-0000-000000000000\",\n    \"newPassword\": \"NewSecurePassword2026!\"\n  }\n}"
+              "raw": "{\n  \"data\": {\n    \"targetUserId\": \"{{sample_employee_id}}\",\n    \"role\": \"hr\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
-              "raw": "{{base_url}}/_server/changeAccountPassword",
+              "raw": "{{base_url}}/_server/assignRole",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "_server",
-                "changeAccountPassword"
+                "assignRole"
               ]
             },
-            "description": "Allows Admin to change password for any account using the deployed isolated send-smtp-email service."
-          }
+            "description": "Assigns an administrative or functional role (admin, hr, manager, finance, employee) to a user."
+          },
+          "response": []
+        },
+        {
+          "name": "Bulk Change Roles (bulkChangeRole)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"assignments\": [\n      {\n        \"userId\": \"{{sample_employee_id}}\",\n        \"role\": \"manager\"\n      }\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/bulkChangeRole",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "bulkChangeRole"
+              ]
+            },
+            "description": "Updates roles in bulk for multiple staff members."
+          },
+          "response": []
+        },
+        {
+          "name": "List Role Audit Log (listRoleAudit)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"limit\": 50\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/listRoleAudit",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "listRoleAudit"
+              ]
+            },
+            "description": "Retrieves the security audit log of all role elevation and assignment changes."
+          },
+          "response": []
         }
       ]
     },
     {
-      "name": "2. Employees & Organization",
-      "description": "Employee master directory, department structures, position levels, and manager reporting lines.",
+      "name": "2. Employees Management",
       "item": [
         {
-          "name": "List Employees (Admin / HR Paginated)",
+          "name": "Create Employee Admin (createEmployeeAdmin)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/json",
+                "type": "text"
               },
               {
                 "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"data\": {\n    \"page\": 1,\n    \"pageSize\": 15,\n    \"search\": \"Ahmed\",\n    \"departmentId\": null,\n    \"status\": \"active\"\n  }\n}"
+              "raw": "{\n  \"data\": {\n    \"name\": \"Ahmed Hassan\",\n    \"nameAr\": \"أحمد حسن\",\n    \"email\": \"ahmed.hassan@company.com\",\n    \"phone\": \"+201012345678\",\n    \"password\": \"InitialPassword123!\",\n    \"dept\": \"Engineering\",\n    \"position\": \"Senior Network Engineer\",\n    \"role\": \"employee\",\n    \"status\": \"Active\",\n    \"gender\": \"male\",\n    \"city\": \"Cairo\",\n    \"district\": \"Nasr City\",\n    \"nationalId\": \"29501011234567\",\n    \"salaryMode\": \"net\",\n    \"salaryNet\": 18500,\n    \"salaryGross\": 22000,\n    \"annualAdvanceLimit\": 50000\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
-              "raw": "{{base_url}}/_server/listEmployeesAdmin",
+              "raw": "{{base_url}}/_server/createEmployeeAdmin",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "_server",
-                "listEmployeesAdmin"
+                "createEmployeeAdmin"
               ]
             },
-            "description": "Returns paginated list of employee profiles with department, position, and status filters."
-          }
+            "description": "Admin endpoint to provision a new employee account, auth user, profile record, and initial payroll salary settings."
+          },
+          "response": []
         },
         {
-          "name": "Get Manager Direct Team (getMyTeam)",
+          "name": "Update Employee Admin (updateEmployeeAdmin)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/json",
+                "type": "text"
               },
               {
                 "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"data\": {}\n}"
+              "raw": "{\n  \"data\": {\n    \"id\": \"{{sample_employee_id}}\",\n    \"full_name\": \"Ahmed Hassan Updated\",\n    \"full_name_ar\": \"أحمد حسن معدل\",\n    \"phone\": \"+201098765432\",\n    \"city\": \"Giza\",\n    \"district\": \"Dokki\",\n    \"status\": \"Active\",\n    \"salary_mode\": \"net\",\n    \"salary_net\": 20000\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
-              "raw": "{{base_url}}/_server/getMyTeam",
+              "raw": "{{base_url}}/_server/updateEmployeeAdmin",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "_server",
-                "getMyTeam"
+                "updateEmployeeAdmin"
               ]
             },
-            "description": "Returns direct reporting team members and department subordinates for the calling manager."
-          }
+            "description": "Admin endpoint to update personal details, job assignment, contact info, and compensation parameters of an employee."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Employee Detail (getEmployeeDetail)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"employeeId\": \"{{sample_employee_id}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/getEmployeeDetail",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "getEmployeeDetail"
+              ]
+            },
+            "description": "Fetches complete employee detail including contract, documents, equipment custody, and salary info."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete / Terminate Employee (deleteEmployeeAdmin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"id\": \"{{sample_employee_id}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/deleteEmployeeAdmin",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "deleteEmployeeAdmin"
+              ]
+            },
+            "description": "Marks an employee as deleted/inactive and revokes active session credentials."
+          },
+          "response": []
+        },
+        {
+          "name": "Bulk Set Employee Status (bulkSetEmployeeStatus)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"ids\": [\n      \"{{sample_employee_id}}\"\n    ],\n    \"status\": \"Active\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/bulkSetEmployeeStatus",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "bulkSetEmployeeStatus"
+              ]
+            },
+            "description": "Changes the status (Active or Inactive) for multiple employees simultaneously."
+          },
+          "response": []
+        },
+        {
+          "name": "Admin Transfer Employee Department (adminTransferEmployee)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"employeeId\": \"{{sample_employee_id}}\",\n    \"newDepartmentId\": \"00000000-0000-0000-0000-000000000010\",\n    \"newPositionId\": \"00000000-0000-0000-0000-000000000020\",\n    \"effectiveDate\": \"2026-11-01\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/adminTransferEmployee",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "adminTransferEmployee"
+              ]
+            },
+            "description": "Transfers an employee to a new department and job position with audit tracking."
+          },
+          "response": []
+        },
+        {
+          "name": "List Employees for Attendance (listEmployeesForAttendance)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"departmentId\": null,\n    \"status\": \"Active\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/listEmployeesForAttendance",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "listEmployeesForAttendance"
+              ]
+            },
+            "description": "Lists active employees with their current geofence and attendance requirement settings."
+          },
+          "response": []
         }
       ]
     },
     {
-      "name": "3. Attendance & Biometric Verification",
-      "description": "GPS geofence attendance check-in/out, biometric liveness challenges, and anti-spoofing verification.",
+      "name": "3. Geofencing & Locations",
       "item": [
         {
-          "name": "Generate Biometric Challenge Token",
+          "name": "List Geofences Admin (listGeofencesAdmin)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/json",
+                "type": "text"
               },
               {
                 "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"data\": {\n    \"deviceId\": \"android_pixel_8_hw_id_98234\"\n  }\n}"
+              "raw": "{\n  \"data\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
-              "raw": "{{base_url}}/_server/createBiometricChallenge",
+              "raw": "{{base_url}}/_server/listGeofencesAdmin",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "_server",
-                "createBiometricChallenge"
+                "listGeofencesAdmin"
               ]
             },
-            "description": "Generates a single-use cryptographic verification token (120-second TTL) and liveness gesture requirement."
-          }
+            "description": "Lists all defined work sites and geofence perimeters."
+          },
+          "response": []
         },
         {
-          "name": "Attendance Check-In (GPS + Biometrics)",
+          "name": "Create Geofence Location (createGeofenceAdmin)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/json",
+                "type": "text"
               },
               {
                 "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"data\": {\n    \"latitude\": 30.0444,\n    \"longitude\": 31.2357,\n    \"accuracy\": 8.5,\n    \"verificationToken\": \"token_from_challenge_endpoint\",\n    \"selfieBase64\": \"data:image/jpeg;base64,/9j/4AAQSkZJRg...\"\n  }\n}"
+              "raw": "{\n  \"data\": {\n    \"name\": \"Main HQ - Cairo Campus\",\n    \"lat\": 30.0444,\n    \"lng\": 31.2357,\n    \"radius_m\": 150,\n    \"active\": true\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
-              "raw": "{{base_url}}/_server/checkInAttendance",
+              "raw": "{{base_url}}/_server/createGeofenceAdmin",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "_server",
-                "checkInAttendance"
+                "createGeofenceAdmin"
               ]
             },
-            "description": "Executes anti-spoofing checks, verifies geofence radius, and records check-in punch in attendance_logs."
-          }
+            "description": "Creates an authorized geofence boundary location for employee attendance check-ins."
+          },
+          "response": []
         },
         {
-          "name": "Attendance Check-Out",
+          "name": "Update Geofence Location (updateGeofenceAdmin)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/json",
+                "type": "text"
               },
               {
                 "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"data\": {\n    \"latitude\": 30.0444,\n    \"longitude\": 31.2357,\n    \"accuracy\": 9,\n    \"verificationToken\": \"token_from_challenge_endpoint\"\n  }\n}"
+              "raw": "{\n  \"data\": {\n    \"id\": \"{{sample_geofence_id}}\",\n    \"name\": \"Main HQ - Building B Expanded\",\n    \"radius_m\": 200,\n    \"active\": true\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
-              "raw": "{{base_url}}/_server/checkOutAttendance",
+              "raw": "{{base_url}}/_server/updateGeofenceAdmin",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "_server",
-                "checkOutAttendance"
+                "updateGeofenceAdmin"
               ]
             },
-            "description": "Logs departure punch for the employee."
-          }
+            "description": "Updates the name, coordinates, or radius buffer of a geofence site."
+          },
+          "response": []
         },
         {
-          "name": "List Attendance Logs (Admin)",
+          "name": "Delete Geofence Location (deleteGeofenceAdmin)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/json",
+                "type": "text"
               },
               {
                 "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"data\": {\n    \"startDate\": \"2026-11-01\",\n    \"endDate\": \"2026-11-30\",\n    \"departmentId\": null,\n    \"page\": 1,\n    \"pageSize\": 25\n  }\n}"
+              "raw": "{\n  \"data\": {\n    \"id\": \"{{sample_geofence_id}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
-              "raw": "{{base_url}}/_server/listAttendanceLogsAdmin",
+              "raw": "{{base_url}}/_server/deleteGeofenceAdmin",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "_server",
-                "listAttendanceLogsAdmin"
+                "deleteGeofenceAdmin"
               ]
             },
-            "description": "Returns paginated attendance punches with geofence and verification status."
-          }
+            "description": "Soft deletes or removes a geofence location."
+          },
+          "response": []
+        },
+        {
+          "name": "Bulk Assign Geofences to Employees (bulkAssignGeofences)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"geofenceId\": \"{{sample_geofence_id}}\",\n    \"employeeIds\": [\n      \"{{sample_employee_id}}\"\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/bulkAssignGeofences",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "bulkAssignGeofences"
+              ]
+            },
+            "description": "Authorizes multiple employees to punch attendance within a specific geofence location."
+          },
+          "response": []
         }
       ]
     },
     {
-      "name": "4. Leaves & Vacations",
-      "description": "Leave applications, balance inquiries, and manager/HR approval workflows.",
+      "name": "4. Directory & Organization Structure",
       "item": [
         {
-          "name": "Get My Leave Balances",
+          "name": "List Departments (listDepartments)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/json",
+                "type": "text"
               },
               {
                 "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"data\": {\n    \"year\": 2026\n  }\n}"
+              "raw": "{\n  \"data\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
-              "raw": "{{base_url}}/_server/getMyLeaveBalances",
+              "raw": "{{base_url}}/_server/listDepartments",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "_server",
-                "getMyLeaveBalances"
+                "listDepartments"
               ]
             },
-            "description": "Returns annual, sick, and casual leave balances, used days, and remaining quotas."
-          }
+            "description": "Retrieves all company departments and division counts."
+          },
+          "response": []
         },
         {
-          "name": "Submit Leave Request",
+          "name": "Upsert Department (upsertDepartment)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/json",
+                "type": "text"
               },
               {
                 "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"data\": {\n    \"leaveTypeId\": \"00000000-0000-0000-0000-000000000000\",\n    \"startDate\": \"2026-11-10\",\n    \"endDate\": \"2026-11-12\",\n    \"reason\": \"Attending annual professional training conference\",\n    \"attachmentUrl\": null\n  }\n}"
+              "raw": "{\n  \"data\": {\n    \"name_en\": \"Information Technology\",\n    \"name_ar\": \"تكنولوجيا المعلومات\",\n    \"code\": \"IT\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
-              "raw": "{{base_url}}/_server/submitLeaveRequest",
+              "raw": "{{base_url}}/_server/upsertDepartment",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "_server",
-                "submitLeaveRequest"
+                "upsertDepartment"
               ]
             },
-            "description": "Submits a new vacation request and locks requested days in pending balance."
-          }
+            "description": "Creates or updates an organizational department."
+          },
+          "response": []
         },
         {
-          "name": "Review Leave Request (Manager / HR)",
+          "name": "Delete Department (deleteDepartment)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/json",
+                "type": "text"
               },
               {
                 "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"data\": {\n    \"requestId\": \"00000000-0000-0000-0000-000000000000\",\n    \"action\": \"approve\",\n    \"rejectionReason\": null\n  }\n}"
+              "raw": "{\n  \"data\": {\n    \"id\": \"00000000-0000-0000-0000-000000000010\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
-              "raw": "{{base_url}}/_server/reviewLeaveRequest",
+              "raw": "{{base_url}}/_server/deleteDepartment",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "_server",
-                "reviewLeaveRequest"
+                "deleteDepartment"
               ]
             },
-            "description": "Approve or reject leave request. Deducts balance upon final approval."
-          }
+            "description": "Deletes a department if no active employees are assigned."
+          },
+          "response": []
+        },
+        {
+          "name": "List Positions (listPositions)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/listPositions",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "listPositions"
+              ]
+            },
+            "description": "Lists all job titles and job positions."
+          },
+          "response": []
+        },
+        {
+          "name": "Upsert Position (upsertPosition)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"title_en\": \"Software Engineer\",\n    \"title_ar\": \"مهندس برمجيات\",\n    \"department_id\": \"00000000-0000-0000-0000-000000000010\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/upsertPosition",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "upsertPosition"
+              ]
+            },
+            "description": "Creates or updates a job title within a department."
+          },
+          "response": []
+        },
+        {
+          "name": "List Job Grades (listJobGrades)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/listJobGrades",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "listJobGrades"
+              ]
+            },
+            "description": "Retrieves employee job grades and bands."
+          },
+          "response": []
+        },
+        {
+          "name": "Upsert Job Grade (upsertJobGrade)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"code\": \"G5\",\n    \"name\": \"Senior Grade 5\",\n    \"min_salary\": 15000,\n    \"max_salary\": 25000\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/upsertJobGrade",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "upsertJobGrade"
+              ]
+            },
+            "description": "Creates or modifies a salary and seniority job grade."
+          },
+          "response": []
+        },
+        {
+          "name": "List Cost Centers (listCostCenters)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/listCostCenters",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "listCostCenters"
+              ]
+            },
+            "description": "Lists all accounting cost centers."
+          },
+          "response": []
+        },
+        {
+          "name": "Upsert Cost Center (upsertCostCenter)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"code\": \"CC-102\",\n    \"name\": \"Operations & Logistics\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/upsertCostCenter",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "upsertCostCenter"
+              ]
+            },
+            "description": "Creates or updates a financial cost center."
+          },
+          "response": []
+        },
+        {
+          "name": "List Cities with Districts (listCitiesWithDistricts)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/listCitiesWithDistricts",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "listCitiesWithDistricts"
+              ]
+            },
+            "description": "Fetches all governorates/cities and their sub-districts."
+          },
+          "response": []
+        },
+        {
+          "name": "Upsert City (upsertCity)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"name_en\": \"Alexandria\",\n    \"name_ar\": \"الإسكندرية\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/upsertCity",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "upsertCity"
+              ]
+            },
+            "description": "Creates or updates a regional governorate/city."
+          },
+          "response": []
+        },
+        {
+          "name": "Upsert District (upsertDistrict)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"city_id\": \"00000000-0000-0000-0000-000000000030\",\n    \"name_en\": \"Sidi Gaber\",\n    \"name_ar\": \"سيدي جابر\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/upsertDistrict",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "upsertDistrict"
+              ]
+            },
+            "description": "Adds a district or neighborhood under a city."
+          },
+          "response": []
         }
       ]
     },
     {
-      "name": "5. Payroll & Solaf (Advances)",
-      "description": "Employee advance loans (Solaf), installment schedules, and monthly payroll calculations.",
+      "name": "5. Attendance & Punch Tracking",
       "item": [
         {
-          "name": "Apply for Advance / Loan (Solaf)",
+          "name": "Employee Check-In (checkIn)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/json",
+                "type": "text"
               },
               {
                 "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"data\": {\n    \"amount\": 5000,\n    \"repaymentMonths\": 5,\n    \"deductionStartDate\": \"2026-12-01\",\n    \"reason\": \"Urgent family medical expenses\"\n  }\n}"
+              "raw": "{\n  \"data\": {\n    \"lat\": 30.0444,\n    \"lng\": 31.2357,\n    \"accuracy\": 12.5,\n    \"timestamp\": \"2026-11-01T19:38:59.977Z\",\n    \"method\": \"face\",\n    \"face_distance\": 0.28,\n    \"device_id\": \"uuid-mobile-device-fingerprint\",\n    \"wifi_ssid\": \"INT-CORP-WIFI\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
-              "raw": "{{base_url}}/_server/applyAdvance",
+              "raw": "{{base_url}}/_server/checkIn",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "_server",
-                "applyAdvance"
+                "checkIn"
               ]
             },
-            "description": "Applies for an advance loan. Validates requested amount against annual_advance_limit."
-          }
+            "description": "Records employee check-in with client-side geofence validation, face match distance, and device verification."
+          },
+          "response": []
         },
         {
-          "name": "Approve Advance Request (Finance / Admin)",
+          "name": "Employee Check-Out (checkOut)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/json",
+                "type": "text"
               },
               {
                 "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"data\": {\n    \"advanceId\": \"00000000-0000-0000-0000-000000000000\"\n  }\n}"
+              "raw": "{\n  \"data\": {\n    \"lat\": 30.0444,\n    \"lng\": 31.2357,\n    \"accuracy\": 15,\n    \"timestamp\": \"2026-11-01T19:38:59.978Z\",\n    \"method\": \"face\",\n    \"face_distance\": 0.31\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
-              "raw": "{{base_url}}/_server/approveAdvance",
+              "raw": "{{base_url}}/_server/checkOut",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "_server",
-                "approveAdvance"
+                "checkOut"
               ]
             },
-            "description": "Formally approves loan and generates monthly schedule in advance_installments."
-          }
+            "description": "Records employee departure punch, closes the daily attendance record, and verifies active tasks."
+          },
+          "response": []
         },
         {
-          "name": "Run Monthly Payroll Batch",
+          "name": "List My Attendance History (listMyAttendance)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/json",
+                "type": "text"
               },
               {
                 "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"data\": {\n    \"month\": 11,\n    \"year\": 2026,\n    \"departmentId\": null\n  }\n}"
+              "raw": "{\n  \"data\": {\n    \"start_date\": \"2026-11-01\",\n    \"end_date\": \"2026-11-30\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
-              "raw": "{{base_url}}/_server/runMonthlyPayroll",
+              "raw": "{{base_url}}/_server/listMyAttendance",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "_server",
-                "runMonthlyPayroll"
+                "listMyAttendance"
               ]
             },
-            "description": "Computes base salaries + allowances - advances - penalties - unpaid leaves."
-          }
+            "description": "Retrieves personal attendance log for the current employee."
+          },
+          "response": []
+        },
+        {
+          "name": "Admin Upsert Attendance (adminUpsertAttendance)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"employee_id\": \"{{sample_employee_id}}\",\n    \"date\": \"2026-11-01\",\n    \"in_time\": \"09:00:00\",\n    \"out_time\": \"17:30:00\",\n    \"branch\": \"Main HQ\",\n    \"note\": \"Manual HR adjustment due to field assignment\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/adminUpsertAttendance",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "adminUpsertAttendance"
+              ]
+            },
+            "description": "Allows HR admin to manually add or correct an attendance record."
+          },
+          "response": []
+        },
+        {
+          "name": "Admin Delete Attendance (adminDeleteAttendance)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"id\": \"00000000-0000-0000-0000-000000000050\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/adminDeleteAttendance",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "adminDeleteAttendance"
+              ]
+            },
+            "description": "Admin endpoint to delete an erroneous attendance entry."
+          },
+          "response": []
+        },
+        {
+          "name": "Admin Attendance Report (adminAttendanceReport)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"from\": \"2026-11-01\",\n    \"to\": \"2026-11-30\",\n    \"onlyApprovedLocations\": false\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/adminAttendanceReport",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "adminAttendanceReport"
+              ]
+            },
+            "description": "Generates an aggregated attendance report for all employees across the given date range with worked hours."
+          },
+          "response": []
+        },
+        {
+          "name": "List Attendance Review Cases (listAttendanceReviewCases)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"status\": \"pending\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/listAttendanceReviewCases",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "listAttendanceReviewCases"
+              ]
+            },
+            "description": "Lists flagged attendance punch attempts that failed geofence radius or face liveness and require manager review."
+          },
+          "response": []
+        },
+        {
+          "name": "Resolve Attendance Review Case (resolveAttendanceReviewCase)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"review_case_id\": \"00000000-0000-0000-0000-000000000060\",\n    \"decision\": \"approved\",\n    \"resolution_note\": \"Verified remote field presence by manager\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/resolveAttendanceReviewCase",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "resolveAttendanceReviewCase"
+              ]
+            },
+            "description": "Approves or rejects a flagged attendance attempt."
+          },
+          "response": []
         }
       ]
     },
     {
-      "name": "6. KPI & Performance Evaluations (Quarterly)",
-      "description": "3-Layer Criteria Catalog (Common 40%, Role 60%, Custom), Q1-Q4 Quarterly Evaluations, and HR Approval Queue.",
+      "name": "6. Biometrics & Face Recognition",
       "item": [
         {
-          "name": "List Criteria Catalog (listKpiCriteria)",
+          "name": "Enroll Face Descriptor (enrollFace)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/json",
+                "type": "text"
               },
               {
                 "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"data\": {\n    \"layer\": \"all\"\n  }\n}"
+              "raw": "{\n  \"data\": {\n    \"descriptor\": [\n      -0.06778266992147115,\n      -0.04026407468731108,\n      0.06300453449943683,\n      -0.08406406559853008,\n      -0.05266017985100305,\n      -0.06168076750407945,\n      0.03432964444112979,\n      0.02959786049313537,\n      -0.04415301592945795,\n      -0.014307461752249173,\n      -0.03960427273044873,\n      -0.019128268268151463,\n      -0.02651721343692115,\n      0.06075241456624006,\n      0.03981533360036815,\n      -0.09471989926242813,\n      -0.0034961030168671192,\n      -0.06593145515075567,\n      -0.0001406863520068552,\n      -0.04967260173250328,\n      0.09336578326498307,\n      -0.029910494538524332,\n      -0.08879812654267596,\n      0.06979843515142994,\n      0.02618375928237099,\n      -0.08635467499148977,\n      -0.022863153900556377,\n      -0.08332222936888023,\n      0.0429152191654866,\n      -0.05768424071253042,\n      -0.0985042928550005,\n      -0.09099802409554388,\n      0.03408466892397119,\n      0.05038631859783857,\n      0.06182676898210257,\n      0.041480558577196375,\n      0.08111723940218979,\n      0.017611211936617494,\n      -0.00852086504112011,\n      0.05114829865233625,\n      0.04529366619760014,\n      -0.09140337821977651,\n      -0.008642678885902866,\n      -0.07933594234198967,\n      0.020046519413935288,\n      0.0022427798268138677,\n      0.09973101362772316,\n      0.06573948053284667,\n      0.023120134147137608,\n      0.06816739132507618,\n      -0.036609098689636396,\n      0.09018517630660591,\n      -0.03653614637749723,\n      0.0548225734819979,\n      -0.08504909237790118,\n      -0.013927823758029673,\n      0.00863318350308337,\n      0.05743048606761142,\n      0.04779036041797044,\n      0.021791313523695524,\n      -0.06924104675984868,\n      -0.005554300142054561,\n      0.05828141170983284,\n      -0.08970313674504551,\n      -0.09750899490812746,\n      0.03428448144830981,\n      0.007613733543479911,\n      -0.07890688845533878,\n      0.0028161779844874807,\n      -0.017197014335520858,\n      0.08868873379100939,\n      -0.06347165790186762,\n      -0.045886025391377316,\n      -0.027777714286475158,\n      0.0799020528282599,\n      0.041079975537574365,\n      0.05324763273651675,\n      -0.03070978745380866,\n      0.08034769243138529,\n      -0.0008541643149951594,\n      -0.07192772069293768,\n      -0.04828440852410516,\n      0.07179288214309273,\n      0.011133243850539598,\n      -0.056387057671214214,\n      -0.03018229298224369,\n      -0.03445073986301543,\n      -0.06429426306313997,\n      0.02271177500995067,\n      0.09501429286035462,\n      -0.06022786289513036,\n      0.0689635533095038,\n      0.08575704166791223,\n      0.0892794556705345,\n      0.0006417661270649716,\n      -0.03231889864369526,\n      -0.0728716622299662,\n      0.01012427740985275,\n      -0.067285691986251,\n      0.043260647585569606,\n      -0.05892613734352059,\n      -0.047688346987147995,\n      0.007117867421112617,\n      0.05597424621695907,\n      0.09442323952879672,\n      -0.09462837636490846,\n      0.009952460462933563,\n      0.012041235455031885,\n      -0.05844912016911894,\n      -0.09466658266421435,\n      0.08492154770639973,\n      -0.029613740698211682,\n      0.020071868514881075,\n      0.09070153755036561,\n      0.09801379599273044,\n      -0.06987084895499494,\n      0.01207397771708281,\n      0.07713647590448813,\n      -0.006127999170077517,\n      -0.0709540426998891,\n      0.09075936462252873,\n      0.09852443180200907,\n      0.0015441309462477515,\n      -0.07888278021636053,\n      0.0002596403163161176,\n      0.04727034939692945,\n      0.05145893069367524,\n      -0.0661999383838868\n    ],\n    \"photo_preview_url\": \"https://storage.supabase.co/faces/preview.jpg\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/enrollFace",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "enrollFace"
+              ]
+            },
+            "description": "Enrolls a 128-dimensional Float32 facial recognition embedding vector for the employee."
+          },
+          "response": []
+        },
+        {
+          "name": "Verify Face (verifyFace)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"descriptor\": [\n      0.07214886844658938,\n      0.06127206888315362,\n      0.05656051284810665,\n      0.0973046297690798,\n      -0.0773772202328781,\n      -0.06193988762744565,\n      0.0896829335520499,\n      -0.009260089104278627,\n      -0.028230527303909986,\n      0.04546729529188562,\n      -0.04220953806383663,\n      -0.025018366034787493,\n      -0.06281330049082298,\n      -0.028086395894861088,\n      -0.050833289559802486,\n      -0.08467525378801875,\n      -0.0601891488279748,\n      0.07544235605465685,\n      0.09857891018471734,\n      0.0671020220373395,\n      0.03514219589664416,\n      0.07356657154848484,\n      0.019927762012586614,\n      0.024674125783603312,\n      0.04633528565609052,\n      -0.023720448699430102,\n      0.05151360286544482,\n      -0.027898335826956625,\n      0.055215152635752995,\n      -0.0812087890766875,\n      -0.038810811848290785,\n      -0.06945032018508078,\n      -0.032039207247116425,\n      -0.09361780939633416,\n      0.06367164996116653,\n      0.06811006204029499,\n      0.09159707906043191,\n      0.013947336728818496,\n      0.09497670209566694,\n      0.05116411831366616,\n      0.0663843136354699,\n      -0.08458611906994173,\n      -0.06559357836078217,\n      -0.03082243434742403,\n      -0.01171700902960815,\n      -0.06772713654074765,\n      0.05454548873199924,\n      -0.0694235850367778,\n      -0.09379327548538177,\n      0.09708723692130766,\n      0.0026464336402702016,\n      0.09586721710634258,\n      -0.07748505128278414,\n      -0.05488751233990388,\n      -0.04368747645215612,\n      -0.09349118527061462,\n      0.07788886166601583,\n      0.06410172525029059,\n      -0.06676404222794204,\n      0.03328741361546386,\n      0.023292234330976005,\n      -0.015597811782555968,\n      0.018810329753322683,\n      0.05674367516569731,\n      -0.07007193917807886,\n      -0.09750267721676678,\n      -0.08210093494645615,\n      0.023970092410296212,\n      0.032935050356813905,\n      -0.04144581570662958,\n      0.015360223077886023,\n      0.06602106223419998,\n      0.04943244386770779,\n      0.07331222799295359,\n      -0.06618127135097973,\n      -0.021834979711937888,\n      -0.03226642366846276,\n      -0.027414287781325444,\n      -0.05288664791003481,\n      0.03950781395802108,\n      -0.013440611951066786,\n      0.0643401635813437,\n      -0.06402782028518389,\n      0.01079927547959296,\n      -0.02161026526627055,\n      -0.0848994021477349,\n      -0.08562079915812548,\n      -0.04402844248427704,\n      0.06947819117256651,\n      0.004230072547233288,\n      -0.08404578474026132,\n      -0.008027603782750387,\n      -0.08912829344912519,\n      0.0667140406756806,\n      -0.07960405921710328,\n      0.05665850713638662,\n      -0.08268886164646366,\n      -0.057658340723828874,\n      -0.0822867819376083,\n      0.0686585179984179,\n      -0.0637965694910196,\n      0.07606837981558787,\n      0.08235562205194369,\n      -0.04261071074250418,\n      0.0924522957100812,\n      -0.06821146983866319,\n      0.08016241122868811,\n      -0.008706313842931482,\n      0.01727664511344669,\n      -0.003945574890066389,\n      -0.07295358642557406,\n      0.040914509836689594,\n      -0.05119114734928823,\n      0.023841692939194165,\n      0.0584515432059276,\n      0.05755240004509096,\n      -0.007328189360463672,\n      0.07504731111536231,\n      0.023938656617703474,\n      -0.01153528545124552,\n      -0.001046787091517884,\n      -0.07172712873268564,\n      -0.06848570231295695,\n      0.02844304219429411,\n      0.05168586504533876,\n      -0.06081453967776378,\n      0.09406504709309355,\n      0.0532817377229772\n    ],\n    \"action\": \"verification\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/verifyFace",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "verifyFace"
+              ]
+            },
+            "description": "Verifies a facial embedding against the registered face descriptor."
+          },
+          "response": []
+        },
+        {
+          "name": "Face Login by Email (faceLogin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"email\": \"ahmed.hassan@company.com\",\n    \"descriptor\": [\n      -0.03518927949018069,\n      0.028335319578867146,\n      0.09972200478271814,\n      0.0011013234531880717,\n      -0.07855519300819913,\n      0.0625714371027426,\n      0.08062110360111988,\n      -0.05635569086452766,\n      -0.09192865242073998,\n      0.047487223265142736,\n      0.030757786497500106,\n      0.0271184616838748,\n      0.014633431222882548,\n      -0.08772780301788714,\n      -0.07013195201683314,\n      0.09430582087671607,\n      0.07596405145832508,\n      -0.04813241102448904,\n      -0.062380610080685545,\n      0.06586896535416137,\n      -0.02264167001254211,\n      0.0033248710482717964,\n      -0.014113341768600712,\n      0.01724575755553595,\n      0.07929082200943191,\n      0.005129384062412076,\n      0.009901426663603052,\n      0.06098057666774323,\n      -0.06940573700289297,\n      0.016508733856194807,\n      -0.025747992376988146,\n      -0.00384801167819937,\n      0.03292888535643454,\n      -0.05562617983915872,\n      -0.08155034729585578,\n      0.01703764746164041,\n      -0.03404796512619322,\n      0.08379850787121695,\n      0.03793244507609511,\n      0.08108512722227626,\n      -0.007070109088404705,\n      -0.025754814017869707,\n      0.05017738135135072,\n      -0.0723793807991561,\n      0.04740794597253975,\n      -0.014423538512383607,\n      -0.0025317030125470846,\n      0.0033673663640842594,\n      -0.025673683762486604,\n      -0.019886523680297724,\n      0.06003370187222723,\n      -0.04576411403829139,\n      -0.01790738397410903,\n      -0.08210033824968509,\n      0.0585337807486683,\n      0.006590564960406914,\n      0.08301974914503765,\n      -0.07907196349480881,\n      0.044697839928524885,\n      0.06370712392562342,\n      -0.08168615104651328,\n      0.018986543893507027,\n      0.017328216980532968,\n      -0.016966142862268455,\n      0.04532847823159045,\n      -0.04779657541793081,\n      -0.004822575951047986,\n      -0.009098284006528526,\n      -0.03449131564085808,\n      0.037892546413054395,\n      -0.06624322455159942,\n      0.07667108714452353,\n      -0.01908388896697981,\n      -0.07209978941570211,\n      -0.086455718665521,\n      -0.02485474768913294,\n      0.014817020628352967,\n      0.07223275142529026,\n      0.020168205287551547,\n      0.06072627381632581,\n      -0.06864906583968172,\n      0.019286739565828007,\n      -0.059105670001401614,\n      0.0034766711777760584,\n      -0.080127795667573,\n      -0.037907294705561645,\n      0.06398676707838843,\n      0.06701906428976265,\n      0.0210083870958961,\n      0.03737768838001024,\n      0.06081306868174993,\n      -0.06783658758079475,\n      0.08419430397654967,\n      -0.017684372170045662,\n      -0.04532084992209837,\n      0.05351288103243418,\n      0.05907009338190536,\n      -0.049293463023587815,\n      0.09713762916429869,\n      -0.09644616318498525,\n      -0.08833899589084795,\n      0.03987864790651208,\n      -0.06985846502251798,\n      -0.051303823684017674,\n      0.030959600152299677,\n      0.015477014541049397,\n      -0.028953875729650316,\n      -0.09418507085104318,\n      -0.04558660759101416,\n      -0.05188533074639543,\n      0.0003754847025179975,\n      -0.030320575380056794,\n      0.011084302466750448,\n      0.014679152312936997,\n      0.004583826022285506,\n      0.044680683141966826,\n      0.04204813327987028,\n      -0.07197653807375236,\n      0.08962105258674816,\n      -0.05580196585684152,\n      -0.029743037765591215,\n      -0.02812606743515836,\n      -0.01545342373053335,\n      -0.002203171428996953,\n      -0.019106067101003266,\n      -0.07312452264459175,\n      -0.011328072433397507,\n      0.006231375422530536\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/faceLogin",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "faceLogin"
+              ]
+            },
+            "description": "Performs 1-to-1 face authentication and returns a session auth token without requiring a password."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Face Biometrics (deleteFace)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/deleteFace",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "deleteFace"
+              ]
+            },
+            "description": "Removes enrolled facial descriptor vectors for the user."
+          },
+          "response": []
+        },
+        {
+          "name": "WebAuthn - Get Register Options (webauthnRegisterOptions)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/webauthnRegisterOptions",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "webauthnRegisterOptions"
+              ]
+            },
+            "description": "Generates FIDO2 / Passkey registration challenge options for fingerprint or hardware key."
+          },
+          "response": []
+        },
+        {
+          "name": "WebAuthn - Verify Registration (webauthnRegisterVerify)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"credential\": {\n      \"id\": \"sample-credential-id\",\n      \"rawId\": \"sample-raw-id\",\n      \"response\": {\n        \"clientDataJSON\": \"eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIn0=\",\n        \"attestationObject\": \"o2NmbXRkbm9uZWdhdHRTdG10oGhhdXRoRGF0YViU...\"\n      },\n      \"type\": \"public-key\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/webauthnRegisterVerify",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "webauthnRegisterVerify"
+              ]
+            },
+            "description": "Verifies and stores employee passkey credential in the database."
+          },
+          "response": []
+        },
+        {
+          "name": "List My Biometrics (listMyBiometrics)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/listMyBiometrics",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "listMyBiometrics"
+              ]
+            },
+            "description": "Returns registered biometric methods for the user (Face ID, Passkeys, WebAuthn)."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Biometric Health Status (getBiometricHealthStatus)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/getBiometricHealthStatus",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "getBiometricHealthStatus"
+              ]
+            },
+            "description": "Admin overview of biometric verification success rates, fraud attempts, and latency."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "7. Leaves & Vacations",
+      "item": [
+        {
+          "name": "Submit Leave Request (submitLeave)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"leave_type_id\": \"00000000-0000-0000-0000-000000000070\",\n    \"from\": \"2026-12-20\",\n    \"to\": \"2026-12-25\",\n    \"reason\": \"Annual vacation trip\",\n    \"proof_document_url\": null\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/submitLeave",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "submitLeave"
+              ]
+            },
+            "description": "Submits an employee leave request for manager and HR approval."
+          },
+          "response": []
+        },
+        {
+          "name": "Decide Leave Request (decideLeave)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"id\": \"{{sample_leave_id}}\",\n    \"status\": \"approved\",\n    \"notify\": true\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/decideLeave",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "decideLeave"
+              ]
+            },
+            "description": "Manager or HR approval or rejection of an employee leave request."
+          },
+          "response": []
+        },
+        {
+          "name": "Bulk Decide Leaves (decideLeavesBulk)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"ids\": [\n      \"{{sample_leave_id}}\"\n    ],\n    \"status\": \"approved\",\n    \"notify\": true\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/decideLeavesBulk",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "decideLeavesBulk"
+              ]
+            },
+            "description": "Approves or rejects multiple pending leave requests at once."
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel Leave Request (cancelLeave)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"id\": \"{{sample_leave_id}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/cancelLeave",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "cancelLeave"
+              ]
+            },
+            "description": "Cancels a pending or approved future leave request."
+          },
+          "response": []
+        },
+        {
+          "name": "List Leave Approval Queue (listLeaveQueue)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"status\": \"pending\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/listLeaveQueue",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "listLeaveQueue"
+              ]
+            },
+            "description": "Lists leave requests requiring administrative or managerial review."
+          },
+          "response": []
+        },
+        {
+          "name": "List My Leaves (listMyLeaves)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"limit\": 20\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/listMyLeaves",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "listMyLeaves"
+              ]
+            },
+            "description": "Lists past and upcoming leave requests for the logged in employee."
+          },
+          "response": []
+        },
+        {
+          "name": "List Active Leave Types (listActiveLeaveTypes)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/listActiveLeaveTypes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "listActiveLeaveTypes"
+              ]
+            },
+            "description": "Fetches all system leave types (Annual, Sick, Casual, Unpaid, Paternity)."
+          },
+          "response": []
+        },
+        {
+          "name": "List Leave Balances Admin (listLeaveBalancesAdmin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"year\": 2026\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/listLeaveBalancesAdmin",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "listLeaveBalancesAdmin"
+              ]
+            },
+            "description": "Retrieves employee annual leave balances, used days, and remaining quotas."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Leave Balance (updateLeaveBalance)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"employee_id\": \"{{sample_employee_id}}\",\n    \"leave_type_id\": \"00000000-0000-0000-0000-000000000070\",\n    \"year\": 2026,\n    \"balance\": 21,\n    \"used\": 5\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/updateLeaveBalance",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "updateLeaveBalance"
+              ]
+            },
+            "description": "Manually sets or corrects an employee leave balance quota."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "8. Permissions (Hourly Exits)",
+      "item": [
+        {
+          "name": "Request Hourly Permission (requestPermission)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"date\": \"2026-11-15\",\n    \"start_time\": \"13:00\",\n    \"end_time\": \"15:00\",\n    \"duration_hours\": 2,\n    \"reason\": \"Doctor appointment\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/requestPermission",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "requestPermission"
+              ]
+            },
+            "description": "Submits an hourly exit permission request (max 2 hours per occurrence)."
+          },
+          "response": []
+        },
+        {
+          "name": "Decide Permission Request (decidePermission)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"id\": \"00000000-0000-0000-0000-000000000080\",\n    \"status\": \"approved\",\n    \"decision_note\": \"Approved by direct manager\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/decidePermission",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "decidePermission"
+              ]
+            },
+            "description": "Approves or rejects an employee hourly exit permission."
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel Permission Request (cancelPermission)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"id\": \"00000000-0000-0000-0000-000000000080\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/cancelPermission",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "cancelPermission"
+              ]
+            },
+            "description": "Cancels a submitted permission request."
+          },
+          "response": []
+        },
+        {
+          "name": "List Permissions Admin (listPermissionsAdmin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"status\": \"pending\",\n    \"limit\": 50\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/listPermissionsAdmin",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "listPermissionsAdmin"
+              ]
+            },
+            "description": "Lists all permission requests across the organization for administration review."
+          },
+          "response": []
+        },
+        {
+          "name": "List My Permissions (listMyPermissions)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/listMyPermissions",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "listMyPermissions"
+              ]
+            },
+            "description": "Retrieves personal monthly exit permissions and remaining quota."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "9. Loans & Advances (Solaf)",
+      "item": [
+        {
+          "name": "Check Advance Eligibility (getAdvanceEligibility)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/getAdvanceEligibility",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "getAdvanceEligibility"
+              ]
+            },
+            "description": "Checks whether employee is past probation, has outstanding loans, and is within the 15th-20th window."
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Advance Request (createAdvanceRequest)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"amount\": 5000,\n    \"installments_count\": 5,\n    \"reason\": \"Emergency home maintenance\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/createAdvanceRequest",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "createAdvanceRequest"
+              ]
+            },
+            "description": "Submits a salary advance (سلفة) request with monthly installments."
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel My Advance (cancelMyAdvance)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"id\": \"{{sample_advance_id}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/cancelMyAdvance",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "cancelMyAdvance"
+              ]
+            },
+            "description": "Cancels an advance request that is still pending."
+          },
+          "response": []
+        },
+        {
+          "name": "List My Advances (listMyAdvances)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/listMyAdvances",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "listMyAdvances"
+              ]
+            },
+            "description": "Lists advance history and payment schedules for the authenticated employee."
+          },
+          "response": []
+        },
+        {
+          "name": "List Team Advances for Manager (listTeamAdvances)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"status\": \"pending_manager\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/listTeamAdvances",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "listTeamAdvances"
+              ]
+            },
+            "description": "Manager view of advance requests submitted by team members."
+          },
+          "response": []
+        },
+        {
+          "name": "Manager Decide Advance (managerDecideAdvance)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"id\": \"{{sample_advance_id}}\",\n    \"action\": \"approved\",\n    \"notes\": \"Approved based on performance and tenure\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/managerDecideAdvance",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "managerDecideAdvance"
+              ]
+            },
+            "description": "Direct manager approval transitioning request to pending_hr."
+          },
+          "response": []
+        },
+        {
+          "name": "List Advances for HR Queue (listAdvancesForHR)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"status\": \"pending_hr\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/listAdvancesForHR",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "listAdvancesForHR"
+              ]
+            },
+            "description": "HR queue of advance requests pending policy verification."
+          },
+          "response": []
+        },
+        {
+          "name": "HR Decide Advance (hrDecideAdvance)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"id\": \"{{sample_advance_id}}\",\n    \"action\": \"approved\",\n    \"notes\": \"Policy checks passed: tenure > 6 months, limit satisfied\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/hrDecideAdvance",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "hrDecideAdvance"
+              ]
+            },
+            "description": "HR approval transitioning request to pending_finance."
+          },
+          "response": []
+        },
+        {
+          "name": "List Advances for Finance (listAdvancesForFinance)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"status\": \"pending_finance\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/listAdvancesForFinance",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "listAdvancesForFinance"
+              ]
+            },
+            "description": "Finance queue of advance requests awaiting disbursement and bank transfer."
+          },
+          "response": []
+        },
+        {
+          "name": "Finance Approve Payment (financeApprovePayment)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"id\": \"{{sample_advance_id}}\",\n    \"payment_method\": \"bank_transfer\",\n    \"reference_number\": \"TRX-994821\",\n    \"notes\": \"Queued for bank payroll dispatch\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/financeApprovePayment",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "financeApprovePayment"
+              ]
+            },
+            "description": "Finance approval of disbursement schedule."
+          },
+          "response": []
+        },
+        {
+          "name": "Finance Mark Paid (financeMarkPaid)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"id\": \"{{sample_advance_id}}\",\n    \"disbursement_date\": \"2026-11-25\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/financeMarkPaid",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "financeMarkPaid"
+              ]
+            },
+            "description": "Marks the advance loan as paid/disbursed and activates automatic monthly payroll deductions."
+          },
+          "response": []
+        },
+        {
+          "name": "Finance Reject Advance (financeRejectAdvance)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"id\": \"{{sample_advance_id}}\",\n    \"reason\": \"Exceeds monthly company advance liquidity cap\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/financeRejectAdvance",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "financeRejectAdvance"
+              ]
+            },
+            "description": "Rejects the advance at finance stage."
+          },
+          "response": []
+        },
+        {
+          "name": "List Advance Installments (listAdvanceInstallments)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"advance_id\": \"{{sample_advance_id}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/listAdvanceInstallments",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "listAdvanceInstallments"
+              ]
+            },
+            "description": "Returns the schedule of monthly deduction installments and repayment status."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Annual Advance Limit (updateAnnualAdvanceLimit)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"employee_id\": \"{{sample_employee_id}}\",\n    \"limit\": 60000\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/updateAnnualAdvanceLimit",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "updateAnnualAdvanceLimit"
+              ]
+            },
+            "description": "Admin endpoint to adjust the annual salary advance cap for an employee."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "10. Devices, Shifts & Schedules",
+      "item": [
+        {
+          "name": "Register My Mobile Device (registerMyDevice)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"device_id\": \"d9e8f7a6-b5c4-3d2e-1f0a-9b8c7d6e5f4a\",\n    \"device_model\": \"Samsung Galaxy S24 Ultra\",\n    \"os_version\": \"Android 15\",\n    \"app_version\": \"2.4.0\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/registerMyDevice",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "registerMyDevice"
+              ]
+            },
+            "description": "Registers an employee smartphone hardware fingerprint for binding check-in security."
+          },
+          "response": []
+        },
+        {
+          "name": "List All Devices Admin (listAllDevices)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"status\": \"pending\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/listAllDevices",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "listAllDevices"
+              ]
+            },
+            "description": "Lists employee device binding requests requiring approval."
+          },
+          "response": []
+        },
+        {
+          "name": "Decide Device Approval (decideDevice)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"device_id\": \"d9e8f7a6-b5c4-3d2e-1f0a-9b8c7d6e5f4a\",\n    \"status\": \"approved\",\n    \"notes\": \"Company-issued corporate phone verified\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/decideDevice",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "decideDevice"
+              ]
+            },
+            "description": "Approves or rejects a device for attendance use."
+          },
+          "response": []
+        },
+        {
+          "name": "Set Device Binding Requirement (setDeviceRequirement)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"employee_id\": \"{{sample_employee_id}}\",\n    \"required\": true\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/setDeviceRequirement",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "setDeviceRequirement"
+              ]
+            },
+            "description": "Enforces that an employee can only punch attendance from their approved device."
+          },
+          "response": []
+        },
+        {
+          "name": "Set Face Match Requirement (setFaceRequirement)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"employee_id\": \"{{sample_employee_id}}\",\n    \"required\": true\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/setFaceRequirement",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "setFaceRequirement"
+              ]
+            },
+            "description": "Enforces facial biometric verification during attendance check-in for this employee."
+          },
+          "response": []
+        },
+        {
+          "name": "List Shifts (listShifts)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/listShifts",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "listShifts"
+              ]
+            },
+            "description": "Lists all working shifts and grace period settings."
+          },
+          "response": []
+        },
+        {
+          "name": "Upsert Shift (upsertShift)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"name_en\": \"Morning Shift (HQ)\",\n    \"name_ar\": \"الوردية الصباحية (المقر الرئيسي)\",\n    \"start_time\": \"09:00\",\n    \"end_time\": \"17:00\",\n    \"grace_period_minutes\": 15,\n    \"is_night_shift\": false\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/upsertShift",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "upsertShift"
+              ]
+            },
+            "description": "Creates or updates a shift schedule."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Shift (deleteShift)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"id\": \"00000000-0000-0000-0000-000000000090\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/deleteShift",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "deleteShift"
+              ]
+            },
+            "description": "Deletes a shift definition."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Employee Working Days (getEmployeeWorkingDays)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"employee_id\": \"{{sample_employee_id}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/getEmployeeWorkingDays",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "getEmployeeWorkingDays"
+              ]
+            },
+            "description": "Fetches weekly active work days (Sunday-Thursday vs Saturday-Wednesday)."
+          },
+          "response": []
+        },
+        {
+          "name": "Set Employee Weekly Working Days (setEmployeeWorkingDaysWeekly)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"employee_id\": \"{{sample_employee_id}}\",\n    \"working_days\": [\n      0,\n      1,\n      2,\n      3,\n      4\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/setEmployeeWorkingDaysWeekly",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "setEmployeeWorkingDaysWeekly"
+              ]
+            },
+            "description": "Configures weekly rest days and work days for an employee."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "11. Contracts & Custody",
+      "item": [
+        {
+          "name": "List Contracts Admin (listContractsAdmin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"status\": \"active\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/listContractsAdmin",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "listContractsAdmin"
+              ]
+            },
+            "description": "Retrieves all employee employment contracts, expiration dates, and renewal status."
+          },
+          "response": []
+        },
+        {
+          "name": "Renew Contract Admin (renewContractAdmin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"contract_id\": \"00000000-0000-0000-0000-000000000100\",\n    \"start_date\": \"2027-01-01\",\n    \"end_date\": \"2027-12-31\",\n    \"salary\": 22000,\n    \"notes\": \"Annual renewal with merit salary increase\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/renewContractAdmin",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "renewContractAdmin"
+              ]
+            },
+            "description": "Renews an employment contract with new dates and compensation."
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel Contract Admin (cancelContractAdmin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"contract_id\": \"00000000-0000-0000-0000-000000000100\",\n    \"reason\": \"Mutual separation agreement\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/cancelContractAdmin",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "cancelContractAdmin"
+              ]
+            },
+            "description": "Terminates an employment contract."
+          },
+          "response": []
+        },
+        {
+          "name": "List Employee Custody (listEmployeeCustody)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"employee_id\": \"{{sample_employee_id}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/listEmployeeCustody",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "listEmployeeCustody"
+              ]
+            },
+            "description": "Lists company equipment assigned to an employee (Laptops, SIM cards, Vehicles)."
+          },
+          "response": []
+        },
+        {
+          "name": "Add Employee Custody Asset (addEmployeeCustody)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"employee_id\": \"{{sample_employee_id}}\",\n    \"item_name\": \"MacBook Pro 16 M3\",\n    \"serial_number\": \"C02XYZ12345\",\n    \"category\": \"IT Hardware\",\n    \"received_date\": \"2026-11-01\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/addEmployeeCustody",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "addEmployeeCustody"
+              ]
+            },
+            "description": "Registers physical custody of an asset assigned to an employee."
+          },
+          "response": []
+        },
+        {
+          "name": "Return Employee Custody Asset (returnEmployeeCustody)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"custody_id\": \"00000000-0000-0000-0000-000000000110\",\n    \"return_date\": \"2026-11-01\",\n    \"condition\": \"excellent\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/returnEmployeeCustody",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "returnEmployeeCustody"
+              ]
+            },
+            "description": "Marks a custody item as returned to company inventory."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "12. Tasks & Trips",
+      "item": [
+        {
+          "name": "List Tasks (listTasks)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"status\": \"all\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/listTasks",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "listTasks"
+              ]
+            },
+            "description": "Lists operational tasks and assignments."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Task (createTask)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"title\": \"Fiber Optic Installation - Zone 4\",\n    \"description\": \"Install external optical termination unit at customer premises\",\n    \"priority\": \"high\",\n    \"assignees\": [\n      \"{{sample_employee_id}}\"\n    ],\n    \"due_date\": \"2026-11-20\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/createTask",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "createTask"
+              ]
+            },
+            "description": "Dispatches a new operational task to staff."
+          },
+          "response": []
+        },
+        {
+          "name": "Transition Task Status (transitionTask)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"task_id\": \"00000000-0000-0000-0000-000000000120\",\n    \"status\": \"completed\",\n    \"comment\": \"All lines tested and operational\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/transitionTask",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "transitionTask"
+              ]
+            },
+            "description": "Updates task lifecycle status (pending -> in_progress -> completed)."
+          },
+          "response": []
+        },
+        {
+          "name": "List Trips (listTrips)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"month\": \"2026-11\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/listTrips",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "listTrips"
+              ]
+            },
+            "description": "Lists travel trips and field deployments."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Trip Request (createTrip)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"destination\": \"Alexandria Branch\",\n    \"start_date\": \"2026-11-10\",\n    \"end_date\": \"2026-11-12\",\n    \"purpose\": \"Hardware installation and branch rollout\",\n    \"estimated_allowance\": 1200\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/createTrip",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "createTrip"
+              ]
+            },
+            "description": "Requests a business trip with daily allowance calculation."
+          },
+          "response": []
+        },
+        {
+          "name": "Approve Trip (approveTrip)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"trip_id\": \"00000000-0000-0000-0000-000000000130\",\n    \"status\": \"approved\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/approveTrip",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "approveTrip"
+              ]
+            },
+            "description": "Manager approval of business travel and allowances."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "13. KPI & Quarterly Evaluations",
+      "item": [
+        {
+          "name": "List KPI Criteria Catalog (listKpiCriteria)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{base_url}}/_server/listKpiCriteria",
@@ -589,26 +3951,34 @@
                 "listKpiCriteria"
               ]
             },
-            "description": "Fetches active KPI criteria catalog filtered by layer ('all', 'common', 'role', 'custom')."
-          }
+            "description": "Retrieves all 42 KPI evaluation criteria across role-specific, corporate, and manager layers."
+          },
+          "response": []
         },
         {
-          "name": "Save KPI Criterion (Admin / HR)",
+          "name": "Save KPI Criterion (saveKpiCriterion)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/json",
+                "type": "text"
               },
               {
                 "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"data\": {\n    \"code\": \"KPI-108\",\n    \"name_en\": \"System Commissioning & Startup Accuracy\",\n    \"name_ar\": \"دقة تشغيل وبدء تشغيل الأنظمة\",\n    \"category_en\": \"Commissioning & Programming\",\n    \"category_ar\": \"التشغيل والبرمجة\",\n    \"layer\": \"role\",\n    \"default_weight\": 0.1,\n    \"default_target\": 0.9,\n    \"unit\": \"%\",\n    \"how_measured_en\": \"% of systems passing startup on first test\",\n    \"how_measured_ar\": \"نسبة الأنظمة التي تجتاز التشغيل من أول فحص\"\n  }\n}"
+              "raw": "{\n  \"data\": {\n    \"code\": \"KPI-NEW-01\",\n    \"name_en\": \"Clean Code & Test Coverage\",\n    \"name_ar\": \"جودة الكود وتغطية الاختبارات\",\n    \"category_en\": \"Installation & Technical Execution\",\n    \"category_ar\": \"التنفيذ الفني والتركيبات\",\n    \"layer\": \"role\",\n    \"weight\": 5,\n    \"target\": 95,\n    \"unit\": \"%\",\n    \"how_measured_en\": \"Automated CI/CD test run coverage >= 95%\",\n    \"how_measured_ar\": \"تغطية الاختبارات الآلية بنسبة لا تقل عن 95%\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{base_url}}/_server/saveKpiCriterion",
@@ -620,8 +3990,9 @@
                 "saveKpiCriterion"
               ]
             },
-            "description": "Adds or updates a criterion in the catalog with bilingual naming, default weights, and measurement method."
-          }
+            "description": "Creates or updates a benchmark evaluation criterion in the master catalog."
+          },
+          "response": []
         },
         {
           "name": "Get Quarterly Evaluation (getQuarterlyEvaluation)",
@@ -630,16 +4001,23 @@
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/json",
+                "type": "text"
               },
               {
                 "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"data\": {\n    \"employeeId\": \"00000000-0000-0000-0000-000000000000\",\n    \"year\": 2026,\n    \"quarter\": \"q1\"\n  }\n}"
+              "raw": "{\n  \"data\": {\n    \"employee_id\": \"{{sample_employee_id}}\",\n    \"year\": 2026,\n    \"quarter\": \"Q1\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{base_url}}/_server/getQuarterlyEvaluation",
@@ -651,26 +4029,34 @@
                 "getQuarterlyEvaluation"
               ]
             },
-            "description": "Returns quarterly header, status ('draft', 'submitted', 'returned', 'approved'), return_reason, and scored items."
-          }
+            "description": "Loads the quarterly score card, criteria scores, composite percentage, and grade band."
+          },
+          "response": []
         },
         {
-          "name": "Save / Submit Quarterly Evaluation",
+          "name": "Save Quarterly Evaluation (saveQuarterlyEvaluation)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/json",
+                "type": "text"
               },
               {
                 "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"data\": {\n    \"employeeId\": \"00000000-0000-0000-0000-000000000000\",\n    \"year\": 2026,\n    \"quarter\": \"q1\",\n    \"items\": [\n      {\n        \"criterionId\": \"00000000-0000-0000-0000-000000000001\",\n        \"actualValue\": 0.95,\n        \"comments\": \"Completed all scheduled site milestones on plan.\"\n      },\n      {\n        \"criterionId\": \"00000000-0000-0000-0000-000000000002\",\n        \"actualValue\": 0.92,\n        \"comments\": \"Zero major consultant snag rejections.\"\n      }\n    ],\n    \"notes\": {\n      \"strengths\": \"Exceptional site discipline and fast cable termination delivery.\",\n      \"growthAreas\": \"Improve integration timing with HVAC interface trip tests.\",\n      \"recommendations\": \"Recommend Cisco Certified Network Associate (CCNA) certification.\"\n    },\n    \"submitToHr\": true\n  }\n}"
+              "raw": "{\n  \"data\": {\n    \"employee_id\": \"{{sample_employee_id}}\",\n    \"year\": 2026,\n    \"quarter\": \"Q1\",\n    \"scores\": {\n      \"KPI-001\": 96.5,\n      \"KPI-002\": 92,\n      \"KPI-003\": 88\n    },\n    \"manager_feedback\": \"Exceptional performance in milestone deliveries this quarter.\",\n    \"is_draft\": false\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{base_url}}/_server/saveQuarterlyEvaluation",
@@ -682,26 +4068,34 @@
                 "saveQuarterlyEvaluation"
               ]
             },
-            "description": "Saves draft or submits quarterly review. Server enforces score formula: achievement = min(1, actual/target), score = sum(achv * weight * 100)."
-          }
+            "description": "Saves employee quarterly scores, calculates weighted total, and submits for sign-off."
+          },
+          "response": []
         },
         {
-          "name": "Review Quarterly Evaluation - APPROVE (HR Admin)",
+          "name": "Review Quarterly Evaluation (reviewQuarterlyEvaluation)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/json",
+                "type": "text"
               },
               {
                 "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"data\": {\n    \"evaluation_id\": \"00000000-0000-0000-0000-000000000000\",\n    \"action\": \"approve\"\n  }\n}"
+              "raw": "{\n  \"data\": {\n    \"evaluation_id\": \"00000000-0000-0000-0000-000000000140\",\n    \"action\": \"approved\",\n    \"review_note\": \"Approved by Department Head and HR Director\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{base_url}}/_server/reviewQuarterlyEvaluation",
@@ -713,57 +4107,34 @@
                 "reviewQuarterlyEvaluation"
               ]
             },
-            "description": "Formally approves quarterly review. Locks evaluation and updates employee profile."
-          }
+            "description": "Official approval or return for revision of a quarterly evaluation."
+          },
+          "response": []
         },
         {
-          "name": "Review Quarterly Evaluation - RETURN FOR REVISION (Mandatory Reason)",
+          "name": "List Pending KPI Approvals (listPendingApprovals)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/json",
+                "type": "text"
               },
               {
                 "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"data\": {\n    \"evaluation_id\": \"00000000-0000-0000-0000-000000000000\",\n    \"action\": \"return\",\n    \"return_reason\": \"Please re-verify the Q1 installation pass rate and clarify the HVAC snag justification before final submission.\"\n  }\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/_server/reviewQuarterlyEvaluation",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "_server",
-                "reviewQuarterlyEvaluation"
-              ]
-            },
-            "description": "Rejects submission and returns to manager for corrections. Enforces mandatory return_reason >= 5 chars."
-          }
-        },
-        {
-          "name": "List Pending Approvals Queue (listPendingApprovals)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
+              "raw": "{\n  \"data\": {\n    \"year\": 2026,\n    \"quarter\": \"Q1\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
               }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"data\": {\n    \"year\": 2026,\n    \"quarter\": \"all\"\n  }\n}"
             },
             "url": {
               "raw": "{{base_url}}/_server/listPendingApprovals",
@@ -775,32 +4146,395 @@
                 "listPendingApprovals"
               ]
             },
-            "description": "Returns the queue of submitted quarterly evaluations waiting for HR review and sign-off."
-          }
+            "description": "Lists all evaluations submitted for approval."
+          },
+          "response": []
         }
       ]
     },
     {
-      "name": "7. System Settings & Security Audit",
-      "description": "Anti-spoofing security toggles, biometric thresholds, and tamper-proof audit trail streams.",
+      "name": "14. Payroll, Allowances & Penalties",
       "item": [
         {
-          "name": "Get Biometric Security Settings",
+          "name": "Get Payroll Period Summary (getPayrollPeriod)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/json",
+                "type": "text"
               },
               {
                 "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"data\": {}\n}"
+              "raw": "{\n  \"data\": {\n    \"month\": 11,\n    \"year\": 2026\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/getPayrollPeriod",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "getPayrollPeriod"
+              ]
+            },
+            "description": "Calculates monthly gross, deductions, advance installments, penalties, allowances, and final net payout."
+          },
+          "response": []
+        },
+        {
+          "name": "Lock Payroll Run (lockPayrollRun)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"month\": 11,\n    \"year\": 2026\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/lockPayrollRun",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "lockPayrollRun"
+              ]
+            },
+            "description": "Freezes payroll records for the specified month to prevent further adjustments prior to bank release."
+          },
+          "response": []
+        },
+        {
+          "name": "Unlock Payroll Run (unlockPayrollRun)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"month\": 11,\n    \"year\": 2026\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/unlockPayrollRun",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "unlockPayrollRun"
+              ]
+            },
+            "description": "Unlocks a payroll run with admin audit logging."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Advanced Payroll Settings (getAdvancedPayrollSettings)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/getAdvancedPayrollSettings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "getAdvancedPayrollSettings"
+              ]
+            },
+            "description": "Retrieves Egyptian social insurance and tax bracket configurations."
+          },
+          "response": []
+        },
+        {
+          "name": "Save Advanced Payroll Settings (saveAdvancedPayrollSettings)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"insurance_bracket_min\": 2000,\n    \"insurance_bracket_max\": 12600,\n    \"employee_insurance_rate\": 0.11,\n    \"employer_insurance_rate\": 0.1875,\n    \"tax_brackets\": [\n      {\n        \"up_to\": 40000,\n        \"rate\": 0\n      },\n      {\n        \"up_to\": 55000,\n        \"rate\": 0.1\n      },\n      {\n        \"up_to\": 70000,\n        \"rate\": 0.15\n      },\n      {\n        \"up_to\": 200000,\n        \"rate\": 0.2\n      },\n      {\n        \"up_to\": 400000,\n        \"rate\": 0.225\n      },\n      {\n        \"up_to\": 1000000,\n        \"rate\": 0.25\n      }\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/saveAdvancedPayrollSettings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "saveAdvancedPayrollSettings"
+              ]
+            },
+            "description": "Updates national tax and insurance rate formulas."
+          },
+          "response": []
+        },
+        {
+          "name": "List Allowances (listAllowances)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/listAllowances",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "listAllowances"
+              ]
+            },
+            "description": "Lists regular recurring allowances (housing, transportation, mobile, food)."
+          },
+          "response": []
+        },
+        {
+          "name": "Upsert Allowance (upsertAllowance)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"name_en\": \"Remote Work Allowance\",\n    \"name_ar\": \"بدل العمل عن بعد\",\n    \"amount\": 1500,\n    \"taxable\": true\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/upsertAllowance",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "upsertAllowance"
+              ]
+            },
+            "description": "Creates or modifies a monthly allowance rate."
+          },
+          "response": []
+        },
+        {
+          "name": "List Employee Penalties (listEmployeePenalties)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"employee_id\": \"{{sample_employee_id}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/listEmployeePenalties",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "listEmployeePenalties"
+              ]
+            },
+            "description": "Lists salary deductions and disciplinary penalties."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Employee Penalty (createEmployeePenalty)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"employee_id\": \"{{sample_employee_id}}\",\n    \"penalty_type\": \"lateness\",\n    \"deduction_days\": 0.5,\n    \"reason\": \"Repeated unexcused morning lateness exceeding grace period\",\n    \"date\": \"2026-11-01\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/createEmployeePenalty",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "createEmployeePenalty"
+              ]
+            },
+            "description": "Applies a disciplinary deduction to be processed in the current payroll period."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "15. Security & System Settings",
+      "item": [
+        {
+          "name": "Get Security Settings (getSecuritySettings)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{base_url}}/_server/getSecuritySettings",
@@ -812,26 +4546,34 @@
                 "getSecuritySettings"
               ]
             },
-            "description": "Returns active biometric thresholds, lockout minutes, and mock-GPS blocking flags."
-          }
+            "description": "Retrieves global platform security parameters: face recognition thresholds, geofence radius limits, and rate limits."
+          },
+          "response": []
         },
         {
-          "name": "Update Security Settings (Admin Only)",
+          "name": "Update Security Settings (updateSecuritySettings)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/json",
+                "type": "text"
               },
               {
                 "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"data\": {\n    \"requireBiometrics\": true,\n    \"requireGeofencing\": true,\n    \"blockMockLocations\": true,\n    \"faceMatchThreshold\": 0.88,\n    \"maxFailedAttempts\": 3,\n    \"lockoutDurationMinutes\": 15\n  }\n}"
+              "raw": "{\n  \"data\": {\n    \"face_threshold\": 0.4,\n    \"geofence_default_radius_m\": 100,\n    \"max_attendance_rate_limit_per_min\": 5,\n    \"enforce_device_binding\": true,\n    \"require_face_liveness\": true\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{base_url}}/_server/updateSecuritySettings",
@@ -843,39 +4585,204 @@
                 "updateSecuritySettings"
               ]
             },
-            "description": "Configures system-wide anti-spoofing defense thresholds."
-          }
+            "description": "Updates system security thresholds and strictness toggles."
+          },
+          "response": []
         },
         {
-          "name": "Get Security Audit Logs",
+          "name": "Reset Employee Attendance Rate Limit (resetEmployeeAttendanceRateLimit)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/json",
+                "type": "text"
               },
               {
                 "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"data\": {\n    \"page\": 1,\n    \"pageSize\": 50,\n    \"entityName\": \"kpi_quarterly_evaluations\"\n  }\n}"
+              "raw": "{\n  \"data\": {\n    \"employeeId\": \"{{sample_employee_id}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
-              "raw": "{{base_url}}/_server/getAuditLogs",
+              "raw": "{{base_url}}/_server/resetEmployeeAttendanceRateLimit",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "_server",
-                "getAuditLogs"
+                "resetEmployeeAttendanceRateLimit"
               ]
             },
-            "description": "Fetches immutable audit log records with actor, action, timestamp, IP, and diff snapshots."
-          }
+            "description": "Clears rate limiting blocks on an employee following multiple failed punches."
+          },
+          "response": []
+        },
+        {
+          "name": "List Security Blocklist (listBlocklist)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/listBlocklist",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "listBlocklist"
+              ]
+            },
+            "description": "Retrieves blocked IP addresses and blacklisted hardware device IDs."
+          },
+          "response": []
+        },
+        {
+          "name": "Add Security Blocklist Entry (addBlocklistEntry)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"type\": \"ip\",\n    \"value\": \"192.168.1.100\",\n    \"reason\": \"Detected suspicious mock location injection\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/addBlocklistEntry",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "addBlocklistEntry"
+              ]
+            },
+            "description": "Blocks an IP address or device identifier from authenticating."
+          },
+          "response": []
+        },
+        {
+          "name": "Get System Audit Events (getAuditEvents)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"limit\": 100,\n    \"category\": \"all\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/getAuditEvents",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "getAuditEvents"
+              ]
+            },
+            "description": "Retrieves comprehensive administrative audit logs with IP, user agent, actor ID, and changed payloads."
+          },
+          "response": []
+        },
+        {
+          "name": "Run Security Scan (runSecurityScan)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/_server/runSecurityScan",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "_server",
+                "runSecurityScan"
+              ]
+            },
+            "description": "Executes automated system security scan for compromised credentials and rogue devices."
+          },
+          "response": []
         }
       ]
     }
