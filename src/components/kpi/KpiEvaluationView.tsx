@@ -205,16 +205,6 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
   const [empSelectorOpen, setEmpSelectorOpen] = useState(false);
   const [empSelectorSearch, setEmpSelectorSearch] = useState("");
 
-  const filteredSelectorEmployees = useMemo(() => {
-    if (!empSelectorSearch.trim()) return employeesList;
-    const term = empSelectorSearch.trim().toLowerCase();
-    return employeesList.filter((e) =>
-      (e.name || "").toLowerCase().includes(term) ||
-      (e.code || "").toLowerCase().includes(term) ||
-      (e.position || "").toLowerCase().includes(term) ||
-      (e.department || "").toLowerCase().includes(term)
-    );
-  }, [employeesList, empSelectorSearch]);
   const [evaluatorName, setEvaluatorName] = useState<string>(
     session?.name || (role === "manager" ? (isAr ? "المدير المباشر" : "Direct Manager") : (isAr ? "مهندس الإشراف / HR" : "Engineering Lead / HR"))
   );
@@ -387,6 +377,17 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
       department: e.department || (isAr ? "الإدارة الهندسية" : "Engineering"),
     }));
   }, [isManagerMode, managerTeamData, adminEmpsData, isAr]);
+
+  const filteredSelectorEmployees = useMemo(() => {
+    if (!empSelectorSearch.trim()) return employeesList;
+    const term = empSelectorSearch.trim().toLowerCase();
+    return employeesList.filter((e) =>
+      (e.name || "").toLowerCase().includes(term) ||
+      (e.code || "").toLowerCase().includes(term) ||
+      (e.position || "").toLowerCase().includes(term) ||
+      (e.department || "").toLowerCase().includes(term)
+    );
+  }, [employeesList, empSelectorSearch]);
 
   // Set default selected employee once employees load
   useEffect(() => {
