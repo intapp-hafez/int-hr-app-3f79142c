@@ -5,44 +5,88 @@ import {
   getRatingFromScore,
 } from "./light-current-kpi.data";
 
+export interface EvaluationExportItem {
+  id: string | number;
+  category: string;
+  name: string;
+  definition?: string;
+  howMeasured?: string;
+  weight: number;
+  target: number;
+  unit?: string;
+}
+
 export interface EvaluationExportMeta {
   employeeName: string;
+  employeeCode?: string;
   evaluatorName: string;
   year: number | string;
   department?: string;
   jobTitle?: string;
+  evaluationState?: Record<string | number, KpiRowState>;
+  items?: EvaluationExportItem[];
+  notes?: {
+    strengths?: string;
+    growthAreas?: string;
+    recommendations?: string;
+  };
 }
 
 export function exportKpiEvaluationToExcel(
-  state: Record<number, KpiRowState>,
-  meta: EvaluationExportMeta
+  stateOrMeta: Record<string | number, KpiRowState> | EvaluationExportMeta,
+  possibleMeta?: EvaluationExportMeta
 ) {
+  const isSingleArg = !possibleMeta && stateOrMeta && typeof stateOrMeta === "object" && "employeeName" in stateOrMeta;
+  const meta: EvaluationExportMeta = (isSingleArg ? stateOrMeta : possibleMeta) || {
+    employeeName: "Employee",
+    evaluatorName: "Evaluator",
+    year: new Date().getFullYear(),
+  };
+  const state: Record<string | number, KpiRowState> = isSingleArg
+    ? (meta.evaluationState || {})
+    : ((stateOrMeta as Record<string | number, KpiRowState>) || {});
+
+  const exportItems: EvaluationExportItem[] =
+    meta.items && meta.items.length > 0
+      ? meta.items
+      : LIGHT_CURRENT_ENGINEER_KPIS.map((k) => ({
+          id: k.id,
+          category: k.category,
+          name: k.name,
+          definition: k.definition,
+          howMeasured: k.howMeasured,
+          weight: k.weight,
+          target: k.target,
+        }));
+
   const wb = XLSX.utils.book_new();
 
   // 1. KPI Overview Sheet
   const overviewData: (string | number)[][] = [
     ["INTEGRATED TECHNICS"],
     [],
-    [`Annul KPI Evaluation | Job Title: ${meta.jobTitle || "Junior ELV / Light Current Site Engineer"} | Department: ${meta.department || "Engineering"}`],
+    [`Annul KPI Evaluation | Job Title: ${meta.jobTitle || "Job Role"} | Department: ${meta.department || "General"}`],
     [],
     [],
     ["#", "Category", "KPI / Metric Name", "Definition (What it measures)", "How it's measured", "Weight (%)", "Target"],
   ];
 
-  for (const kpi of LIGHT_CURRENT_ENGINEER_KPIS) {
+  let totalExportWeight = 0;
+  for (const it of exportItems) {
+    totalExportWeight += it.weight;
     overviewData.push([
-      kpi.id,
-      kpi.category,
-      kpi.name,
-      kpi.definition,
-      kpi.howMeasured,
-      kpi.weight,
-      kpi.target,
+      it.id,
+      it.category,
+      it.name,
+      it.definition || "",
+      it.howMeasured || "",
+      it.weight,
+      it.target,
     ]);
   }
 
   overviewData.push([]);
-  overviewData.push(["", "", "", "", "Total Weight", 1.0]);
+  overviewData.push(["", "", "", "", "Total Weight", totalExportWeight]);
 
   const overviewWs = XLSX.utils.aoa_to_sheet(overviewData);
   XLSX.utils.book_append_sheet(wb, overviewWs, "KPI Overview");
@@ -83,8 +127,8 @@ export function exportKpiEvaluationToExcel(
   let totalQ4Score = 0;
   let totalAnnualScore = 0;
 
-  for (const kpi of LIGHT_CURRENT_ENGINEER_KPIS) {
-    const row = state[kpi.id];
+  for (const item of exportItems) {
+    const row = state[item.id];
     const q1A = row?.q1.actual ?? "";
     const q1Ach = row?.q1.achievement ?? "";
     const q1Sc = row?.q1.score ?? "";
@@ -110,10 +154,10 @@ export function exportKpiEvaluationToExcel(
     if (typeof ann === "number") totalAnnualScore += ann;
 
     evalData.push([
-      kpi.id,
-      kpi.name,
-      kpi.weight,
-      kpi.target,
+      item.id,
+      item.name,
+      item.weight,
+      item.target,
       q1A,
       q1Ach,
       q1Sc,
@@ -134,7 +178,7 @@ export function exportKpiEvaluationToExcel(
   evalData.push([
     "",
     "TOTAL",
-    1.0,
+    Number(totalExportWeight.toFixed(4)),
     "",
     "",
     "",

@@ -103,6 +103,90 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+export interface ScorecardItem {
+  id: string;
+  numericIndex: number;
+  code: string;
+  name: string;
+  name_ar: string;
+  category: string;
+  category_ar?: string;
+  definition: string;
+  definition_ar: string;
+  weight: number;
+  target: number;
+  unit: string;
+  direction: "higher_is_better" | "lower_is_better" | "rating_5";
+  inputType: "percentage" | "rating_5" | "numeric";
+  howMeasured?: string;
+  howMeasured_ar?: string;
+}
+
+export function computeAchievement(
+  actual: number | null,
+  targetBenchmark: number,
+  direction: string = "higher_is_better",
+  unit: string = "%"
+): number | null {
+  if (actual === null || isNaN(actual)) return null;
+
+  let normTarget = targetBenchmark;
+  if (unit === "%" && normTarget > 1) {
+    normTarget = normTarget / 100;
+  } else if (unit === "scale" && normTarget > 1) {
+    normTarget = normTarget / 5;
+  } else if (normTarget > 1 && normTarget <= 100) {
+    normTarget = normTarget / 100;
+  }
+
+  if (normTarget <= 0) return 1.0;
+
+  if (direction === "lower_is_better") {
+    if (actual <= 0) return 1.0;
+    return Math.min(1.0, normTarget / actual);
+  }
+
+  return Math.min(1.0, actual / normTarget);
+}
+
+export function formatCategoryName(cat: string | undefined | null, isAr: boolean): string {
+  if (!cat) return isAr ? "معايير الأداء الوظيفي" : "Job Role Criteria";
+  const normalized = cat.toLowerCase().replace(/_/g, " ").trim();
+  const dict: Record<string, { en: string; ar: string }> = {
+    technical: { en: "Technical Execution & Architecture", ar: "الأداء والتنفيذ الفني والبرمجي" },
+    quality: { en: "Quality, Standards & Review", ar: "الجودة والمعايير والتدقيق" },
+    operational: { en: "Operational Excellence & Delivery", ar: "الكفاءة التشغيلية والتسليم" },
+    behavioral: { en: "Behavioral Competencies & Teamwork", ar: "الجدارات السلوكية والعمل الجماعي" },
+    compliance: { en: "Compliance, Safety & Governance", ar: "الالتزام والسلامة والحوكمة" },
+    safety: { en: "Site Safety & PPE Compliance", ar: "السلامة المهنية ومهمات الوقاية" },
+    hse: { en: "HSE & Environmental Health", ar: "السلامة والصحة المهنية والبيئة" },
+    customer_service: { en: "Customer Service & Stakeholder Care", ar: "خدمة العملاء ورعاية المستفيدين" },
+    financial: { en: "Financial Accuracy & Governance", ar: "الحوكمة والدقة المالية" },
+    innovation: { en: "Innovation & Continuous Learning", ar: "الابتكار والتطوير المستمر" },
+    sales: { en: "Sales & Business Development", ar: "المبيعات وتطوير الأعمال" },
+    hr: { en: "HR & People Operations", ar: "الموارد البشرية والعمليات" },
+    "installation & technical execution": { en: "Installation & Technical Execution", ar: "التركيب والتنفيذ الفني" },
+    "commissioning & system programming": { en: "Commissioning & System Programming", ar: "التشغيل وبرمجة الأنظمة" },
+    "system integration": { en: "System Integration", ar: "تكامل وترابط الأنظمة" },
+    "troubleshooting & testing": { en: "Troubleshooting & Testing", ar: "استكشاف الأعطال والاختبارات" },
+    "reporting & support": { en: "Reporting & Support", ar: "التقارير والدعم الفني" },
+    "cross-discipline coordination": { en: "Cross-Discipline Coordination", ar: "التنسيق بين التخصصات" },
+    "professional development": { en: "Professional Development", ar: "التطوير والتعلم المهني" },
+    "soft skills / behavioral competencies": { en: "Soft Skills & Behavioral Competencies", ar: "المهارات الشخصية والسلوكية" },
+  };
+
+  if (dict[normalized]) {
+    return isAr ? dict[normalized].ar : dict[normalized].en;
+  }
+  if (KPI_CATEGORIES_AR[cat]) {
+    return isAr ? KPI_CATEGORIES_AR[cat] : cat;
+  }
+  return cat
+    .split(" ")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
 interface KpiEvaluationViewProps {
   role?: "admin" | "hr" | "manager";
 }
@@ -136,8 +220,8 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
   });
 
   // State for all 17 KPIs
-  const [kpiState, setKpiState] = useState<Record<number, KpiRowState>>(createEmptyEvaluationState);
-  const [infoModalKpi, setInfoModalKpi] = useState<KpiMetricDefinition | null>(null);
+  const [kpiState, setKpiState] = useState<Record<string, KpiRowState>>({});
+  const [infoModalKpi, setInfoModalKpi] = useState<any | null>(null);
   const [isEvaluationsListOpen, setIsEvaluationsListOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
@@ -375,6 +459,114 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
     queryFn: () => matchTemplateFn({ data: { employeeId: selectedEmpId } }),
     enabled: !!selectedEmpId,
   });
+
+  // ── DYNAMIC SCORECARD ITEMS FROM MATCHED ROLE TEMPLATE ──
+  const activeScorecardItems = useMemo<ScorecardItem[]>(() => {
+    const rawItems =
+      matchedTemplateData?.matched &&
+      matchedTemplateData.template?.items &&
+      matchedTemplateData.template.items.length > 0
+        ? matchedTemplateData.template.items
+        : null;
+
+    if (rawItems && rawItems.length > 0) {
+      const sorted = [...rawItems].sort(
+        (a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0)
+      );
+      return sorted.map((it: any, idx: number) => {
+        const crit = it.criterion || {};
+        const weight =
+          Number(it.weight) > 1 ? Number(it.weight) / 100 : Number(it.weight || 0);
+        const target = Number(it.target_benchmark ?? crit.default_target ?? 100);
+        const direction = (it.scoring_direction ||
+          crit.scoring_direction ||
+          "higher_is_better") as "higher_is_better" | "lower_is_better" | "rating_5";
+        const unit = it.unit || crit.unit || "%";
+        const inputType =
+          direction === "rating_5" || unit === "scale"
+            ? "rating_5"
+            : unit === "%"
+            ? "percentage"
+            : "numeric";
+        const keyId = String(it.criterion_id || it.id || idx + 1);
+
+        return {
+          id: keyId,
+          numericIndex: idx + 1,
+          code: crit.code || `KPI-${idx + 1}`,
+          name: crit.name_en || `Metric ${idx + 1}`,
+          name_ar: crit.name_ar || `مؤشر ${idx + 1}`,
+          category: crit.category || "operational",
+          category_ar: crit.category_ar,
+          definition: crit.description_en || crit.how_measured_en || "",
+          definition_ar: crit.description_ar || crit.how_measured_ar || "",
+          weight,
+          target,
+          unit,
+          direction,
+          inputType,
+          howMeasured: crit.how_measured_en || "",
+          howMeasured_ar: crit.how_measured_ar || "",
+        };
+      });
+    }
+
+    // Default fallback to LIGHT_CURRENT_ENGINEER_KPIS
+    return LIGHT_CURRENT_ENGINEER_KPIS.map((k) => ({
+      id: String(k.id),
+      numericIndex: k.id,
+      code: `KPI-${k.id}`,
+      name: k.name,
+      name_ar: k.name_ar,
+      category: k.category,
+      category_ar: k.category_ar,
+      definition: k.definition,
+      definition_ar: k.definition_ar,
+      weight: k.weight,
+      target: k.target,
+      unit: k.inputType === "rating_5" ? "scale" : "%",
+      direction: (k.inputType === "rating_5"
+        ? "rating_5"
+        : "higher_is_better") as "higher_is_better" | "lower_is_better" | "rating_5",
+      inputType: k.inputType as "percentage" | "rating_5" | "numeric",
+      howMeasured: k.howMeasured,
+      howMeasured_ar: k.howMeasured_ar,
+    }));
+  }, [matchedTemplateData]);
+
+  // Group active scorecard items by category
+  const activeCategories = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        category: string;
+        category_ar?: string;
+        items: ScorecardItem[];
+        totalWeight: number;
+      }
+    >();
+
+    for (const item of activeScorecardItems) {
+      const cat = item.category || "operational";
+      if (!map.has(cat)) {
+        map.set(cat, {
+          category: cat,
+          category_ar: item.category_ar,
+          items: [],
+          totalWeight: 0,
+        });
+      }
+      const entry = map.get(cat)!;
+      entry.items.push(item);
+      entry.totalWeight += item.weight;
+    }
+
+    return Array.from(map.values());
+  }, [activeScorecardItems]);
+
+  const totalTemplateWeight = useMemo(() => {
+    return activeScorecardItems.reduce((acc, it) => acc + (it.weight || 0), 0);
+  }, [activeScorecardItems]);
 
   // ── TEMPLATE BUILDER & DUPLICATION STATE ──
   const [templateSubTab, setTemplateSubTab] = useState<"templates" | "criteria">("templates");
@@ -794,20 +986,17 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
   // Sync state when serverRecord arrives
   useEffect(() => {
     if (serverRecord && serverRecord.scores) {
-      const incomingState = createEmptyEvaluationState();
+      const incomingState: Record<string, KpiRowState> = {};
       Object.entries(serverRecord.scores).forEach(([key, val]: [string, any]) => {
-        const id = Number(key);
-        if (incomingState[id]) {
-          incomingState[id] = {
-            id,
-            targetAnnual: val.targetAnnual ?? incomingState[id].targetAnnual,
-            q1: val.q1 ?? incomingState[id].q1,
-            q2: val.q2 ?? incomingState[id].q2,
-            q3: val.q3 ?? incomingState[id].q3,
-            q4: val.q4 ?? incomingState[id].q4,
-            annualScore: val.annualScore ?? null,
-          };
-        }
+        incomingState[key] = {
+          id: key as any,
+          targetAnnual: val.targetAnnual ?? null,
+          q1: val.q1 ?? { actual: null, achievement: null, score: null },
+          q2: val.q2 ?? { actual: null, achievement: null, score: null },
+          q3: val.q3 ?? { actual: null, achievement: null, score: null },
+          q4: val.q4 ?? { actual: null, achievement: null, score: null },
+          annualScore: val.annualScore ?? null,
+        };
       });
       setKpiState(incomingState);
       if (serverRecord.notes) {
@@ -826,12 +1015,24 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
       }
       setHasUnsavedChanges(false);
     } else if (serverRecord === null && selectedEmpId) {
-      setKpiState(createEmptyEvaluationState());
+      const emptyState: Record<string, KpiRowState> = {};
+      for (const it of activeScorecardItems) {
+        emptyState[it.id] = {
+          id: it.id as any,
+          targetAnnual: it.target,
+          q1: { actual: null, achievement: null, score: null },
+          q2: { actual: null, achievement: null, score: null },
+          q3: { actual: null, achievement: null, score: null },
+          q4: { actual: null, achievement: null, score: null },
+          annualScore: null,
+        };
+      }
+      setKpiState(emptyState);
       setNotes({ strengths: "", growthAreas: "", recommendations: "" });
       setStatus("Draft");
       setHasUnsavedChanges(false);
     }
-  }, [serverRecord, selectedEmpId]);
+  }, [serverRecord, selectedEmpId, activeScorecardItems]);
 
   // Calculate live summary totals
   const summaryTotals = useMemo(() => {
@@ -846,8 +1047,8 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
     let q3Count = 0;
     let q4Count = 0;
 
-    for (const kpi of LIGHT_CURRENT_ENGINEER_KPIS) {
-      const row = kpiState[kpi.id];
+    for (const item of activeScorecardItems) {
+      const row = kpiState[item.id];
       if (!row) continue;
 
       if (typeof row.q1.score === "number") {
@@ -879,46 +1080,42 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
       annualWeightedSum,
       hasData: q1Count > 0 || q2Count > 0 || q3Count > 0 || q4Count > 0,
     };
-  }, [kpiState]);
+  }, [activeScorecardItems, kpiState]);
 
   const ratingTier = useMemo(() => {
     return getRatingFromScore(summaryTotals.annualWeightedSum, summaryTotals.hasData);
   }, [summaryTotals.annualWeightedSum, summaryTotals.hasData]);
 
-  // Dynamic Category stats using disciplines
+  // Dynamic Category stats using activeCategories
   const categoryStats = useMemo(() => {
-    return disciplines.map((disc) => {
-      const catKpis = LIGHT_CURRENT_ENGINEER_KPIS.filter(
-        (k) =>
-          k.category === disc.name ||
-          k.category_ar === disc.name_ar ||
-          (disc.isDefault && (k.category === disc.name || KPI_CATEGORIES_AR[k.category] === disc.name_ar))
-      );
-      const totalWeight = disc.weight;
+    return activeCategories.map((cat) => {
+      const catItems = cat.items;
+      const totalWeight = cat.totalWeight;
 
       let earnedScore = 0;
-      catKpis.forEach((k) => {
-        const row = kpiState[k.id];
-        if (row && row.annualScore !== null) {
+      let hasData = false;
+
+      for (const it of catItems) {
+        const row = kpiState[it.id];
+        if (row && typeof row.annualScore === "number") {
           earnedScore += row.annualScore;
+          hasData = true;
         }
-      });
+      }
 
       const percentage = totalWeight > 0 ? Math.round((earnedScore / totalWeight) * 100) : 0;
 
       return {
-        id: disc.id,
-        name: disc.name,
-        name_ar: disc.name_ar,
+        id: cat.category,
+        name: formatCategoryName(cat.category, false),
+        name_ar: cat.category_ar || formatCategoryName(cat.category, true),
         totalWeight,
         earnedScore,
-        percentage,
-        kpiCount: catKpis.length,
-        isDefault: disc.isDefault ?? false,
-        discipline: disc,
+        percentage: hasData ? percentage : 0,
+        kpiCount: catItems.length,
       };
     });
-  }, [disciplines, kpiState]);
+  }, [activeCategories, kpiState]);
 
   // Mutations
   const saveMutation = useMutation({
@@ -953,7 +1150,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
         data: {
           employeeId: selectedEmpId,
           year: selectedYear,
-          templateType: "light_current_engineer",
+          templateType: matchedTemplateData?.template?.id || matchedTemplateData?.template?.name_en || "role_template",
           evaluatorName,
           status: payload.targetStatus,
           scores: serializedScores,
@@ -1345,6 +1542,16 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
       year: selectedYear,
       department: currentEmployee.department,
       jobTitle: currentEmployee.position,
+      items: activeScorecardItems.map((it) => ({
+        id: it.id,
+        category: formatCategoryName(it.category, isAr),
+        name: isAr ? it.name_ar : it.name,
+        definition: isAr ? it.definition_ar : it.definition,
+        howMeasured: isAr ? it.howMeasured_ar : it.howMeasured,
+        weight: it.weight,
+        target: it.target,
+        unit: it.unit,
+      })),
     });
     toast.success(isAr ? "تم تصدير ملف الإكسيل بنجاح" : "KPI scorecard exported to Excel");
   };
@@ -1764,105 +1971,255 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {paginatedEmployees.length === 0 ? (
-                    <tr>
-                      <td colSpan={12} className="px-4 py-8 text-center text-muted-foreground text-xs">
-                        {isAr ? "لا يوجد موظفون مطابقون لشروط البحث المحددة" : "No employees match current filter criteria"}
-                      </td>
-                    </tr>
-                  ) : (
-                    paginatedEmployees.map((item) => {
-                      const isCurrent = item.id === selectedEmpId;
-                      return (
-                        <tr
-                          key={item.id}
-                          className={`hover:bg-muted/30 transition-colors ${
-                            isCurrent ? "bg-brand/5 font-medium" : ""
-                          }`}
-                        >
-                          <td className="px-3 py-3 text-muted-foreground font-mono">{item.index}</td>
-                          <td className="px-3 py-3">
-                            <div className="flex items-center gap-2">
-                              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand/10 text-brand font-bold text-[11px] shrink-0">
-                                {item.name.slice(0, 2).toUpperCase()}
+                  {activeCategories.map((cat, catIdx) => {
+                    const categoryWeight = cat.totalWeight;
+
+                    return (
+                      <React.Fragment key={cat.category || catIdx}>
+                        {/* Category Header Row */}
+                        <tr className="bg-muted/40 font-semibold text-foreground">
+                          <td colSpan={19} className="px-4 py-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs uppercase tracking-wider text-brand font-bold">
+                                  {formatCategoryName(cat.category, isAr)}
+                                </span>
+                                <Badge variant="outline" className="text-[9px] px-1.5 py-0 font-medium text-muted-foreground border-border">
+                                  {cat.items.length} {isAr ? "معايير" : "criteria"}
+                                </Badge>
                               </div>
-                              <div className="min-w-0">
-                                <span className="font-semibold text-foreground truncate block">{item.name}</span>
-                                {item.code && (
-                                  <span className="font-mono text-[10px] text-muted-foreground">{item.code}</span>
-                                )}
-                              </div>
+                              <span className="font-mono text-[11px] text-muted-foreground">
+                                {isAr ? `وزن الفئة: ${fmtPercent(categoryWeight, 1)}` : `Category Weight: ${fmtPercent(categoryWeight, 1)}`}
+                              </span>
                             </div>
                           </td>
-                          <td className="px-3 py-3 text-muted-foreground">
-                            <span className="text-foreground font-medium block">{item.position}</span>
-                            <span className="text-[10px]">{item.department}</span>
-                          </td>
-                          <td className="px-3 py-3 text-center font-mono bg-blue-500/5 text-blue-700 dark:text-blue-300">
-                            {item.q1Score !== null ? `${(item.q1Score * 100).toFixed(1)}%` : "—"}
-                          </td>
-                          <td className="px-3 py-3 text-center font-mono bg-emerald-500/5 text-emerald-700 dark:text-emerald-300">
-                            {item.q2Score !== null ? `${(item.q2Score * 100).toFixed(1)}%` : "—"}
-                          </td>
-                          <td className="px-3 py-3 text-center font-mono bg-amber-500/5 text-amber-700 dark:text-amber-300">
-                            {item.q3Score !== null ? `${(item.q3Score * 100).toFixed(1)}%` : "—"}
-                          </td>
-                          <td className="px-3 py-3 text-center font-mono bg-purple-500/5 text-purple-700 dark:text-purple-300">
-                            {item.q4Score !== null ? `${(item.q4Score * 100).toFixed(1)}%` : "—"}
-                          </td>
-                          <td className="px-3 py-3 text-center font-mono font-bold bg-muted/60 text-foreground">
-                            {item.totalScore !== null ? `${item.totalScore.toFixed(1)}%` : "—"}
-                          </td>
-                          <td className="px-3 py-3 text-center">
-                            {item.ratingTier ? (
-                              <Badge className={`text-[10px] px-2 py-0.5 font-semibold ${item.ratingTier.badgeClass}`}>
-                                {isAr ? item.ratingTier.tier_ar : item.ratingTier.tier}
-                              </Badge>
-                            ) : (
-                              <span className="text-muted-foreground font-mono">—</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-3 text-center">
-                            {item.status === "approved" ? (
-                              <Badge className="bg-emerald-600 text-white text-[10px] px-2 py-0.5 font-semibold">
-                                {isAr ? "معتمد" : "Approved"}
-                              </Badge>
-                            ) : item.status === "submitted" ? (
-                              <Badge className="bg-blue-600 text-white text-[10px] px-2 py-0.5 font-semibold">
-                                {isAr ? "مقدم" : "Submitted"}
-                              </Badge>
-                            ) : item.status === "draft" ? (
-                              <Badge variant="outline" className="text-[10px] px-2 py-0.5 text-muted-foreground">
-                                {isAr ? "مسودة" : "Draft"}
-                              </Badge>
-                            ) : (
-                              <Badge variant="secondary" className="text-[10px] px-2 py-0.5 text-muted-foreground">
-                                {isAr ? "لم يبدأ" : "Not Started"}
-                              </Badge>
-                            )}
-                          </td>
-                          <td className="px-3 py-3 text-muted-foreground text-[11px]">
-                            {item.evaluator || "—"}
-                          </td>
-                          <td className="px-3 py-3 text-center">
-                            <Button
-                              variant={item.hasEvaluation ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => {
-                                setSelectedEmpId(item.id);
-                                setMainTab("scorecard");
-                              }}
-                              className={`h-7 text-xs rounded-xl px-2.5 cursor-pointer ${
-                                item.hasEvaluation ? "bg-brand text-brand-foreground hover:bg-brand/90" : ""
-                              }`}
-                            >
-                              {item.hasEvaluation ? (isAr ? "فتح" : "Open") : (isAr ? "تقييم" : "Evaluate")}
-                            </Button>
-                          </td>
                         </tr>
-                      );
-                    })
-                  )}
+
+                        {cat.items.length === 0 && (
+                          <tr>
+                            <td colSpan={19} className="px-4 py-3 text-center text-xs text-muted-foreground italic bg-muted/10">
+                              {isAr ? "لا توجد معايير مقترنة بهذه الفئة حالياً" : "No criteria currently assigned to this category"}
+                            </td>
+                          </tr>
+                        )}
+
+                        {/* KPI / Criteria Rows */}
+                        {cat.items.map((kpi) => {
+                          const row = kpiState[kpi.id] || {
+                            id: kpi.id as any,
+                            targetAnnual: kpi.target,
+                            q1: { actual: null, achievement: null, score: null },
+                            q2: { actual: null, achievement: null, score: null },
+                            q3: { actual: null, achievement: null, score: null },
+                            q4: { actual: null, achievement: null, score: null },
+                            annualScore: null,
+                          };
+
+                          const formatTargetDisplay = (target: number, unit: string) => {
+                            if (unit === "%") {
+                              const pctVal = target > 1 ? target : target * 100;
+                              return `${pctVal.toFixed(0)}%`;
+                            }
+                            if (unit === "scale") {
+                              return `${target}/5`;
+                            }
+                            return `${target} ${unit || ""}`.trim();
+                          };
+
+                          const formatActualDisplay = (val: number | null, inputType: string, unit: string) => {
+                            if (val === null) return "";
+                            if (inputType === "rating_5" || unit === "scale") {
+                              return (val * 5).toFixed(1);
+                            }
+                            if (unit === "%") {
+                              return `${(val * 100).toFixed(0)}%`;
+                            }
+                            return String(val);
+                          };
+
+                          const placeholderText = kpi.inputType === "rating_5" || kpi.unit === "scale" ? "1-5" : kpi.unit || "%";
+
+                          return (
+                            <tr key={kpi.id} className="hover:bg-muted/20 transition-colors">
+                              <td className="px-3 py-2 text-muted-foreground font-mono font-medium text-center">
+                                {kpi.numericIndex}
+                              </td>
+                              <td className="px-3 py-2">
+                                <div className="space-y-0.5">
+                                  <div className="font-semibold text-foreground leading-snug flex items-center gap-1.5">
+                                    <span>{isAr ? kpi.name_ar : kpi.name}</span>
+                                    {kpi.direction === "lower_is_better" && (
+                                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 font-normal">
+                                        {isAr ? "الأقل أفضل" : "Lower is better"}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[11px] text-muted-foreground line-clamp-1">
+                                    {isAr ? kpi.definition_ar : kpi.definition}
+                                  </p>
+                                </div>
+                              </td>
+                              <td className="px-3 py-2 text-center font-mono font-medium">
+                                {fmtPercent(kpi.weight, 1)}
+                              </td>
+                              <td className="px-3 py-2 text-center font-mono font-semibold text-muted-foreground">
+                                {formatTargetDisplay(kpi.target, kpi.unit)}
+                              </td>
+
+                              {/* Q1 Inputs & Scores */}
+                              {(activeQuarterFilter === "all" || activeQuarterFilter === "q1") && (
+                                <>
+                                  <td className="px-1 py-1 text-center bg-blue-500/5">
+                                    <Input
+                                      type="text"
+                                      disabled={isLocked}
+                                      value={formatActualDisplay(row.q1.actual, kpi.inputType, kpi.unit)}
+                                      onChange={(e) => handleActualChange(kpi.id, "q1", e.target.value)}
+                                      placeholder={placeholderText}
+                                      className="h-7 w-16 text-center font-mono text-xs mx-auto p-1 rounded-lg"
+                                    />
+                                  </td>
+                                  <td className="px-2 py-2 text-center font-mono bg-blue-500/5">
+                                    {fmtPercent(row.q1.achievement, 0)}
+                                  </td>
+                                  <td className="px-2 py-2 text-center font-mono font-bold bg-blue-500/5 text-blue-700 dark:text-blue-300">
+                                    {fmtRawScore(row.q1.score)}
+                                  </td>
+                                </>
+                              )}
+
+                              {/* Q2 Inputs & Scores */}
+                              {(activeQuarterFilter === "all" || activeQuarterFilter === "q2") && (
+                                <>
+                                  <td className="px-1 py-1 text-center bg-emerald-500/5">
+                                    <Input
+                                      type="text"
+                                      disabled={isLocked}
+                                      value={formatActualDisplay(row.q2.actual, kpi.inputType, kpi.unit)}
+                                      onChange={(e) => handleActualChange(kpi.id, "q2", e.target.value)}
+                                      placeholder={placeholderText}
+                                      className="h-7 w-16 text-center font-mono text-xs mx-auto p-1 rounded-lg"
+                                    />
+                                  </td>
+                                  <td className="px-2 py-2 text-center font-mono bg-emerald-500/5">
+                                    {fmtPercent(row.q2.achievement, 0)}
+                                  </td>
+                                  <td className="px-2 py-2 text-center font-mono font-bold bg-emerald-500/5 text-emerald-700 dark:text-emerald-300">
+                                    {fmtRawScore(row.q2.score)}
+                                  </td>
+                                </>
+                              )}
+
+                              {/* Q3 Inputs & Scores */}
+                              {(activeQuarterFilter === "all" || activeQuarterFilter === "q3") && (
+                                <>
+                                  <td className="px-1 py-1 text-center bg-amber-500/5">
+                                    <Input
+                                      type="text"
+                                      disabled={isLocked}
+                                      value={formatActualDisplay(row.q3.actual, kpi.inputType, kpi.unit)}
+                                      onChange={(e) => handleActualChange(kpi.id, "q3", e.target.value)}
+                                      placeholder={placeholderText}
+                                      className="h-7 w-16 text-center font-mono text-xs mx-auto p-1 rounded-lg"
+                                    />
+                                  </td>
+                                  <td className="px-2 py-2 text-center font-mono bg-amber-500/5">
+                                    {fmtPercent(row.q3.achievement, 0)}
+                                  </td>
+                                  <td className="px-2 py-2 text-center font-mono font-bold bg-amber-500/5 text-amber-700 dark:text-amber-300">
+                                    {fmtRawScore(row.q3.score)}
+                                  </td>
+                                </>
+                              )}
+
+                              {/* Q4 Inputs & Scores */}
+                              {(activeQuarterFilter === "all" || activeQuarterFilter === "q4") && (
+                                <>
+                                  <td className="px-1 py-1 text-center bg-purple-500/5">
+                                    <Input
+                                      type="text"
+                                      disabled={isLocked}
+                                      value={formatActualDisplay(row.q4.actual, kpi.inputType, kpi.unit)}
+                                      onChange={(e) => handleActualChange(kpi.id, "q4", e.target.value)}
+                                      placeholder={placeholderText}
+                                      className="h-7 w-16 text-center font-mono text-xs mx-auto p-1 rounded-lg"
+                                    />
+                                  </td>
+                                  <td className="px-2 py-2 text-center font-mono bg-purple-500/5">
+                                    {fmtPercent(row.q4.achievement, 0)}
+                                  </td>
+                                  <td className="px-2 py-2 text-center font-mono font-bold bg-purple-500/5 text-purple-700 dark:text-purple-300">
+                                    {fmtRawScore(row.q4.score)}
+                                  </td>
+                                </>
+                              )}
+
+                              {/* Annual Score Column */}
+                              <td className="px-3 py-2 text-center font-mono font-extrabold bg-muted/60 text-foreground">
+                                {fmtRawScore(row.annualScore)}
+                              </td>
+
+                              {/* Info Dialog Trigger */}
+                              <td className="px-2 py-2 text-center print:hidden">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setInfoModalKpi(kpi as any)}
+                                  className="h-6 w-6 rounded-lg text-muted-foreground hover:text-foreground cursor-pointer"
+                                  title={isAr ? "معلومات وطريقة قياس المؤشر" : "Metric Measurement & Definition"}
+                                >
+                                  <Info className="h-3.5 w-3.5" />
+                                </Button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </React.Fragment>
+                    );
+                  })}
+
+                  {/* Summary Footer Row */}
+                  <tr className="bg-muted font-bold text-foreground border-t-2 border-border">
+                    <td colSpan={4} className="px-4 py-3 text-end uppercase tracking-wider text-xs">
+                      {isAr ? "المجموع الموزون والنتيجة السنوية العامة:" : "Total Weighted Annual Performance Score:"}
+                    </td>
+
+                    {/* Q1 Total */}
+                    {(activeQuarterFilter === "all" || activeQuarterFilter === "q1") && (
+                      <td colSpan={3} className="px-3 py-3 text-center font-mono text-sm bg-blue-500/10 text-blue-700 dark:text-blue-300">
+                        {fmtPercent(summaryTotals.q1Sum, 2)}
+                      </td>
+                    )}
+
+                    {/* Q2 Total */}
+                    {(activeQuarterFilter === "all" || activeQuarterFilter === "q2") && (
+                      <td colSpan={3} className="px-3 py-3 text-center font-mono text-sm bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+                        {fmtPercent(summaryTotals.q2Sum, 2)}
+                      </td>
+                    )}
+
+                    {/* Q3 Total */}
+                    {(activeQuarterFilter === "all" || activeQuarterFilter === "q3") && (
+                      <td colSpan={3} className="px-3 py-3 text-center font-mono text-sm bg-amber-500/10 text-amber-700 dark:text-amber-300">
+                        {fmtPercent(summaryTotals.q3Sum, 2)}
+                      </td>
+                    )}
+
+                    {/* Q4 Total */}
+                    {(activeQuarterFilter === "all" || activeQuarterFilter === "q4") && (
+                      <td colSpan={3} className="px-3 py-3 text-center font-mono text-sm bg-purple-500/10 text-purple-700 dark:text-purple-300">
+                        {fmtPercent(summaryTotals.q4Sum, 2)}
+                      </td>
+                    )}
+
+                    {/* Annual Weighted Total */}
+                    <td className="px-3 py-3 text-center font-mono text-base font-extrabold bg-brand text-white shadow-xs">
+                      {summaryTotals.hasData ? fmtPercent(summaryTotals.annualWeightedSum, 2) : "—"}
+                    </td>
+
+                    <td className="print:hidden"></td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -2000,8 +2357,17 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
             </div>
 
             <div className="flex items-center gap-2">
+              {matchedTemplateData?.matched && matchedTemplateData.template && (
+                <Badge variant="secondary" className="gap-1.5 text-xs font-semibold bg-brand/10 text-brand border border-brand/20 py-1">
+                  <Layers className="h-3.5 w-3.5" />
+                  <span>{isAr ? matchedTemplateData.template.name_ar : matchedTemplateData.template.name_en}</span>
+                  {matchedTemplateData.template.version && (
+                    <span className="text-[10px] opacity-75 font-mono">v{matchedTemplateData.template.version}</span>
+                  )}
+                </Badge>
+              )}
               <Badge variant="outline" className="font-mono text-xs">
-                {isAr ? "إجمالي الوزن:" : "Total Weight:"} 100.0%
+                {isAr ? "إجمالي الوزن:" : "Total Weight:"} {(totalTemplateWeight * 100).toFixed(1)}%
               </Badge>
               {activeQuarterFilter !== "all" && (
                 <button
