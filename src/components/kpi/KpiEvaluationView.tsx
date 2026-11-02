@@ -1764,6 +1764,15 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
             <TabsTrigger value="scorecard" className="rounded-xl px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer">
               <FileSpreadsheet className="h-4 w-4" /> {isAr ? "بطاقة التقييم" : "Evaluation Scorecard"}
             </TabsTrigger>
+            <TabsTrigger value="guidelines" className="rounded-xl px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer">
+              <HelpCircle className="h-4 w-4" /> {isAr ? "دليل مؤشرات الأداء والتعريفات" : "KPI Overview & Definitions"}
+            </TabsTrigger>
+            <TabsTrigger value="categories" className="rounded-xl px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer">
+              <Layers className="h-4 w-4" /> {isAr ? "توزيع الأداء حسب التخصص" : "Category Breakdown"}
+            </TabsTrigger>
+            <TabsTrigger value="signoff" className="rounded-xl px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer">
+              <FileText className="h-4 w-4" /> {isAr ? "ملاحظات المشرف والاعتمادات" : "Supervisor Feedback"}
+            </TabsTrigger>
             <TabsTrigger value="pending-approvals" className="rounded-xl px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer">
               <Clock className="h-4 w-4 text-amber-500" />
               <span>{isAr ? "المعاملات المعلقة" : "Pending Approvals"}</span>
@@ -2824,7 +2833,259 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
           </div>
         </TabsContent>
 
-        
+        {/* ── TAB 2: GUIDELINES & DEFINITIONS (DYNAMIC TEMPLATE ITEMS) ── */}
+        <TabsContent value="guidelines" className="space-y-4">
+          <div className="rounded-3xl border border-border bg-card p-6 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="font-display text-lg font-bold text-foreground">
+                  {matchedTemplateData?.template
+                    ? (isAr ? matchedTemplateData.template.name_ar : matchedTemplateData.template.name_en)
+                    : (isAr ? "دليل مؤشرات الأداء والتعريفات" : "KPI Framework Guidelines & Definitions")}
+                </h2>
+                <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">
+                  {isAr
+                    ? "معايير الأداء المعتمدة الخاصة بهذه الوظيفة مع طريقة القياس والوزن النسبي والهدف المطلوب."
+                    : "Official job role criteria definitions, target benchmarks, and measurement methodologies."}
+                </p>
+              </div>
+              <Badge variant="outline" className="font-mono text-xs shrink-0 self-start sm:self-auto">
+                {isAr ? "إجمالي الوزن:" : "Total Weight:"} {(totalTemplateWeight * 100).toFixed(1)}%
+              </Badge>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+              {activeScorecardItems.map((kpi) => (
+                <div key={kpi.id} className="p-3.5 rounded-2xl border border-border bg-muted/10 space-y-2 hover:bg-muted/20 transition-colors">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-xs text-foreground">
+                        #{kpi.numericIndex}. {isAr ? kpi.name_ar : kpi.name}
+                      </span>
+                      {kpi.direction === "lower_is_better" && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 font-normal">
+                          {isAr ? "الأقل أفضل" : "Lower is better"}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Badge variant="outline" className="text-[10px] font-mono">
+                        {isAr ? `الوزن: ${fmtPercent(kpi.weight, 1)}` : `Weight: ${fmtPercent(kpi.weight, 1)}`}
+                      </Badge>
+                      <Badge variant="secondary" className="text-[10px] font-mono">
+                        {isAr
+                          ? `الهدف: ${kpi.unit === "%" ? (kpi.target > 1 ? kpi.target : kpi.target * 100) + "%" : `${kpi.target} ${kpi.unit || ""}`}`
+                          : `Target: ${kpi.unit === "%" ? (kpi.target > 1 ? kpi.target : kpi.target * 100) + "%" : `${kpi.target} ${kpi.unit || ""}`}`}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="text-[10px] text-brand font-semibold uppercase tracking-wider">
+                    {formatCategoryName(kpi.category, isAr)}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-snug">
+                    {isAr ? kpi.definition_ar : kpi.definition}
+                  </p>
+                  {(kpi.howMeasured || kpi.howMeasured_ar) && (
+                    <p className="text-[10px] text-brand/80 font-medium bg-brand/5 p-2 rounded-xl border border-brand/10">
+                      {isAr ? `طريقة القياس والمصدر: ${kpi.howMeasured_ar || kpi.howMeasured}` : `Measurement: ${kpi.howMeasured}`}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* ── TAB 3: CATEGORY BREAKDOWN (DYNAMIC TEMPLATE CATEGORIES) ── */}
+        <TabsContent value="categories" className="space-y-4">
+          <div className="rounded-3xl border border-border bg-card p-6 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="font-display text-lg font-bold text-foreground">
+                    {isAr ? "توزيع الأداء حسب مجالات التقييم والتخصص" : "Performance Breakdown by Role Category"}
+                  </h2>
+                  <Badge variant="outline" className="text-xs font-mono font-semibold">
+                    {isAr ? `إجمالي الأوزان: ${(totalTemplateWeight * 100).toFixed(1)}%` : `Total Weight: ${(totalTemplateWeight * 100).toFixed(1)}%`}
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {isAr
+                    ? "توزيع الدرجات الموزونة المحققة ونسب الإنجاز في كل مجال من مجالات بطاقة تقييم الوظيفة."
+                    : "Distribution of weighted scores and achievement attainment across role evaluation categories."}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {categoryStats.map((cat) => (
+                <div key={cat.id} className="p-4 rounded-2xl border border-border bg-card space-y-3 shadow-2xs">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="font-semibold text-xs text-foreground uppercase tracking-wider">
+                      {isAr ? cat.name_ar : cat.name}
+                    </span>
+                    <Badge variant="outline" className="text-[10px] font-mono shrink-0">
+                      {isAr ? `الوزن: ${fmtPercent(cat.totalWeight, 1)}` : `Weight: ${fmtPercent(cat.totalWeight, 1)}`}
+                    </Badge>
+                  </div>
+
+                  <div className="flex items-baseline justify-between text-xs">
+                    <span className="text-muted-foreground">
+                      {isAr ? "الدرجة المحققة:" : "Earned Score:"}
+                    </span>
+                    <span className="font-mono font-bold text-foreground">
+                      {fmtRawScore(cat.earnedScore)} / {fmtRawScore(cat.totalWeight)}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-[11px] text-muted-foreground">
+                      <span>{isAr ? "نسبة إنجاز الفئة" : "Category Attainment"}</span>
+                      <span className="font-medium text-foreground">{cat.percentage}%</span>
+                    </div>
+                    <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          cat.percentage >= 90
+                            ? "bg-emerald-500"
+                            : cat.percentage >= 75
+                            ? "bg-blue-500"
+                            : cat.percentage >= 60
+                            ? "bg-amber-500"
+                            : "bg-rose-500"
+                        }`}
+                        style={{ width: `${Math.min(100, cat.percentage)}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-1 text-[10px] text-muted-foreground">
+                    <span>{cat.kpiCount} {isAr ? "معايير تابعة لهذا المجال" : "criteria in this category"}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* ── TAB 4: SUPERVISOR FEEDBACK & SIGN-OFF ── */}
+        <TabsContent value="signoff" className="space-y-4">
+          <div className="rounded-3xl border border-border bg-card p-6 shadow-sm space-y-6">
+            <div>
+              <h2 className="font-display text-lg font-bold text-foreground">
+                {isAr ? "التقييم النوعي والاعتمادات الرسمية" : "Qualitative Assessment & Formal Sign-off"}
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                {isAr
+                  ? "توثيق نقاط القوة، فرص التحسين المستمر، والتوصيات التدريبية والاعتمادات الرسمية."
+                  : "Document strengths, coaching development areas, and official sign-offs."}
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {/* Strengths */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  {isAr ? "أبرز نقاط القوة والإنجازات:" : "Major Strengths & Key Achievements:"}
+                </Label>
+                <textarea
+                  rows={3}
+                  disabled={isLocked}
+                  value={notes.strengths}
+                  onChange={(e) => {
+                    setNotes((prev) => ({ ...prev, strengths: e.target.value }));
+                    setHasUnsavedChanges(true);
+                  }}
+                  placeholder={isAr ? "اكتب تفاصيل إنجازات الموظف..." : "Detail specific technical wins and contributions..."}
+                  className="w-full rounded-xl border border-input bg-background p-3 text-xs leading-relaxed focus:border-brand focus:ring-1 focus:ring-brand"
+                />
+              </div>
+
+              {/* Growth Areas */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                  <AlertCircle className="h-4 w-4 text-amber-600" />
+                  {isAr ? "مجالات التحسين والتطوير المستمر:" : "Priority Growth & Improvement Areas:"}
+                </Label>
+                <textarea
+                  rows={3}
+                  disabled={isLocked}
+                  value={notes.growthAreas}
+                  onChange={(e) => {
+                    setNotes((prev) => ({ ...prev, growthAreas: e.target.value }));
+                    setHasUnsavedChanges(true);
+                  }}
+                  placeholder={isAr ? "حدد مجالات العمل التي تتطلب تطوير..." : "Identify tasks and skills requiring development..."}
+                  className="w-full rounded-xl border border-input bg-background p-3 text-xs leading-relaxed focus:border-brand focus:ring-1 focus:ring-brand"
+                />
+              </div>
+
+              {/* Recommendations */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                  <TrendingUp className="h-4 w-4 text-brand" />
+                  {isAr ? "التوصيات التدريبية والشهادات المهنية المعتمدة:" : "Recommended Training, Certifications & Milestones:"}
+                </Label>
+                <textarea
+                  rows={3}
+                  disabled={isLocked}
+                  value={notes.recommendations}
+                  onChange={(e) => {
+                    setNotes((prev) => ({ ...prev, recommendations: e.target.value }));
+                    setHasUnsavedChanges(true);
+                  }}
+                  placeholder={isAr ? "الدورات والشهادات الموصى بها..." : "Specific training milestones and professional certifications..."}
+                  className="w-full rounded-xl border border-input bg-background p-3 text-xs leading-relaxed focus:border-brand focus:ring-1 focus:ring-brand"
+                />
+              </div>
+            </div>
+
+            {/* Formal Sign-off Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-border">
+              <div className="rounded-2xl border border-border p-4 bg-muted/10 space-y-2">
+                <span className="text-[10px] font-semibold uppercase text-muted-foreground">
+                  {isAr ? "المُقيِّم" : "Evaluator"}
+                </span>
+                <p className="font-semibold text-sm text-foreground">{evaluatorName || "—"}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {isAr
+                    ? `الحالة: ${status === "Draft" ? "قيد الإعداد" : "تم التوقيع والإرسال"}`
+                    : `Status: ${status === "Draft" ? "Drafting" : "Signed & Submitted"}`}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-border p-4 bg-muted/10 space-y-2">
+                <span className="text-[10px] font-semibold uppercase text-muted-foreground">
+                  {isAr ? "إقرار الموظف" : "Employee Acknowledgment"}
+                </span>
+                <p className="font-semibold text-sm text-foreground">{currentEmployee.name}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {status === "Approved"
+                    ? isAr ? "تم الاطلاع والاعتماد" : "Acknowledged & Finalized"
+                    : isAr ? "بانتظار استكمال التقييم" : "Pending completion"}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-border p-4 bg-muted/10 space-y-2">
+                <span className="text-[10px] font-semibold uppercase text-muted-foreground">
+                  {isAr ? "اعتماد الموارد البشرية" : "HR Verification"}
+                </span>
+                <p className="font-semibold text-sm text-foreground">
+                  {isAr ? "الموارد البشرية — إنترجريتد تكنيكس" : "Integrated Technics HR"}
+                </p>
+                <Badge
+                  variant={status === "Approved" ? "default" : "secondary"}
+                  className="text-[10px]"
+                >
+                  {status === "Approved"
+                    ? isAr ? "معتمد رسمياً" : "Officially Approved"
+                    : isAr ? "قيد المراجعة" : "Under Review"}
+                </Badge>
+              </div>
+            </div>
+          </div>
+        </TabsContent>
 
         {/* ── TAB: PENDING APPROVALS (HR ADMIN & MANAGERS) ── */}
         <TabsContent value="pending-approvals" className="space-y-4">
