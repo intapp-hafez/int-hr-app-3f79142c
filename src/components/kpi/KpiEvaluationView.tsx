@@ -1570,15 +1570,6 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
               <Award className="h-4 w-4 text-brand" />
               <span>{isAr ? "القوالب والمعايير" : "Templates & Criteria"}</span>
             </TabsTrigger>
-            <TabsTrigger value="guidelines" className="rounded-xl px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer">
-              <HelpCircle className="h-4 w-4" /> {isAr ? "دليل مؤشرات الأداء والتعريفات" : "KPI Overview & Definitions"}
-            </TabsTrigger>
-            <TabsTrigger value="categories" className="rounded-xl px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer">
-              <Layers className="h-4 w-4" /> {isAr ? "توزيع الأداء حسب التخصص" : "Category Breakdown"}
-            </TabsTrigger>
-            <TabsTrigger value="signoff" className="rounded-xl px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer">
-              <FileText className="h-4 w-4" /> {isAr ? "ملاحظات المشرف والاعتمادات" : "Supervisor Feedback & Sign-off"}
-            </TabsTrigger>
           </TabsList>
 
           {/* Quick Quarter Filter on Scorecard view */}
@@ -2351,188 +2342,16 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
               </table>
             </div>
           </div>
-        </TabsContent>
 
-        {/* ── TAB 2: GUIDELINES & DEFINITIONS ── */}
-        <TabsContent value="guidelines" className="space-y-4">
-          <div className="rounded-3xl border border-border bg-card p-6 shadow-sm space-y-4">
-            <h2 className="font-display text-lg font-bold text-foreground">
-              {isAr ? "دليل معايير تقييم مهندس موقع التيار الخفيف" : "Junior ELV Site Engineer KPI Framework Guidelines"}
-            </h2>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              {isAr
-                ? "تم استخلاص هذه المعايير الـ 17 من بطاقة التقييم المعتمدة بشركة إنترجريتد تكنيكس. تنقسم الأوزان إلى 8 تخصصات فنية وسلوكية، ويتم حساب النتيجة السنوية كمتوسط نواتج الأرباع الأربعة."
-                : "The 17 verified KPIs are extracted from the verified Integrated Technics site scorecard template. The annual score is an average across quarters."}
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
-              {LIGHT_CURRENT_ENGINEER_KPIS.map((kpi) => (
-                <div key={kpi.id} className="p-3.5 rounded-2xl border border-border bg-muted/10 space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-xs text-foreground">#{kpi.id}. {isAr ? kpi.name_ar : kpi.name}</span>
-                    <Badge variant="outline" className="text-[10px] font-mono">
-                      {isAr ? `الوزن: ${fmtPercent(kpi.weight, 1)}` : `Weight: ${fmtPercent(kpi.weight, 1)}`}
-                    </Badge>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground leading-snug">
-                    {isAr ? kpi.definition_ar : kpi.definition}
-                  </p>
-                  <p className="text-[10px] text-brand/80 font-medium">
-                    {isAr ? `طريقة القياس: ${kpi.howMeasured_ar}` : `Measurement: ${kpi.howMeasured}`}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </TabsContent>
-
-        {/* ── TAB 3: CATEGORY BREAKDOWN (ADD, EDIT, DELETE CAPABILITIES) ── */}
-        <TabsContent value="categories" className="space-y-4">
-          <div className="rounded-3xl border border-border bg-card p-6 shadow-sm space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="font-display text-lg font-bold text-foreground">
-                    {isAr ? "توزيع الأداء حسب التخصص الهندسي" : "Performance by Engineering Discipline"}
-                  </h2>
-                  <Badge
-                    variant={Math.abs(totalDisciplinesWeight - 1.0) < 0.005 ? "secondary" : "outline"}
-                    className={`text-xs font-mono font-semibold ${
-                      Math.abs(totalDisciplinesWeight - 1.0) < 0.005
-                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
-                        : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
-                    }`}
-                  >
-                    {isAr
-                      ? `إجمالي الأوزان: ${(totalDisciplinesWeight * 100).toFixed(1)}%`
-                      : `Total Weight: ${(totalDisciplinesWeight * 100).toFixed(1)}%`}
-                  </Badge>
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {isAr
-                    ? "توزيع الدرجات الموزونة المحققة في كل مجال من مجالات كفاءة مهندس الموقع مع إمكانية إضافة وتعديل التخصصات والأوزان."
-                    : "Distribution of weighted scores achieved across each core engineering competency area with options to add and edit disciplines."}
-                </p>
-              </div>
-
-              {/* Action Buttons: Add Discipline & Reset to Defaults */}
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleResetDisciplines}
-                  className="rounded-xl gap-1 text-xs cursor-pointer"
-                  title={isAr ? "استعادة التخصصات الافتراضية" : "Reset Disciplines to Default"}
-                >
-                  <RotateCcw className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="hidden sm:inline">{isAr ? "استعادة الافتراضي" : "Reset"}</span>
-                </Button>
-
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={handleOpenAddDiscipline}
-                  className="rounded-xl gap-1.5 text-xs bg-brand text-white hover:bg-brand/90 font-semibold cursor-pointer shadow-xs"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>{isAr ? "إضافة تخصص جديد" : "Add Discipline"}</span>
-                </Button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {categoryStats.map((cat) => (
-                <div
-                  key={cat.id || cat.name}
-                  className="group relative rounded-2xl border border-border bg-muted/10 hover:border-brand/40 hover:bg-muted/20 p-4 space-y-3 transition-all shadow-2xs"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-1.5">
-                        <h4 className="font-bold text-sm text-foreground">{isAr ? cat.name_ar : cat.name}</h4>
-                        {!cat.isDefault && (
-                          <Badge variant="outline" className="text-[9px] px-1.5 py-0 font-medium text-brand border-brand/30">
-                            {isAr ? "مخصص" : "Custom"}
-                          </Badge>
-                        )}
-                      </div>
-                      <span className="text-xs text-muted-foreground block">
-                        {isAr
-                          ? `وزن الفئة: ${(cat.totalWeight * 100).toFixed(1)}%`
-                          : `Category Weight: ${(cat.totalWeight * 100).toFixed(1)}%`}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-1 shrink-0">
-                      <span className="font-mono text-sm font-bold text-foreground me-1.5">
-                        {(cat.earnedScore * 100).toFixed(1)}% / {(cat.totalWeight * 100).toFixed(1)}%
-                      </span>
-
-                      {/* Edit Button */}
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleOpenEditDiscipline(cat.discipline)}
-                        className="h-7 w-7 rounded-lg text-muted-foreground hover:text-foreground hover:bg-background cursor-pointer"
-                        title={isAr ? "تعديل هذا التخصص" : "Edit Discipline"}
-                      >
-                        <Pencil className="h-3.5 w-3.5 text-brand" />
-                      </Button>
-
-                      {/* Delete Button (for custom disciplines) */}
-                      {!cat.isDefault && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteDiscipline(cat.id)}
-                          className="h-7 w-7 rounded-lg text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10 cursor-pointer"
-                          title={isAr ? "حذف التخصص" : "Delete Discipline"}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[11px] text-muted-foreground">
-                      <span>{isAr ? "نسبة إنجاز الفئة" : "Category Attainment"}</span>
-                      <span className="font-medium text-foreground">{cat.percentage}%</span>
-                    </div>
-                    <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-500 ${
-                          cat.percentage >= 90
-                            ? "bg-emerald-500"
-                            : cat.percentage >= 75
-                            ? "bg-blue-500"
-                            : cat.percentage >= 60
-                            ? "bg-amber-500"
-                            : "bg-rose-500"
-                        }`}
-                        style={{ width: `${cat.percentage}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </TabsContent>
-
-        {/* ── TAB 4: SUPERVISOR FEEDBACK & SIGN-OFF ── */}
-        <TabsContent value="signoff" className="space-y-4">
-          <div className="rounded-3xl border border-border bg-card p-6 shadow-sm space-y-6">
+          {/* Qualitative Assessment & Formal Sign-off (Integrated into Scorecard) */}
+          <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-sm space-y-6">
             <div>
-              <h2 className="font-display text-lg font-bold text-foreground">
+              <h2 className="font-display text-base font-bold text-foreground">
                 {isAr ? "التقييم النوعي والاعتمادات الرسمية" : "Qualitative Assessment & Formal Sign-off"}
               </h2>
               <p className="text-xs text-muted-foreground">
                 {isAr
-                  ? "توثيق نقاط القوة، فرص التحسين المستمر، والتوصيات التدريبية المعتمدة رسمياً."
+                  ? "توثيق نقاط القوة، مجالات التحسين المستمر، والتوصيات التدريبية والاعتمادات الرسمية."
                   : "Document strengths, coaching development areas, and official sign-offs."}
               </p>
             </div>
@@ -2542,7 +2361,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
               <div className="space-y-1.5">
                 <Label className="text-xs font-bold text-foreground flex items-center gap-1.5">
                   <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                  {isAr ? "أبرز نقاط القوة والإنجازات الميدانية:" : "Major Site Strengths & Key Achievements:"}
+                  {isAr ? "أبرز نقاط القوة والإنجازات:" : "Major Strengths & Key Achievements:"}
                 </Label>
                 <textarea
                   rows={3}
@@ -2552,7 +2371,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                     setNotes((prev) => ({ ...prev, strengths: e.target.value }));
                     setHasUnsavedChanges(true);
                   }}
-                  placeholder={isAr ? "اكتب تفاصيل إنجازات المهندس..." : "Detail specific technical wins..."}
+                  placeholder={isAr ? "اكتب تفاصيل إنجازات الموظف..." : "Detail specific achievements..."}
                   className="w-full rounded-xl border border-input bg-background p-3 text-xs leading-relaxed focus:border-brand focus:ring-1 focus:ring-brand"
                 />
               </div>
@@ -2590,7 +2409,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                     setNotes((prev) => ({ ...prev, recommendations: e.target.value }));
                     setHasUnsavedChanges(true);
                   }}
-                  placeholder={isAr ? "الدورات الموصى بها (Honeywell, Cisco, Schneider...)" : "Specific training milestones..."}
+                  placeholder={isAr ? "الدورات والشهادات المهنية الموصى بها..." : "Specific training milestones..."}
                   className="w-full rounded-xl border border-input bg-background p-3 text-xs leading-relaxed focus:border-brand focus:ring-1 focus:ring-brand"
                 />
               </div>
@@ -2638,6 +2457,8 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
             </div>
           </div>
         </TabsContent>
+
+        
 
         {/* ── TAB: PENDING APPROVALS (HR ADMIN & MANAGERS) ── */}
         <TabsContent value="pending-approvals" className="space-y-4">
