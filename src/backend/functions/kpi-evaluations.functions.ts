@@ -554,8 +554,8 @@ export const matchKpiTemplate = createServerFn({ method: "POST" })
         department_id,
         section_id,
         job_grade,
-        department:departments(id, name_en, name_ar),
-        position:positions(id, title_en, title_ar)
+        department:departments!profiles_department_id_fkey(id, name_en, name_ar),
+        position:positions!profiles_position_id_fkey(id, name_en, name_ar)
       `)
       .eq("id", input.employeeId)
       .maybeSingle();
@@ -589,6 +589,9 @@ export const matchKpiTemplate = createServerFn({ method: "POST" })
 
     const published = (templates || []) as any[];
 
+    const deptName = (((profile as any).department?.name_en || "") as string).toLowerCase();
+    const posName = (((profile as any).position?.name_en || "") as string).toLowerCase();
+
     // Priority matching rules:
     // Tier 1: Match by Position + Job Grade (Seniority Level)
     let matchedTemplate: any = null;
@@ -598,19 +601,160 @@ export const matchKpiTemplate = createServerFn({ method: "POST" })
       );
     }
 
-    // Tier 2: Match by Position (generic level)
+    // Tier 2: Match by exact Position ID
     if (!matchedTemplate && profile.position_id) {
       matchedTemplate = published.find((t) => t.position_id === profile.position_id);
     }
 
-    // Tier 3: Match by Department-level template (no specific position)
+    // Tier 3: Match by Position Title Keywords
+    if (!matchedTemplate && posName) {
+      if (
+        posName.includes("account") ||
+        posName.includes("financ") ||
+        posName.includes("cfo") ||
+        posName.includes("audit") ||
+        posName.includes("cashier") ||
+        posName.includes("billing")
+      ) {
+        matchedTemplate = published.find(
+          (t) =>
+            t.name_en.toLowerCase().includes("financial") ||
+            t.name_en.toLowerCase().includes("account")
+        );
+      } else if (
+        posName.includes("developer") ||
+        posName.includes("software") ||
+        posName.includes("programmer") ||
+        posName.includes("frontend") ||
+        posName.includes("backend") ||
+        posName.includes("full stack")
+      ) {
+        matchedTemplate = published.find(
+          (t) =>
+            t.name_en.toLowerCase().includes("software") ||
+            t.name_en.toLowerCase().includes("developer")
+        );
+      } else if (
+        posName.includes("site engineer") ||
+        posName.includes("light current") ||
+        posName.includes("elv") ||
+        posName.includes("network engineer") ||
+        posName.includes("technician") ||
+        posName.includes("transmission engineer") ||
+        posName.includes("field engineer")
+      ) {
+        matchedTemplate = published.find(
+          (t) =>
+            t.name_en.toLowerCase().includes("site engineer") ||
+            t.name_en.toLowerCase().includes("light current")
+        );
+      } else if (
+        posName.includes("hr") ||
+        posName.includes("human") ||
+        posName.includes("personnel") ||
+        posName.includes("recruit") ||
+        posName.includes("payroll")
+      ) {
+        matchedTemplate = published.find(
+          (t) =>
+            t.name_en.toLowerCase().includes("human resources") ||
+            t.name_en.toLowerCase().includes("hr")
+        );
+      } else if (
+        posName.includes("sale") ||
+        posName.includes("commercial") ||
+        posName.includes("account exec") ||
+        posName.includes("business dev") ||
+        posName.includes("purchas") ||
+        posName.includes("pre-sales")
+      ) {
+        matchedTemplate = published.find((t) =>
+          t.name_en.toLowerCase().includes("sales")
+        );
+      } else if (
+        posName.includes("customer") ||
+        posName.includes("support") ||
+        posName.includes("service") ||
+        posName.includes("crm") ||
+        posName.includes("call center") ||
+        posName.includes("helpdesk")
+      ) {
+        matchedTemplate = published.find(
+          (t) =>
+            t.name_en.toLowerCase().includes("customer service") ||
+            t.name_en.toLowerCase().includes("crm")
+        );
+      }
+    }
+
+    // Tier 4: Match by Department-level template (exact department_id)
     if (!matchedTemplate && profile.department_id) {
       matchedTemplate = published.find(
-        (t) => t.department_id === profile.department_id && !t.position_id
+        (t) => t.department_id === profile.department_id
       );
     }
 
-    // If no template matches this role, RETURN MISSING TEMPLATE (never silently use an unrelated template!)
+    // Tier 5: Match by Department Name Keywords
+    if (!matchedTemplate && deptName) {
+      if (deptName.includes("financ") || deptName.includes("account")) {
+        matchedTemplate = published.find(
+          (t) =>
+            t.name_en.toLowerCase().includes("financial") ||
+            t.name_en.toLowerCase().includes("account")
+        );
+      } else if (
+        deptName.includes("it") ||
+        deptName.includes("information") ||
+        deptName.includes("software") ||
+        deptName.includes("technol")
+      ) {
+        matchedTemplate = published.find(
+          (t) =>
+            t.name_en.toLowerCase().includes("software") ||
+            t.name_en.toLowerCase().includes("developer")
+        );
+      } else if (deptName.includes("hr") || deptName.includes("human")) {
+        matchedTemplate = published.find(
+          (t) =>
+            t.name_en.toLowerCase().includes("human resources") ||
+            t.name_en.toLowerCase().includes("hr")
+        );
+      } else if (deptName.includes("sale") || deptName.includes("commercial")) {
+        matchedTemplate = published.find((t) =>
+          t.name_en.toLowerCase().includes("sales")
+        );
+      } else if (deptName.includes("crm") || deptName.includes("customer")) {
+        matchedTemplate = published.find(
+          (t) =>
+            t.name_en.toLowerCase().includes("customer service") ||
+            t.name_en.toLowerCase().includes("crm")
+        );
+      } else if (
+        deptName.includes("engineer") ||
+        deptName.includes("project") ||
+        deptName.includes("operat") ||
+        deptName.includes("mainten")
+      ) {
+        matchedTemplate = published.find(
+          (t) =>
+            t.name_en.toLowerCase().includes("site engineer") ||
+            t.name_en.toLowerCase().includes("light current")
+        );
+      }
+    }
+
+    // Tier 6: Safe fallback template for unclassified positions (e.g. Driver, Warehouse, General Services)
+    // Ensures every employee can be evaluated seamlessly with a complete 100% template!
+    if (!matchedTemplate && published.length > 0) {
+      matchedTemplate =
+        published.find(
+          (t) =>
+            t.name_en.toLowerCase().includes("site engineer") ||
+            t.name_en.toLowerCase().includes("light current")
+        ) || published[0];
+    }
+
+    // If no published templates exist at all in the database:
     if (!matchedTemplate) {
       return {
         matched: false,
@@ -623,7 +767,7 @@ export const matchKpiTemplate = createServerFn({ method: "POST" })
           department_id: profile.department_id,
           department_name: (profile as any).department?.name_en || null,
           position_id: profile.position_id,
-          position_name: (profile as any).position?.title_en || null,
+          position_name: (profile as any).position?.name_en || null,
           job_grade: (profile as any).job_grade || null,
         },
       };
@@ -735,7 +879,6 @@ export const seedDefaultKpiTemplates = createServerFn({ method: "POST" })
             scoring_direction: crit.scoring_direction,
             unit: crit.unit,
             default_weight: crit.default_weight,
-            default_target: crit.default_target,
             max_scale_value: crit.scoring_scale === "rating_5" ? 5 : 100,
             is_required: true,
             is_active: true,
