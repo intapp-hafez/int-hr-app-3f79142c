@@ -3,6 +3,7 @@ import {
   Award,
   Calendar,
   CheckCircle2,
+  ChevronsUpDown,
   ChevronDown,
   ChevronUp,
   Download,
@@ -94,6 +95,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import {
   Dialog,
   DialogContent,
@@ -200,6 +202,19 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [selectedEmpId, setSelectedEmpId] = useState<string>("");
+  const [empSelectorOpen, setEmpSelectorOpen] = useState(false);
+  const [empSelectorSearch, setEmpSelectorSearch] = useState("");
+
+  const filteredSelectorEmployees = useMemo(() => {
+    if (!empSelectorSearch.trim()) return employeesList;
+    const term = empSelectorSearch.trim().toLowerCase();
+    return employeesList.filter((e) =>
+      (e.name || "").toLowerCase().includes(term) ||
+      (e.code || "").toLowerCase().includes(term) ||
+      (e.position || "").toLowerCase().includes(term) ||
+      (e.department || "").toLowerCase().includes(term)
+    );
+  }, [employeesList, empSelectorSearch]);
   const [evaluatorName, setEvaluatorName] = useState<string>(
     session?.name || (role === "manager" ? (isAr ? "المدير المباشر" : "Direct Manager") : (isAr ? "مهندس الإشراف / HR" : "Engineering Lead / HR"))
   );
@@ -344,7 +359,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
 
   const { data: adminEmpsData } = useQuery({
     queryKey: ["admin", "employees-for-kpi"],
-    queryFn: () => adminEmpFn({ data: { page: 1, pageSize: 200 } }),
+    queryFn: () => adminEmpFn({ data: { page: 1, pageSize: 2000, status: "" } }),
     enabled: !isManagerMode,
   });
 
@@ -1778,23 +1793,137 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
 
       {/* Employee Selector & Metadata Grid */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 rounded-3xl border border-border bg-card/60 shadow-xs print:border-none print:p-0">
-        {/* Employee Selector */}
+        {/* Employee Selector with Search Box */}
         <div className="space-y-1.5 md:col-span-2">
-          <Label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-            <User className="h-3.5 w-3.5" /> {isAr ? "الموظف المُراد تقييمه" : "Target Employee"}
-          </Label>
-          <select
-            value={selectedEmpId}
-            onChange={(e) => setSelectedEmpId(e.target.value)}
-            disabled={isLocked}
-            className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-brand disabled:opacity-75 cursor-pointer"
-          >
-            {employeesList.map((emp) => (
-              <option key={emp.id} value={emp.id}>
-                {emp.name} {emp.code ? `(${emp.code})` : ""} — {emp.position}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center justify-between">
+            <Label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+              <User className="h-3.5 w-3.5" /> {isAr ? "الموظف المُراد تقييمه" : "Target Employee"}
+            </Label>
+            <span className="text-[10px] text-muted-foreground font-mono">
+              {employeesList.length} {isAr ? "موظف" : "users"}
+            </span>
+          </div>
+
+          <Popover open={empSelectorOpen} onOpenChange={setEmpSelectorOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={empSelectorOpen}
+                disabled={isLocked}
+                className="w-full justify-between rounded-xl px-3 py-2 text-sm font-medium shadow-2xs border-input bg-background h-10 hover:bg-muted/30 cursor-pointer"
+              >
+                <div className="flex items-center gap-2 truncate text-start">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-brand/10 text-brand font-bold text-[10px] shrink-0">
+                    {currentEmployee.name.slice(0, 2).toUpperCase()}
+                  </div>
+                  <span className="truncate font-semibold text-foreground">
+                    {currentEmployee.name}
+                    {currentEmployee.code ? ` (${currentEmployee.code})` : ""}
+                    <span className="text-muted-foreground font-normal"> — {currentEmployee.position}</span>
+                  </span>
+                </div>
+                <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50 ms-2" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              className="w-[min(540px,94vw)] p-2 rounded-2xl shadow-xl border-border bg-card z-50"
+              align="start"
+            >
+              <div className="space-y-2">
+                {/* Search Box */}
+                <div className="relative">
+                  <Search className="absolute start-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    autoFocus
+                    value={empSelectorSearch}
+                    onChange={(e) => setEmpSelectorSearch(e.target.value)}
+                    placeholder={
+                      isAr
+                        ? "ابحث بالاسم، كود الموظف، المسمى الوظيفي، أو القسم..."
+                        : "Search by name, employee code, job title, or department..."
+                    }
+                    className="rounded-xl ps-9 text-xs h-9"
+                  />
+                  {empSelectorSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setEmpSelectorSearch("")}
+                      className="absolute end-2.5 top-2.5 text-muted-foreground hover:text-foreground cursor-pointer"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between px-1 text-[11px] text-muted-foreground font-medium">
+                  <span>
+                    {isAr
+                      ? `النتائج (${filteredSelectorEmployees.length} من ${employeesList.length})`
+                      : `Results (${filteredSelectorEmployees.length} of ${employeesList.length})`}
+                  </span>
+                  {isManagerMode ? (
+                    <span className="text-brand font-semibold text-[10px]">
+                      {isAr ? "فريق عملك المباشر" : "Your Direct Team"}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground text-[10px]">
+                      {isAr ? "كافة موظفي الشركة" : "All Company Staff"}
+                    </span>
+                  )}
+                </div>
+
+                {/* Filtered Scrollable List */}
+                <div className="max-h-64 overflow-y-auto space-y-1 pr-1">
+                  {filteredSelectorEmployees.length === 0 ? (
+                    <div className="py-6 text-center text-xs text-muted-foreground">
+                      {isAr ? "لا يوجد موظف مطابق للبحث" : "No employees match your search"}
+                    </div>
+                  ) : (
+                    filteredSelectorEmployees.map((emp) => {
+                      const isSelected = emp.id === selectedEmpId;
+                      return (
+                        <button
+                          key={emp.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedEmpId(emp.id);
+                            setEmpSelectorOpen(false);
+                            setEmpSelectorSearch("");
+                          }}
+                          className={`w-full flex items-center justify-between p-2 rounded-xl text-xs transition-colors cursor-pointer text-start ${
+                            isSelected
+                              ? "bg-brand/10 text-brand font-semibold"
+                              : "hover:bg-muted/60 text-foreground"
+                          }`}
+                        >
+                          <div className="min-w-0 flex items-center gap-2.5">
+                            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand/10 text-brand font-bold text-[11px] shrink-0">
+                              {emp.name.slice(0, 2).toUpperCase()}
+                            </div>
+                            <div className="truncate">
+                              <div className="truncate flex items-center gap-1.5">
+                                <span className="font-semibold text-foreground">{emp.name}</span>
+                                {emp.code && (
+                                  <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
+                                    {emp.code}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-muted-foreground truncate">
+                                {emp.position} {emp.department ? `• ${emp.department}` : ""}
+                              </div>
+                            </div>
+                          </div>
+                          {isSelected && <Check className="h-4 w-4 text-brand shrink-0 ms-2" />}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
 
         {/* Year Selector */}

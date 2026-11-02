@@ -190,7 +190,7 @@ export const listEmployeesAdmin = createServerFn({ method: "POST" })
     z
       .object({
         page: z.number().int().min(1).default(1),
-        pageSize: z.number().int().min(1).max(200).default(25),
+        pageSize: z.number().int().min(1).max(5000).default(25),
         sort: z.enum(SORT_COLS).default("emp_code"),
         dir: z.enum(["asc", "desc"]).default("asc"),
         q: z.string().max(120).optional().default(""),
