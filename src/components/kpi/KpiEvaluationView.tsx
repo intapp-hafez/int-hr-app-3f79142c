@@ -82,6 +82,7 @@ import {
   matchKpiTemplate,
   getQuarterlyEvaluation,
   saveQuarterlyEvaluation,
+  seedDefaultKpiTemplates,
   KpiEvaluationRecord,
 } from "@/backend/functions/kpi-evaluations.functions";
 import {
@@ -326,6 +327,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
   const listJobGradesFn = useServerFn(listJobGrades);
   const getQuarterlyFn = useServerFn(getQuarterlyEvaluation);
   const saveQuarterlyFn = useServerFn(saveQuarterlyEvaluation);
+  const seedDefaultTemplatesFn = useServerFn(seedDefaultKpiTemplates);
 
   // ── PENDING APPROVALS QUERY ──
   const { data: pendingApprovals = [], refetch: refetchPending, isLoading: isLoadingPending } = useQuery({
@@ -753,6 +755,25 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
       refetchTemplates();
     } catch (err: any) {
       toast.error(err.message || "Failed to duplicate template");
+    }
+  };
+
+  const [isSeedingTemplates, setIsSeedingTemplates] = useState(false);
+  const handleSeedDefaultTemplates = async () => {
+    try {
+      setIsSeedingTemplates(true);
+      const res = await seedDefaultTemplatesFn({ data: { overwrite: false } });
+      toast.success(
+        isAr
+          ? `تم إدراج ${res.seededCount} قوالب تقييم نموذجية بنجاح`
+          : `Successfully seeded ${res.seededCount} default evaluation templates!`
+      );
+      refetchTemplates();
+      refetchCriteria();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to seed default templates");
+    } finally {
+      setIsSeedingTemplates(false);
     }
   };
 
@@ -2859,6 +2880,17 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
 
                 <div className="flex items-center gap-2">
                   <Button
+                    onClick={handleSeedDefaultTemplates}
+                    variant="outline"
+                    size="sm"
+                    disabled={isSeedingTemplates}
+                    className="rounded-2xl gap-1.5 cursor-pointer text-xs border-brand/30 hover:bg-brand/5"
+                    title={isAr ? "إدراج قوالب الوظائف الافتراضية (هندسة، برمجيات، موارد بشرية، محاسبة، مبيعات)" : "Seed standard templates for Engineering, IT, HR, Finance, Sales"}
+                  >
+                    {isSeedingTemplates ? <Loader2 className="h-4 w-4 animate-spin text-brand" /> : <Sparkles className="h-4 w-4 text-brand" />}
+                    <span>{isAr ? "إدراج القوالب الافتراضية" : "Seed Default Templates"}</span>
+                  </Button>
+                  <Button
                     onClick={handleOpenCreateTemplate}
                     size="sm"
                     className="rounded-2xl gap-1.5 bg-brand text-brand-foreground hover:bg-brand/90 cursor-pointer shadow-xs"
@@ -2920,15 +2952,26 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                   <p className="text-xs font-semibold text-foreground">
                     {isAr ? "لا توجد قوالب تطابق البحث" : "No templates found matching your criteria"}
                   </p>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleOpenCreateTemplate}
-                    className="rounded-xl text-xs gap-1.5 cursor-pointer"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    <span>{isAr ? "إنشاء أول قالب تقييم" : "Create first template"}</span>
-                  </Button>
+                  <div className="flex items-center justify-center gap-2 pt-1">
+                    <Button
+                      size="sm"
+                      onClick={handleSeedDefaultTemplates}
+                      disabled={isSeedingTemplates}
+                      className="rounded-xl text-xs gap-1.5 cursor-pointer bg-brand text-brand-foreground hover:bg-brand/90"
+                    >
+                      {isSeedingTemplates ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                      <span>{isAr ? "إدراج القوالب الافتراضية الجاهزة" : "Seed Default Templates"}</span>
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleOpenCreateTemplate}
+                      className="rounded-xl text-xs gap-1.5 cursor-pointer"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>{isAr ? "إنشاء قالب مخصص" : "Create Custom Template"}</span>
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

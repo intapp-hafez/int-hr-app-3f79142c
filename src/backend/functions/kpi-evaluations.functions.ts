@@ -21,6 +21,7 @@ import {
   ReviewQuarterlyEvaluationSchema,
   ListPendingApprovalsSchema,
   GetQuarterlyHistorySchema,
+  SeedKpiTemplatesSchema,
 } from "../schemas/kpi-evaluation.schema";
 import { resolveTeamMemberScope } from "@/lib/team.functions";
 import { getRatingFromScore } from "@/lib/kpi/light-current-kpi.data";
@@ -632,6 +633,300 @@ export const matchKpiTemplate = createServerFn({ method: "POST" })
       matched: true,
       template: matchedTemplate,
       items: matchedTemplate.items || [],
+    };
+  });
+
+export const seedDefaultKpiTemplates = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => SeedKpiTemplatesSchema.parse(input))
+  .handler(async ({ data: input, context }) => {
+    const { supabase, userId } = context;
+    const { isAdmin } = await assertKpiAccess(supabase, userId);
+    if (!isAdmin) {
+      throw new Error("Forbidden: Only HR or Admins can seed default evaluation templates");
+    }
+
+    // 1. Fetch available departments, positions, job_grades
+    const [{ data: depts }, { data: positions }, { data: grades }] = await Promise.all([
+      (supabase as any).from("departments").select("id, name_en, name_ar"),
+      (supabase as any).from("positions").select("id, name_en, name_ar, department_id"),
+      (supabase as any).from("job_grades").select("id, name_en, name_ar"),
+    ]);
+
+    const findDept = (term: string) =>
+      depts?.find((d: any) => d.name_en?.toLowerCase().includes(term) || d.name_ar?.toLowerCase().includes(term))?.id || null;
+    const findPos = (term: string) =>
+      positions?.find((p: any) => p.name_en?.toLowerCase().includes(term) || p.name_ar?.toLowerCase().includes(term))?.id || null;
+    const findGrade = (term: string) =>
+      grades?.find((g: any) => g.name_en?.toLowerCase().includes(term) || g.name_ar?.toLowerCase().includes(term))?.id || null;
+
+    const engDeptId = findDept("engineer") || findDept("technic") || null;
+    const itDeptId = findDept("it") || findDept("information") || findDept("software") || null;
+    const hrDeptId = findDept("hr") || findDept("human") || null;
+    const finDeptId = findDept("finan") || findDept("account") || null;
+    const salesDeptId = findDept("sale") || findDept("commercial") || null;
+    const crmDeptId = findDept("crm") || findDept("customer") || null;
+
+    const siteEngPosId = findPos("site") || findPos("engineer") || null;
+    const swDevPosId = findPos("software") || findPos("developer") || null;
+    const hrSpecPosId = findPos("hr") || null;
+    const acctPosId = findPos("account") || null;
+    const salesPosId = findPos("sale") || null;
+    const csPosId = findPos("customer") || findPos("support") || null;
+
+    const juniorGradeId = findGrade("junior") || findGrade("g02") || null;
+    const midGradeId = findGrade("officer") || findGrade("g03") || null;
+    const seniorGradeId = findGrade("senior") || findGrade("g04") || null;
+
+    // 2. Standard criteria definitions
+    const standardCriteria = [
+      { name_en: "Attendance & Punctuality", name_ar: "الحضور والانضباط بمواعيد العمل", category: "behavioral", criterion_type: "common", scoring_scale: "percentage", scoring_direction: "higher_is_better", unit: "%", default_weight: 0.10, default_target: 95 },
+      { name_en: "Site Safety & PPE Compliance", name_ar: "الانضباط والالتزام بقواعد ومهمات السلامة", category: "safety", criterion_type: "common", scoring_scale: "percentage", scoring_direction: "higher_is_better", unit: "%", default_weight: 0.10, default_target: 100 },
+      { name_en: "Teamwork & Cross-functional Collaboration", name_ar: "العمل الجماعي والتعاون الفعال", category: "behavioral", criterion_type: "common", scoring_scale: "percentage", scoring_direction: "higher_is_better", unit: "%", default_weight: 0.10, default_target: 90 },
+      { name_en: "Reporting & Policy Compliance", name_ar: "الالتزام بالسياسات والتقارير الفنية", category: "quality", criterion_type: "common", scoring_scale: "percentage", scoring_direction: "higher_is_better", unit: "%", default_weight: 0.10, default_target: 95 },
+      { name_en: "On-Time Installation Completion", name_ar: "إنجاز أعمال التركيبات في الوقت المحدد", category: "technical", criterion_type: "position_specific", scoring_scale: "percentage", scoring_direction: "higher_is_better", unit: "%", default_weight: 0.15, default_target: 90 },
+      { name_en: "Shop Drawing Execution Compliance", name_ar: "المطابقة للمخططات التنفيذية المعتمدة", category: "quality", criterion_type: "position_specific", scoring_scale: "percentage", scoring_direction: "higher_is_better", unit: "%", default_weight: 0.15, default_target: 95 },
+      { name_en: "System Commissioning & Programming Accuracy", name_ar: "دقة تشغيل وبرمجة الأنظمة", category: "technical", criterion_type: "position_specific", scoring_scale: "percentage", scoring_direction: "higher_is_better", unit: "%", default_weight: 0.15, default_target: 90 },
+      { name_en: "Troubleshooting & Issue Resolution", name_ar: "سرعة وكفاءة استكشاف الأعطال وحلها", category: "productivity", criterion_type: "position_specific", scoring_scale: "percentage", scoring_direction: "higher_is_better", unit: "%", default_weight: 0.15, default_target: 90 },
+      { name_en: "Code Quality & Automated Test Coverage", name_ar: "جودة الكود وتغطية الاختبارات الآلية", category: "quality", criterion_type: "position_specific", scoring_scale: "percentage", scoring_direction: "higher_is_better", unit: "%", default_weight: 0.20, default_target: 85 },
+      { name_en: "Sprint Velocity & On-Time Story Delivery", name_ar: "سرعة الإنجاز والالتزام بمهام السبرنت", category: "productivity", criterion_type: "position_specific", scoring_scale: "percentage", scoring_direction: "higher_is_better", unit: "%", default_weight: 0.20, default_target: 90 },
+      { name_en: "Production Defect & Bug Escape Rate", name_ar: "معدل الأخطاء البرمجية في بيئة الإنتاج", category: "quality", criterion_type: "position_specific", scoring_scale: "count", scoring_direction: "lower_is_better", unit: "count", default_weight: 0.15, default_target: 2 },
+      { name_en: "API Latency & System Performance SLA", name_ar: "كفاءة وسرعة استجابة واجهات الأنظمة", category: "technical", criterion_type: "position_specific", scoring_scale: "percentage", scoring_direction: "higher_is_better", unit: "%", default_weight: 0.15, default_target: 99 },
+      { name_en: "Code Review & Team Knowledge Sharing", name_ar: "مراجعة الأكواد ومشاركة المعرفة", category: "behavioral", criterion_type: "position_specific", scoring_scale: "rating_5", scoring_direction: "rating_5", unit: "scale", default_weight: 0.10, default_target: 4.5 },
+      { name_en: "Recruitment Milestone & Time-to-Hire", name_ar: "سرعة إغلاق الشواغر والتوظيف", category: "productivity", criterion_type: "position_specific", scoring_scale: "count", scoring_direction: "lower_is_better", unit: "days", default_weight: 0.20, default_target: 25 },
+      { name_en: "Payroll Processing Timeliness & Accuracy", name_ar: "دقة ومواعيد إعداد الرواتب", category: "quality", criterion_type: "position_specific", scoring_scale: "percentage", scoring_direction: "higher_is_better", unit: "%", default_weight: 0.20, default_target: 100 },
+      { name_en: "Employee Grievance & Issue Resolution Rate", name_ar: "معالجة استفسارات وشكاوى الموظفين", category: "behavioral", criterion_type: "position_specific", scoring_scale: "percentage", scoring_direction: "higher_is_better", unit: "%", default_weight: 0.15, default_target: 90 },
+      { name_en: "Onboarding Experience & Retention Rate", name_ar: "جودة برنامج التهيئة واستقرار الجدد", category: "quality", criterion_type: "position_specific", scoring_scale: "percentage", scoring_direction: "higher_is_better", unit: "%", default_weight: 0.15, default_target: 90 },
+      { name_en: "Personnel Records & Labor Law Compliance", name_ar: "الامتثال لقانون العمل ودقة الملفات", category: "quality", criterion_type: "position_specific", scoring_scale: "percentage", scoring_direction: "higher_is_better", unit: "%", default_weight: 0.10, default_target: 100 },
+      { name_en: "Monthly Financial Closing Timeliness", name_ar: "الالتزام بمواعيد الإقفال المالي الشهري", category: "productivity", criterion_type: "position_specific", scoring_scale: "percentage", scoring_direction: "higher_is_better", unit: "%", default_weight: 0.20, default_target: 95 },
+      { name_en: "Accounts Payable & Invoice Accuracy", name_ar: "دقة مراجعة فواتير الموردين والمصروفات", category: "quality", criterion_type: "position_specific", scoring_scale: "percentage", scoring_direction: "higher_is_better", unit: "%", default_weight: 0.20, default_target: 98 },
+      { name_en: "Bank & Ledger Reconciliation Variance", name_ar: "نسبة الفروقات في مطابقات البنوك", category: "quality", criterion_type: "position_specific", scoring_scale: "percentage", scoring_direction: "lower_is_better", unit: "%", default_weight: 0.15, default_target: 1 },
+      { name_en: "Accounts Receivable & Collection Follow-up", name_ar: "متابعة التحصيلات ومستحقات الشركة", category: "productivity", criterion_type: "position_specific", scoring_scale: "percentage", scoring_direction: "higher_is_better", unit: "%", default_weight: 0.15, default_target: 90 },
+      { name_en: "Tax & Statutory Filing Compliance", name_ar: "الالتزام بتقديم الإقرارات الضريبية", category: "quality", criterion_type: "position_specific", scoring_scale: "percentage", scoring_direction: "higher_is_better", unit: "%", default_weight: 0.10, default_target: 100 },
+      { name_en: "Quarterly Sales Quota Achievement", name_ar: "تحقيق المستهدف البيعي الربع سنوي", category: "productivity", criterion_type: "position_specific", scoring_scale: "percentage", scoring_direction: "higher_is_better", unit: "%", default_weight: 0.30, default_target: 100 },
+      { name_en: "Opportunity Pipeline Conversion Velocity", name_ar: "معدل تحويل الفرص البيعية لصفقات", category: "productivity", criterion_type: "position_specific", scoring_scale: "percentage", scoring_direction: "higher_is_better", unit: "%", default_weight: 0.15, default_target: 25 },
+      { name_en: "Client Retention & Contract Renewal Rate", name_ar: "الحفاظ على العملاء وتجديد العقود", category: "quality", criterion_type: "position_specific", scoring_scale: "percentage", scoring_direction: "higher_is_better", unit: "%", default_weight: 0.15, default_target: 90 },
+      { name_en: "CRM Pipeline Hygiene & Activity Logging", name_ar: "تسجيل الأنشطة وتحديث نظام الـ CRM", category: "quality", criterion_type: "position_specific", scoring_scale: "percentage", scoring_direction: "higher_is_better", unit: "%", default_weight: 0.10, default_target: 95 },
+      { name_en: "Commercial Proposal Turnaround Time", name_ar: "سرعة إعداد وتقديم العروض المالية", category: "productivity", criterion_type: "position_specific", scoring_scale: "count", scoring_direction: "lower_is_better", unit: "days", default_weight: 0.10, default_target: 2 },
+      { name_en: "First Response Time (FRT) SLA", name_ar: "سرعة الرد الأولي على استفسارات العملاء", category: "productivity", criterion_type: "position_specific", scoring_scale: "count", scoring_direction: "lower_is_better", unit: "minutes", default_weight: 0.20, default_target: 15 },
+      { name_en: "Customer Support Ticket Resolution SLA", name_ar: "نسبة إغلاق التذاكر الفنية في الوقت المحدد", category: "productivity", criterion_type: "position_specific", scoring_scale: "percentage", scoring_direction: "higher_is_better", unit: "%", default_weight: 0.20, default_target: 95 },
+      { name_en: "Customer Satisfaction Rating (CSAT)", name_ar: "مؤشر رضا العملاء عن جودة الخدمة", category: "quality", criterion_type: "position_specific", scoring_scale: "rating_5", scoring_direction: "rating_5", unit: "scale", default_weight: 0.20, default_target: 4.5 },
+      { name_en: "Support Ticket Reopen Rate", name_ar: "نسبة إعادة فتح التذاكر المغلقة", category: "quality", criterion_type: "position_specific", scoring_scale: "percentage", scoring_direction: "lower_is_better", unit: "%", default_weight: 0.10, default_target: 5 },
+      { name_en: "Help Center Knowledge Base Contribution", name_ar: "المساهمة في بناء قاعدة المعرفة", category: "technical", criterion_type: "position_specific", scoring_scale: "count", scoring_direction: "higher_is_better", unit: "count", default_weight: 0.10, default_target: 5 },
+    ];
+
+    // Ensure criteria in database
+    const { data: existingCriteria } = await (supabase as any).from("kpi_criteria").select("id, name_en");
+    const criteriaMap = new Map<string, string>();
+    (existingCriteria || []).forEach((c: any) => criteriaMap.set(c.name_en?.toLowerCase().trim(), c.id));
+
+    const now = new Date().toISOString();
+    for (const crit of standardCriteria) {
+      const key = crit.name_en.toLowerCase().trim();
+      if (!criteriaMap.has(key)) {
+        const { data: inserted, error: critErr } = await (supabase as any)
+          .from("kpi_criteria")
+          .insert({
+            name_en: crit.name_en,
+            name_ar: crit.name_ar,
+            criterion_type: crit.criterion_type,
+            category: crit.category,
+            scoring_scale: crit.scoring_scale,
+            scoring_direction: crit.scoring_direction,
+            unit: crit.unit,
+            default_weight: crit.default_weight,
+            default_target: crit.default_target,
+            max_scale_value: crit.scoring_scale === "rating_5" ? 5 : 100,
+            is_required: true,
+            is_active: true,
+            created_at: now,
+            updated_at: now,
+          })
+          .select("id")
+          .single();
+        if (!critErr && inserted) {
+          criteriaMap.set(key, inserted.id);
+        }
+      }
+    }
+
+    const getCritId = (term: string) => {
+      const lower = term.toLowerCase();
+      for (const [key, id] of criteriaMap.entries()) {
+        if (key.includes(lower)) return id;
+      }
+      return null;
+    };
+
+    // 3. Define Standard Templates
+    const defaultTemplates = [
+      {
+        name_en: "Light Current Site Engineer Evaluation",
+        name_ar: "تقييم أداء مهندس موقع تيار خفيف (مبتدئ / متوسط)",
+        description: "Standard technical and behavioral evaluation for field ELV site engineers.",
+        department_id: engDeptId,
+        position_id: siteEngPosId,
+        job_grade_id: juniorGradeId,
+        items: [
+          { name: "attendance", weight: 0.10, target: 95, dir: "higher_is_better", unit: "%" },
+          { name: "safety", weight: 0.10, target: 100, dir: "higher_is_better", unit: "%" },
+          { name: "teamwork", weight: 0.10, target: 90, dir: "higher_is_better", unit: "%" },
+          { name: "reporting", weight: 0.10, target: 95, dir: "higher_is_better", unit: "%" },
+          { name: "installation", weight: 0.15, target: 90, dir: "higher_is_better", unit: "%" },
+          { name: "shop drawing", weight: 0.15, target: 95, dir: "higher_is_better", unit: "%" },
+          { name: "commissioning", weight: 0.15, target: 90, dir: "higher_is_better", unit: "%" },
+          { name: "troubleshooting", weight: 0.15, target: 90, dir: "higher_is_better", unit: "%" },
+        ],
+      },
+      {
+        name_en: "Software Engineer & Full Stack Developer Evaluation",
+        name_ar: "تقييم أداء مهندس برمجيات ومطور تطبيقات",
+        description: "Performance evaluation framework for frontend, backend, and full-stack software engineers.",
+        department_id: itDeptId,
+        position_id: swDevPosId,
+        job_grade_id: seniorGradeId,
+        items: [
+          { name: "attendance", weight: 0.10, target: 95, dir: "higher_is_better", unit: "%" },
+          { name: "teamwork", weight: 0.10, target: 90, dir: "higher_is_better", unit: "%" },
+          { name: "code quality", weight: 0.20, target: 85, dir: "higher_is_better", unit: "%" },
+          { name: "sprint velocity", weight: 0.20, target: 90, dir: "higher_is_better", unit: "%" },
+          { name: "production defect", weight: 0.15, target: 2, dir: "lower_is_better", unit: "count" },
+          { name: "api latency", weight: 0.15, target: 99, dir: "higher_is_better", unit: "%" },
+          { name: "code review", weight: 0.10, target: 4.5, dir: "rating_5", unit: "scale" },
+        ],
+      },
+      {
+        name_en: "Human Resources Specialist Evaluation",
+        name_ar: "تقييم أداء أخصائي الموارد البشرية والعمليات",
+        description: "Key performance indicators for HR generalists, recruitment, and payroll officers.",
+        department_id: hrDeptId,
+        position_id: hrSpecPosId,
+        job_grade_id: midGradeId,
+        items: [
+          { name: "attendance", weight: 0.10, target: 98, dir: "higher_is_better", unit: "%" },
+          { name: "teamwork", weight: 0.10, target: 95, dir: "higher_is_better", unit: "%" },
+          { name: "recruitment", weight: 0.20, target: 25, dir: "lower_is_better", unit: "days" },
+          { name: "payroll", weight: 0.20, target: 100, dir: "higher_is_better", unit: "%" },
+          { name: "grievance", weight: 0.15, target: 90, dir: "higher_is_better", unit: "%" },
+          { name: "onboarding", weight: 0.15, target: 90, dir: "higher_is_better", unit: "%" },
+          { name: "personnel records", weight: 0.10, target: 100, dir: "higher_is_better", unit: "%" },
+        ],
+      },
+      {
+        name_en: "Financial Accountant Evaluation",
+        name_ar: "تقييم أداء المحاسب المالي",
+        description: "Evaluation metrics covering ledger accounting, financial closings, and reconciliations.",
+        department_id: finDeptId,
+        position_id: acctPosId,
+        job_grade_id: midGradeId,
+        items: [
+          { name: "attendance", weight: 0.10, target: 98, dir: "higher_is_better", unit: "%" },
+          { name: "teamwork", weight: 0.10, target: 90, dir: "higher_is_better", unit: "%" },
+          { name: "monthly financial closing", weight: 0.20, target: 95, dir: "higher_is_better", unit: "%" },
+          { name: "accounts payable", weight: 0.20, target: 98, dir: "higher_is_better", unit: "%" },
+          { name: "bank & ledger", weight: 0.15, target: 1, dir: "lower_is_better", unit: "%" },
+          { name: "accounts receivable", weight: 0.15, target: 90, dir: "higher_is_better", unit: "%" },
+          { name: "tax & statutory", weight: 0.10, target: 100, dir: "higher_is_better", unit: "%" },
+        ],
+      },
+      {
+        name_en: "Sales Specialist & Account Executive Evaluation",
+        name_ar: "تقييم أداء أخصائي المبيعات وإدارة الحسابات",
+        description: "Target-driven KPI framework evaluating revenue quota, conversion velocity, and client retention.",
+        department_id: salesDeptId,
+        position_id: salesPosId,
+        job_grade_id: seniorGradeId,
+        items: [
+          { name: "attendance", weight: 0.10, target: 95, dir: "higher_is_better", unit: "%" },
+          { name: "teamwork", weight: 0.10, target: 90, dir: "higher_is_better", unit: "%" },
+          { name: "quarterly sales quota", weight: 0.30, target: 100, dir: "higher_is_better", unit: "%" },
+          { name: "opportunity pipeline conversion", weight: 0.15, target: 25, dir: "higher_is_better", unit: "%" },
+          { name: "client retention", weight: 0.15, target: 90, dir: "higher_is_better", unit: "%" },
+          { name: "crm pipeline hygiene", weight: 0.10, target: 95, dir: "higher_is_better", unit: "%" },
+          { name: "proposal turnaround", weight: 0.10, target: 2, dir: "lower_is_better", unit: "days" },
+        ],
+      },
+      {
+        name_en: "Customer Service & CRM Specialist Evaluation",
+        name_ar: "تقييم أداء أخصائي خدمة العملاء والدعم الفني",
+        description: "Customer-centric performance framework focusing on SLA resolution, CSAT scores, and first response speed.",
+        department_id: crmDeptId,
+        position_id: csPosId,
+        job_grade_id: juniorGradeId,
+        items: [
+          { name: "attendance", weight: 0.10, target: 98, dir: "higher_is_better", unit: "%" },
+          { name: "teamwork", weight: 0.10, target: 95, dir: "higher_is_better", unit: "%" },
+          { name: "first response time", weight: 0.20, target: 15, dir: "lower_is_better", unit: "minutes" },
+          { name: "ticket resolution sla", weight: 0.20, target: 95, dir: "higher_is_better", unit: "%" },
+          { name: "customer satisfaction", weight: 0.20, target: 4.5, dir: "rating_5", unit: "scale" },
+          { name: "ticket reopen rate", weight: 0.10, target: 5, dir: "lower_is_better", unit: "%" },
+          { name: "knowledge base", weight: 0.10, target: 5, dir: "higher_is_better", unit: "count" },
+        ],
+      },
+    ];
+
+    const { data: existingTemplates } = await (supabase as any).from("kpi_templates").select("id, name_en");
+    const existingNames = new Set((existingTemplates || []).map((t: any) => t.name_en?.toLowerCase().trim()));
+
+    let seededCount = 0;
+    for (const dt of defaultTemplates) {
+      const exists = existingNames.has(dt.name_en.toLowerCase().trim());
+      if (exists && !input.overwrite) continue;
+
+      const templatePayload = {
+        name_en: dt.name_en,
+        name_ar: dt.name_ar,
+        description: dt.description,
+        department_id: dt.department_id,
+        position_id: dt.position_id,
+        job_grade_id: dt.job_grade_id,
+        version: 1,
+        status: "published",
+        common_weight_pct: 40,
+        position_weight_pct: 60,
+        effective_year: 2026,
+        effective_quarter: "all",
+        is_active: true,
+        updated_at: now,
+      };
+
+      const { data: newTemplate, error: tmplErr } = await (supabase as any)
+        .from("kpi_templates")
+        .insert({ ...templatePayload, created_at: now })
+        .select("id")
+        .single();
+
+      if (tmplErr || !newTemplate) continue;
+
+      // Insert template items
+      const itemsPayload = dt.items
+        .map((it, idx) => {
+          const critId = getCritId(it.name);
+          if (!critId) return null;
+          return {
+            template_id: newTemplate.id,
+            criterion_id: critId,
+            weight: it.weight,
+            target_benchmark: it.target,
+            scoring_direction: it.dir,
+            unit: it.unit,
+            display_order: idx + 1,
+            created_at: now,
+          };
+        })
+        .filter(Boolean);
+
+      if (itemsPayload.length > 0) {
+        await (supabase as any).from("kpi_template_items").insert(itemsPayload);
+      }
+      seededCount++;
+    }
+
+    return {
+      success: true,
+      seededCount,
+      totalTemplates: defaultTemplates.length,
+      message: `Successfully seeded ${seededCount} default evaluation templates.`,
     };
   });
 

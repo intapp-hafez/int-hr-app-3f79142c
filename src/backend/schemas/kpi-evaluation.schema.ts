@@ -282,3 +282,8 @@ export const GetMyKpiEvaluationSchema = z.object({
   templateType: z.string().default("light_current_engineer"),
 });
 export type GetMyKpiEvaluationInput = z.infer<typeof GetMyKpiEvaluationSchema>;
+
+export const SeedKpiTemplatesSchema = z.object({
+  overwrite: z.boolean().default(false).optional(),
+});
+export type SeedKpiTemplatesInput = z.infer<typeof SeedKpiTemplatesSchema>;
