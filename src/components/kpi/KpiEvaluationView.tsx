@@ -360,8 +360,8 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
         id: m.id,
         name: m.name || m.full_name || (isAr ? "موظف" : "Employee"),
         code: m.code || m.emp_code || "",
-        position: m.position || m.job_title || (isAr ? "مهندس موقع" : "Site Engineer"),
-        department: m.department || (isAr ? "الإدارة الهندسية" : "Engineering"),
+        position: m.role || m.position || m.job_title || (isAr ? "عضو الفريق" : "Team Member"),
+        department: m.dept || m.department || (isAr ? "الإدارة" : "Department"),
       }));
     }
     return (adminEmpsData?.rows || []).map((e: any) => ({
@@ -417,21 +417,21 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
   const { data: pendingApprovals = [], refetch: refetchPending, isLoading: isLoadingPending } = useQuery({
     queryKey: ["kpi-pending-approvals", selectedYear],
     queryFn: () => listPendingFn({ data: { year: selectedYear } }),
-    enabled: !!session,
+    enabled: !!session && !isManagerMode,
   });
 
   // ── CRITERIA CATALOG QUERY ──
   const { data: kpiCriteria = [], refetch: refetchCriteria, isLoading: isLoadingCriteria } = useQuery({
     queryKey: ["kpi-criteria-catalog"],
     queryFn: () => listCriteriaFn({ data: { layer: "all" } }),
-    enabled: !!session,
+    enabled: !!session && !isManagerMode,
   });
 
   // ── TEMPLATES QUERY ──
   const { data: kpiTemplates = [], refetch: refetchTemplates, isLoading: isLoadingTemplates } = useQuery({
     queryKey: ["kpi-templates"],
     queryFn: () => listTemplatesFn({ data: {} }),
-    enabled: !!session,
+    enabled: !!session && !isManagerMode,
   });
 
   // ── DIRECTORY DATA QUERIES (DEPARTMENTS, POSITIONS, GRADES) ──
@@ -987,10 +987,23 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
   useEffect(() => {
     if (serverRecord && serverRecord.scores) {
       const incomingState: Record<string, KpiRowState> = {};
+      // 1. Initialize template items with defaults
+      for (const it of activeScorecardItems) {
+        incomingState[it.id] = {
+          id: it.id as any,
+          targetAnnual: it.target,
+          q1: { actual: null, achievement: null, score: null },
+          q2: { actual: null, achievement: null, score: null },
+          q3: { actual: null, achievement: null, score: null },
+          q4: { actual: null, achievement: null, score: null },
+          annualScore: null,
+        };
+      }
+      // 2. Overlay saved scores
       Object.entries(serverRecord.scores).forEach(([key, val]: [string, any]) => {
         incomingState[key] = {
           id: key as any,
-          targetAnnual: val.targetAnnual ?? null,
+          targetAnnual: val.targetAnnual ?? incomingState[key]?.targetAnnual ?? null,
           q1: val.q1 ?? { actual: null, achievement: null, score: null },
           q2: val.q2 ?? { actual: null, achievement: null, score: null },
           q3: val.q3 ?? { actual: null, achievement: null, score: null },
@@ -1228,7 +1241,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
 
   // Cell Value Updates
   const handleActualChange = (
-    kpiId: number,
+    kpiId: string | number,
     quarter: "q1" | "q2" | "q3" | "q4",
     rawValue: string
   ) => {
@@ -1237,7 +1250,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
       return;
     }
 
-    const kpi = LIGHT_CURRENT_ENGINEER_KPIS.find((k) => k.id === kpiId);
+    const kpi = activeScorecardItems.find((k) => String(k.id) === String(kpiId));
     if (!kpi) return;
 
     let parsedActual: number | null = null;
@@ -1246,17 +1259,19 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
     if (trimmed !== "") {
       const numeric = parseFloat(trimmed.replace("%", ""));
       if (!isNaN(numeric)) {
-        if (kpi.inputType === "rating_5") {
+        if (kpi.inputType === "rating_5" || kpi.unit === "scale") {
           parsedActual = numeric <= 5 ? numeric / 5 : numeric / 100;
-        } else {
+        } else if (kpi.unit === "%") {
           parsedActual = numeric > 1 ? numeric / 100 : numeric;
+        } else {
+          parsedActual = numeric;
         }
       }
     }
 
     setKpiState((prev) => {
-      const row = prev[kpiId] || {
-        id: kpiId,
+      const row = prev[String(kpiId)] || {
+        id: kpiId as any,
         targetAnnual: kpi.target,
         q1: { actual: null, achievement: null, score: null },
         q2: { actual: null, achievement: null, score: null },
@@ -1265,8 +1280,20 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
         annualScore: null,
       };
 
-      const achv = calculateAchievement(parsedActual, kpi.target);
-      const score = calculateScore(achv, kpi.weight);
+      let achv: number | null = null;
+      if (parsedActual !== null && kpi.target > 0) {
+        if (kpi.direction === "lower_is_better") {
+          achv = parsedActual <= 0 ? 1 : Math.min(1.5, Math.max(0, kpi.target / parsedActual));
+        } else if (kpi.direction === "rating_5" || kpi.unit === "scale") {
+          const targetNormalized = kpi.target > 1 ? kpi.target / 5 : kpi.target;
+          achv = targetNormalized > 0 ? Math.min(1.5, parsedActual / targetNormalized) : parsedActual;
+        } else {
+          const targetNormalized = kpi.unit === "%" && kpi.target > 1 ? kpi.target / 100 : kpi.target;
+          achv = targetNormalized > 0 ? Math.min(1.5, parsedActual / targetNormalized) : parsedActual;
+        }
+      }
+
+      const score = achv !== null ? achv * kpi.weight : null;
 
       const updatedQuarter = { actual: parsedActual, achievement: achv, score };
       const updatedRow = { ...row, [quarter]: updatedQuarter };
@@ -1279,7 +1306,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
       ];
       updatedRow.annualScore = calculateAnnualScore(allScores);
 
-      return { ...prev, [kpiId]: updatedRow };
+      return { ...prev, [String(kpiId)]: updatedRow };
     });
 
     setHasUnsavedChanges(true);
@@ -1290,18 +1317,56 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
       toast.warning(isAr ? "التقييم معتمد ومقفل رسمياً" : "This evaluation is locked");
       return;
     }
-    const mock = createMockEvaluationState();
-    setKpiState(mock);
+    const mockState: Record<string, KpiRowState> = {};
+    activeScorecardItems.forEach((kpi, idx) => {
+      const q1Achv = 0.90 + ((idx % 3) * 0.05);
+      const q2Achv = 0.92 + ((idx % 4) * 0.02);
+      const q3Achv = 0.95 + ((idx % 2) * 0.03);
+      const q4Achv = 0.94 + ((idx % 3) * 0.02);
+
+      const targetVal = kpi.target;
+      const calcQuarter = (achv: number) => {
+        let actual: number;
+        if (kpi.inputType === "rating_5" || kpi.unit === "scale") {
+          actual = Math.min(1.0, achv * (targetVal > 1 ? targetVal / 5 : targetVal));
+        } else if (kpi.unit === "%") {
+          actual = achv * (targetVal > 1 ? targetVal / 100 : targetVal);
+        } else {
+          actual = Math.round(achv * targetVal);
+        }
+        const score = achv * kpi.weight;
+        return { actual, achievement: achv, score };
+      };
+
+      const q1 = calcQuarter(q1Achv);
+      const q2 = calcQuarter(q2Achv);
+      const q3 = calcQuarter(q3Achv);
+      const q4 = calcQuarter(q4Achv);
+
+      const annualScore = calculateAnnualScore([q1.score, q2.score, q3.score, q4.score]);
+
+      mockState[kpi.id] = {
+        id: kpi.id as any,
+        targetAnnual: kpi.target,
+        q1,
+        q2,
+        q3,
+        q4,
+        annualScore,
+      };
+    });
+
+    setKpiState(mockState);
     setNotes({
       strengths: isAr
-        ? "تفانٍ كبير في العمل الميداني خلال اختبارات تكامل أنظمة التيار الخفيف بموقع المشروع. إتقان ممتاز لشبكات كاميرات المراقبة وبروتوكولات التحكم في الدخول."
-        : "High dedication during ELV integration tests on Site A. Strong command of CCTV networking and Access Control protocols.",
+        ? ("تفانٍ كبير في العمل وإنجاز متميز للمهام والأهداف وفقاً لمتطلبات " + currentEmployee.position + ".")
+        : ("High dedication and consistent achievement across core competencies for " + currentEmployee.position + "."),
       growthAreas: isAr
-        ? "تعزيز سرعة التنسيق وإغلاق مشكلات مسارات الكابلات المشتركة مع فرق الأعمال الكهربائية."
-        : "Further enhance cross-discipline closeout velocity with Electrical teams on cable tray coordination.",
+        ? "مواصلة تعزيز المهارات التخصصية وسرعة التنسيق وإغلاق المهام المتقدمة."
+        : "Continue strengthening specialized workflow velocity and advanced task handoffs.",
       recommendations: isAr
-        ? "يوصى بحضور دورات متقدمة في Honeywell EBI وشهادة شبكات Cisco CCNA خلال الربع القادم."
-        : "Recommend advanced Honeywell/Cisco CCNA training for Q3.",
+        ? "يوصى بالمشاركة في برامج التطوير المهني المستمر والشهادات التخصصية المعتمدة."
+        : "Recommend advanced certifications and ongoing professional development workshops.",
     });
     setHasUnsavedChanges(true);
     toast.success(isAr ? "تم تحميل بيانات تجريبية واقعية لمعاينة الحسابات" : "Loaded realistic evaluation data for preview");
@@ -1312,7 +1377,19 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
       toast.warning(isAr ? "التقييم معتمد ومقفل رسمياً" : "This evaluation is locked");
       return;
     }
-    setKpiState(createEmptyEvaluationState());
+    const emptyState: Record<string, KpiRowState> = {};
+    for (const it of activeScorecardItems) {
+      emptyState[it.id] = {
+        id: it.id as any,
+        targetAnnual: it.target,
+        q1: { actual: null, achievement: null, score: null },
+        q2: { actual: null, achievement: null, score: null },
+        q3: { actual: null, achievement: null, score: null },
+        q4: { actual: null, achievement: null, score: null },
+        annualScore: null,
+      };
+    }
+    setKpiState(emptyState);
     setNotes({ strengths: "", growthAreas: "", recommendations: "" });
     setStatus("Draft");
     setHasUnsavedChanges(true);
@@ -1579,9 +1656,9 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
             {isFetchingEval && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
           </h1>
           <p className="text-sm text-muted-foreground">
-            {isAr
-              ? "مهندس موقع تيار خفيف مبتدئ — بطاقة التقييم ومصفوفة الأداء الربع سنوية"
-              : "Junior ELV / Light Current Site Engineer — Quarterly Scorecard & Rating Matrix"}
+            {currentEmployee.position} — {matchedTemplateData?.matched && matchedTemplateData.template
+              ? (isAr ? matchedTemplateData.template.name_ar : matchedTemplateData.template.name_en)
+              : (isAr ? "بطاقة التقييم ومصفوفة الأداء الربع سنوية" : "Quarterly Scorecard & Rating Matrix")}
           </p>
         </div>
 
@@ -1756,7 +1833,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
           <TabsList className="h-auto w-full sm:w-auto rounded-2xl p-1 bg-muted/60 flex overflow-x-auto no-scrollbar gap-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             <TabsTrigger value="all-employees" className="rounded-xl px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer">
               <Users className="h-4 w-4" />
-              <span>{isAr ? "سجل جميع الموظفين" : "All Employees Evaluations"}</span>
+              <span>{isManagerMode ? (isAr ? "تقييمات فريق العمل" : "Team Evaluations") : (isAr ? "سجل جميع الموظفين" : "All Employees Evaluations")}</span>
               <Badge variant="secondary" className="px-1.5 py-0 text-[10px] font-mono">
                 {employeesWithEvaluations.length}
               </Badge>
@@ -1764,19 +1841,23 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
             <TabsTrigger value="scorecard" className="rounded-xl px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer">
               <FileSpreadsheet className="h-4 w-4" /> {isAr ? "بطاقة التقييم" : "Evaluation Scorecard"}
             </TabsTrigger>
-            <TabsTrigger value="pending-approvals" className="rounded-xl px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer">
-              <Clock className="h-4 w-4 text-amber-500" />
-              <span>{isAr ? "المعاملات المعلقة" : "Pending Approvals"}</span>
-              {pendingApprovals.length > 0 && (
-                <Badge className="bg-amber-500 text-white px-1.5 py-0 text-[10px] font-mono">
-                  {pendingApprovals.length}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="templates-criteria" className="rounded-xl px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer">
-              <Award className="h-4 w-4 text-brand" />
-              <span>{isAr ? "القوالب والمعايير" : "Templates & Criteria"}</span>
-            </TabsTrigger>
+            {!isManagerMode && (
+              <TabsTrigger value="pending-approvals" className="rounded-xl px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer">
+                <Clock className="h-4 w-4 text-amber-500" />
+                <span>{isAr ? "المعاملات المعلقة" : "Pending Approvals"}</span>
+                {pendingApprovals.length > 0 && (
+                  <Badge className="bg-amber-500 text-white px-1.5 py-0 text-[10px] font-mono">
+                    {pendingApprovals.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            )}
+            {!isManagerMode && (
+              <TabsTrigger value="templates-criteria" className="rounded-xl px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer">
+                <Award className="h-4 w-4 text-brand" />
+                <span>{isAr ? "القوالب والمعايير" : "Templates & Criteria"}</span>
+              </TabsTrigger>
+            )}
           </TabsList>
 
           {/* Quick Quarter Filter on Scorecard view */}
@@ -1865,12 +1946,18 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h3 className="font-display text-sm font-bold text-foreground">
-                  {isAr ? `سجل تقييمات الموظفين لعام ${selectedYear}` : `Staff KPI Scorecards Directory — Year ${selectedYear}`}
+                  {isManagerMode
+                    ? (isAr ? ("سجل تقييمات فريق العمل لعام " + selectedYear) : ("Team Performance Scorecards — Year " + selectedYear))
+                    : (isAr ? ("سجل تقييمات الموظفين لعام " + selectedYear) : ("Staff KPI Scorecards Directory — Year " + selectedYear))}
                 </h3>
                 <p className="text-xs text-muted-foreground">
-                  {isAr
-                    ? "قائمة شاملة بنتائج الأرباع الأربعة والدرجة الإجمالية وحالة التقييم لكل موظف."
-                    : "Complete quarterly scorecards, annual percentages, and sign-off statuses."}
+                  {isManagerMode
+                    ? (isAr
+                      ? "قائمة أعضاء فريقك لتقييم أدائهم ومتابعة النتائج الربع سنوية والاعتمادات."
+                      : "Direct team members directory for performance evaluations and quarterly review tracking.")
+                    : (isAr
+                      ? "قائمة شاملة بنتائج الأرباع الأربعة والدرجة الإجمالية وحالة التقييم لكل موظف."
+                      : "Complete quarterly scorecards, annual percentages, and sign-off statuses.")}
                 </p>
               </div>
 
@@ -2193,7 +2280,6 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                     type="button"
                     onClick={() => {
                       setActiveScorecardQuarter(q);
-                      setActiveQuarterFilter(q);
                     }}
                     className={`rounded-xl px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                       isSelected
@@ -2699,8 +2785,9 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
           </div>
         </TabsContent>
 
-        {/* ── TAB: PENDING APPROVALS (HR ADMIN & MANAGERS) ── */}
-        <TabsContent value="pending-approvals" className="space-y-4">
+        {/* ── TAB: PENDING APPROVALS (HR ADMIN) ── */}
+        {!isManagerMode && (
+          <TabsContent value="pending-approvals" className="space-y-4">
           <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-sm space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
@@ -2864,8 +2951,10 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
             )}
           </div>
         </TabsContent>
+        )}
 
-        {/* ── TAB: TEMPLATES & CRITERIA CATALOG ── */}
+        {/* ── TAB: TEMPLATES & CRITERIA CATALOG (HR ADMIN) ── */}
+        {!isManagerMode && (
         <TabsContent value="templates-criteria" className="space-y-4">
           {/* Sub-tab Navigation: Templates vs Criteria */}
           <div className="flex items-center gap-2 border-b border-border pb-3">
@@ -3389,6 +3478,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
             </div>
           )}
         </TabsContent>
+        )}
       </Tabs>
 
       {/* Metric Detail Info Dialog */}
