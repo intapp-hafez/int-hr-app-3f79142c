@@ -33,6 +33,8 @@ import {
   Plus,
   Pencil,
   RotateCcw,
+  Copy,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -76,10 +78,17 @@ import {
   listKpiTemplates,
   saveKpiTemplate,
   publishKpiTemplate,
+  duplicateKpiTemplate,
+  matchKpiTemplate,
   getQuarterlyEvaluation,
   saveQuarterlyEvaluation,
   KpiEvaluationRecord,
 } from "@/backend/functions/kpi-evaluations.functions";
+import {
+  listDepartments,
+  listPositions,
+  listJobGrades,
+} from "@/backend/functions/directory.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -310,6 +319,11 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
   const listTemplatesFn = useServerFn(listKpiTemplates);
   const saveTemplateFn = useServerFn(saveKpiTemplate);
   const publishTemplateFn = useServerFn(publishKpiTemplate);
+  const duplicateTemplateFn = useServerFn(duplicateKpiTemplate);
+  const matchTemplateFn = useServerFn(matchKpiTemplate);
+  const listDepartmentsFn = useServerFn(listDepartments);
+  const listPositionsFn = useServerFn(listPositions);
+  const listJobGradesFn = useServerFn(listJobGrades);
   const getQuarterlyFn = useServerFn(getQuarterlyEvaluation);
   const saveQuarterlyFn = useServerFn(saveQuarterlyEvaluation);
 
@@ -332,6 +346,77 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
     queryKey: ["kpi-templates"],
     queryFn: () => listTemplatesFn({ data: {} }),
     enabled: !!session,
+  });
+
+  // ── DIRECTORY DATA QUERIES (DEPARTMENTS, POSITIONS, GRADES) ──
+  const { data: departmentsData = [] } = useQuery({
+    queryKey: ["kpi-departments-list"],
+    queryFn: () => listDepartmentsFn({ data: {} }),
+    enabled: !!session,
+  });
+
+  const { data: positionsData = [] } = useQuery({
+    queryKey: ["kpi-positions-list"],
+    queryFn: () => listPositionsFn({ data: {} }),
+    enabled: !!session,
+  });
+
+  const { data: jobGradesData = [] } = useQuery({
+    queryKey: ["kpi-job-grades-list"],
+    queryFn: () => listJobGradesFn({ data: {} }),
+    enabled: !!session,
+  });
+
+  // ── EMPLOYEE TEMPLATE MATCH QUERY (MISSING TEMPLATE GUARD) ──
+  const { data: matchedTemplateData, isLoading: isLoadingMatchedTemplate } = useQuery({
+    queryKey: ["kpi-matched-template", selectedEmpId],
+    queryFn: () => matchTemplateFn({ data: { employeeId: selectedEmpId } }),
+    enabled: !!selectedEmpId,
+  });
+
+  // ── TEMPLATE BUILDER & DUPLICATION STATE ──
+  const [templateSubTab, setTemplateSubTab] = useState<"templates" | "criteria">("templates");
+  const [templateSearch, setTemplateSearch] = useState("");
+  const [templateDeptFilter, setTemplateDeptFilter] = useState("all");
+  const [templateStatusFilter, setTemplateStatusFilter] = useState("all");
+
+  const [templateModalOpen, setTemplateModalOpen] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<any | null>(null);
+  const [templateForm, setTemplateForm] = useState<{
+    name_en: string;
+    name_ar: string;
+    description: string;
+    department_id: string;
+    position_id: string;
+    job_grade_id: string;
+    effective_year: number;
+    items: Array<{
+      criterion_id: string;
+      weight: number;
+      target_benchmark: number;
+      scoring_direction: "higher_is_better" | "lower_is_better" | "rating_5" | "target_range";
+      unit: string;
+      display_order: number;
+    }>;
+  }>({
+    name_en: "",
+    name_ar: "",
+    description: "",
+    department_id: "",
+    position_id: "",
+    job_grade_id: "",
+    effective_year: currentYear,
+    items: [],
+  });
+
+  const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
+  const [duplicateSourceTemplate, setDuplicateSourceTemplate] = useState<any | null>(null);
+  const [duplicateForm, setDuplicateForm] = useState({
+    new_name_en: "",
+    new_name_ar: "",
+    target_department_id: "",
+    target_position_id: "",
+    target_job_grade_id: "",
   });
 
   // State for Pending Approvals & Reviews
@@ -497,6 +582,177 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
       refetchCriteria();
     } catch (err: any) {
       toast.error(err.message || "Failed to archive criterion");
+    }
+  };
+
+  // ── TEMPLATE BUILDER & DUPLICATION HANDLERS ──
+  const handleOpenCreateTemplate = () => {
+    setEditingTemplate(null);
+    setTemplateForm({
+      name_en: "",
+      name_ar: "",
+      description: "",
+      department_id: "",
+      position_id: "",
+      job_grade_id: "",
+      effective_year: currentYear,
+      items: [],
+    });
+    setTemplateModalOpen(true);
+  };
+
+  const handleOpenEditTemplate = (tmpl: any) => {
+    setEditingTemplate(tmpl);
+    setTemplateForm({
+      name_en: tmpl.name_en || "",
+      name_ar: tmpl.name_ar || "",
+      description: tmpl.description || "",
+      department_id: tmpl.department_id || "",
+      position_id: tmpl.position_id || "",
+      job_grade_id: tmpl.job_grade_id || "",
+      effective_year: tmpl.effective_year || currentYear,
+      items: (tmpl.items || []).map((it: any, idx: number) => ({
+        criterion_id: it.criterion_id,
+        weight: Math.round(Number(it.weight) * 100),
+        target_benchmark: it.target_benchmark ?? 100,
+        scoring_direction: it.scoring_direction || "higher_is_better",
+        unit: it.unit || "%",
+        display_order: it.display_order ?? idx + 1,
+      })),
+    });
+    setTemplateModalOpen(true);
+  };
+
+  const handleAddCriterionToTemplate = (crit: any) => {
+    if (templateForm.items.some((i) => i.criterion_id === crit.id)) {
+      toast.warning(isAr ? "المعيار مضاف بالفعل للقالب" : "Criterion is already added to this template");
+      return;
+    }
+    const currentSum = templateForm.items.reduce((acc, it) => acc + Number(it.weight), 0);
+    const suggestedWeight = Math.max(5, Math.min(25, 100 - currentSum));
+
+    setTemplateForm((prev) => ({
+      ...prev,
+      items: [
+        ...prev.items,
+        {
+          criterion_id: crit.id,
+          weight: suggestedWeight > 0 ? suggestedWeight : 5,
+          target_benchmark: crit.default_target ? Math.round(crit.default_target * 100) : 90,
+          scoring_direction: crit.scoring_direction || "higher_is_better",
+          unit: crit.unit || "%",
+          display_order: prev.items.length + 1,
+        },
+      ],
+    }));
+  };
+
+  const handleRemoveCriterionFromTemplate = (critId: string) => {
+    setTemplateForm((prev) => ({
+      ...prev,
+      items: prev.items.filter((it) => it.criterion_id !== critId),
+    }));
+  };
+
+  const handleSaveTemplate = async (publishImmediate = false) => {
+    if (!templateForm.name_en.trim() || !templateForm.name_ar.trim()) {
+      toast.error(isAr ? "يرجى إدخال اسم القالب باللغتين" : "Please provide template name in both languages");
+      return;
+    }
+    if (templateForm.items.length === 0) {
+      toast.error(isAr ? "يجب إضافة معيار واحد على الأقل للقالب" : "Template must include at least one criterion");
+      return;
+    }
+
+    const totalWeight = templateForm.items.reduce((acc, it) => acc + Number(it.weight), 0);
+    if (publishImmediate && Math.abs(totalWeight - 100) > 0.5) {
+      toast.error(
+        isAr
+          ? `لا يمكن نشر القالب: يجب أن يكون مجموع الأوزان 100% تماماً (الحالي: ${totalWeight}%)`
+          : `Cannot publish: Total criteria weight must equal exactly 100% (Current: ${totalWeight}%)`
+      );
+      return;
+    }
+
+    try {
+      await saveTemplateFn({
+        data: {
+          id: editingTemplate?.id,
+          name_en: templateForm.name_en.trim(),
+          name_ar: templateForm.name_ar.trim(),
+          description: templateForm.description.trim(),
+          department_id: templateForm.department_id || null,
+          position_id: templateForm.position_id || null,
+          job_grade_id: templateForm.job_grade_id || null,
+          effective_year: templateForm.effective_year,
+          effective_quarter: "all",
+          common_weight_pct: 40,
+          position_weight_pct: 60,
+          is_active: true,
+          status: publishImmediate ? "published" : "draft",
+          items: templateForm.items.map((it) => ({
+            criterion_id: it.criterion_id,
+            weight: it.weight / 100,
+            target_benchmark: it.target_benchmark,
+            scoring_direction: it.scoring_direction,
+            unit: it.unit,
+            display_order: it.display_order,
+          })),
+        },
+      });
+
+      toast.success(
+        publishImmediate
+          ? isAr ? "تم نشر واعتماد القالب رسمياً بنجاح" : "Template successfully published!"
+          : isAr ? "تم حفظ مسودة القالب بنجاح" : "Template draft saved successfully"
+      );
+      setTemplateModalOpen(false);
+      refetchTemplates();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save template");
+    }
+  };
+
+  const handlePublishTemplateDirectly = async (templateId: string) => {
+    try {
+      await publishTemplateFn({ data: { id: templateId } });
+      toast.success(isAr ? "تم نشر القالب بنجاح" : "Template published successfully");
+      refetchTemplates();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to publish template");
+    }
+  };
+
+  const handleOpenDuplicateTemplate = (tmpl: any) => {
+    setDuplicateSourceTemplate(tmpl);
+    setDuplicateForm({
+      new_name_en: `${tmpl.name_en} (Copy)`,
+      new_name_ar: `${tmpl.name_ar} (نسخة)`,
+      target_department_id: tmpl.department_id || "",
+      target_position_id: tmpl.position_id || "",
+      target_job_grade_id: tmpl.job_grade_id || "",
+    });
+    setDuplicateModalOpen(true);
+  };
+
+  const handleSaveDuplicateTemplate = async () => {
+    if (!duplicateSourceTemplate || !duplicateForm.new_name_en.trim()) return;
+    try {
+      await duplicateTemplateFn({
+        data: {
+          template_id: duplicateSourceTemplate.id,
+          new_name_en: duplicateForm.new_name_en.trim(),
+          new_name_ar: duplicateForm.new_name_ar.trim(),
+          target_department_id: duplicateForm.target_department_id || null,
+          target_position_id: duplicateForm.target_position_id || null,
+          target_job_grade_id: duplicateForm.target_job_grade_id || null,
+        },
+      });
+      toast.success(isAr ? "تم استنساخ القالب كمسودة جديدة بنجاح" : "Template duplicated successfully as a new draft");
+      setDuplicateModalOpen(false);
+      refetchTemplates();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to duplicate template");
     }
   };
 
@@ -988,6 +1244,40 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
 
     return { total, evaluated, approved, submitted, draft, avgScore };
   }, [employeesWithEvaluations]);
+
+  const filteredTemplates = useMemo(() => {
+    return (kpiTemplates || []).filter((tmpl: any) => {
+      if (templateSearch.trim()) {
+        const q = templateSearch.toLowerCase().trim();
+        const nameEn = (tmpl.name_en || "").toLowerCase();
+        const nameAr = (tmpl.name_ar || "").toLowerCase();
+        const posEn = (tmpl.position?.name_en || "").toLowerCase();
+        const posAr = (tmpl.position?.name_ar || "").toLowerCase();
+        const deptEn = (tmpl.department?.name_en || "").toLowerCase();
+        const deptAr = (tmpl.department?.name_ar || "").toLowerCase();
+        if (
+          !nameEn.includes(q) &&
+          !nameAr.includes(q) &&
+          !posEn.includes(q) &&
+          !posAr.includes(q) &&
+          !deptEn.includes(q) &&
+          !deptAr.includes(q)
+        ) {
+          return false;
+        }
+      }
+
+      if (templateDeptFilter !== "all" && tmpl.department_id !== templateDeptFilter) {
+        return false;
+      }
+
+      if (templateStatusFilter !== "all" && tmpl.status !== templateStatusFilter) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [kpiTemplates, templateSearch, templateDeptFilter, templateStatusFilter]);
 
   const handleExportAllToExcel = () => {
     const exportRows: AllEvaluationsExportRow[] = filteredEmployeesWithEvaluations.map((item, idx) => ({
@@ -1645,6 +1935,23 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
 
         {/* ── TAB 1: FULL SCORECARD TABLE ── */}
         <TabsContent value="scorecard" className="space-y-4">
+          {/* Missing Template Guard Alert */}
+          {matchedTemplateData && !matchedTemplateData.matched && (
+            <div className="rounded-2xl border border-amber-300 bg-amber-50/90 dark:bg-amber-950/20 p-4 flex items-start gap-3.5 shadow-xs">
+              <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <h4 className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                  {isAr ? "تنبيه: لا يوجد قالب تقييم معتمد لهذا المنصب" : "Missing Published Evaluation Template"}
+                </h4>
+                <p className="text-[11px] text-amber-800 dark:text-amber-300">
+                  {isAr
+                    ? `لم يتم العثور على قالب تقييم معتمد ومحدد لقسم (${matchedTemplateData.employee?.department_name || "غير محدد"}) والمسمى الوظيفي (${matchedTemplateData.employee?.position_name || "غير محدد"}). وفقاً للسياسات الإدارية، لا يجوز تقييم الموظف بقالب غير مخصص لوظيفته. يرجى من مسؤول الموارد البشرية إنشاء ونشر قالب مخصص لهذا المنصب.`
+                    : `No published evaluation template was found for department (${matchedTemplateData.employee?.department_name || "Unassigned"}) and position (${matchedTemplateData.employee?.position_name || "Unassigned"}). Per company policy, evaluations cannot use mismatched templates. Please publish a template for this role in HR Admin.`}
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Quarter Workflow Switcher & Status Bar */}
           <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-card border border-border shadow-2xs">
             <div className="flex items-center gap-1.5 overflow-x-auto">
@@ -2479,199 +2786,505 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
 
         {/* ── TAB: TEMPLATES & CRITERIA CATALOG ── */}
         <TabsContent value="templates-criteria" className="space-y-4">
-          <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-sm space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
-              <div>
+          {/* Sub-tab Navigation: Templates vs Criteria */}
+          <div className="flex items-center gap-2 border-b border-border pb-3">
+            <button
+              type="button"
+              onClick={() => setTemplateSubTab("templates")}
+              className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
+                templateSubTab === "templates"
+                  ? "bg-brand text-brand-foreground shadow-xs"
+                  : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+            >
+              <Layers className="h-4 w-4" />
+              <span>{isAr ? "قوالب التقييم الوظيفية" : "Job Role Templates"}</span>
+              <Badge
+                variant="outline"
+                className={`text-[10px] px-1.5 py-0 font-mono ${
+                  templateSubTab === "templates" ? "border-brand-foreground/30 text-brand-foreground" : ""
+                }`}
+              >
+                {kpiTemplates.length}
+              </Badge>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setTemplateSubTab("criteria")}
+              className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
+                templateSubTab === "criteria"
+                  ? "bg-brand text-brand-foreground shadow-xs"
+                  : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+            >
+              <Award className="h-4 w-4" />
+              <span>{isAr ? "دليل ومكتبة المعايير" : "Criteria Library"}</span>
+              <Badge
+                variant="outline"
+                className={`text-[10px] px-1.5 py-0 font-mono ${
+                  templateSubTab === "criteria" ? "border-brand-foreground/30 text-brand-foreground" : ""
+                }`}
+              >
+                {kpiCriteria.length}
+              </Badge>
+            </button>
+          </div>
+
+          {/* ═════════════════════════════════════════════════════════════════ */}
+          {/* VIEW A: TEMPLATES MANAGER                                         */}
+          {/* ═════════════════════════════════════════════════════════════════ */}
+          {templateSubTab === "templates" ? (
+            <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-sm space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-semibold text-brand">
+                      <Layers className="h-3.5 w-3.5" />
+                      {isAr ? "محرك قوالب التقييم" : "Template Engine"}
+                    </span>
+                    <Badge variant="outline" className="text-[10px] font-mono">
+                      {kpiTemplates.length} {isAr ? "قوالب" : "Templates"}
+                    </Badge>
+                  </div>
+                  <h2 className="font-display text-lg font-bold text-foreground mt-1">
+                    {isAr ? "قوالب تقييم الوظائف والمستويات المهنية" : "Job Role Evaluation Templates"}
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    {isAr
+                      ? "إدارة قوالب التقييم وفق الهيكل: الإدارة ← المسمى الوظيفي ← المستوى المهني (Junior, Mid, Senior, Lead). يجب أن يساوي مجموع الأوزان 100% بالضبط للنشر."
+                      : "Configure templates tailored by Department → Position → Seniority Level. Sum of criteria weights must equal exactly 100% to publish."}
+                  </p>
+                </div>
+
                 <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-semibold text-brand">
-                    <Award className="h-3.5 w-3.5" />
-                    {isAr ? "مصفوفة المعايير والقوالب" : "KPI Criteria & Templates"}
-                  </span>
-                  <Badge variant="outline" className="text-[10px] font-mono">
-                    {kpiCriteria.length} {isAr ? "معياراً مسجلاً" : "Criteria"}
-                  </Badge>
-                </div>
-                <h2 className="font-display text-lg font-bold text-foreground mt-1">
-                  {isAr ? "إدارة مصفوفة ومعايير تقييم الأداء المؤسسي" : "Evaluation Criteria Catalog & Template Rules"}
-                </h2>
-                <p className="text-xs text-muted-foreground">
-                  {isAr
-                    ? "توزيع أوزان التقييم المعتمد: 40% معايير عامة للشركة، و60% معايير تخصصية فنية وفق المنصب."
-                    : "Standard evaluation framework: 40% Company-wide Common Criteria, 60% Position-Specific Technical Criteria."}
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  onClick={handleOpenAddCriterion}
-                  size="sm"
-                  className="rounded-2xl gap-1.5 bg-brand text-brand-foreground hover:bg-brand/90 cursor-pointer shadow-xs"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>{isAr ? "إضافة معيار جديد" : "Add Criterion"}</span>
-                </Button>
-              </div>
-            </div>
-
-            {/* Architecture 3-Layer Weight Summary Banner */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-              <div className="p-4 rounded-2xl border border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-900/40 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-blue-700 dark:text-blue-400">
-                    {isAr ? "1. المعايير العامة للشركة" : "1. Company Common Layer"}
-                  </span>
-                  <Badge className="bg-blue-600 text-white font-mono text-[10px]">40.0%</Badge>
-                </div>
-                <p className="text-[11px] text-muted-foreground">
-                  {isAr
-                    ? "الانضباط والمواعيد، السلوك المهني والسياسات، العمل الجماعي، والمبادرة والمسؤولية."
-                    : "Attendance & punctuality, code of conduct, teamwork, initiative & ownership."}
-                </p>
-              </div>
-
-              <div className="p-4 rounded-2xl border border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/20 dark:border-emerald-900/40 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
-                    {isAr ? "2. معايير التخصص والمنصب" : "2. Position / Role Layer"}
-                  </span>
-                  <Badge className="bg-emerald-600 text-white font-mono text-[10px]">60.0%</Badge>
-                </div>
-                <p className="text-[11px] text-muted-foreground">
-                  {isAr
-                    ? "الكفاءات الفنية الميدانية لكل مسمى وظيفي (مصفوفة الـ 17 مؤشراً لمهندسي التيار الخفيف)."
-                    : "Field competencies tailored to job role (e.g. 17 technical KPIs for ELV Engineers)."}
-                </p>
-              </div>
-
-              <div className="p-4 rounded-2xl border border-brand/30 bg-brand/5 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-brand">
-                    {isAr ? "3. مجموع الأوزان المستهدف" : "3. Target Weight Validation"}
-                  </span>
-                  <Badge className="bg-brand text-brand-foreground font-mono text-[10px]">100.0%</Badge>
-                </div>
-                <p className="text-[11px] text-muted-foreground">
-                  {isAr
-                    ? "التحقق الصارم من توازن الأوزان المئوية لتساوي دائماً 100% بدقة قبل اعتماد القوالب."
-                    : "Strict mathematical enforcement ensuring sum of all category weights equals exactly 100%."}
-                </p>
-              </div>
-            </div>
-
-            {/* Filter by Layer */}
-            <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2">
-              <div className="flex items-center gap-1.5 bg-muted/60 p-1 rounded-2xl border border-border text-xs">
-                {(["all", "common", "role", "custom"] as const).map((layer) => (
-                  <button
-                    key={layer}
-                    type="button"
-                    onClick={() => setCriteriaLayerFilter(layer)}
-                    className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
-                      criteriaLayerFilter === layer
-                        ? "bg-card text-foreground shadow-xs"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
+                  <Button
+                    onClick={handleOpenCreateTemplate}
+                    size="sm"
+                    className="rounded-2xl gap-1.5 bg-brand text-brand-foreground hover:bg-brand/90 cursor-pointer shadow-xs"
                   >
-                    {layer === "all"
-                      ? isAr ? "كل المعايير" : "All Layers"
-                      : layer === "common"
-                      ? isAr ? "عامة (40%)" : "Common (40%)"
-                      : layer === "role"
-                      ? isAr ? "تخصصية (60%)" : "Role Specific (60%)"
-                      : isAr ? "مخصصة" : "Custom"}
-                  </button>
-                ))}
+                    <Plus className="h-4 w-4" />
+                    <span>{isAr ? "إنشاء قالب جديد" : "Create New Template"}</span>
+                  </Button>
+                </div>
               </div>
-            </div>
 
-            {/* Criteria Catalog Table */}
-            {isLoadingCriteria ? (
-              <div className="p-12 text-center text-xs text-muted-foreground flex flex-col items-center gap-2">
-                <Loader2 className="h-6 w-6 animate-spin text-brand" />
-                <span>{isAr ? "جارٍ تحميل دليل المعايير..." : "Loading criteria..."}</span>
+              {/* Filter bar */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="relative">
+                  <Input
+                    value={templateSearch}
+                    onChange={(e) => setTemplateSearch(e.target.value)}
+                    placeholder={isAr ? "بحث بالاسم أو المنصب أو القسم..." : "Search templates, roles, depts..."}
+                    className="rounded-xl text-xs"
+                  />
+                </div>
+
+                <div>
+                  <select
+                    value={templateDeptFilter}
+                    onChange={(e) => setTemplateDeptFilter(e.target.value)}
+                    className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold"
+                  >
+                    <option value="all">{isAr ? "جميع الأقسام" : "All Departments"}</option>
+                    {(departmentsData || []).map((dept: any) => (
+                      <option key={dept.id} value={dept.id}>
+                        {isAr ? dept.name_ar || dept.name_en : dept.name_en || dept.name_ar}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <select
+                    value={templateStatusFilter}
+                    onChange={(e) => setTemplateStatusFilter(e.target.value)}
+                    className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold"
+                  >
+                    <option value="all">{isAr ? "جميع الحالات" : "All Statuses"}</option>
+                    <option value="published">{isAr ? "معتمد ومنشور" : "Published"}</option>
+                    <option value="draft">{isAr ? "مسودة" : "Draft"}</option>
+                  </select>
+                </div>
               </div>
-            ) : (
-              <div className="divide-y divide-border rounded-2xl border border-border overflow-hidden bg-card">
-                {kpiCriteria
-                  .filter((crit: any) => criteriaLayerFilter === "all" || crit.layer === criteriaLayerFilter)
-                  .map((crit: any) => {
-                    const weightPct = crit.default_weight ? (crit.default_weight * 100).toFixed(1) : "—";
-                    const targetPct = crit.default_target ? (crit.default_target * 100).toFixed(0) : "—";
+
+              {/* Templates Grid */}
+              {isLoadingTemplates ? (
+                <div className="p-12 text-center text-xs text-muted-foreground flex flex-col items-center gap-2">
+                  <Loader2 className="h-6 w-6 animate-spin text-brand" />
+                  <span>{isAr ? "جارٍ تحميل القوالب..." : "Loading templates..."}</span>
+                </div>
+              ) : filteredTemplates.length === 0 ? (
+                <div className="p-12 text-center rounded-2xl border border-dashed border-border bg-muted/20 space-y-3">
+                  <Layers className="h-10 w-10 text-muted-foreground/60 mx-auto" />
+                  <p className="text-xs font-semibold text-foreground">
+                    {isAr ? "لا توجد قوالب تطابق البحث" : "No templates found matching your criteria"}
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleOpenCreateTemplate}
+                    className="rounded-xl text-xs gap-1.5 cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>{isAr ? "إنشاء أول قالب تقييم" : "Create first template"}</span>
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredTemplates.map((tmpl: any) => {
+                    const totalWeight = Math.round(
+                      (tmpl.items || []).reduce((acc: number, it: any) => acc + Number(it.weight || 0), 0) * 100
+                    );
+                    const is100 = totalWeight === 100;
+                    const isPublished = tmpl.status === "published";
+                    const version = tmpl.version || 1;
 
                     return (
                       <div
-                        key={crit.id}
-                        className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-muted/30 transition-colors"
+                        key={tmpl.id}
+                        className="rounded-2xl border border-border bg-card p-4 shadow-xs hover:border-brand/40 transition-all flex flex-col justify-between space-y-4"
                       >
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0">
-                              {crit.code}
-                            </Badge>
-                            <span className="font-bold text-xs text-foreground">
-                              {isAr ? crit.name_ar : crit.name_en}
-                            </span>
-                            <Badge
-                              className={`text-[10px] px-2 py-0 ${
-                                crit.layer === "common"
-                                  ? "bg-blue-600 text-white"
-                                  : crit.layer === "role"
-                                  ? "bg-emerald-600 text-white"
-                                  : "bg-purple-600 text-white"
-                              }`}
-                            >
-                              {crit.layer === "common"
-                                ? isAr ? "معيار عام" : "Common"
-                                : crit.layer === "role"
-                                ? isAr ? "معيار تخصصي" : "Role"
-                                : isAr ? "مخصص" : "Custom"}
-                            </Badge>
+                        <div className="space-y-3">
+                          {/* Card Header */}
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="space-y-0.5">
+                              <h3 className="font-bold text-sm text-foreground leading-tight">
+                                {isAr ? tmpl.name_ar || tmpl.name_en : tmpl.name_en}
+                              </h3>
+                              {tmpl.name_ar && !isAr && (
+                                <p className="text-[11px] text-muted-foreground font-arabic" dir="rtl">
+                                  {tmpl.name_ar}
+                                </p>
+                              )}
+                              {tmpl.name_en && isAr && (
+                                <p className="text-[11px] text-muted-foreground font-mono">
+                                  {tmpl.name_en}
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0 bg-muted/40">
+                                v{version}
+                              </Badge>
+                              {isPublished ? (
+                                <Badge className="bg-emerald-600 text-white text-[10px] px-2 py-0">
+                                  {isAr ? "معتمد" : "Published"}
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 text-[10px] px-2 py-0">
+                                  {isAr ? "مسودة" : "Draft"}
+                                </Badge>
+                              )}
+                            </div>
                           </div>
-                          <p className="text-[11px] text-muted-foreground">
-                            {isAr ? crit.category_ar : crit.category_en}
-                            {crit.how_measured_en && (
-                              <span className="ms-2 text-muted-foreground/80">
-                                • {isAr ? crit.how_measured_ar : crit.how_measured_en}
-                              </span>
+
+                          {/* Role Badges */}
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <Badge variant="secondary" className="text-[10px] px-2 py-0.5 font-medium">
+                              {tmpl.department ? (isAr ? tmpl.department.name_ar || tmpl.department.name_en : tmpl.department.name_en) : (isAr ? "كل الأقسام" : "All Departments")}
+                            </Badge>
+                            <Badge variant="secondary" className="text-[10px] px-2 py-0.5 font-medium bg-brand/10 text-brand">
+                              {tmpl.position ? (isAr ? tmpl.position.name_ar || tmpl.position.name_en : tmpl.position.name_en) : (isAr ? "كل المناصب" : "All Positions")}
+                            </Badge>
+                            {tmpl.job_grade && (
+                              <Badge variant="outline" className="text-[10px] px-2 py-0.5 font-semibold text-purple-600 border-purple-300 dark:border-purple-800">
+                                {isAr ? tmpl.job_grade.name_ar || tmpl.job_grade.name_en : tmpl.job_grade.name_en}
+                              </Badge>
                             )}
-                          </p>
+                          </div>
+
+                          {/* Weight & Criteria Count Banner */}
+                          <div className="flex items-center justify-between p-2 rounded-xl bg-muted/40 border border-border/60 text-xs">
+                            <span className="text-muted-foreground flex items-center gap-1">
+                              <Award className="h-3 w-3 text-brand" />
+                              <span>{tmpl.items?.length || 0} {isAr ? "معايير" : "KPIs"}</span>
+                            </span>
+                            <span className={`font-mono font-bold text-xs ${is100 ? "text-emerald-600" : "text-amber-600"}`}>
+                              {isAr ? `مجموع الأوزان: ${totalWeight}%` : `Weight: ${totalWeight}%`}
+                            </span>
+                          </div>
+
+                          {/* Items Preview */}
+                          <div className="space-y-1">
+                            {(tmpl.items || []).slice(0, 3).map((it: any, iIdx: number) => {
+                              const critName = isAr
+                                ? it.criterion?.name_ar || it.criterion?.name_en || `#${iIdx + 1}`
+                                : it.criterion?.name_en || it.criterion?.name_ar || `#${iIdx + 1}`;
+                              const itWeight = Math.round(Number(it.weight || 0) * 100);
+                              return (
+                                <div key={it.id || iIdx} className="flex items-center justify-between text-[11px] text-muted-foreground">
+                                  <span className="truncate max-w-[200px]">• {critName}</span>
+                                  <span className="font-mono text-[10px] shrink-0 font-semibold">{itWeight}%</span>
+                                </div>
+                              );
+                            })}
+                            {(tmpl.items || []).length > 3 && (
+                              <p className="text-[10px] text-muted-foreground/80 italic text-end">
+                                + {(tmpl.items || []).length - 3} {isAr ? "معايير أخرى" : "more criteria"}
+                              </p>
+                            )}
+                          </div>
                         </div>
 
-                        <div className="flex items-center gap-3 shrink-0">
-                          <div className="text-end font-mono text-xs">
-                            <span className="text-muted-foreground">{isAr ? "الوزن:" : "Weight:"} </span>
-                            <strong className="text-foreground">{weightPct}%</strong>
-                            <span className="ms-2 text-muted-foreground">{isAr ? "الهدف:" : "Target:"} </span>
-                            <strong className="text-emerald-600">{targetPct}%</strong>
-                          </div>
+                        {/* Card Actions */}
+                        <div className="pt-3 border-t border-border flex items-center justify-between gap-1.5">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenEditTemplate(tmpl)}
+                            className="h-7 text-xs rounded-xl px-2.5 gap-1 cursor-pointer"
+                          >
+                            <Pencil className="h-3 w-3" />
+                            <span>{isAr ? "تعديل" : "Edit"}</span>
+                          </Button>
 
-                          <div className="flex items-center gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenDuplicateTemplate(tmpl)}
+                            className="h-7 text-xs rounded-xl px-2.5 gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
+                          >
+                            <Copy className="h-3 w-3" />
+                            <span>{isAr ? "استنساخ" : "Duplicate"}</span>
+                          </Button>
+
+                          {!isPublished && (
                             <Button
-                              variant="ghost"
                               size="sm"
-                              onClick={() => handleOpenEditCriterion(crit)}
-                              className="h-7 w-7 p-0 rounded-lg text-muted-foreground hover:text-brand cursor-pointer"
-                              title={isAr ? "تعديل" : "Edit"}
+                              onClick={() => handlePublishTemplateDirectly(tmpl.id)}
+                              disabled={!is100}
+                              className={`h-7 text-xs rounded-xl px-2.5 gap-1 cursor-pointer ${
+                                is100 ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "opacity-50 cursor-not-allowed"
+                              }`}
+                              title={!is100 ? (isAr ? "يتطلب مجموع 100% للنشر" : "Requires 100% total weight") : ""}
                             >
-                              <Pencil className="h-3.5 w-3.5" />
+                              <ShieldCheck className="h-3 w-3" />
+                              <span>{isAr ? "نشر" : "Publish"}</span>
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleArchiveCriterion(crit.id)}
-                              className="h-7 w-7 p-0 rounded-lg text-muted-foreground hover:text-rose-600 cursor-pointer"
-                              title={isAr ? "أرشفة" : "Archive"}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
+                          )}
                         </div>
                       </div>
                     );
                   })}
+                </div>
+              )}
+            </div>
+          ) : (
+            /* ═════════════════════════════════════════════════════════════════ */
+            /* VIEW B: CRITERIA LIBRARY                                         */
+            /* ═════════════════════════════════════════════════════════════════ */
+            <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-sm space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-semibold text-brand">
+                      <Award className="h-3.5 w-3.5" />
+                      {isAr ? "دليل المعايير والمؤشرات" : "Criteria Catalog"}
+                    </span>
+                    <Badge variant="outline" className="text-[10px] font-mono">
+                      {kpiCriteria.length} {isAr ? "معياراً مسجلاً" : "Criteria"}
+                    </Badge>
+                  </div>
+                  <h2 className="font-display text-lg font-bold text-foreground mt-1">
+                    {isAr ? "إدارة بنك معايير ومؤشرات الأداء" : "KPI Criteria Library & Measurement Definitions"}
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    {isAr
+                      ? "المعايير المعتمدة المتاحة لإدراجها في قوالب تقييم الوظائف المختلفة مع اتجاهات القياس والوحدات."
+                      : "Approved metric definitions with scoring directions (Higher is better, Lower is better, 1-5 scale) and target benchmarks."}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={handleOpenAddCriterion}
+                    size="sm"
+                    className="rounded-2xl gap-1.5 bg-brand text-brand-foreground hover:bg-brand/90 cursor-pointer shadow-xs"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span>{isAr ? "إضافة معيار جديد" : "Add Criterion"}</span>
+                  </Button>
+                </div>
               </div>
-            )}
-          </div>
+
+              {/* Architecture 3-Layer Weight Summary Banner */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                <div className="p-4 rounded-2xl border border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-900/40 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-blue-700 dark:text-blue-400">
+                      {isAr ? "1. المعايير العامة للشركة" : "1. Company Common Layer"}
+                    </span>
+                    <Badge className="bg-blue-600 text-white font-mono text-[10px]">40.0%</Badge>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    {isAr
+                      ? "الانضباط والمواعيد، السلوك المهني والسياسات، العمل الجماعي، والمبادرة والمسؤولية."
+                      : "Attendance & punctuality, code of conduct, teamwork, initiative & ownership."}
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-2xl border border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/20 dark:border-emerald-900/40 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                      {isAr ? "2. معايير التخصص والمنصب" : "2. Position / Role Layer"}
+                    </span>
+                    <Badge className="bg-emerald-600 text-white font-mono text-[10px]">60.0%</Badge>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    {isAr
+                      ? "الكفاءات الفنية الميدانية لكل مسمى وظيفي ومجال تخصص."
+                      : "Field competencies tailored to job role and discipline."}
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-2xl border border-brand/30 bg-brand/5 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-brand">
+                      {isAr ? "3. مجموع الأوزان المستهدف" : "3. Target Weight Validation"}
+                    </span>
+                    <Badge className="bg-brand text-brand-foreground font-mono text-[10px]">100.0%</Badge>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    {isAr
+                      ? "التحقق الصارم من توازن الأوزان المئوية لتساوي دائماً 100% بدقة قبل اعتماد القوالب."
+                      : "Strict mathematical enforcement ensuring sum of all category weights equals exactly 100%."}
+                  </p>
+                </div>
+              </div>
+
+              {/* Filter by Layer */}
+              <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2">
+                <div className="flex items-center gap-1.5 bg-muted/60 p-1 rounded-2xl border border-border text-xs">
+                  {(["all", "common", "role", "custom"] as const).map((layer) => (
+                    <button
+                      key={layer}
+                      type="button"
+                      onClick={() => setCriteriaLayerFilter(layer)}
+                      className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                        criteriaLayerFilter === layer
+                          ? "bg-card text-foreground shadow-xs"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {layer === "all"
+                        ? isAr ? "كل المعايير" : "All Layers"
+                        : layer === "common"
+                        ? isAr ? "عامة (40%)" : "Common (40%)"
+                        : layer === "role"
+                        ? isAr ? "تخصصية (60%)" : "Role Specific (60%)"
+                        : isAr ? "مخصصة" : "Custom"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Criteria Catalog Table */}
+              {isLoadingCriteria ? (
+                <div className="p-12 text-center text-xs text-muted-foreground flex flex-col items-center gap-2">
+                  <Loader2 className="h-6 w-6 animate-spin text-brand" />
+                  <span>{isAr ? "جارٍ تحميل دليل المعايير..." : "Loading criteria..."}</span>
+                </div>
+              ) : (
+                <div className="divide-y divide-border rounded-2xl border border-border overflow-hidden bg-card">
+                  {kpiCriteria
+                    .filter((crit: any) => criteriaLayerFilter === "all" || crit.layer === criteriaLayerFilter)
+                    .map((crit: any) => {
+                      const weightPct = crit.default_weight ? (crit.default_weight * 100).toFixed(1) : "—";
+                      const targetPct = crit.default_target ? (crit.default_target * 100).toFixed(0) : "—";
+
+                      return (
+                        <div
+                          key={crit.id}
+                          className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-muted/30 transition-colors"
+                        >
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0">
+                                {crit.code}
+                              </Badge>
+                              <span className="font-bold text-xs text-foreground">
+                                {isAr ? crit.name_ar : crit.name_en}
+                              </span>
+                              <Badge
+                                className={`text-[10px] px-2 py-0 ${
+                                  crit.layer === "common"
+                                    ? "bg-blue-600 text-white"
+                                    : crit.layer === "role"
+                                    ? "bg-emerald-600 text-white"
+                                    : "bg-purple-600 text-white"
+                                }`}
+                              >
+                                {crit.layer === "common"
+                                  ? isAr ? "معيار عام" : "Common"
+                                  : crit.layer === "role"
+                                  ? isAr ? "معيار تخصصي" : "Role"
+                                  : isAr ? "مخصص" : "Custom"}
+                              </Badge>
+
+                              {crit.scoring_direction && (
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono text-muted-foreground">
+                                  {crit.scoring_direction === "higher_is_better"
+                                    ? isAr ? "الأعلى أفضل ↑" : "Higher ↑"
+                                    : crit.scoring_direction === "lower_is_better"
+                                    ? isAr ? "الأقل أفضل ↓" : "Lower ↓"
+                                    : crit.scoring_direction === "rating_5"
+                                    ? isAr ? "مقياس 1-5 ★" : "Scale 1-5"
+                                    : crit.scoring_direction}
+                                </Badge>
+                              )}
+                              {crit.unit && (
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono text-muted-foreground">
+                                  {crit.unit}
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-muted-foreground">
+                              {isAr ? crit.category_ar : crit.category_en}
+                              {crit.how_measured_en && (
+                                <span className="ms-2 text-muted-foreground/80">
+                                  • {isAr ? crit.how_measured_ar : crit.how_measured_en}
+                                </span>
+                              )}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-3 shrink-0">
+                            <div className="text-end font-mono text-xs">
+                              <span className="text-muted-foreground">{isAr ? "الوزن:" : "Weight:"} </span>
+                              <strong className="text-foreground">{weightPct}%</strong>
+                              <span className="ms-2 text-muted-foreground">{isAr ? "الهدف:" : "Target:"} </span>
+                              <strong className="text-emerald-600">{targetPct}%</strong>
+                            </div>
+
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleOpenEditCriterion(crit)}
+                                className="h-7 w-7 p-0 rounded-lg text-muted-foreground hover:text-brand cursor-pointer"
+                                title={isAr ? "تعديل" : "Edit"}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleArchiveCriterion(crit.id)}
+                                className="h-7 w-7 p-0 rounded-lg text-muted-foreground hover:text-rose-600 cursor-pointer"
+                                title={isAr ? "أرشفة" : "Archive"}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 
@@ -3165,6 +3778,517 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                 className="rounded-xl bg-brand text-brand-foreground hover:bg-brand/90 cursor-pointer shadow-xs"
               >
                 {editingCriterion ? (isAr ? "حفظ التعديلات" : "Save Changes") : (isAr ? "إضافة المعيار" : "Add Criterion")}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── TEMPLATE BUILDER & EDITOR DIALOG ── */}
+      <Dialog open={templateModalOpen} onOpenChange={setTemplateModalOpen}>
+        <DialogContent className="sm:max-w-3xl rounded-3xl max-h-[90vh] overflow-y-auto" dir={dir}>
+          <DialogHeader>
+            <div className="flex items-center gap-2 text-brand">
+              <Layers className="h-5 w-5" />
+              <DialogTitle className="text-base font-bold font-display">
+                {editingTemplate
+                  ? isAr
+                    ? `تعديل قالب التقييم (الإصدار v${editingTemplate.version || 1})`
+                    : `Edit KPI Template (v${editingTemplate.version || 1})`
+                  : isAr
+                  ? "إنشاء قالب تقييم جديد للوظيفة"
+                  : "Create New Job Evaluation Template"}
+              </DialogTitle>
+            </div>
+          </DialogHeader>
+
+          <div className="space-y-4 pt-2 text-xs">
+            {/* Version Branching Notice if editing an active template */}
+            {editingTemplate && editingTemplate.status === "published" && (
+              <div className="flex items-start gap-2.5 p-3 rounded-2xl border border-amber-300 bg-amber-500/10 text-amber-800 dark:text-amber-200">
+                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <p className="font-semibold text-xs">
+                    {isAr ? "ميزة سلامة الإصدارات (Template Immutability):" : "Template Immutability Notice:"}
+                  </p>
+                  <p className="text-[11px] leading-relaxed">
+                    {isAr
+                      ? "هذا القالب معتمد حالياً. في حال تم استخدامه في تقييمات موظفين، سيؤدي حفظ التعديلات إلى إنشاء إصدار جديد (v" +
+                        ((editingTemplate.version || 1) + 1) +
+                        ") كمسودة، لحماية التقييمات السابقة من التغيير."
+                      : "This template is currently published. If evaluations already exist, saving will branch to a new version draft (v" +
+                        ((editingTemplate.version || 1) + 1) +
+                        ") ensuring historical evaluations remain intact."}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Template Identity Fields */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">{isAr ? "اسم القالب (بالإنجليزية)" : "Template Name (English)"} *</Label>
+                <Input
+                  value={templateForm.name_en}
+                  onChange={(e) => setTemplateForm((p) => ({ ...p, name_en: e.target.value }))}
+                  placeholder="e.g. Junior ELV Site Engineer Evaluation"
+                  className="rounded-xl text-xs"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">{isAr ? "اسم القالب (بالعربية)" : "Template Name (Arabic)"} *</Label>
+                <Input
+                  value={templateForm.name_ar}
+                  onChange={(e) => setTemplateForm((p) => ({ ...p, name_ar: e.target.value }))}
+                  placeholder="مثال: تقييم أداء مهندس موقع تيار خفيف مبتدئ"
+                  dir="rtl"
+                  className="rounded-xl text-xs text-right"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs font-semibold">{isAr ? "الوصف وملاحظات الاستخدام" : "Description & Scope"}</Label>
+              <Input
+                value={templateForm.description}
+                onChange={(e) => setTemplateForm((p) => ({ ...p, description: e.target.value }))}
+                placeholder={isAr ? "وصف مخصص للوظيفة ومجال التطبيق..." : "Target job family, roles and guidelines..."}
+                className="rounded-xl text-xs"
+              />
+            </div>
+
+            {/* Department -> Position -> Seniority Level Matrix */}
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 p-3 rounded-2xl bg-muted/40 border border-border">
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold text-muted-foreground">{isAr ? "الإدارة / القسم" : "Department"}</Label>
+                <select
+                  value={templateForm.department_id}
+                  onChange={(e) => setTemplateForm((p) => ({ ...p, department_id: e.target.value }))}
+                  className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold"
+                >
+                  <option value="">{isAr ? "عام لكل الأقسام" : "All Departments"}</option>
+                  {(departmentsData || []).map((dept: any) => (
+                    <option key={dept.id} value={dept.id}>
+                      {isAr ? dept.name_ar || dept.name_en : dept.name_en || dept.name_ar}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold text-muted-foreground">{isAr ? "المسمى الوظيفي" : "Position"}</Label>
+                <select
+                  value={templateForm.position_id}
+                  onChange={(e) => setTemplateForm((p) => ({ ...p, position_id: e.target.value }))}
+                  className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold"
+                >
+                  <option value="">{isAr ? "عام لكل المناصب" : "All Positions"}</option>
+                  {(positionsData || [])
+                    .filter((pos: any) => !templateForm.department_id || pos.department_id === templateForm.department_id)
+                    .map((pos: any) => (
+                      <option key={pos.id} value={pos.id}>
+                        {isAr ? pos.name_ar || pos.name_en : pos.name_en || pos.name_ar}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold text-muted-foreground">{isAr ? "المستوى المهني" : "Seniority Grade"}</Label>
+                <select
+                  value={templateForm.job_grade_id}
+                  onChange={(e) => setTemplateForm((p) => ({ ...p, job_grade_id: e.target.value }))}
+                  className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold"
+                >
+                  <option value="">{isAr ? "كل المستويات (Junior/Mid/Sr/Lead)" : "All Seniority Levels"}</option>
+                  {(jobGradesData || []).map((jg: any) => (
+                    <option key={jg.id} value={jg.id}>
+                      {isAr ? jg.name_ar || jg.name_en : jg.name_en || jg.name_ar}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold text-muted-foreground">{isAr ? "سنة التطبيق" : "Effective Year"}</Label>
+                <select
+                  value={templateForm.effective_year}
+                  onChange={(e) => setTemplateForm((p) => ({ ...p, effective_year: Number(e.target.value) }))}
+                  className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold"
+                >
+                  <option value={currentYear}>{currentYear}</option>
+                  <option value={currentYear + 1}>{currentYear + 1}</option>
+                  <option value={currentYear - 1}>{currentYear - 1}</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Criteria Assignment Section */}
+            <div className="space-y-3 pt-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <Label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                  <Award className="h-4 w-4 text-brand" />
+                  <span>{isAr ? "المعايير المحددة لهذا القالب" : "Assigned Evaluation Criteria"}</span>
+                  <Badge variant="outline" className="font-mono text-[10px]">
+                    {templateForm.items.length}
+                  </Badge>
+                </Label>
+
+                {/* Dropdown to add criterion from library */}
+                <div className="flex items-center gap-2">
+                  <select
+                    defaultValue=""
+                    onChange={(e) => {
+                      if (!e.target.value) return;
+                      const selectedCrit = kpiCriteria.find((c: any) => c.id === e.target.value);
+                      if (selectedCrit) handleAddCriterionToTemplate(selectedCrit);
+                      e.target.value = "";
+                    }}
+                    className="rounded-xl border border-input bg-background px-3 py-1.5 text-xs font-semibold cursor-pointer max-w-[260px]"
+                  >
+                    <option value="">{isAr ? "+ اختر معياراً لإضافته للقالب..." : "+ Add criterion to template..."}</option>
+                    {kpiCriteria
+                      .filter((c: any) => !templateForm.items.some((it) => it.criterion_id === c.id))
+                      .map((c: any) => (
+                        <option key={c.id} value={c.id}>
+                          {c.code} — {isAr ? c.name_ar : c.name_en} ({c.layer})
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Items Table */}
+              {templateForm.items.length === 0 ? (
+                <div className="p-8 text-center rounded-2xl border border-dashed border-border bg-muted/20 text-muted-foreground text-xs space-y-1">
+                  <p>{isAr ? "لم يتم إضافة أي معايير بعد لهذا القالب." : "No criteria added to this template yet."}</p>
+                  <p className="text-[11px] text-muted-foreground/80">
+                    {isAr
+                      ? "اختر المعايير من القائمة المنسدلة أعلاه وحدد أوزانها لتصل إلى 100% بالضبط."
+                      : "Select criteria from the dropdown above and calibrate weights to equal exactly 100%."}
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y divide-border rounded-2xl border border-border overflow-hidden bg-card">
+                  <div className="grid grid-cols-12 gap-2 p-2.5 bg-muted/60 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    <span className="col-span-4">{isAr ? "المعيار" : "Criterion"}</span>
+                    <span className="col-span-3">{isAr ? "اتجاه التقييم" : "Direction"}</span>
+                    <span className="col-span-2 text-center">{isAr ? "الوحدة" : "Unit"}</span>
+                    <span className="col-span-1 text-center">{isAr ? "الهدف" : "Target"}</span>
+                    <span className="col-span-1 text-center">{isAr ? "الوزن %" : "Weight %"}</span>
+                    <span className="col-span-1 text-end">{isAr ? "حذف" : "Del"}</span>
+                  </div>
+
+                  {templateForm.items.map((it, idx) => {
+                    const critDef = kpiCriteria.find((c: any) => c.id === it.criterion_id);
+                    const critName = critDef
+                      ? isAr ? critDef.name_ar : critDef.name_en
+                      : `Criterion #${idx + 1}`;
+
+                    return (
+                      <div key={it.criterion_id || idx} className="grid grid-cols-12 gap-2 p-2.5 items-center hover:bg-muted/20 text-xs">
+                        {/* Criterion Name */}
+                        <div className="col-span-4 space-y-0.5">
+                          <p className="font-semibold text-foreground truncate">{critName}</p>
+                          <span className="text-[10px] text-muted-foreground font-mono">
+                            {critDef?.code} • {critDef?.layer}
+                          </span>
+                        </div>
+
+                        {/* Scoring Direction */}
+                        <div className="col-span-3">
+                          <select
+                            value={it.scoring_direction}
+                            onChange={(e) => {
+                              const val = e.target.value as any;
+                              setTemplateForm((prev) => ({
+                                ...prev,
+                                items: prev.items.map((item, i) => (i === idx ? { ...item, scoring_direction: val } : item)),
+                              }));
+                            }}
+                            className="w-full rounded-lg border border-input bg-background px-2 py-1 text-[11px] font-semibold"
+                          >
+                            <option value="higher_is_better">{isAr ? "الأعلى أفضل (Actual/Target)" : "Higher is better (Actual/Target)"}</option>
+                            <option value="lower_is_better">{isAr ? "الأقل أفضل (Target/Actual)" : "Lower is better (Target/Actual)"}</option>
+                            <option value="rating_5">{isAr ? "مقياس 1-5 (Actual/5.0)" : "1-5 Rating Scale (Actual/5.0)"}</option>
+                          </select>
+                        </div>
+
+                        {/* Unit */}
+                        <div className="col-span-2">
+                          <Input
+                            value={it.unit}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setTemplateForm((prev) => ({
+                                ...prev,
+                                items: prev.items.map((item, i) => (i === idx ? { ...item, unit: val } : item)),
+                              }));
+                            }}
+                            placeholder="%, count"
+                            className="rounded-lg text-[11px] font-mono h-7 px-2 text-center"
+                          />
+                        </div>
+
+                        {/* Target Benchmark */}
+                        <div className="col-span-1">
+                          <Input
+                            type="number"
+                            value={it.target_benchmark}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value) || 0;
+                              setTemplateForm((prev) => ({
+                                ...prev,
+                                items: prev.items.map((item, i) => (i === idx ? { ...item, target_benchmark: val } : item)),
+                              }));
+                            }}
+                            className="rounded-lg text-[11px] font-mono h-7 px-1 text-center"
+                          />
+                        </div>
+
+                        {/* Weight % */}
+                        <div className="col-span-1">
+                          <Input
+                            type="number"
+                            min="1"
+                            max="100"
+                            value={it.weight}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value) || 0;
+                              setTemplateForm((prev) => ({
+                                ...prev,
+                                items: prev.items.map((item, i) => (i === idx ? { ...item, weight: val } : item)),
+                              }));
+                            }}
+                            className="rounded-lg text-[11px] font-mono font-bold h-7 px-1 text-center text-brand"
+                          />
+                        </div>
+
+                        {/* Remove Action */}
+                        <div className="col-span-1 text-end">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveCriterionFromTemplate(it.criterion_id)}
+                            className="h-7 w-7 p-0 rounded-lg text-muted-foreground hover:text-destructive cursor-pointer"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* ── Strict 100% Total Weight Live Progress Indicator ── */}
+              {(() => {
+                const currentSum = templateForm.items.reduce((acc, it) => acc + Number(it.weight || 0), 0);
+                const isExact100 = Math.abs(currentSum - 100) < 0.5;
+                const isUnder = currentSum < 100;
+
+                return (
+                  <div
+                    className={`p-3.5 rounded-2xl border transition-all space-y-2 ${
+                      isExact100
+                        ? "border-emerald-300 bg-emerald-500/10 text-emerald-900 dark:text-emerald-200"
+                        : isUnder
+                        ? "border-amber-300 bg-amber-500/10 text-amber-900 dark:text-amber-200"
+                        : "border-rose-300 bg-rose-500/10 text-rose-900 dark:text-rose-200"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between text-xs font-bold">
+                      <span className="flex items-center gap-1.5">
+                        {isExact100 ? (
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        ) : (
+                          <AlertTriangle className="h-4 w-4 text-amber-600" />
+                        )}
+                        <span>{isAr ? "مجموع أوزان المعايير التراكمي:" : "Total Criteria Weight Sum:"}</span>
+                      </span>
+                      <span className="font-mono text-sm">
+                        {currentSum}% / 100.0%
+                      </span>
+                    </div>
+
+                    <div className="h-2 w-full rounded-full bg-muted/60 overflow-hidden">
+                      <div
+                        className={`h-full transition-all duration-300 ${
+                          isExact100 ? "bg-emerald-600" : isUnder ? "bg-amber-500" : "bg-rose-600"
+                        }`}
+                        style={{ width: `${Math.min(100, Math.max(0, currentSum))}%` }}
+                      />
+                    </div>
+
+                    <p className="text-[11px] leading-relaxed">
+                      {isExact100
+                        ? isAr
+                          ? "✓ الأوزان متطابقة بنسبة 100% تماماً. القالب مؤهل للنشر والاعتماد الرسمي."
+                          : "✓ Target weight achieved (100.0%). Template is fully eligible for publishing."
+                        : isUnder
+                        ? isAr
+                          ? `• إجمالي الأوزان أقل من 100% بـ (${(100 - currentSum).toFixed(1)}%). يمكنك الحفظ كمسودة، لكن يلزم 100% بالضبط لنشر القالب.`
+                          : `• Total weight is under 100% by ${(100 - currentSum).toFixed(1)}%. You may save as a Draft, but must reach exactly 100% to publish.`
+                        : isAr
+                        ? `• إجمالي الأوزان يتجاوز 100% بـ (${(currentSum - 100).toFixed(1)}%). يرجى خفض أوزان المعايير.`
+                        : `• Total weight exceeds 100% by ${(currentSum - 100).toFixed(1)}%. Please reduce criteria weights.`}
+                    </p>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Modal Footer Actions */}
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setTemplateModalOpen(false)}
+                className="rounded-xl cursor-pointer"
+              >
+                {isAr ? "إلغاء" : "Cancel"}
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleSaveTemplate(false)}
+                className="rounded-xl gap-1.5 cursor-pointer"
+              >
+                <Save className="h-4 w-4" />
+                <span>{isAr ? "حفظ كمسودة (Draft)" : "Save as Draft"}</span>
+              </Button>
+
+              <Button
+                size="sm"
+                onClick={() => handleSaveTemplate(true)}
+                disabled={Math.abs(templateForm.items.reduce((acc, it) => acc + Number(it.weight || 0), 0) - 100) > 0.5}
+                className="rounded-xl gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-xs disabled:opacity-50"
+              >
+                <ShieldCheck className="h-4 w-4" />
+                <span>{isAr ? "نشر واعتماد القالب (Publish 100%)" : "Publish Template (100%)"}</span>
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── DUPLICATE TEMPLATE DIALOG ── */}
+      <Dialog open={duplicateModalOpen} onOpenChange={setDuplicateModalOpen}>
+        <DialogContent className="sm:max-w-md rounded-3xl" dir={dir}>
+          <DialogHeader>
+            <div className="flex items-center gap-2 text-brand">
+              <Copy className="h-5 w-5" />
+              <DialogTitle className="text-base font-bold font-display">
+                {isAr ? "استنساخ قالب تقييم أداء" : "Duplicate KPI Template"}
+              </DialogTitle>
+            </div>
+          </DialogHeader>
+
+          <div className="space-y-3.5 pt-2 text-xs">
+            {/* Source Template Info */}
+            <div className="p-3 rounded-2xl bg-muted/40 border border-border space-y-1">
+              <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+                {isAr ? "القالب المصدر:" : "Source Template:"}
+              </span>
+              <p className="font-bold text-foreground">
+                {duplicateSourceTemplate?.name_en}
+                {duplicateSourceTemplate?.name_ar && ` (${duplicateSourceTemplate.name_ar})`}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                {duplicateSourceTemplate?.items?.length || 0} {isAr ? "معايير سيتم نسخها بالكامل" : "criteria will be cloned into a new draft"}
+              </p>
+            </div>
+
+            {/* Target Names */}
+            <div className="space-y-1">
+              <Label className="text-xs font-semibold">{isAr ? "اسم النسخة الجديدة (بالإنجليزية)" : "New Name (English)"} *</Label>
+              <Input
+                value={duplicateForm.new_name_en}
+                onChange={(e) => setDuplicateForm((p) => ({ ...p, new_name_en: e.target.value }))}
+                className="rounded-xl text-xs"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs font-semibold">{isAr ? "اسم النسخة الجديدة (بالعربية)" : "New Name (Arabic)"}</Label>
+              <Input
+                value={duplicateForm.new_name_ar}
+                onChange={(e) => setDuplicateForm((p) => ({ ...p, new_name_ar: e.target.value }))}
+                dir="rtl"
+                className="rounded-xl text-xs text-right"
+              />
+            </div>
+
+            {/* Target Role Assignment */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold text-muted-foreground">{isAr ? "الإدارة المستهدفة" : "Target Dept"}</Label>
+                <select
+                  value={duplicateForm.target_department_id}
+                  onChange={(e) => setDuplicateForm((p) => ({ ...p, target_department_id: e.target.value }))}
+                  className="w-full rounded-xl border border-input bg-background px-2.5 py-1.5 text-xs font-semibold"
+                >
+                  <option value="">{isAr ? "عام" : "All"}</option>
+                  {(departmentsData || []).map((dept: any) => (
+                    <option key={dept.id} value={dept.id}>
+                      {isAr ? dept.name_ar || dept.name_en : dept.name_en || dept.name_ar}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold text-muted-foreground">{isAr ? "المنصب المستهدف" : "Target Position"}</Label>
+                <select
+                  value={duplicateForm.target_position_id}
+                  onChange={(e) => setDuplicateForm((p) => ({ ...p, target_position_id: e.target.value }))}
+                  className="w-full rounded-xl border border-input bg-background px-2.5 py-1.5 text-xs font-semibold"
+                >
+                  <option value="">{isAr ? "عام" : "All"}</option>
+                  {(positionsData || []).map((pos: any) => (
+                    <option key={pos.id} value={pos.id}>
+                      {isAr ? pos.name_ar || pos.name_en : pos.name_en || pos.name_ar}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold text-muted-foreground">{isAr ? "المستوى المهني" : "Target Seniority"}</Label>
+                <select
+                  value={duplicateForm.target_job_grade_id}
+                  onChange={(e) => setDuplicateForm((p) => ({ ...p, target_job_grade_id: e.target.value }))}
+                  className="w-full rounded-xl border border-input bg-background px-2.5 py-1.5 text-xs font-semibold"
+                >
+                  <option value="">{isAr ? "كل المستويات" : "All Levels"}</option>
+                  {(jobGradesData || []).map((jg: any) => (
+                    <option key={jg.id} value={jg.id}>
+                      {isAr ? jg.name_ar || jg.name_en : jg.name_en || jg.name_ar}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setDuplicateModalOpen(false)}
+                className="rounded-xl cursor-pointer"
+              >
+                {isAr ? "إلغاء" : "Cancel"}
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleSaveDuplicateTemplate}
+                className="rounded-xl bg-brand text-brand-foreground hover:bg-brand/90 cursor-pointer shadow-xs gap-1.5"
+              >
+                <Copy className="h-4 w-4" />
+                <span>{isAr ? "تأكيد الاستنساخ كمسودة" : "Clone as New Draft"}</span>
               </Button>
             </div>
           </div>

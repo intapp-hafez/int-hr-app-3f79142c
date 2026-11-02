@@ -18,6 +18,14 @@ export type KpiCriterionCategory = z.infer<typeof KpiCriterionCategorySchema>;
 export const KpiScoringScaleSchema = z.enum(["rating_5", "percentage", "count", "boolean"]);
 export type KpiScoringScale = z.infer<typeof KpiScoringScaleSchema>;
 
+export const KpiScoringDirectionSchema = z.enum([
+  "higher_is_better",
+  "lower_is_better",
+  "rating_5",
+  "target_range",
+]);
+export type KpiScoringDirection = z.infer<typeof KpiScoringDirectionSchema>;
+
 export const SaveKpiCriterionSchema = z.object({
   id: z.string().uuid().optional(),
   name_en: z.string().min(2, "English name is required").max(200),
@@ -27,6 +35,12 @@ export const SaveKpiCriterionSchema = z.object({
   criterion_type: KpiCriterionTypeSchema.default("position_specific"),
   category: KpiCriterionCategorySchema.default("technical"),
   scoring_scale: KpiScoringScaleSchema.default("percentage"),
+  scoring_direction: KpiScoringDirectionSchema.default("higher_is_better"),
+  unit: z.string().max(30).default("%"),
+  min_value: z.number().default(0),
+  max_value: z.number().default(100),
+  how_measured_en: z.string().max(1000).optional().default(""),
+  how_measured_ar: z.string().max(1000).optional().default(""),
   max_scale_value: z.number().positive().default(100),
   default_weight: z.number().positive().max(1.0).default(0.05),
   is_required: z.boolean().default(true),
@@ -54,6 +68,10 @@ export const KpiTemplateItemInputSchema = z.object({
   criterion_id: z.string().uuid(),
   weight: z.number().positive().max(1.0),
   target_benchmark: z.number().default(1.0),
+  scoring_direction: KpiScoringDirectionSchema.default("higher_is_better"),
+  unit: z.string().max(30).default("%"),
+  min_value: z.number().default(0),
+  max_value: z.number().default(100),
   display_order: z.number().int().default(0),
 });
 
@@ -61,14 +79,29 @@ export const SaveKpiTemplateSchema = z.object({
   id: z.string().uuid().optional(),
   name_en: z.string().min(2).max(200),
   name_ar: z.string().min(2).max(200),
+  description: z.string().max(1000).optional().default(""),
+  department_id: z.string().uuid().nullable().optional(),
   position_id: z.string().uuid().nullable().optional(),
   job_grade_id: z.string().uuid().nullable().optional(),
+  effective_year: z.number().int().min(2020).max(2100).default(2026),
+  effective_quarter: z.enum(["all", "q1", "q2", "q3", "q4"]).default("all"),
   common_weight_pct: z.number().min(0).max(100).default(40),
   position_weight_pct: z.number().min(0).max(100).default(60),
   is_active: z.boolean().default(true),
+  status: z.enum(["draft", "published", "archived"]).default("draft"),
   items: z.array(KpiTemplateItemInputSchema).min(1, "Template must include at least one criterion"),
 });
 export type SaveKpiTemplateInput = z.infer<typeof SaveKpiTemplateSchema>;
+
+export const DuplicateKpiTemplateSchema = z.object({
+  template_id: z.string().uuid(),
+  new_name_en: z.string().min(2).max(200),
+  new_name_ar: z.string().min(2).max(200),
+  target_department_id: z.string().uuid().nullable().optional(),
+  target_position_id: z.string().uuid().nullable().optional(),
+  target_job_grade_id: z.string().uuid().nullable().optional(),
+});
+export type DuplicateKpiTemplateInput = z.infer<typeof DuplicateKpiTemplateSchema>;
 
 export const PublishKpiTemplateSchema = z.object({
   id: z.string().uuid(),
@@ -76,7 +109,9 @@ export const PublishKpiTemplateSchema = z.object({
 export type PublishKpiTemplateInput = z.infer<typeof PublishKpiTemplateSchema>;
 
 export const ListKpiTemplatesSchema = z.object({
+  departmentId: z.string().uuid().optional(),
   positionId: z.string().uuid().optional(),
+  jobGradeId: z.string().uuid().optional(),
   status: z.enum(["draft", "published", "archived", "all"]).default("all"),
 });
 export type ListKpiTemplatesInput = z.infer<typeof ListKpiTemplatesSchema>;
@@ -98,6 +133,8 @@ export const QuarterlyItemInputSchema = z.object({
   criterion_type: KpiCriterionTypeSchema,
   category: z.string().default("technical"),
   scoring_scale: KpiScoringScaleSchema.default("percentage"),
+  scoring_direction: KpiScoringDirectionSchema.default("higher_is_better"),
+  unit: z.string().max(30).default("%"),
   weight: z.number().positive().max(1.0),
   target_benchmark: z.number().default(1.0),
   actual_value: z.number().nullable().optional(),

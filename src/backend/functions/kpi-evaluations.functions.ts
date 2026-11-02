@@ -12,6 +12,7 @@ import {
   ListKpiCriteriaSchema,
   ArchiveKpiCriterionSchema,
   SaveKpiTemplateSchema,
+  DuplicateKpiTemplateSchema,
   PublishKpiTemplateSchema,
   ListKpiTemplatesSchema,
   MatchKpiTemplateSchema,
@@ -214,6 +215,12 @@ export const saveKpiCriterion = createServerFn({ method: "POST" })
       criterion_type: input.criterion_type,
       category: input.category,
       scoring_scale: input.scoring_scale,
+      scoring_direction: input.scoring_direction || "higher_is_better",
+      unit: input.unit || "%",
+      min_value: input.min_value ?? 0,
+      max_value: input.max_value ?? 100,
+      how_measured_en: input.how_measured_en || "",
+      how_measured_ar: input.how_measured_ar || "",
       max_scale_value: input.max_scale_value,
       default_weight: input.default_weight,
       is_required: input.is_required,
@@ -274,6 +281,7 @@ export const listKpiTemplates = createServerFn({ method: "POST" })
       .from("kpi_templates")
       .select(`
         *,
+        department:departments(id, name_en, name_ar),
         position:positions(id, name_en, name_ar),
         job_grade:job_grades(id, name_en, name_ar),
         items:kpi_template_items(
@@ -281,6 +289,10 @@ export const listKpiTemplates = createServerFn({ method: "POST" })
           criterion_id,
           weight,
           target_benchmark,
+          scoring_direction,
+          unit,
+          min_value,
+          max_value,
           display_order,
           criterion:kpi_criteria(*)
         )
@@ -290,8 +302,14 @@ export const listKpiTemplates = createServerFn({ method: "POST" })
     if (input.status && input.status !== "all") {
       query = query.eq("status", input.status);
     }
+    if (input.departmentId) {
+      query = query.eq("department_id", input.departmentId);
+    }
     if (input.positionId) {
       query = query.eq("position_id", input.positionId);
+    }
+    if (input.jobGradeId) {
+      query = query.eq("job_grade_id", input.jobGradeId);
     }
 
     const { data, error } = await query;
@@ -309,44 +327,85 @@ export const saveKpiTemplate = createServerFn({ method: "POST" })
       throw new Error("Forbidden: Only HR or Admins can create or modify evaluation templates");
     }
 
-    // Validate that sum of weights equals 1.0 (100%)
     const sumWeight = input.items.reduce((acc, it) => acc + Number(it.weight), 0);
-    if (Math.abs(sumWeight - 1.0) > 0.005) {
-      throw new Error(`Total template weight must equal exactly 100%. Current total: ${(sumWeight * 100).toFixed(1)}%`);
+
+    // If publishing directly, strictly enforce 100% total weight
+    if (input.status === "published" && Math.abs(sumWeight - 1.0) > 0.005) {
+      throw new Error(`Cannot publish template: Total weight of criteria must equal exactly 100%. Current total: ${(sumWeight * 100).toFixed(1)}%`);
     }
 
     const now = new Date().toISOString();
     const templatePayload = {
       name_en: input.name_en,
       name_ar: input.name_ar,
+      description: input.description || "",
+      department_id: input.department_id || null,
       position_id: input.position_id || null,
       job_grade_id: input.job_grade_id || null,
+      effective_year: input.effective_year || 2026,
+      effective_quarter: input.effective_quarter || "all",
       common_weight_pct: input.common_weight_pct,
       position_weight_pct: input.position_weight_pct,
       is_active: input.is_active,
+      status: input.status,
       updated_at: now,
     };
 
     let templateId = input.id;
+    let targetVersion = 1;
 
     if (templateId) {
-      const { error: updErr } = await (supabase as any)
-        .from("kpi_templates")
-        .update(templatePayload)
-        .eq("id", templateId);
-      if (updErr) throw new Error(`Failed to update template: ${updErr.message}`);
-
-      // Delete existing items to replace with updated list
-      await (supabase as any)
-        .from("kpi_template_items")
-        .delete()
+      // Versioning Check: Check if this template has already been used in quarterly evaluations
+      const { data: usageCount } = await (supabase as any)
+        .from("kpi_quarterly_evaluations")
+        .select("id", { count: "exact", head: true })
         .eq("template_id", templateId);
+
+      const hasExistingEvaluations = (usageCount as any) > 0;
+
+      if (hasExistingEvaluations) {
+        // Immutability Rule: Do not mutate active in-use template. Branch to a new version!
+        const { data: currentTemplate } = await (supabase as any)
+          .from("kpi_templates")
+          .select("version")
+          .eq("id", templateId)
+          .single();
+
+        targetVersion = (currentTemplate?.version || 1) + 1;
+
+        const { data: branched, error: branchErr } = await (supabase as any)
+          .from("kpi_templates")
+          .insert({
+            ...templatePayload,
+            version: targetVersion,
+            status: "draft",
+            parent_template_id: templateId,
+            created_at: now,
+          })
+          .select("id")
+          .single();
+
+        if (branchErr) throw new Error(`Failed to version template: ${branchErr.message}`);
+        templateId = branched.id;
+      } else {
+        // Can safely update in place
+        const { error: updErr } = await (supabase as any)
+          .from("kpi_templates")
+          .update(templatePayload)
+          .eq("id", templateId);
+        if (updErr) throw new Error(`Failed to update template: ${updErr.message}`);
+
+        await (supabase as any)
+          .from("kpi_template_items")
+          .delete()
+          .eq("template_id", templateId);
+      }
     } else {
       const { data: inserted, error: insErr } = await (supabase as any)
         .from("kpi_templates")
         .insert({
           ...templatePayload,
-          status: "draft",
+          status: input.status || "draft",
           version: 1,
           created_at: now,
         })
@@ -362,6 +421,10 @@ export const saveKpiTemplate = createServerFn({ method: "POST" })
       criterion_id: it.criterion_id,
       weight: it.weight,
       target_benchmark: it.target_benchmark ?? 1.0,
+      scoring_direction: it.scoring_direction || "higher_is_better",
+      unit: it.unit || "%",
+      min_value: it.min_value ?? 0,
+      max_value: it.max_value ?? 100,
       display_order: it.display_order ?? idx + 1,
       created_at: now,
     }));
@@ -372,7 +435,68 @@ export const saveKpiTemplate = createServerFn({ method: "POST" })
 
     if (itemsErr) throw new Error(`Failed to save template items: ${itemsErr.message}`);
 
-    return { success: true, id: templateId };
+    return { success: true, id: templateId, version: targetVersion };
+  });
+
+export const duplicateKpiTemplate = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => DuplicateKpiTemplateSchema.parse(input))
+  .handler(async ({ data: input, context }) => {
+    const { supabase, userId } = context;
+    const { isAdmin } = await assertKpiAccess(supabase, userId);
+    if (!isAdmin) {
+      throw new Error("Forbidden: Only HR or Admins can duplicate templates");
+    }
+
+    const { data: source, error: srcErr } = await (supabase as any)
+      .from("kpi_templates")
+      .select(`*, items:kpi_template_items(*)`)
+      .eq("id", input.template_id)
+      .single();
+
+    if (srcErr || !source) throw new Error("Source template not found");
+
+    const now = new Date().toISOString();
+    const { data: created, error: crtErr } = await (supabase as any)
+      .from("kpi_templates")
+      .insert({
+        name_en: input.new_name_en,
+        name_ar: input.new_name_ar,
+        description: source.description || "",
+        department_id: input.target_department_id !== undefined ? input.target_department_id : source.department_id,
+        position_id: input.target_position_id !== undefined ? input.target_position_id : source.position_id,
+        job_grade_id: input.target_job_grade_id !== undefined ? input.target_job_grade_id : source.job_grade_id,
+        version: 1,
+        status: "draft",
+        common_weight_pct: source.common_weight_pct,
+        position_weight_pct: source.position_weight_pct,
+        is_active: true,
+        created_at: now,
+        updated_at: now,
+      })
+      .select("id")
+      .single();
+
+    if (crtErr) throw new Error(`Failed to duplicate template: ${crtErr.message}`);
+
+    if (source.items && source.items.length > 0) {
+      const clonedItems = source.items.map((it: any, idx: number) => ({
+        template_id: created.id,
+        criterion_id: it.criterion_id,
+        weight: it.weight,
+        target_benchmark: it.target_benchmark,
+        scoring_direction: it.scoring_direction || "higher_is_better",
+        unit: it.unit || "%",
+        min_value: it.min_value ?? 0,
+        max_value: it.max_value ?? 100,
+        display_order: it.display_order ?? idx + 1,
+        created_at: now,
+      }));
+
+      await (supabase as any).from("kpi_template_items").insert(clonedItems);
+    }
+
+    return { success: true, id: created.id };
   });
 
 export const publishKpiTemplate = createServerFn({ method: "POST" })
@@ -383,6 +507,17 @@ export const publishKpiTemplate = createServerFn({ method: "POST" })
     const { isAdmin } = await assertKpiAccess(supabase, userId);
     if (!isAdmin) {
       throw new Error("Forbidden: Only HR or Admins can publish templates");
+    }
+
+    // Verify 100% total weight before allowing publish
+    const { data: items } = await (supabase as any)
+      .from("kpi_template_items")
+      .select("weight")
+      .eq("template_id", input.id);
+
+    const sumWeight = (items || []).reduce((acc: number, it: any) => acc + Number(it.weight), 0);
+    if (Math.abs(sumWeight - 1.0) > 0.005) {
+      throw new Error(`Cannot publish template: Total weight of criteria must equal exactly 100%. Current: ${(sumWeight * 100).toFixed(1)}%`);
     }
 
     const now = new Date().toISOString();
@@ -408,10 +543,19 @@ export const matchKpiTemplate = createServerFn({ method: "POST" })
   .handler(async ({ data: input, context }) => {
     const { supabase } = context;
 
-    // 1. Fetch employee's position and job grade
+    // 1. Fetch employee's complete profile with department, position, and job grade
     const { data: profile } = await supabase
       .from("profiles")
-      .select("id, position_id, department_id, section_id")
+      .select(`
+        id,
+        full_name,
+        position_id,
+        department_id,
+        section_id,
+        job_grade,
+        department:departments(id, name_en, name_ar),
+        position:positions(id, title_en, title_ar)
+      `)
       .eq("id", input.employeeId)
       .maybeSingle();
 
@@ -422,30 +566,73 @@ export const matchKpiTemplate = createServerFn({ method: "POST" })
       .from("kpi_templates")
       .select(`
         *,
+        department:departments(id, name_en, name_ar),
+        position:positions(id, name_en, name_ar),
+        job_grade:job_grades(id, name_en, name_ar),
         items:kpi_template_items(
           id,
           criterion_id,
           weight,
           target_benchmark,
+          scoring_direction,
+          unit,
+          min_value,
+          max_value,
           display_order,
           criterion:kpi_criteria(*)
         )
       `)
       .eq("status", "published")
-      .eq("is_active", true);
+      .eq("is_active", true)
+      .order("version", { ascending: false });
 
     const published = (templates || []) as any[];
 
-    // Priority matching:
-    // A: Exact position match
-    if (profile.position_id) {
-      const posMatch = published.find((t) => t.position_id === profile.position_id);
-      if (posMatch) return posMatch;
+    // Priority matching rules:
+    // Tier 1: Match by Position + Job Grade (Seniority Level)
+    let matchedTemplate: any = null;
+    if (profile.position_id && (profile as any).job_grade_id) {
+      matchedTemplate = published.find(
+        (t) => t.position_id === profile.position_id && t.job_grade_id === (profile as any).job_grade_id
+      );
     }
 
-    // B: Fallback template (no specific position or first active)
-    const fallback = published.find((t) => !t.position_id) || published[0] || null;
-    return fallback;
+    // Tier 2: Match by Position (generic level)
+    if (!matchedTemplate && profile.position_id) {
+      matchedTemplate = published.find((t) => t.position_id === profile.position_id);
+    }
+
+    // Tier 3: Match by Department-level template (no specific position)
+    if (!matchedTemplate && profile.department_id) {
+      matchedTemplate = published.find(
+        (t) => t.department_id === profile.department_id && !t.position_id
+      );
+    }
+
+    // If no template matches this role, RETURN MISSING TEMPLATE (never silently use an unrelated template!)
+    if (!matchedTemplate) {
+      return {
+        matched: false,
+        template: null,
+        items: [],
+        reason: "missing_template",
+        employee: {
+          id: profile.id,
+          name: profile.full_name,
+          department_id: profile.department_id,
+          department_name: (profile as any).department?.name_en || null,
+          position_id: profile.position_id,
+          position_name: (profile as any).position?.title_en || null,
+          job_grade: (profile as any).job_grade || null,
+        },
+      };
+    }
+
+    return {
+      matched: true,
+      template: matchedTemplate,
+      items: matchedTemplate.items || [],
+    };
   });
 
 // ─── QUARTERLY EVALUATIONS WORKFLOW ──────────────────────────────────────────
@@ -500,6 +687,12 @@ export const getQuarterlyEvaluation = createServerFn({ method: "POST" })
       .maybeSingle();
 
     if (error) throw new Error(`Failed to fetch quarterly evaluation: ${error.message}`);
+
+    // Employee Privacy Boundary: Employees see only approved evaluations, never unapproved drafts or pending submissions
+    if (!isAdmin && input.employeeId === userId && evalRecord && evalRecord.status !== "approved") {
+      return null;
+    }
+
     return (evalRecord as QuarterlyEvaluationRecord) || null;
   });
 
@@ -552,14 +745,35 @@ export const saveQuarterlyEvaluation = createServerFn({ method: "POST" })
       const weight = Number(it.weight);
       totalWeight += weight;
 
-      let achievement = it.achievement_rate;
-      if (it.actual_value != null && it.target_benchmark > 0) {
-        achievement = Math.min(1.0, it.actual_value / it.target_benchmark);
+      const direction = it.scoring_direction || "higher_is_better";
+      let achievement: number | null = null;
+
+      if (it.actual_value != null) {
+        if (direction === "rating_5") {
+          achievement = Math.min(1.0, Math.max(0, it.actual_value / 5.0));
+        } else if (direction === "lower_is_better") {
+          if (it.actual_value <= it.target_benchmark) {
+            achievement = 1.0;
+          } else if (it.actual_value > 0) {
+            achievement = it.target_benchmark > 0 ? (it.target_benchmark / it.actual_value) : 0;
+          } else {
+            achievement = 1.0;
+          }
+        } else {
+          // higher_is_better
+          if (it.target_benchmark > 0) {
+            achievement = it.actual_value / it.target_benchmark;
+          } else {
+            achievement = it.actual_value > 0 ? 1.0 : 0;
+          }
+        }
+        // Cap achievement at 100% by default as specified in implementation brief
+        achievement = Math.min(1.0, Math.max(0, achievement));
       }
 
-      let weightedScore = null;
+      let weightedScore: number | null = null;
       if (achievement != null) {
-        weightedScore = achievement * weight * 100;
+        weightedScore = Number((achievement * weight * 100).toFixed(2));
         earnedSum += weightedScore;
 
         if (it.criterion_type === "common") commonEarned += weightedScore;
@@ -569,8 +783,10 @@ export const saveQuarterlyEvaluation = createServerFn({ method: "POST" })
 
       return {
         ...it,
-        achievement_rate: achievement,
-        weighted_score: weightedScore != null ? Number(weightedScore.toFixed(2)) : null,
+        scoring_direction: direction,
+        unit: it.unit || "%",
+        achievement_rate: achievement != null ? Number(achievement.toFixed(4)) : null,
+        weighted_score: weightedScore,
         display_order: it.display_order || idx + 1,
       };
     });
@@ -637,6 +853,8 @@ export const saveQuarterlyEvaluation = createServerFn({ method: "POST" })
       criterion_type: it.criterion_type,
       category: it.category,
       scoring_scale: it.scoring_scale,
+      scoring_direction: it.scoring_direction,
+      unit: it.unit,
       weight: it.weight,
       target_benchmark: it.target_benchmark,
       actual_value: it.actual_value,
@@ -1130,7 +1348,7 @@ export const getMyKpiEvaluation = createServerFn({ method: "POST" })
       .eq("employee_id", userId)
       .eq("evaluation_year", targetYear)
       .eq("template_type", input.templateType || "light_current_engineer")
-      .in("status", ["submitted", "reviewed", "approved"])
+      .eq("status", "approved")
       .maybeSingle();
 
     if (error) throw new Error(`Failed to fetch your KPI evaluation: ${error.message}`);
@@ -1161,7 +1379,7 @@ export const listMyKpiEvaluations = createServerFn({ method: "POST" })
         updated_at
       `)
       .eq("employee_id", userId)
-      .in("status", ["submitted", "reviewed", "approved"])
+      .eq("status", "approved")
       .order("evaluation_year", { ascending: false });
 
     if (error) throw new Error(`Failed to list your KPI evaluations: ${error.message}`);

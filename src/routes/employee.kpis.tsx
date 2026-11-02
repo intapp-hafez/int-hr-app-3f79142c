@@ -117,12 +117,21 @@ export function EmployeeKpiPage() {
       if (row.annualScore !== null) { annualSum += row.annualScore; hasData = true; }
     });
 
+    const completedQuarters = [q1Sum, q2Sum, q3Sum, q4Sum].filter((_, idx) =>
+      kpiRows.some((r) => (idx === 0 ? r.q1 : idx === 1 ? r.q2 : idx === 2 ? r.q3 : r.q4).score !== null)
+    );
+    const completedQuartersCount = completedQuarters.length;
+    const trueAnnualAvg = completedQuartersCount > 0
+      ? completedQuarters.reduce((a, b) => a + b, 0) / completedQuartersCount
+      : (annualSum > 0 ? annualSum : 0);
+
     return {
       q1Score: q1Sum,
       q2Score: q2Sum,
       q3Score: q3Sum,
       q4Score: q4Sum,
-      annualWeightedSum: annualSum,
+      annualWeightedSum: trueAnnualAvg,
+      completedQuartersCount,
       hasData,
     };
   }, [kpiRows]);
@@ -301,6 +310,13 @@ export function EmployeeKpiPage() {
             </div>
 
             <div className="h-6 w-px bg-border hidden xs:block" />
+
+            <Badge variant="outline" className="text-xs px-2.5 py-0.5 font-mono text-muted-foreground flex items-center gap-1.5">
+              <Layers className="h-3 w-3 text-brand" />
+              <span>
+                {summaryTotals.completedQuartersCount}/4 {isAr ? "أرباع معتمدة" : "Quarters Approved"}
+              </span>
+            </Badge>
 
             <Badge
               variant={summaryTotals.hasData ? "default" : "outline"}
