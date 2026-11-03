@@ -9,7 +9,6 @@ import {
   Info,
   Layers,
   Printer,
-  TrendingUp,
   Check,
   AlertCircle,
   Filter,
@@ -17,7 +16,6 @@ import {
   Clock,
   ArrowLeft,
   ArrowRight,
-  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
@@ -52,7 +50,6 @@ export function EmployeeKpiPage() {
 
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
-  const [activeQuarterFilter, setActiveQuarterFilter] = useState<"all" | "q1" | "q2" | "q3" | "q4">("all");
 
   const getMyKpiFn = useServerFn(getMyKpiEvaluation);
   const listMyKpisFn = useServerFn(listMyKpiEvaluations);
@@ -379,87 +376,6 @@ export function EmployeeKpiPage() {
             )}
           </div>
         )}
-      </div>
-
-      {/* Quarterly Breakdown Cards */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between px-1">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-            <TrendingUp className="h-3.5 w-3.5 text-brand" />
-            {isAr ? "تفصيل الأرباع السنوية" : "Quarterly Breakdown"}
-          </h2>
-          {activeQuarterFilter !== "all" && (
-            <button
-              type="button"
-              onClick={() => setActiveQuarterFilter("all")}
-              className="text-[11px] font-semibold text-brand hover:underline inline-flex items-center gap-1 cursor-pointer"
-            >
-              <span>{isAr ? "عرض كل الأرباع" : "Show All"}</span>
-              <X className="h-3 w-3" />
-            </button>
-          )}
-        </div>
-
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
-          {quartersList.map((item) => {
-            const isSelected = activeQuarterFilter === item.q;
-            const progress = item.score !== null ? Math.min(100, Math.round((item.score / item.target) * 100)) : 0;
-
-            return (
-              <button
-                key={item.q}
-                type="button"
-                onClick={() => setActiveQuarterFilter(isSelected ? "all" : item.q)}
-                className={`p-3 rounded-2xl border text-start transition-all cursor-pointer relative overflow-hidden group active:scale-[0.98] ${
-                  isSelected
-                    ? "border-brand bg-brand/10 ring-2 ring-brand/30 shadow-xs"
-                    : "border-border bg-card hover:bg-muted/40 hover:border-border/80"
-                }`}
-              >
-                <div className="flex items-baseline justify-between gap-1 w-full">
-                  <div className="flex items-baseline gap-1.5 min-w-0">
-                    <span className="font-display font-bold text-sm text-foreground shrink-0">
-                      {isAr ? item.label_ar : item.label}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground whitespace-nowrap font-medium">
-                      {item.date}
-                    </span>
-                  </div>
-                  {isSelected && (
-                    <span className="h-2 w-2 rounded-full bg-brand animate-pulse shrink-0" />
-                  )}
-                </div>
-
-                <div className="mt-2 flex items-baseline justify-between">
-                  <span className="font-mono text-base font-bold text-foreground">
-                    {item.score !== null ? fmtPercent(item.score, 1) : "—"}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground font-mono">
-                    / 25.0%
-                  </span>
-                </div>
-
-                {/* Quarter Mini Progress Bar */}
-                <div className="mt-1.5 h-1.5 w-full rounded-full bg-muted/80 overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all duration-500 ${
-                      progress >= 90
-                        ? "bg-emerald-500"
-                        : progress >= 75
-                        ? "bg-blue-500"
-                        : progress >= 60
-                        ? "bg-amber-500"
-                        : progress > 0
-                        ? "bg-rose-500"
-                        : "bg-transparent"
-                    }`}
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
-              </button>
-            );
-          })}
-        </div>
       </div>
 
       {/* Main Tabs Navigation (No scrollbar track, smooth swipeable) */}
