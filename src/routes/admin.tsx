@@ -6,6 +6,7 @@ import { AppLogo } from "@/components/AppLogo";
 import { UserMenu } from "@/components/UserMenu";
 import { InstallButton } from "@/components/InstallButton";
 import { LanguageToggle, useI18n } from "@/lib/i18n";
+import { ThemeToggle } from "@/lib/theme";
 import { useSession, useAuthReady } from "@/lib/auth";
 import { useExportScheduler } from "@/lib/export-scheduler";
 import { useQuery } from "@tanstack/react-query";
@@ -532,6 +533,7 @@ function AdminLayout() {
               <StickyNote className="h-5 w-5" />
             </Link>
             <InstallButton variant="outline" className="hidden sm:inline-flex" />
+            <ThemeToggle />
             <LanguageToggle />
             <NotificationsBell />
             <UserMenu />

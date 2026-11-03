@@ -2,6 +2,7 @@ import { createFileRoute, Outlet, Link, useRouterState, Navigate } from "@tansta
 import { LayoutDashboard, Wallet, Banknote, StickyNote, UserCircle, LogOut, Settings } from "lucide-react";
 import { AppLogo } from "@/components/AppLogo";
 import { LanguageToggle, useI18n } from "@/lib/i18n";
+import { ThemeToggle } from "@/lib/theme";
 import { useSession, useAuthReady, signOut } from "@/lib/auth";
 import { UserMenu } from "@/components/UserMenu";
 import { PanelNotificationsBell } from "@/components/PanelNotificationsBell";
@@ -83,6 +84,7 @@ function FinanceLayout() {
             <span className="hidden text-sm font-semibold lg:inline">{t("financePanel") || "Finance Panel"}</span>
             <div className="flex items-center gap-2">
               <span className="hidden text-xs text-muted-foreground sm:inline lg:hidden">{session.name}</span>
+              <ThemeToggle />
               <LanguageToggle />
               <PanelNotificationsBell to="/finance/notifications" />
               <UserMenu size="sm" />

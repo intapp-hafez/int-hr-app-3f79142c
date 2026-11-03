@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { Award, Home, Users, ListChecks, Route as RouteIcon, LogOut, LogIn, UserCircle, Banknote, MessageSquare, CalendarCheck, History } from "lucide-react";
 import { AppLogo } from "@/components/AppLogo";
 import { LanguageToggle, useI18n } from "@/lib/i18n";
+import { ThemeToggle } from "@/lib/theme";
 import { useSession, useAuthReady, signOut } from "@/lib/auth";
 import { UserMenu } from "@/components/UserMenu";
 import { PanelNotificationsBell } from "@/components/PanelNotificationsBell";
@@ -185,6 +186,7 @@ function ManagerLayout() {
             <div className="flex items-center gap-2">
               <span className="hidden text-xs text-muted-foreground sm:inline lg:hidden">{session.name}</span>
               <InstallButton variant="outline" className="hidden sm:inline-flex" />
+              <ThemeToggle />
               <LanguageToggle />
               <PanelNotificationsBell to="/manager/notifications" />
               <UserMenu size="sm" />
