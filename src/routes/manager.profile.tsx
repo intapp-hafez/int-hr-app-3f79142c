@@ -51,17 +51,24 @@ function ManagerProfilePage() {
     ) || null;
   }, [details?.manager_id, allEmployees]);
 
+  const hasManager = Boolean(details?.manager || details?.manager_id || details?.manager_email || managerFromStore?.name);
   const rawManagerName = details?.manager || managerFromStore?.name || null;
   const resolvedManager = useMemo(() => {
-    if (!rawManagerName) return null;
+    if (!rawManagerName) {
+      if (details?.manager_email) return details.manager_email;
+      if (hasManager) return "Direct Manager";
+      return null;
+    }
     if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}/i.test(rawManagerName) || rawManagerName.startsWith("Manager (")) {
       const found = allEmployees.find(
         (e) => e.id === rawManagerName || (e as any).userId === rawManagerName || (e as any).profile_id === rawManagerName
       );
-      return found?.name || null;
+      if (found?.name) return found.name;
+      if (details?.manager_email) return details.manager_email;
+      return "Direct Manager";
     }
     return rawManagerName;
-  }, [rawManagerName, allEmployees]);
+  }, [rawManagerName, allEmployees, details?.manager_email, hasManager]);
 
   const realProfile = realMe?.profile as {
     id?: string; full_name?: string | null; email?: string | null;

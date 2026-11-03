@@ -134,7 +134,20 @@ export const getMyProfileDetails = createServerFn({ method: "GET" })
         } catch {}
       }
 
-      // 4. Server-side admin fallback if executed in Node environment
+      // 4. API endpoint fallback (/api/manager-profile)
+      if (!mgrData && typeof fetch !== "undefined") {
+        try {
+          const res = await fetch(`/api/manager-profile?id=${encodeURIComponent(managerIdToFetch)}`);
+          if (res.ok) {
+            const json = await res.json();
+            if (json?.data) {
+              mgrData = json.data;
+            }
+          }
+        } catch {}
+      }
+
+      // 5. Server-side admin fallback if executed in Node environment
       if (!mgrData) {
         try {
           const { supabaseAdmin } = await import("@/backend/server/admin-client.server");

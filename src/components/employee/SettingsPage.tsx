@@ -58,10 +58,24 @@ export function SettingsPage() {
     ) || null;
   }, [details?.manager_id, me, allEmployees]);
 
+  const hasManager = Boolean(
+    details?.manager ||
+    details?.manager_id ||
+    details?.manager_email ||
+    managerFromStore?.name ||
+    (me as any)?.manager ||
+    (me as any)?.managerName ||
+    (me as any)?.managerId
+  );
+
   const rawManagerName = details?.manager || managerFromStore?.name || (me as any)?.manager || (me as any)?.managerName || null;
   // Ensure we NEVER show raw UUID or "Manager (ID)" as the name
   const resolvedManagerName = useMemo(() => {
-    if (!rawManagerName) return null;
+    if (!rawManagerName) {
+      if (details?.manager_email) return details.manager_email;
+      if (hasManager) return lang === "ar" ? "المدير المباشر" : "Direct Manager";
+      return null;
+    }
     if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}/i.test(rawManagerName) || rawManagerName.startsWith("Manager (")) {
       const found = allEmployees.find(
         (e) =>
@@ -70,10 +84,12 @@ export function SettingsPage() {
           (e as any).profile_id === rawManagerName ||
           e.name === rawManagerName
       );
-      return found?.name || null;
+      if (found?.name) return found.name;
+      if (details?.manager_email) return details.manager_email;
+      return lang === "ar" ? "المدير المباشر" : "Direct Manager";
     }
     return rawManagerName;
-  }, [rawManagerName, allEmployees]);
+  }, [rawManagerName, allEmployees, details?.manager_email, hasManager, lang]);
   const resolvedManagerEmail = details?.manager_email || managerFromStore?.email || null;
   const resolvedManagerPhone = details?.manager_phone || managerFromStore?.phone || null;
   const locations = useStore((s) => s.locations);
@@ -284,7 +300,11 @@ export function SettingsPage() {
             <ProfileRow icon={IdCard} label={lang === "ar" ? "الرقم القومي" : "National ID"} value={details?.national_id} mono />
             <ProfileRow icon={Building2} label={lang === "ar" ? "القسم" : "Department"} value={details?.department} />
             <ProfileRow icon={Briefcase} label={lang === "ar" ? "المسمى الوظيفي" : "Position"} value={displayPosition} />
-            <ProfileRow icon={UserCog} label={lang === "ar" ? "المدير المباشر" : "Manager"} value={resolvedManagerName} />
+            <ProfileRow
+              icon={UserCog}
+              label={lang === "ar" ? "المدير المباشر" : "Manager"}
+              value={resolvedManagerName || (hasManager ? (lang === "ar" ? "المدير المباشر" : "Direct Manager") : "—")}
+            />
             {resolvedManagerEmail && (
               <ProfileRow icon={Mail} label={lang === "ar" ? "بريد المدير المباشر" : "Manager's Email"} value={resolvedManagerEmail} />
             )}
@@ -296,7 +316,7 @@ export function SettingsPage() {
       </section>
 
       {/* Direct Manager Highlight Card */}
-      {resolvedManagerName && (
+      {hasManager && (
         <section className="overflow-hidden rounded-2xl border border-border bg-card p-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
@@ -308,7 +328,7 @@ export function SettingsPage() {
                   {lang === "ar" ? "المدير المباشر" : "Direct Manager"}
                 </p>
                 <p className="text-sm font-bold text-foreground truncate">
-                  {resolvedManagerName}
+                  {resolvedManagerName || (lang === "ar" ? "المدير المباشر" : "Direct Manager")}
                 </p>
               </div>
             </div>
