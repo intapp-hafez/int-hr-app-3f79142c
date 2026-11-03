@@ -4907,21 +4907,25 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                         variant="outline"
                         role="combobox"
                         aria-expanded={templateCriterionPopoverOpen}
-                        className="rounded-2xl border-input bg-background px-3 py-1.5 text-xs font-semibold cursor-pointer shadow-xs hover:bg-muted/60 gap-2 h-8 flex items-center justify-between min-w-[220px]"
+                        className="rounded-2xl border-input bg-background px-3 py-1.5 text-xs font-semibold cursor-pointer shadow-xs hover:bg-muted/60 gap-2 h-8 flex items-center justify-between min-w-[210px]"
                       >
                         <div className="flex items-center gap-1.5 truncate">
                           <Plus className="h-3.5 w-3.5 text-brand shrink-0" />
-                          <span className="truncate">{isAr ? "+ إضافة معيار للقالب..." : "+ Add criterion to template..."}</span>
+                          <span className="truncate">{isAr ? "إضافة معيار للقالب..." : "Add criterion to template..."}</span>
                         </div>
                         <ChevronDown className="h-3.5 w-3.5 opacity-60 shrink-0 ms-1" />
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent
-                      className="w-[min(520px,94vw)] p-3 rounded-2xl shadow-2xl border-border bg-card z-50 space-y-2.5"
+                      side="bottom"
+                      sideOffset={6}
                       align={isAr ? "start" : "end"}
+                      avoidCollisions={true}
+                      collisionPadding={16}
+                      className="w-[min(540px,calc(100vw-32px))] p-0 rounded-2xl shadow-2xl border border-border/80 bg-card z-[100] flex flex-col overflow-hidden max-h-[min(480px,calc(var(--radix-popover-content-available-height,480px)-16px))]"
                     >
-                      {/* Search box & Filter controls */}
-                      <div className="space-y-2">
+                      {/* Search box & Filter controls - Fixed Header */}
+                      <div className="p-3 pb-2 border-b border-border/50 bg-card/95 backdrop-blur-xs shrink-0 space-y-2">
                         <div className="relative">
                           <Search className="absolute start-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
                           <Input
@@ -4943,16 +4947,16 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                         </div>
 
                         {/* Layer quick filters */}
-                        <div className="flex items-center gap-1 text-[11px] overflow-x-auto pb-0.5">
+                        <div className="flex items-center gap-1 text-[11px] overflow-x-auto no-scrollbar pb-0.5">
                           {(["all", "common", "role", "custom"] as const).map((l) => (
                             <button
                               key={l}
                               type="button"
                               onClick={() => setTemplateCriterionLayerFilter(l)}
-                              className={`px-2 py-0.5 rounded-lg text-[10px] font-medium transition-colors cursor-pointer shrink-0 ${
+                              className={`px-2.5 py-0.5 rounded-lg text-[10px] font-medium transition-colors cursor-pointer shrink-0 ${
                                 templateCriterionLayerFilter === l
-                                  ? "bg-brand text-brand-foreground font-semibold"
-                                  : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                                  ? "bg-brand text-brand-foreground font-semibold shadow-xs"
+                                  : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
                               }`}
                             >
                               {l === "all"
@@ -4970,10 +4974,10 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                         </div>
                       </div>
 
-                      {/* Criteria list */}
-                      <div className="max-h-[300px] overflow-y-auto space-y-1 pe-1">
+                      {/* Criteria list - Only this container scrolls */}
+                      <div className="flex-1 min-h-[140px] max-h-[320px] overflow-y-auto p-2 space-y-1 overscroll-contain">
                         {availableTemplateCriteria.length === 0 ? (
-                          <div className="p-6 text-center text-xs text-muted-foreground rounded-xl border border-dashed border-border bg-muted/20">
+                          <div className="p-6 text-center text-xs text-muted-foreground rounded-xl border border-dashed border-border bg-muted/20 my-2">
                             {templateCriterionSearch || templateCriterionLayerFilter !== "all"
                               ? (isAr ? "لا توجد معايير مطابقة للبحث أو الفلتر" : "No criteria match your search or filter")
                               : (isAr ? "تمت إضافة جميع المعايير المتاحة لهذا القالب" : "All available criteria have been added to this template")}
@@ -4984,8 +4988,6 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                               key={c.id}
                               onClick={() => {
                                 handleAddCriterionToTemplate(c);
-                                setTemplateCriterionPopoverOpen(false);
-                                setTemplateCriterionSearch("");
                               }}
                               className="p-2.5 rounded-xl border border-transparent hover:border-brand/30 hover:bg-brand/5 dark:hover:bg-brand/10 transition-all cursor-pointer flex items-center justify-between gap-2.5 group"
                             >
@@ -5043,6 +5045,27 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                             </div>
                           ))
                         )}
+                      </div>
+
+                      {/* Footer bar with quick count & Done button */}
+                      <div className="p-2 px-3 border-t border-border/50 bg-muted/30 shrink-0 flex items-center justify-between text-xs">
+                        <span className="text-[11px] text-muted-foreground">
+                          {isAr
+                            ? `المحدد بالقالب: ${templateForm.items.length} معيار`
+                            : `Assigned: ${templateForm.items.length} criteria`}
+                        </span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setTemplateCriterionPopoverOpen(false);
+                            setTemplateCriterionSearch("");
+                          }}
+                          className="h-6 px-2.5 text-[11px] rounded-lg hover:bg-muted font-medium cursor-pointer"
+                        >
+                          {isAr ? "تم / إغلاق" : "Done"}
+                        </Button>
                       </div>
                     </PopoverContent>
                   </Popover>
