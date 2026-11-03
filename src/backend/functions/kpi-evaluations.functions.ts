@@ -2163,7 +2163,7 @@ export const getMyKpiEvaluation = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const targetYear = input.year || new Date().getFullYear();
 
-    const { data: record, error } = await (supabase as any)
+    let query = (supabase as any)
       .from("kpi_evaluations")
       .select(`
         id,
@@ -2190,12 +2190,18 @@ export const getMyKpiEvaluation = createServerFn({ method: "POST" })
         )
       `)
       .eq("employee_id", userId)
-      .eq("evaluation_year", targetYear)
-      .eq("template_type", input.templateType || "light_current_engineer")
-      .eq("status", "approved")
-      .maybeSingle();
+      .eq("evaluation_year", targetYear);
+
+    if (input.templateType) {
+      query = query.eq("template_type", input.templateType);
+    }
+
+    const { data: records, error } = await query
+      .order("updated_at", { ascending: false })
+      .limit(1);
 
     if (error) throw new Error(`Failed to fetch your KPI evaluation: ${error.message}`);
+    const record = Array.isArray(records) && records.length > 0 ? records[0] : null;
     return (record as KpiEvaluationRecord) || null;
   });
 
@@ -2223,7 +2229,6 @@ export const listMyKpiEvaluations = createServerFn({ method: "POST" })
         updated_at
       `)
       .eq("employee_id", userId)
-      .eq("status", "approved")
       .order("evaluation_year", { ascending: false });
 
     if (error) throw new Error(`Failed to list your KPI evaluations: ${error.message}`);
