@@ -1,4 +1,4 @@
-import React, { useState, useMemo, Fragment } from "react";
+import React, { useState, useMemo } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Award,
@@ -17,8 +17,6 @@ import {
   Clock,
   ArrowLeft,
   ArrowRight,
-  LayoutGrid,
-  Table as TableIcon,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -42,12 +40,6 @@ import {
 } from "@/backend/functions/kpi-evaluations.functions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const Route = createFileRoute("/employee/kpis")({
@@ -61,8 +53,6 @@ export function EmployeeKpiPage() {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [activeQuarterFilter, setActiveQuarterFilter] = useState<"all" | "q1" | "q2" | "q3" | "q4">("all");
-  const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
-  const [infoModalKpi, setInfoModalKpi] = useState<KpiMetricDefinition | null>(null);
 
   const getMyKpiFn = useServerFn(getMyKpiEvaluation);
   const listMyKpisFn = useServerFn(listMyKpiEvaluations);
@@ -473,295 +463,110 @@ export function EmployeeKpiPage() {
       </div>
 
       {/* Main Tabs Navigation (No scrollbar track, smooth swipeable) */}
-      <Tabs defaultValue="scorecard" className="space-y-3.5">
+      <Tabs defaultValue="quarters" className="space-y-3.5">
         <div className="flex items-center justify-between gap-2 border-b border-border pb-2 px-1 overflow-x-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           <TabsList className="h-auto w-full justify-start rounded-2xl p-1 bg-muted/60 flex overflow-x-auto no-scrollbar scroll-smooth gap-1 max-w-full [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-            <TabsTrigger value="scorecard" className="rounded-xl px-3 py-1.5 text-xs font-semibold gap-1.5 shrink-0 cursor-pointer">
-              <FileSpreadsheet className="h-3.5 w-3.5" />
-              <span>{isAr ? "بطاقة الأداء" : "Scorecard"}</span>
+            <TabsTrigger value="quarters" className="rounded-xl px-3.5 py-1.5 text-xs font-semibold gap-1.5 shrink-0 cursor-pointer">
+              <Calendar className="h-3.5 w-3.5" />
+              <span>{isAr ? "النتائج الفصلية (الأرباع)" : "Quarterly Results (Qs)"}</span>
             </TabsTrigger>
-            <TabsTrigger value="categories" className="rounded-xl px-3 py-1.5 text-xs font-semibold gap-1.5 shrink-0 cursor-pointer">
-              <TrendingUp className="h-3.5 w-3.5" />
-              <span>{isAr ? "التخصصات" : "Disciplines"}</span>
-            </TabsTrigger>
-            <TabsTrigger value="feedback" className="rounded-xl px-3 py-1.5 text-xs font-semibold gap-1.5 shrink-0 cursor-pointer">
+            <TabsTrigger value="feedback" className="rounded-xl px-3.5 py-1.5 text-xs font-semibold gap-1.5 shrink-0 cursor-pointer">
               <CheckCircle2 className="h-3.5 w-3.5" />
               <span>{isAr ? "ملاحظات المدير" : "Feedback"}</span>
             </TabsTrigger>
-            <TabsTrigger value="history" className="rounded-xl px-3 py-1.5 text-xs font-semibold gap-1.5 shrink-0 cursor-pointer">
+            <TabsTrigger value="history" className="rounded-xl px-3.5 py-1.5 text-xs font-semibold gap-1.5 shrink-0 cursor-pointer">
               <Layers className="h-3.5 w-3.5" />
               <span>{isAr ? "السجل" : "History"}</span>
             </TabsTrigger>
           </TabsList>
         </div>
 
-        {/* ── TAB 1: THE 17 KPIS (CARDS VIEW / TABLE VIEW) ── */}
-        <TabsContent value="scorecard" className="space-y-3">
-          {/* Controls: Active filter reminder & View mode toggle */}
-          <div className="flex items-center justify-between px-1">
-            <div className="text-xs text-muted-foreground">
-              {activeQuarterFilter !== "all" ? (
-                <span className="font-semibold text-brand">
-                  {isAr ? `تصفية حسب: ${quartersList.find(q => q.q === activeQuarterFilter)?.label_ar}` : `Filter: ${activeQuarterFilter.toUpperCase()}`}
-                </span>
-              ) : (
-                <span>{isAr ? "مؤشرات الأداء" : "Performance Metrics"}</span>
-              )}
-            </div>
+        {/* ── TAB 1: THE QS (QUARTERLY PERFORMANCE RESULTS) ── */}
+        <TabsContent value="quarters" className="space-y-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            {quartersList.map((item) => {
+              const isCompleted = item.score !== null;
+              const progress = item.score !== null ? Math.min(100, Math.round((item.score / item.target) * 100)) : 0;
 
-            <div className="inline-flex items-center rounded-xl border border-border bg-card p-0.5 text-xs">
-              <button
-                type="button"
-                onClick={() => setViewMode("cards")}
-                className={`flex items-center gap-1 rounded-lg px-2.5 py-1 font-semibold transition-colors cursor-pointer ${
-                  viewMode === "cards" ? "bg-muted text-foreground shadow-2xs" : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <LayoutGrid className="h-3.5 w-3.5" />
-                <span>{isAr ? "بطاقات" : "Cards"}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode("table")}
-                className={`flex items-center gap-1 rounded-lg px-2.5 py-1 font-semibold transition-colors cursor-pointer ${
-                  viewMode === "table" ? "bg-muted text-foreground shadow-2xs" : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <TableIcon className="h-3.5 w-3.5" />
-                <span>{isAr ? "جدول" : "Table"}</span>
-              </button>
-            </div>
-          </div>
-
-          {/* MODE A: MOBILE CARDS VIEW (Clean, Responsive, No Horizontal Cutoffs) */}
-          {viewMode === "cards" && (
-            <div className="space-y-4">
-              {KPI_CATEGORIES.map((category) => {
-                const categoryRows = kpiRows.filter((r) => r.kpi.category === category);
-
-                return (
-                  <div key={category} className="space-y-2.5">
-                    {/* Category Header Banner */}
-                    <div className="flex items-center justify-between rounded-2xl bg-muted/50 px-3.5 py-2 border border-border/60">
-                      <span className="text-xs font-bold uppercase tracking-wider text-brand">
-                        {isAr ? (KPI_CATEGORIES_AR[category] || category) : category}
-                      </span>
-                    </div>
-
-                    {/* KPI Cards in this category */}
-                    <div className="space-y-2.5">
-                      {categoryRows.map(({ kpi, q1, q2, q3, q4 }) => {
-                        // Focus on single quarter if filtered, or show all 4
-                        const activeQ = activeQuarterFilter;
-                        const singleQuarterData =
-                          activeQ === "q1" ? q1 : activeQ === "q2" ? q2 : activeQ === "q3" ? q3 : activeQ === "q4" ? q4 : null;
-
-                        return (
-                          <div
-                            key={kpi.id}
-                            className="rounded-2xl border border-border bg-card p-3 shadow-2xs space-y-2 transition-all hover:border-border/80"
-                          >
-                            {/* Card Header: # and Metric Title only */}
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-mono font-bold text-xs text-muted-foreground shrink-0">
-                                #{kpi.id}
-                              </span>
-                              <h4 className="font-bold text-xs text-foreground leading-snug">
-                                {isAr ? kpi.name_ar : kpi.name}
-                              </h4>
-                            </div>
-
-                            {/* Only the Qs: Single Quarter Focus vs 4-Quarter Grid */}
-                            {singleQuarterData ? (
-                              <div className="rounded-xl bg-muted/30 p-2.5 border border-border/50 flex items-center justify-between text-xs">
-                                <div>
-                                  <span className="text-[10px] text-muted-foreground uppercase font-bold">
-                                    {activeQ.toUpperCase()} {isAr ? "الفعلي" : "Actual"}
-                                  </span>
-                                  <p className="font-mono font-bold text-foreground">
-                                    {singleQuarterData.actual !== null
-                                      ? kpi.inputType === "rating_5"
-                                        ? `${(singleQuarterData.actual * 5).toFixed(1)} / 5`
-                                        : `${Math.round(singleQuarterData.actual * 100)}%`
-                                      : "—"}
-                                  </p>
-                                </div>
-
-                                <div className="text-center">
-                                  <span className="text-[10px] text-muted-foreground uppercase font-bold">
-                                    {isAr ? "نسبة الإنجاز" : "Attainment"}
-                                  </span>
-                                  <p className="font-mono font-bold text-brand">
-                                    {fmtPercent(singleQuarterData.achievement, 0)}
-                                  </p>
-                                </div>
-
-                                <div className="text-end">
-                                  <span className="text-[10px] text-muted-foreground uppercase font-bold">
-                                    {isAr ? "الدرجة" : "Score"}
-                                  </span>
-                                  <p className="font-mono font-bold text-foreground">
-                                    {fmtPercent(singleQuarterData.score, 1)}
-                                  </p>
-                                </div>
-                              </div>
-                            ) : (
-                              /* 4-Quarters Grid View */
-                              <div className="grid grid-cols-4 gap-1.5">
-                                {[
-                                  { label: "Q1", data: q1 },
-                                  { label: "Q2", data: q2 },
-                                  { label: "Q3", data: q3 },
-                                  { label: "Q4", data: q4 },
-                                ].map(({ label, data }) => (
-                                  <div
-                                    key={label}
-                                    className="rounded-xl bg-muted/20 p-2 text-center border border-border/40"
-                                  >
-                                    <span className="text-[10px] font-bold text-muted-foreground block">{label}</span>
-                                    <span className="font-mono text-xs font-bold text-foreground block mt-0.5">
-                                      {fmtPercent(data.score, 1)}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* MODE B: TABLE VIEW (Sticky Metric Column, Horizontal Scroll) */}
-          {viewMode === "table" && (
-            <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-2xs">
-              <div className="overflow-x-auto no-scrollbar">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-border bg-muted/60 text-muted-foreground font-semibold">
-                      <th className="sticky start-0 z-10 bg-muted/95 px-3 py-2.5 text-start min-w-[200px] shadow-2xs">
-                        {isAr ? "المؤشر (KPI)" : "KPI Metric"}
-                      </th>
-
-                      {(activeQuarterFilter === "all" || activeQuarterFilter === "q1") && (
-                        <th className="px-2 py-2.5 text-center bg-blue-500/10 text-blue-700 dark:text-blue-300 w-16">Q1</th>
-                      )}
-                      {(activeQuarterFilter === "all" || activeQuarterFilter === "q2") && (
-                        <th className="px-2 py-2.5 text-center bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 w-16">Q2</th>
-                      )}
-                      {(activeQuarterFilter === "all" || activeQuarterFilter === "q3") && (
-                        <th className="px-2 py-2.5 text-center bg-amber-500/10 text-amber-700 dark:text-amber-300 w-16">Q3</th>
-                      )}
-                      {(activeQuarterFilter === "all" || activeQuarterFilter === "q4") && (
-                        <th className="px-2 py-2.5 text-center bg-purple-500/10 text-purple-700 dark:text-purple-300 w-16">Q4</th>
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {KPI_CATEGORIES.map((category) => {
-                      const categoryRows = kpiRows.filter((r) => r.kpi.category === category);
-                      return (
-                        <Fragment key={category}>
-                          <tr className="bg-muted/40 font-semibold text-foreground">
-                            <td colSpan={5} className="px-3 py-1.5 text-xs text-brand uppercase font-bold">
-                              {isAr ? (KPI_CATEGORIES_AR[category] || category) : category}
-                            </td>
-                          </tr>
-
-                          {categoryRows.map(({ kpi, q1, q2, q3, q4 }) => (
-                            <tr key={kpi.id} className="hover:bg-muted/20 transition-colors">
-                              <td className="sticky start-0 z-10 bg-card px-3 py-2 text-foreground font-medium text-[11px] shadow-2xs">
-                                #{kpi.id}. {isAr ? kpi.name_ar : kpi.name}
-                              </td>
-
-                              {(activeQuarterFilter === "all" || activeQuarterFilter === "q1") && (
-                                <td className="px-2 py-2 text-center font-mono text-[11px] bg-blue-500/5 font-semibold text-blue-700 dark:text-blue-300">
-                                  {fmtPercent(q1.score, 1)}
-                                </td>
-                              )}
-                              {(activeQuarterFilter === "all" || activeQuarterFilter === "q2") && (
-                                <td className="px-2 py-2 text-center font-mono text-[11px] bg-emerald-500/5 font-semibold text-emerald-700 dark:text-emerald-300">
-                                  {fmtPercent(q2.score, 1)}
-                                </td>
-                              )}
-                              {(activeQuarterFilter === "all" || activeQuarterFilter === "q3") && (
-                                <td className="px-2 py-2 text-center font-mono text-[11px] bg-amber-500/5 font-semibold text-amber-700 dark:text-amber-300">
-                                  {fmtPercent(q3.score, 1)}
-                                </td>
-                              )}
-                              {(activeQuarterFilter === "all" || activeQuarterFilter === "q4") && (
-                                <td className="px-2 py-2 text-center font-mono text-[11px] bg-purple-500/5 font-semibold text-purple-700 dark:text-purple-300">
-                                  {fmtPercent(q4.score, 1)}
-                                </td>
-                              )}
-                            </tr>
-                          ))}
-                        </Fragment>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </TabsContent>
-
-        {/* ── TAB 2: DISCIPLINE BREAKDOWN ── */}
-        <TabsContent value="categories" className="space-y-3">
-          <div className="rounded-3xl border border-border bg-card p-4 shadow-2xs space-y-3">
-            <div>
-              <h3 className="font-bold text-sm text-foreground">
-                {isAr ? "تحليل الكفاءة حسب التخصص الهندسي" : "Competency Breakdown"}
-              </h3>
-              <p className="text-xs text-muted-foreground">
-                {isAr
-                  ? "مستوى الإنجاز في مجالات التنفيذ، الجودة، السلامة، والتوثيق."
-                  : "Performance distribution across execution, quality, safety, and reporting."}
-              </p>
-            </div>
-
-            <div className="space-y-2.5">
-              {categoryStats.map((cat) => (
-                <div key={cat.name} className="rounded-2xl border border-border bg-muted/15 p-3 space-y-2">
+              return (
+                <div
+                  key={item.q}
+                  className="rounded-3xl border border-border bg-card p-4 shadow-2xs space-y-3 transition-all hover:border-border/80"
+                >
                   <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-bold text-xs text-foreground">{isAr ? cat.name_ar : cat.name}</h4>
-                      <span className="text-[10px] text-muted-foreground">
-                        {isAr ? `الوزن: ${(cat.totalWeight * 100).toFixed(0)}%` : `Weight: ${(cat.totalWeight * 100).toFixed(0)}%`}
+                    <div className="flex items-center gap-2.5">
+                      <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-brand/10 font-display font-extrabold text-sm text-brand">
+                        {item.label}
                       </span>
+                      <div>
+                        <h4 className="font-bold text-xs text-foreground">
+                          {isAr ? item.label_ar : `${item.label} Quarter`}
+                        </h4>
+                        <p className="text-[10px] text-muted-foreground">{item.date}</p>
+                      </div>
                     </div>
-                    <span className="font-mono text-xs font-bold text-foreground">
-                      {(cat.earnedScore * 100).toFixed(1)}% / {(cat.totalWeight * 100).toFixed(0)}%
-                    </span>
+                    <Badge
+                      variant={isCompleted ? "default" : "outline"}
+                      className={`text-[10px] px-2 py-0.5 font-semibold ${
+                        isCompleted
+                          ? "bg-emerald-600 text-white"
+                          : "text-muted-foreground border-border"
+                      }`}
+                    >
+                      {isCompleted ? (isAr ? "معتمد" : "Approved") : (isAr ? "قيد التقييم" : "Pending Review")}
+                    </Badge>
                   </div>
 
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[10px] text-muted-foreground">
-                      <span>{isAr ? "نسبة الاستيفاء" : "Attainment"}</span>
-                      <span className="font-medium text-foreground">{cat.percentage}%</span>
+                  <div className="grid grid-cols-3 gap-2 rounded-2xl bg-muted/30 p-2.5 text-center border border-border/50">
+                    <div>
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold block">
+                        {isAr ? "الهدف" : "Target"}
+                      </span>
+                      <span className="font-mono text-xs font-bold text-foreground">25.0%</span>
                     </div>
-                    <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                    <div>
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold block">
+                        {isAr ? "الدرجة المحققة" : "Score"}
+                      </span>
+                      <span className="font-mono text-xs font-bold text-brand">
+                        {item.score !== null ? fmtPercent(item.score, 1) : "—"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold block">
+                        {isAr ? "نسبة الاستيفاء" : "Attainment"}
+                      </span>
+                      <span className="font-mono text-xs font-bold text-foreground">
+                        {item.score !== null ? `${progress}%` : "—"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1 pt-0.5">
+                    <div className="flex justify-between text-[10px] text-muted-foreground font-medium">
+                      <span>{isAr ? "التقدم الفصلي" : "Quarterly Progress"}</span>
+                      <span className="font-mono font-bold text-foreground">{progress}%</span>
+                    </div>
+                    <div className="h-2 w-full rounded-full bg-muted/80 overflow-hidden">
                       <div
                         className={`h-full rounded-full transition-all duration-500 ${
-                          cat.percentage >= 90
+                          progress >= 90
                             ? "bg-emerald-500"
-                            : cat.percentage >= 75
+                            : progress >= 75
                             ? "bg-blue-500"
-                            : cat.percentage >= 60
+                            : progress >= 60
                             ? "bg-amber-500"
-                            : "bg-rose-500"
+                            : progress > 0
+                            ? "bg-rose-500"
+                            : "bg-transparent"
                         }`}
-                        style={{ width: `${cat.percentage}%` }}
+                        style={{ width: `${progress}%` }}
                       />
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
         </TabsContent>
 
@@ -877,46 +682,6 @@ export function EmployeeKpiPage() {
           </div>
         </TabsContent>
       </Tabs>
-
-      {/* Info Dialog for Measurement Standard */}
-      <Dialog open={!!infoModalKpi} onOpenChange={(open) => !open && setInfoModalKpi(null)}>
-        <DialogContent className="sm:max-w-md rounded-3xl" dir={dir}>
-          <DialogHeader>
-            <span className="text-[10px] uppercase font-bold text-brand tracking-wider">
-              {isAr ? infoModalKpi?.category_ar : infoModalKpi?.category}
-            </span>
-            <DialogTitle className="text-sm font-bold font-display">
-              #{infoModalKpi?.id}. {isAr ? infoModalKpi?.name_ar : infoModalKpi?.name}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 text-xs pt-2">
-            <div className="flex gap-2">
-              <Badge variant="outline" className="font-mono">
-                {isAr ? `الوزن: ${fmtPercent(infoModalKpi?.weight, 1)}` : `Weight: ${fmtPercent(infoModalKpi?.weight, 1)}`}
-              </Badge>
-              <Badge variant="secondary" className="font-mono">
-                {isAr ? `الهدف: ${fmtPercent(infoModalKpi?.target, 0)}` : `Target: ${fmtPercent(infoModalKpi?.target, 0)}`}
-              </Badge>
-            </div>
-            <div className="space-y-1">
-              <strong className="text-foreground block">
-                {isAr ? "التعريف:" : "Definition:"}
-              </strong>
-              <p className="text-muted-foreground leading-relaxed">
-                {isAr ? infoModalKpi?.definition_ar : infoModalKpi?.definition}
-              </p>
-            </div>
-            <div className="space-y-1 bg-muted/40 p-2.5 rounded-2xl border border-border">
-              <strong className="text-foreground block">
-                {isAr ? "طريقة القياس والاحتساب:" : "Measurement standard:"}
-              </strong>
-              <p className="text-muted-foreground leading-relaxed">
-                {isAr ? infoModalKpi?.howMeasured_ar : infoModalKpi?.howMeasured}
-              </p>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
