@@ -77,8 +77,7 @@ export const getMyProfileDetails = createServerFn({ method: "GET" })
     let managerIdToFetch = p.manager_id;
     if (!managerIdToFetch && p.department_id) {
       try {
-        const { supabaseAdmin } = await import("@/backend/server/admin-client.server");
-        const { data: deptMgr } = await (supabaseAdmin as any)
+        const { data: deptMgr } = await supabase
           .from("departments")
           .select("responsible_person_id")
           .eq("id", p.department_id)
@@ -91,22 +90,56 @@ export const getMyProfileDetails = createServerFn({ method: "GET" })
 
     let mgrData: { id?: string; full_name?: string | null; email?: string | null; phone?: string | null } | null = null;
     if (managerIdToFetch) {
-      const { data: mgrUser } = await supabase
-        .from("profiles")
-        .select("id, full_name, email, phone")
-        .eq("id", managerIdToFetch)
-        .maybeSingle();
-      if (mgrUser) {
-        mgrData = mgrUser;
-      } else {
+      // 1. Try dedicated RPC
+      try {
+        const { data: rpcMgr } = await (supabase as any).rpc("get_my_manager_profile").maybeSingle();
+        if (rpcMgr && (rpcMgr.full_name || rpcMgr.email)) {
+          mgrData = rpcMgr;
+        }
+      } catch {}
+
+      // 2. Direct profiles query (allowed by RLS policy)
+      if (!mgrData) {
+        const { data: mgrUser } = await supabase
+          .from("profiles")
+          .select("id, full_name, email, phone")
+          .eq("id", managerIdToFetch)
+          .maybeSingle();
+        if (mgrUser) {
+          mgrData = mgrUser;
+        }
+      }
+
+      // 3. Try get_staff_employee_names RPC fallback
+      if (!mgrData) {
+        try {
+          const { data: staffRows } = await (supabase as any).rpc("get_staff_employee_names", {
+            p_employee_ids: [managerIdToFetch],
+          });
+          const mRow = Array.isArray(staffRows) ? staffRows[0] : staffRows;
+          if (mRow && (mRow.full_name || mRow.name)) {
+            mgrData = {
+              id: mRow.id || managerIdToFetch,
+              full_name: mRow.full_name || mRow.name,
+              email: mRow.email || null,
+              phone: null,
+            };
+          }
+        } catch {}
+      }
+
+      // 4. Server-side admin fallback if executed in Node environment
+      if (!mgrData) {
         try {
           const { supabaseAdmin } = await import("@/backend/server/admin-client.server");
-          const { data: adminMgr } = await (supabaseAdmin as any)
-            .from("profiles")
-            .select("id, full_name, email, phone")
-            .eq("id", managerIdToFetch)
-            .maybeSingle();
-          if (adminMgr) mgrData = adminMgr;
+          if (supabaseAdmin) {
+            const { data: adminMgr } = await (supabaseAdmin as any)
+              .from("profiles")
+              .select("id, full_name, email, phone")
+              .eq("id", managerIdToFetch)
+              .maybeSingle();
+            if (adminMgr) mgrData = adminMgr;
+          }
         } catch {}
       }
     }

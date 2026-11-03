@@ -234,7 +234,7 @@ function ManagerProfilePage() {
               {
                 icon: UserCog,
                 label: "Reports To",
-                value: details?.manager ?? "Direct Report",
+                value: resolvedManager ?? "Direct Report",
                 color: "text-purple-500 bg-purple-500/10",
               },
               {
@@ -366,7 +366,7 @@ function ManagerProfilePage() {
             <dl className="divide-y divide-border/40">
               {[
                 { icon: Building2, label: "Department", value: details?.department },
-                { icon: UserCog, label: "Direct Manager", value: details?.manager },
+                { icon: UserCog, label: "Direct Manager", value: resolvedManager },
                 {
                   icon: Wallet,
                   label: "Salary",

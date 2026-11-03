@@ -44,6 +44,23 @@ export function SettingsPage() {
   const detailsFn = useServerFn(getMyProfileDetails);
   const { data: details } = useQuery({ queryKey: ["me", "details"], queryFn: () => detailsFn(), staleTime: 30_000 });
   const displayPosition = (lang === "ar" && details?.position_ar ? details.position_ar : details?.position) || (me as any)?.position || null;
+  const allEmployees = useStore((s) => s.employees);
+  const managerFromStore = details?.manager_id
+    ? allEmployees.find(
+        (e) =>
+          e.id === details.manager_id ||
+          (e as any).userId === details.manager_id ||
+          (e as any).profile_id === details.manager_id
+      )
+    : null;
+  const resolvedManagerName =
+    details?.manager ||
+    managerFromStore?.name ||
+    (me as any)?.manager ||
+    (me as any)?.managerName ||
+    (details?.manager_id ? `Manager (${details.manager_id.slice(0, 8)})` : null);
+  const resolvedManagerEmail = details?.manager_email || managerFromStore?.email || null;
+  const resolvedManagerPhone = details?.manager_phone || managerFromStore?.phone || null;
   const locations = useStore((s) => s.locations);
   const networks = useStore((s) => s.networks);
   const [deviceId, setDeviceId] = useState("");
@@ -224,11 +241,11 @@ export function SettingsPage() {
                 {realProfile?.email || details?.email}
               </span>
             )}
-            {(details?.manager || (me as any)?.manager) && (
+            {resolvedManagerName && (
               <span className="inline-flex items-center gap-1.5 rounded-md bg-brand/10 dark:bg-brand/15 text-brand px-2.5 py-1 font-semibold border border-brand/20 shadow-2xs">
                 <UserCog className="h-3.5 w-3.5 shrink-0" />
                 <span className="text-[11px] opacity-80 font-normal">{lang === "ar" ? "المدير:" : "Manager:"}</span>
-                <span className="truncate max-w-[180px]">{details?.manager || (me as any)?.manager}</span>
+                <span className="truncate max-w-[180px]">{resolvedManagerName}</span>
               </span>
             )}
           </div>
@@ -252,19 +269,19 @@ export function SettingsPage() {
             <ProfileRow icon={IdCard} label={lang === "ar" ? "الرقم القومي" : "National ID"} value={details?.national_id} mono />
             <ProfileRow icon={Building2} label={lang === "ar" ? "القسم" : "Department"} value={details?.department} />
             <ProfileRow icon={Briefcase} label={lang === "ar" ? "المسمى الوظيفي" : "Position"} value={displayPosition} />
-            <ProfileRow icon={UserCog} label={lang === "ar" ? "المدير المباشر" : "Manager"} value={details?.manager || (me as any)?.manager} />
-            {details?.manager_email && (
-              <ProfileRow icon={Mail} label={lang === "ar" ? "بريد المدير المباشر" : "Manager's Email"} value={details.manager_email} />
+            <ProfileRow icon={UserCog} label={lang === "ar" ? "المدير المباشر" : "Manager"} value={resolvedManagerName} />
+            {resolvedManagerEmail && (
+              <ProfileRow icon={Mail} label={lang === "ar" ? "بريد المدير المباشر" : "Manager's Email"} value={resolvedManagerEmail} />
             )}
-            {details?.manager_phone && (
-              <ProfileRow icon={Phone} label={lang === "ar" ? "هاتف المدير المباشر" : "Manager's Phone"} value={details.manager_phone} />
+            {resolvedManagerPhone && (
+              <ProfileRow icon={Phone} label={lang === "ar" ? "هاتف المدير المباشر" : "Manager's Phone"} value={resolvedManagerPhone} />
             )}
           </dl>
         </ExpandableRow>
       </section>
 
       {/* Direct Manager Highlight Card */}
-      {(details?.manager || (me as any)?.manager) && (
+      {resolvedManagerName && (
         <section className="overflow-hidden rounded-2xl border border-border bg-card p-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
@@ -276,18 +293,18 @@ export function SettingsPage() {
                   {lang === "ar" ? "المدير المباشر" : "Direct Manager"}
                 </p>
                 <p className="text-sm font-bold text-foreground truncate">
-                  {details?.manager || (me as any)?.manager}
+                  {resolvedManagerName}
                 </p>
               </div>
             </div>
-            {details?.manager_email && (
+            {resolvedManagerEmail && (
               <a
-                href={`mailto:${details.manager_email}`}
+                href={`mailto:${resolvedManagerEmail}`}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-border/80 bg-background px-3 py-1.5 text-xs font-semibold hover:bg-muted transition-colors shrink-0"
-                title={details.manager_email}
+                title={resolvedManagerEmail}
               >
                 <Mail className="h-3.5 w-3.5 text-brand" />
-                <span className="hidden sm:inline">{details.manager_email}</span>
+                <span className="hidden sm:inline">{resolvedManagerEmail}</span>
                 <span className="sm:hidden">{lang === "ar" ? "مراسلة" : "Email"}</span>
               </a>
             )}
