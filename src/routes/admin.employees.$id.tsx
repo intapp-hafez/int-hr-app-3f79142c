@@ -466,7 +466,27 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
   const [resendModalOpen, setResendModalOpen] = useState(false);
   const cityFn = useServerFn(listCitiesAndDistricts);
   const gradesFn = useServerFn(listJobGrades);
-  const { data: locs } = useQuery({ queryKey: ["cities-districts"], queryFn: () => cityFn(), enabled: editing, staleTime: 5 * 60_000 });
+  const { data: locs } = useQuery({ queryKey: ["cities-districts"], queryFn: () => cityFn(), staleTime: 5 * 60_000 });
+  const allEmployees = useStore((s) => s.employees);
+  const managerDisplayName = useMemo(() => {
+    if (detail.manager_name && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}/i.test(detail.manager_name)) {
+      return detail.manager_name;
+    }
+    const mid = detail.manager_id;
+    if (mid) {
+      const fromLocs = (locs?.managers ?? []).find((m) => m.id === mid || (m as any).emp_code === mid);
+      if (fromLocs?.name && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}/i.test(fromLocs.name)) {
+        return fromLocs.name;
+      }
+      const fromStore = allEmployees.find(
+        (e) => e.id === mid || (e as any).userId === mid || (e as any).emp_code === mid || e.email === mid
+      );
+      if (fromStore?.name && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}/i.test(fromStore.name)) {
+        return fromStore.name;
+      }
+    }
+    return "—";
+  }, [detail.manager_name, detail.manager_id, locs?.managers, allEmployees]);
   const { data: grades } = useQuery({ queryKey: ["job-grades"], queryFn: () => gradesFn(), enabled: editing, staleTime: 5 * 60_000 });
   const updateFn = useServerFn(updateEmployeeAdmin);
   const initialForm = useMemo(() => ({
@@ -1197,7 +1217,7 @@ function RealEmployeeView({ detail, canEdit }: { detail: EmployeeDetailRow; canE
                     <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
                       <Info icon={Building2} label={t("department")} value={detail.department ?? "—"} />
                       <Info icon={Briefcase} label={t("position") ?? "Position"} value={detail.position ?? "—"} />
-                      <Info icon={UserIcon} label="Manager" value={detail.manager_name ?? detail.manager_id ?? "—"} />
+                      <Info icon={UserIcon} label="Manager" value={managerDisplayName} />
                       <Info icon={Building2} label={t("costCenter" as any) ?? "Cost Center"} value={detail.cost_center_code ? `#${detail.cost_center_code} - ${detail.cost_center_name ?? ""}` : "—"} />
                       <Info icon={Clock} label={t("shift" as any) ?? "Shift"} value={detail.shift_name ?? "—"} />
                       <Info icon={Plane} label="Job Grade (Trips)" value={detail.job_grade ?? "—"} />

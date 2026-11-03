@@ -70,3 +70,4 @@ $$;
 
 REVOKE EXECUTE ON FUNCTION public.get_my_manager_profile() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_my_manager_profile() TO authenticated;
+

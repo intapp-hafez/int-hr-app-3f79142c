@@ -1601,7 +1601,36 @@ export const getEmployeeDetail = createServerFn({ method: "POST" })
       lookupName("majors", extra.major_id),
       lookupName("sections", extra.section_id),
     ]);
-    const [{ data: dept }, { data: pos }, { data: roles }, { data: mgr }, { data: cityRow }, { data: distRow }, ccRow, shiftRow] = await Promise.all([
+
+    let managerIdToLookup = (p as any).manager_id;
+    if (!managerIdToLookup && (p as any).department_id) {
+      try {
+        const { data: deptRow } = await supabase
+          .from("departments")
+          .select("responsible_person_id")
+          .eq("id", (p as any).department_id)
+          .maybeSingle();
+        if (deptRow?.responsible_person_id && deptRow.responsible_person_id !== data.id) {
+          managerIdToLookup = deptRow.responsible_person_id;
+        }
+      } catch {}
+    }
+
+    const mgrLookupPromise = (async () => {
+      if (!managerIdToLookup) return null;
+      try {
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(managerIdToLookup);
+        const { data: mData } = isUUID
+          ? await supabase.from("profiles").select("id, full_name, full_name_ar, email, emp_code").or(`id.eq.${managerIdToLookup},emp_code.eq.${managerIdToLookup}`).maybeSingle()
+          : await supabase.from("profiles").select("id, full_name, full_name_ar, email, emp_code").eq("emp_code", managerIdToLookup).maybeSingle();
+        if (mData) {
+          return mData.full_name?.trim() || mData.full_name_ar?.trim() || mData.email || mData.emp_code || null;
+        }
+      } catch {}
+      return null;
+    })();
+
+    const [{ data: dept }, { data: pos }, { data: roles }, mgrResolvedName, { data: cityRow }, { data: distRow }, ccRow, shiftRow] = await Promise.all([
       (p as any).department_id
         ? supabase.from("departments").select("name_en, name_ar").eq("id", (p as any).department_id).maybeSingle()
         : Promise.resolve({ data: null }),
@@ -1609,9 +1638,7 @@ export const getEmployeeDetail = createServerFn({ method: "POST" })
         ? supabase.from("positions").select("name_en, name_ar").eq("id", (p as any).position_id).maybeSingle()
         : Promise.resolve({ data: null }),
       supabase.from("user_roles").select("role").eq("user_id", data.id),
-      (p as any).manager_id
-        ? supabase.from("profiles").select("full_name").eq("id", (p as any).manager_id).maybeSingle()
-        : Promise.resolve({ data: null }),
+      mgrLookupPromise,
       (p as any).city_id
         ? supabase.from("cities").select("name_en").eq("id", (p as any).city_id).maybeSingle()
         : Promise.resolve({ data: null }),
@@ -1644,8 +1671,8 @@ export const getEmployeeDetail = createServerFn({ method: "POST" })
       status: (p as any).status ?? "Active",
       inactive_reason: (p as any).inactive_reason ?? null,
       avatar_url: (p as any).avatar_url ?? null,
-      manager_id: (p as any).manager_id ?? null,
-      manager_name: (mgr as any)?.full_name ?? null,
+      manager_id: managerIdToLookup ?? (p as any).manager_id ?? null,
+      manager_name: mgrResolvedName ?? null,
       locale: (p as any).locale ?? null,
       national_id: (p as any).national_id ?? null,
       id_issue_date: (p as any).id_issue_date ?? null,

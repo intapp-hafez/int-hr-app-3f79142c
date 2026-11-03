@@ -37,6 +37,31 @@ function ManagerProfilePage() {
   const detailsFn = useServerFn(getMyProfileDetails);
   const { data: realMe } = useQuery({ queryKey: ["me", "profile"], queryFn: () => meFn(), staleTime: 30_000 });
   const { data: details } = useQuery({ queryKey: ["me", "details"], queryFn: () => detailsFn(), staleTime: 30_000 });
+  const allEmployees = useStore((s) => s.employees);
+  const managerFromStore = useMemo(() => {
+    const mid = details?.manager_id;
+    if (!mid) return null;
+    return allEmployees.find(
+      (e) =>
+        e.id === mid ||
+        (e as any).userId === mid ||
+        (e as any).profile_id === mid ||
+        (e as any).emp_code === mid ||
+        e.email === mid
+    ) || null;
+  }, [details?.manager_id, allEmployees]);
+
+  const rawManagerName = details?.manager || managerFromStore?.name || null;
+  const resolvedManager = useMemo(() => {
+    if (!rawManagerName) return null;
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}/i.test(rawManagerName) || rawManagerName.startsWith("Manager (")) {
+      const found = allEmployees.find(
+        (e) => e.id === rawManagerName || (e as any).userId === rawManagerName || (e as any).profile_id === rawManagerName
+      );
+      return found?.name || null;
+    }
+    return rawManagerName;
+  }, [rawManagerName, allEmployees]);
 
   const realProfile = realMe?.profile as {
     id?: string; full_name?: string | null; email?: string | null;

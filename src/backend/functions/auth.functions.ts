@@ -100,14 +100,20 @@ export const getMyProfileDetails = createServerFn({ method: "GET" })
 
       // 2. Direct profiles query (allowed by RLS policy)
       if (!mgrData) {
-        const { data: mgrUser } = await supabase
-          .from("profiles")
-          .select("id, full_name, email, phone")
-          .eq("id", managerIdToFetch)
-          .maybeSingle();
-        if (mgrUser) {
-          mgrData = mgrUser;
-        }
+        try {
+          const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(managerIdToFetch);
+          const { data: mgrUser } = isUUID
+            ? await supabase.from("profiles").select("id, full_name, full_name_ar, email, phone, emp_code").or(`id.eq.${managerIdToFetch},emp_code.eq.${managerIdToFetch}`).maybeSingle()
+            : await supabase.from("profiles").select("id, full_name, full_name_ar, email, phone, emp_code").eq("emp_code", managerIdToFetch).maybeSingle();
+          if (mgrUser) {
+            mgrData = {
+              id: mgrUser.id,
+              full_name: mgrUser.full_name?.trim() || mgrUser.full_name_ar?.trim() || mgrUser.email || null,
+              email: mgrUser.email ?? null,
+              phone: mgrUser.phone ?? null,
+            };
+          }
+        } catch {}
       }
 
       // 3. Try get_staff_employee_names RPC fallback

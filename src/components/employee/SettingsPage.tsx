@@ -45,20 +45,35 @@ export function SettingsPage() {
   const { data: details } = useQuery({ queryKey: ["me", "details"], queryFn: () => detailsFn(), staleTime: 30_000 });
   const displayPosition = (lang === "ar" && details?.position_ar ? details.position_ar : details?.position) || (me as any)?.position || null;
   const allEmployees = useStore((s) => s.employees);
-  const managerFromStore = details?.manager_id
-    ? allEmployees.find(
+  const managerFromStore = useMemo(() => {
+    const mid = details?.manager_id || (me as any)?.managerId || (me as any)?.manager_id;
+    if (!mid) return null;
+    return allEmployees.find(
+      (e) =>
+        e.id === mid ||
+        (e as any).userId === mid ||
+        (e as any).profile_id === mid ||
+        (e as any).emp_code === mid ||
+        e.email === mid
+    ) || null;
+  }, [details?.manager_id, me, allEmployees]);
+
+  const rawManagerName = details?.manager || managerFromStore?.name || (me as any)?.manager || (me as any)?.managerName || null;
+  // Ensure we NEVER show raw UUID or "Manager (ID)" as the name
+  const resolvedManagerName = useMemo(() => {
+    if (!rawManagerName) return null;
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}/i.test(rawManagerName) || rawManagerName.startsWith("Manager (")) {
+      const found = allEmployees.find(
         (e) =>
-          e.id === details.manager_id ||
-          (e as any).userId === details.manager_id ||
-          (e as any).profile_id === details.manager_id
-      )
-    : null;
-  const resolvedManagerName =
-    details?.manager ||
-    managerFromStore?.name ||
-    (me as any)?.manager ||
-    (me as any)?.managerName ||
-    (details?.manager_id ? `Manager (${details.manager_id.slice(0, 8)})` : null);
+          e.id === rawManagerName ||
+          (e as any).userId === rawManagerName ||
+          (e as any).profile_id === rawManagerName ||
+          e.name === rawManagerName
+      );
+      return found?.name || null;
+    }
+    return rawManagerName;
+  }, [rawManagerName, allEmployees]);
   const resolvedManagerEmail = details?.manager_email || managerFromStore?.email || null;
   const resolvedManagerPhone = details?.manager_phone || managerFromStore?.phone || null;
   const locations = useStore((s) => s.locations);
