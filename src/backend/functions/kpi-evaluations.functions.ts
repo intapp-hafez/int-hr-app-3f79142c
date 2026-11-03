@@ -234,13 +234,44 @@ export const listKpiCriteria = createServerFn({ method: "POST" })
           ? "role"
           : "custom");
       const catKey = (r.category || "technical").toLowerCase();
-      const catEn = r.category_en || categoryNamesEn[catKey] || r.category || "Technical";
-      const catAr = r.category_ar || categoryNamesAr[catKey] || catEn;
+
+      // Extract code if stored in description or r.code
+      let code = r.code;
+      if (!code && r.description_en && r.description_en.startsWith("[")) {
+        const match = r.description_en.match(/^\[([^\]]+)\]/);
+        if (match) code = match[1];
+      }
+      if (!code) {
+        code = `KPI-${String(100 + idx + 1).padStart(3, "0")}`;
+      }
+
+      // Extract Category English:
+      // Check how_measured_en (which holds imported category), or category_en, or clean description, or dictionary
+      let catEn = (r.how_measured_en && r.how_measured_en.trim()) || r.category_en;
+      if (!catEn && r.description_en) {
+        const cleanedDesc = r.description_en.replace(/^\[[^\]]+\]\s*/, "").trim();
+        if (cleanedDesc && cleanedDesc.length < 80 && !cleanedDesc.toLowerCase().includes("percentage") && !cleanedDesc.toLowerCase().includes("compliance")) {
+          catEn = cleanedDesc;
+        }
+      }
+      if (!catEn) {
+        catEn = categoryNamesEn[catKey] || r.category || "Technical";
+      }
+
+      // Extract Category Arabic:
+      let catAr = (r.how_measured_ar && r.how_measured_ar.trim()) || r.category_ar;
+      if (!catAr && r.description_ar && r.description_ar.length < 80) {
+        catAr = r.description_ar.trim();
+      }
+      if (!catAr) {
+        catAr = categoryNamesAr[catKey] || catEn;
+      }
+
       const targetNum = r.max_value !== undefined && r.max_value !== null ? Number(r.max_value) : 95;
 
       return {
         ...r,
-        code: r.code || `KPI-${String(100 + idx + 1).padStart(3, "0")}`,
+        code,
         layer,
         criterion_type: rawType,
         category: r.category || "technical",
@@ -263,25 +294,34 @@ export const saveKpiCriterion = createServerFn({ method: "POST" })
     }
 
     const now = new Date().toISOString();
+    const code = input.code?.trim() || "";
+    const catEn = input.category_en?.trim() || input.how_measured_en?.trim() || "";
+    const catAr = input.category_ar?.trim() || input.how_measured_ar?.trim() || "";
+
+    const descEn = code ? `[${code}] ${catEn || input.description_en}` : (catEn || input.description_en || "");
+    const descAr = catAr || input.description_ar || "";
+    const howEn = catEn || input.how_measured_en || "";
+    const howAr = catAr || input.how_measured_ar || "";
+
     const payload = {
       name_en: input.name_en,
       name_ar: input.name_ar,
-      description_en: input.description_en || "",
-      description_ar: input.description_ar || "",
-      criterion_type: input.criterion_type,
-      category: input.category,
-      scoring_scale: input.scoring_scale,
+      description_en: descEn,
+      description_ar: descAr,
+      criterion_type: input.criterion_type || (input.layer === "common" ? "common" : input.layer === "custom" ? "custom" : "position_specific"),
+      category: input.category || "technical",
+      scoring_scale: input.scoring_scale || "percentage",
       scoring_direction: input.scoring_direction || "higher_is_better",
       unit: input.unit || "%",
       min_value: input.min_value ?? 0,
-      max_value: input.max_value ?? 100,
-      how_measured_en: input.how_measured_en || "",
-      how_measured_ar: input.how_measured_ar || "",
-      max_scale_value: input.max_scale_value,
-      default_weight: input.default_weight,
-      is_required: input.is_required,
-      is_active: input.is_active,
-      display_order: input.display_order,
+      max_value: input.max_value ?? (input.default_target ? Math.round(input.default_target * 100) : 100),
+      how_measured_en: howEn,
+      how_measured_ar: howAr,
+      max_scale_value: input.max_scale_value ?? 100,
+      default_weight: input.default_weight ?? 0.05,
+      is_required: input.is_required ?? true,
+      is_active: input.is_active ?? true,
+      display_order: input.display_order ?? 0,
       updated_at: now,
     };
 
@@ -356,20 +396,29 @@ export const batchImportKpiCriteria = createServerFn({ method: "POST" })
       const nameArKey = (item.name_ar || item.name_en).trim().toLowerCase();
       const existingId = existingMap.get(nameEnKey) || existingMap.get(nameArKey);
 
+      const code = item.code?.trim() || "";
+      const catEn = item.category_en?.trim() || item.how_measured_en?.trim() || "";
+      const catAr = item.category_ar?.trim() || item.how_measured_ar?.trim() || "";
+
+      const descEn = code ? `[${code}] ${catEn || item.description_en}` : (catEn || item.description_en || "");
+      const descAr = catAr || item.description_ar || "";
+      const howEn = catEn || item.how_measured_en || "";
+      const howAr = catAr || item.how_measured_ar || "";
+
       const payload = {
         name_en: item.name_en.trim(),
         name_ar: item.name_ar?.trim() || item.name_en.trim(),
-        description_en: item.description_en || "",
-        description_ar: item.description_ar || "",
-        criterion_type: item.criterion_type,
-        category: item.category,
-        scoring_scale: item.scoring_scale,
-        scoring_direction: item.scoring_direction,
+        description_en: descEn,
+        description_ar: descAr,
+        criterion_type: item.criterion_type || (item.layer === "common" ? "common" : item.layer === "custom" ? "custom" : "position_specific"),
+        category: item.category || "technical",
+        scoring_scale: item.scoring_scale || "percentage",
+        scoring_direction: item.scoring_direction || "higher_is_better",
         unit: item.unit || "%",
         min_value: item.min_value ?? 0,
         max_value: item.max_value ?? 100,
-        how_measured_en: item.how_measured_en || "",
-        how_measured_ar: item.how_measured_ar || "",
+        how_measured_en: howEn,
+        how_measured_ar: howAr,
         default_weight: item.default_weight ?? 0.05,
         is_required: item.is_required ?? true,
         is_active: item.is_active ?? true,

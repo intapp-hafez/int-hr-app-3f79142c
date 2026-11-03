@@ -28,8 +28,12 @@ export type KpiScoringDirection = z.infer<typeof KpiScoringDirectionSchema>;
 
 export const SaveKpiCriterionSchema = z.object({
   id: z.string().uuid().optional(),
+  code: z.string().max(50).optional(),
   name_en: z.string().min(2, "English name is required").max(200),
   name_ar: z.string().min(2, "Arabic name is required").max(200),
+  category_en: z.string().max(200).optional(),
+  category_ar: z.string().max(200).optional(),
+  layer: z.enum(["common", "role", "custom"]).optional(),
   description_en: z.string().max(1000).optional().default(""),
   description_ar: z.string().max(1000).optional().default(""),
   criterion_type: KpiCriterionTypeSchema.default("position_specific"),
@@ -39,6 +43,7 @@ export const SaveKpiCriterionSchema = z.object({
   unit: z.string().max(30).default("%"),
   min_value: z.number().default(0),
   max_value: z.number().default(100),
+  default_target: z.number().optional(),
   how_measured_en: z.string().max(1000).optional().default(""),
   how_measured_ar: z.string().max(1000).optional().default(""),
   max_scale_value: z.number().positive().default(100),
@@ -299,8 +304,12 @@ export const SeedKpiTemplatesSchema = z.object({
 export type SeedKpiTemplatesInput = z.infer<typeof SeedKpiTemplatesSchema>;
 
 export const ImportKpiCriterionItemSchema = z.object({
+  code: z.string().max(50).optional(),
   name_en: z.string().min(1, "English name is required").max(200),
   name_ar: z.string().max(200).optional().default(""),
+  category_en: z.string().max(200).optional(),
+  category_ar: z.string().max(200).optional(),
+  layer: z.enum(["common", "role", "custom"]).optional(),
   description_en: z.string().max(1000).optional().default(""),
   description_ar: z.string().max(1000).optional().default(""),
   criterion_type: KpiCriterionTypeSchema.default("position_specific"),
@@ -310,6 +319,7 @@ export const ImportKpiCriterionItemSchema = z.object({
   unit: z.string().max(30).default("%"),
   min_value: z.number().default(0),
   max_value: z.number().default(100),
+  default_target: z.number().optional(),
   how_measured_en: z.string().max(1000).optional().default(""),
   how_measured_ar: z.string().max(1000).optional().default(""),
   default_weight: z.number().positive().max(1.0).default(0.05),

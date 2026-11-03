@@ -625,6 +625,27 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
     items: [],
   });
 
+  const [templateCriterionSearch, setTemplateCriterionSearch] = useState("");
+  const [templateCriterionPopoverOpen, setTemplateCriterionPopoverOpen] = useState(false);
+  const [templateCriterionLayerFilter, setTemplateCriterionLayerFilter] = useState<"all" | "common" | "role" | "custom">("all");
+
+  const availableTemplateCriteria = useMemo(() => {
+    const existingIds = new Set(templateForm.items.map((it: any) => it.criterion_id));
+    const term = templateCriterionSearch.trim().toLowerCase();
+    return kpiCriteria.filter((c: any) => {
+      if (existingIds.has(c.id)) return false;
+      if (templateCriterionLayerFilter !== "all" && c.layer !== templateCriterionLayerFilter) return false;
+      if (!term) return true;
+      return (
+        (c.name_en || "").toLowerCase().includes(term) ||
+        (c.name_ar || "").toLowerCase().includes(term) ||
+        (c.code || "").toLowerCase().includes(term) ||
+        (c.category_en || c.category || "").toLowerCase().includes(term) ||
+        (c.category_ar || "").toLowerCase().includes(term)
+      );
+    });
+  }, [kpiCriteria, templateForm.items, templateCriterionSearch, templateCriterionLayerFilter]);
+
   const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
   const [duplicateSourceTemplate, setDuplicateSourceTemplate] = useState<any | null>(null);
   const [duplicateForm, setDuplicateForm] = useState({
@@ -1049,12 +1070,36 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
           criterionType = "custom";
         }
 
-        const catEn = String(
-          getVal(r, "Category (English)", "category_en", "category", "التصنيف بالانجليزي", "التصنيف بالانجليزية") || ""
+        const rawCatEn = String(
+          getVal(
+            r,
+            "Category (English)",
+            "category_en",
+            "Category",
+            "category",
+            "English Category",
+            "التصنيف بالانجليزي",
+            "التصنيف بالانجليزية",
+            "الفئة بالانجليزي"
+          ) || ""
         ).trim();
-        const catAr = String(
-          getVal(r, "Category (Arabic)", "category_ar", "التصنيف بالعربي", "الفئة", "التصنيف") || ""
+        const rawCatAr = String(
+          getVal(
+            r,
+            "Category (Arabic)",
+            "category_ar",
+            "Arabic Category",
+            "التصنيف بالعربي",
+            "التصنيف بالعربية",
+            "الفئة",
+            "التصنيف",
+            "الفئة بالعربي"
+          ) || ""
         ).trim();
+
+        const catEn = rawCatEn || rawCatAr || "Technical Execution & Architecture";
+        const catAr = rawCatAr || rawCatEn || "الأداء والتنفيذ الفني والبرمجي";
+
         const rawCat = (catEn + " " + catAr).toLowerCase();
         let category: "behavioral" | "technical" | "quality" | "productivity" | "safety" | "coordination" = "technical";
         if (rawCat.includes("behav") || rawCat.includes("سلوك") || rawCat.includes("انضباط")) category = "behavioral";
@@ -1094,10 +1139,14 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
           : "higher_is_better";
 
         parsedItems.push({
+          code: code || undefined,
           name_en: nameEn || nameAr,
           name_ar: nameAr || nameEn,
-          description_en: catEn || nameEn,
-          description_ar: catAr || nameAr,
+          category_en: catEn,
+          category_ar: catAr,
+          layer: criterionType === "common" ? "common" : criterionType === "custom" ? "custom" : "role",
+          description_en: code ? `[${code}] ${catEn}` : catEn,
+          description_ar: catAr,
           criterion_type: criterionType,
           category,
           scoring_scale: scale,
@@ -4036,7 +4085,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                                     </div>
                                     <p className="text-[11px] text-muted-foreground">
                                       {isAr ? crit.category_ar : crit.category_en}
-                                      {crit.how_measured_en && (
+                                      {crit.how_measured_en && crit.how_measured_en !== crit.category_en && (
                                         <span className="ms-2 text-muted-foreground/80">
                                           • {isAr ? crit.how_measured_ar : crit.how_measured_en}
                                         </span>
@@ -4154,7 +4203,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                             </div>
                             <p className="text-[11px] text-muted-foreground">
                               {isAr ? crit.category_ar : crit.category_en}
-                              {crit.how_measured_en && (
+                              {crit.how_measured_en && crit.how_measured_en !== crit.category_en && (
                                 <span className="ms-2 text-muted-foreground/80">
                                   • {isAr ? crit.how_measured_ar : crit.how_measured_en}
                                 </span>
@@ -4849,27 +4898,154 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                   </Badge>
                 </Label>
 
-                {/* Dropdown to add criterion from library */}
+                {/* Dynamic Searchable Combobox to add criterion from library */}
                 <div className="flex items-center gap-2">
-                  <select
-                    defaultValue=""
-                    onChange={(e) => {
-                      if (!e.target.value) return;
-                      const selectedCrit = kpiCriteria.find((c: any) => c.id === e.target.value);
-                      if (selectedCrit) handleAddCriterionToTemplate(selectedCrit);
-                      e.target.value = "";
-                    }}
-                    className="rounded-xl border border-input bg-background px-3 py-1.5 text-xs font-semibold cursor-pointer max-w-[260px]"
-                  >
-                    <option value="">{isAr ? "+ اختر معياراً لإضافته للقالب..." : "+ Add criterion to template..."}</option>
-                    {kpiCriteria
-                      .filter((c: any) => !templateForm.items.some((it) => it.criterion_id === c.id))
-                      .map((c: any) => (
-                        <option key={c.id} value={c.id}>
-                          {c.code} — {isAr ? c.name_ar : c.name_en} ({c.layer})
-                        </option>
-                      ))}
-                  </select>
+                  <Popover open={templateCriterionPopoverOpen} onOpenChange={setTemplateCriterionPopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={templateCriterionPopoverOpen}
+                        className="rounded-2xl border-input bg-background px-3 py-1.5 text-xs font-semibold cursor-pointer shadow-xs hover:bg-muted/60 gap-2 h-8 flex items-center justify-between min-w-[220px]"
+                      >
+                        <div className="flex items-center gap-1.5 truncate">
+                          <Plus className="h-3.5 w-3.5 text-brand shrink-0" />
+                          <span className="truncate">{isAr ? "+ إضافة معيار للقالب..." : "+ Add criterion to template..."}</span>
+                        </div>
+                        <ChevronDown className="h-3.5 w-3.5 opacity-60 shrink-0 ms-1" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="w-[min(520px,94vw)] p-3 rounded-2xl shadow-2xl border-border bg-card z-50 space-y-2.5"
+                      align={isAr ? "start" : "end"}
+                    >
+                      {/* Search box & Filter controls */}
+                      <div className="space-y-2">
+                        <div className="relative">
+                          <Search className="absolute start-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                          <Input
+                            autoFocus
+                            value={templateCriterionSearch}
+                            onChange={(e) => setTemplateCriterionSearch(e.target.value)}
+                            placeholder={isAr ? "ابحث بالاسم، الكود، أو الفئة..." : "Search criteria by name, code, or category..."}
+                            className="rounded-xl ps-8 pe-8 text-xs h-8.5"
+                          />
+                          {templateCriterionSearch && (
+                            <button
+                              type="button"
+                              onClick={() => setTemplateCriterionSearch("")}
+                              className="absolute end-2 top-2 text-muted-foreground hover:text-foreground cursor-pointer p-0.5"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Layer quick filters */}
+                        <div className="flex items-center gap-1 text-[11px] overflow-x-auto pb-0.5">
+                          {(["all", "common", "role", "custom"] as const).map((l) => (
+                            <button
+                              key={l}
+                              type="button"
+                              onClick={() => setTemplateCriterionLayerFilter(l)}
+                              className={`px-2 py-0.5 rounded-lg text-[10px] font-medium transition-colors cursor-pointer shrink-0 ${
+                                templateCriterionLayerFilter === l
+                                  ? "bg-brand text-brand-foreground font-semibold"
+                                  : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                              }`}
+                            >
+                              {l === "all"
+                                ? isAr ? "الكل" : "All"
+                                : l === "common"
+                                ? isAr ? "عام (40%)" : "Common (40%)"
+                                : l === "role"
+                                ? isAr ? "تخصصي (60%)" : "Role Specific (60%)"
+                                : isAr ? "مخصص" : "Custom"}
+                            </button>
+                          ))}
+                          <span className="ms-auto text-[10px] text-muted-foreground shrink-0 ps-1 font-mono">
+                            {availableTemplateCriteria.length} {isAr ? "معيار" : "items"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Criteria list */}
+                      <div className="max-h-[300px] overflow-y-auto space-y-1 pe-1">
+                        {availableTemplateCriteria.length === 0 ? (
+                          <div className="p-6 text-center text-xs text-muted-foreground rounded-xl border border-dashed border-border bg-muted/20">
+                            {templateCriterionSearch || templateCriterionLayerFilter !== "all"
+                              ? (isAr ? "لا توجد معايير مطابقة للبحث أو الفلتر" : "No criteria match your search or filter")
+                              : (isAr ? "تمت إضافة جميع المعايير المتاحة لهذا القالب" : "All available criteria have been added to this template")}
+                          </div>
+                        ) : (
+                          availableTemplateCriteria.map((c: any) => (
+                            <div
+                              key={c.id}
+                              onClick={() => {
+                                handleAddCriterionToTemplate(c);
+                                setTemplateCriterionPopoverOpen(false);
+                                setTemplateCriterionSearch("");
+                              }}
+                              className="p-2.5 rounded-xl border border-transparent hover:border-brand/30 hover:bg-brand/5 dark:hover:bg-brand/10 transition-all cursor-pointer flex items-center justify-between gap-2.5 group"
+                            >
+                              <div className="min-w-0 space-y-1 flex-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  {c.code && (
+                                    <Badge variant="outline" className="font-mono text-[9px] px-1 py-0 shrink-0">
+                                      {c.code}
+                                    </Badge>
+                                  )}
+                                  <span className="font-semibold text-xs text-foreground group-hover:text-brand transition-colors truncate">
+                                    {isAr ? c.name_ar || c.name_en : c.name_en || c.name_ar}
+                                  </span>
+                                  <Badge
+                                    className={`text-[9px] px-1.5 py-0 shrink-0 ${
+                                      c.layer === "common"
+                                        ? "bg-blue-600/90 text-white"
+                                        : c.layer === "role"
+                                        ? "bg-emerald-600/90 text-white"
+                                        : "bg-purple-600/90 text-white"
+                                    }`}
+                                  >
+                                    {c.layer === "common"
+                                      ? (isAr ? "عام" : "Common")
+                                      : c.layer === "role"
+                                      ? (isAr ? "تخصصي" : "Role")
+                                      : (isAr ? "مخصص" : "Custom")}
+                                  </Badge>
+                                </div>
+                                <div className="flex items-center gap-2 text-[10px] text-muted-foreground flex-wrap">
+                                  <span className="font-medium text-muted-foreground/90 truncate">
+                                    {isAr ? c.category_ar || c.category_en : c.category_en || c.category_ar}
+                                  </span>
+                                  {c.unit && (
+                                    <span className="text-muted-foreground/70 font-mono">
+                                      • {c.unit}
+                                    </span>
+                                  )}
+                                  {c.scoring_scale && (
+                                    <span className="text-muted-foreground/70">
+                                      • {c.scoring_scale === "rating_5" ? "1-5" : c.scoring_scale}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2.5 text-[11px] rounded-lg gap-1 bg-muted/60 text-foreground group-hover:bg-brand group-hover:text-brand-foreground transition-all shrink-0 cursor-pointer"
+                              >
+                                <Plus className="h-3.5 w-3.5" />
+                                <span>{isAr ? "إضافة" : "Add"}</span>
+                              </Button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
 
