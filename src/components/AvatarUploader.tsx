@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { updateEmployeeAdmin } from "@/backend/functions/employees.functions";
 import { EmployeeAvatar } from "@/components/EmployeeAvatar";
+import { cn } from "@/lib/utils";
 
 const ACCEPTED = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
 const MAX_BYTES = 500 * 1024;
@@ -16,6 +17,7 @@ export function AvatarUploader({
   size = "md",
   canEdit = true,
   className,
+  avatarClassName,
 }: {
   userId: string;
   name: string;
@@ -24,6 +26,7 @@ export function AvatarUploader({
   size?: "md" | "lg";
   canEdit?: boolean;
   className?: string;
+  avatarClassName?: string;
 }) {
   const ref = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -69,7 +72,7 @@ export function AvatarUploader({
 
   return (
     <div className={`relative inline-block ${className ?? ""}`}>
-      <EmployeeAvatar id={userId} name={name} url={localUrl} className={dim} />
+      <EmployeeAvatar id={userId} name={name} url={localUrl} className={cn(dim, avatarClassName)} />
       {canEdit && (
         <>
           <input ref={ref} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={onFile} />
@@ -78,7 +81,7 @@ export function AvatarUploader({
             onClick={() => ref.current?.click()}
             disabled={busy}
             title="Upload avatar"
-            className={`absolute -bottom-0.5 -end-0.5 grid ${uploadBtnDim} place-items-center rounded-full bg-gradient-brand text-brand-foreground shadow-sm ${ringCls} ring-background transition-transform active:scale-90 hover:scale-105 disabled:opacity-60`}
+            className={`absolute -bottom-0.5 -end-0.5 grid ${uploadBtnDim} place-items-center rounded-full bg-gradient-brand text-brand-foreground shadow-sm ${ringCls} ring-card dark:ring-[#13151e] transition-transform active:scale-90 hover:scale-105 disabled:opacity-60`}
           >
             <Upload className={uploadIconDim} />
           </button>

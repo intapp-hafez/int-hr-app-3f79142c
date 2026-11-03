@@ -156,26 +156,25 @@ export function SettingsPage() {
         <div className="mx-auto -mt-2 mb-4 h-1.5 w-12 rounded-full bg-border/80 dark:bg-white/20" />
 
         <div className="flex flex-col items-center text-center">
-          {/* Centered Avatar as ID Photo */}
+          {/* Centered Avatar as ID Photo (Clean circular ID styling, no off-center double rings) */}
           <div className="relative mb-3 flex items-center justify-center">
-            <div className="rounded-full p-1 bg-background dark:bg-[#181a24] shadow-md ring-2 ring-primary/30">
-              {realProfile?.id ? (
-                <AvatarUploader
-                  userId={realProfile.id}
-                  name={realProfile.full_name ?? realProfile.email ?? me?.name ?? "?"}
-                  url={realProfile.avatar_url}
-                  size="lg"
-                  canEdit
-                />
-              ) : (
-                <div className="grid h-20 w-20 place-items-center rounded-full bg-gradient-brand text-brand-foreground font-display text-xl font-bold shadow-inner">
-                  {me?.name.split(" ").map((s) => s[0]).slice(0, 2).join("") ?? "??"}
-                </div>
-              )}
-            </div>
+            {realProfile?.id ? (
+              <AvatarUploader
+                userId={realProfile.id}
+                name={realProfile.full_name ?? realProfile.email ?? me?.name ?? "?"}
+                url={realProfile.avatar_url}
+                size="lg"
+                avatarClassName="ring-4 ring-border/80 dark:ring-white/15 shadow-xl"
+                canEdit
+              />
+            ) : (
+              <div className="grid h-20 w-20 place-items-center rounded-full bg-gradient-brand text-brand-foreground font-display text-xl font-bold shadow-xl ring-4 ring-border/80 dark:ring-white/15">
+                {me?.name.split(" ").map((s) => s[0]).slice(0, 2).join("") ?? "??"}
+              </div>
+            )}
           </div>
 
-          {/* 1. ID Number ("then ID") */}
+          {/* 1. ID Number */}
           {(realProfile?.emp_code || details?.emp_code || me?.id) && (
             <div className="inline-flex items-center gap-1.5 rounded-full bg-foreground/5 dark:bg-white/10 px-3 py-0.5 border border-border/80 dark:border-white/15 shadow-2xs">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">ID</span>
@@ -185,15 +184,15 @@ export function SettingsPage() {
             </div>
           )}
 
-          {/* 2. Employee Name ("then name") */}
+          {/* 2. Employee Name */}
           <h2 className="mt-2.5 font-display text-lg sm:text-xl font-bold tracking-tight text-foreground">
             {realProfile?.full_name ?? details?.full_name ?? me?.name ?? realProfile?.email}
           </h2>
 
-          {/* 3. "then so on": Job Position / Title */}
-          {displayPosition && (
-            <p className="mt-1 text-sm font-semibold text-primary dark:text-primary-foreground">
-              {displayPosition}
+          {/* 3. Position directly under Name (High-contrast, vibrant in both light and dark mode) */}
+          {(displayPosition || details?.position || (me as any)?.position) && (
+            <p className="mt-1 text-sm font-semibold text-brand dark:text-orange-400">
+              {displayPosition || details?.position || (me as any)?.position}
             </p>
           )}
 
