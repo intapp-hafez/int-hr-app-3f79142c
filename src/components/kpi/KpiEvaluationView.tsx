@@ -670,13 +670,16 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
       setIsSubmittingReview(true);
       await reviewQuarterlyFn({
         data: {
+          id: item.id,
           evaluation_id: item.id,
           action: "approve",
         },
       });
-      toast.success(isAr ? "تم اعتماد التقييم بنجاح" : "Quarterly evaluation approved");
+      toast.success(isAr ? "تم اعتماد التقييم بنجاح" : "KPI evaluation approved");
       refetchPending();
-      queryClient.invalidateQueries({ queryKey: ["kpi-evaluations"] });
+      queryClient.invalidateQueries({ queryKey: ["kpi-pending-approvals"] });
+      queryClient.invalidateQueries({ queryKey: ["kpi-evaluation"] });
+      queryClient.invalidateQueries({ queryKey: ["kpi-evaluations-list"] });
     } catch (err: any) {
       toast.error(err.message || (isAr ? "فشل اعتماد التقييم" : "Failed to approve evaluation"));
     } finally {
@@ -700,8 +703,10 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
       setIsSubmittingReview(true);
       await reviewQuarterlyFn({
         data: {
+          id: selectedPendingItem.id,
           evaluation_id: selectedPendingItem.id,
           action: "return",
+          reason: returnReason.trim(),
           return_reason: returnReason.trim(),
         },
       });
@@ -710,7 +715,9 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
       setSelectedPendingItem(null);
       setReturnReason("");
       refetchPending();
-      queryClient.invalidateQueries({ queryKey: ["kpi-evaluations"] });
+      queryClient.invalidateQueries({ queryKey: ["kpi-pending-approvals"] });
+      queryClient.invalidateQueries({ queryKey: ["kpi-evaluation"] });
+      queryClient.invalidateQueries({ queryKey: ["kpi-evaluations-list"] });
     } catch (err: any) {
       toast.error(err.message || (isAr ? "فشل إعادة التقييم" : "Failed to return evaluation"));
     } finally {
@@ -2980,14 +2987,20 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
             ) : (
               <div className="divide-y divide-border rounded-2xl border border-border overflow-hidden bg-card">
                 {pendingApprovals
-                  .filter((item: any) => pendingQuarterFilter === "all" || (item.quarter || "").toLowerCase() === pendingQuarterFilter)
+                  .filter((item: any) => {
+                    if (pendingQuarterFilter === "all") return true;
+                    const q = (item.quarter || "").toLowerCase();
+                    if (q === pendingQuarterFilter || q === "annual") return true;
+                    if (Array.isArray(item.quarters) && item.quarters.includes(pendingQuarterFilter)) return true;
+                    return false;
+                  })
                   .map((item: any) => {
                     const empName = item.employee?.full_name || (isAr ? "موظف" : "Employee");
                     const empCode = item.employee?.emp_code;
                     const position = item.employee?.position?.name_en || (isAr ? "مهندس موقع" : "Site Engineer");
                     const dept = item.employee?.department?.name_en || (isAr ? "الهندسة" : "Engineering");
                     const quarterUpper = (item.quarter || "q1").toUpperCase();
-                    const score = Number(item.total_score ?? 0);
+                    const score = Number(item.total_score ?? item.score ?? 0);
                     const rating = getRatingFromScore(score / 100, true);
 
                     return (
@@ -3009,7 +3022,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                                 </Badge>
                               )}
                               <Badge className="bg-brand text-brand-foreground text-[10px] font-bold px-2 py-0">
-                                {quarterUpper} {item.evaluation_year}
+                                {quarterUpper === "ANNUAL" ? (isAr ? "تقييم سنوي وفصلي" : "Annual / Qs") : `${quarterUpper} ${item.evaluation_year}`}
                               </Badge>
                             </div>
                             <p className="text-xs text-muted-foreground">

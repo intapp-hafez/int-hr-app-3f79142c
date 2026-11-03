@@ -170,10 +170,19 @@ export const GetQuarterlyEvaluationSchema = z.object({
 export type GetQuarterlyEvaluationInput = z.infer<typeof GetQuarterlyEvaluationSchema>;
 
 export const ReviewQuarterlyEvaluationSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().uuid().optional(),
+  evaluation_id: z.string().uuid().optional(),
   action: z.enum(["approve", "return"]),
   reason: z.string().max(1000).optional(),
-}).refine(
+  return_reason: z.string().max(1000).optional(),
+}).transform((data) => ({
+  id: (data.id || data.evaluation_id) as string,
+  action: data.action,
+  reason: data.reason || data.return_reason,
+})).refine(
+  (data) => !!data.id,
+  { message: "Evaluation ID is required", path: ["id"] }
+).refine(
   (data) => data.action !== "return" || (data.reason && data.reason.trim().length >= 5),
   { message: "A specific return reason (at least 5 characters) is required when returning an evaluation for revision.", path: ["reason"] }
 );

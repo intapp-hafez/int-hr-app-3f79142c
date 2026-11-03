@@ -1111,8 +1111,8 @@ export const getQuarterlyEvaluation = createServerFn({ method: "POST" })
           id,
           full_name,
           emp_code,
-          department:departments(name_en),
-          position:positions(name_en, name_ar)
+          department:departments!profiles_department_id_fkey(name_en),
+          position:positions!profiles_position_id_fkey(name_en, name_ar)
         ),
         evaluator:profiles!kpi_quarterly_evaluations_evaluator_id_fkey(
           id,
@@ -1351,63 +1351,121 @@ export const reviewQuarterlyEvaluation = createServerFn({ method: "POST" })
       throw new Error("Forbidden: Only HR Admins can approve or return evaluations");
     }
 
-    const { data: record, error: fetchErr } = await (supabase as any)
-      .from("kpi_quarterly_evaluations")
-      .select("id, employee_id, evaluator_id, evaluation_year, quarter, status, score")
-      .eq("id", input.id)
-      .single();
-
-    if (fetchErr || !record) throw new Error("Quarterly evaluation record not found");
-
+    const targetId = input.id;
     const now = new Date().toISOString();
     const newStatus = input.action === "approve" ? "approved" : "returned";
 
-    const updatePayload: Record<string, any> = {
-      status: newStatus,
-      updated_at: now,
-      ...(newStatus === "approved" ? { approved_at: now, return_reason: null } : {}),
-      ...(newStatus === "returned" ? { returned_at: now, return_reason: input.reason } : {}),
-    };
-
-    const { error: updErr } = await (supabase as any)
+    // 1. Try finding in kpi_quarterly_evaluations
+    const { data: record, error: fetchErr } = await (supabase as any)
       .from("kpi_quarterly_evaluations")
-      .update(updatePayload)
-      .eq("id", input.id);
+      .select("id, employee_id, evaluator_id, evaluation_year, quarter, status, score")
+      .eq("id", targetId)
+      .maybeSingle();
 
-    if (updErr) throw new Error(`Failed to update evaluation status: ${updErr.message}`);
+    if (record) {
+      const updatePayload: Record<string, any> = {
+        status: newStatus,
+        updated_at: now,
+        ...(newStatus === "approved" ? { approved_at: now, return_reason: null } : {}),
+        ...(newStatus === "returned" ? { returned_at: now, return_reason: input.reason } : {}),
+      };
 
-    // Record audit transition
-    await (supabase as any).from("kpi_evaluation_transitions").insert({
-      evaluation_id: input.id,
-      actor_id: userId,
-      from_status: record.status,
-      to_status: newStatus,
-      reason: input.action === "return" ? input.reason : "Approved by HR Admin",
-      created_at: now,
-    });
+      const { error: updErr } = await (supabase as any)
+        .from("kpi_quarterly_evaluations")
+        .update(updatePayload)
+        .eq("id", targetId);
 
-    // Notify Manager
-    if (record.evaluator_id) {
-      if (input.action === "approve") {
-        await notifyKpiAction({
-          userIds: [record.evaluator_id, record.employee_id],
-          title: `KPI Evaluation Approved (${record.quarter.toUpperCase()} ${record.evaluation_year})`,
-          body: `The evaluation has been officially approved with a score of ${record.score}%.`,
-          url: "/admin/kpi-evaluations",
-          severity: "success",
-        });
-      } else {
-        await notifyKpiAction({
-          userIds: [record.evaluator_id],
-          title: `KPI Evaluation Returned for Revision (${record.quarter.toUpperCase()} ${record.evaluation_year})`,
-          body: `HR requested revisions: ${input.reason}`,
-          url: "/manager/kpi-evaluations",
-          severity: "warning",
-        });
+      if (updErr) throw new Error(`Failed to update evaluation status: ${updErr.message}`);
+
+      // Record audit transition
+      await (supabase as any).from("kpi_evaluation_transitions").insert({
+        evaluation_id: targetId,
+        actor_id: userId,
+        from_status: record.status,
+        to_status: newStatus,
+        reason: input.action === "return" ? input.reason : "Approved by HR Admin",
+        created_at: now,
+      });
+
+      // Notify Manager & Employee
+      if (record.evaluator_id) {
+        if (input.action === "approve") {
+          await notifyKpiAction({
+            userIds: [record.evaluator_id, record.employee_id],
+            title: `KPI Evaluation Approved (${record.quarter.toUpperCase()} ${record.evaluation_year})`,
+            body: `The evaluation has been officially approved with a score of ${record.score}%.`,
+            url: "/admin/kpi-evaluations",
+            severity: "success",
+          });
+        } else {
+          await notifyKpiAction({
+            userIds: [record.evaluator_id],
+            title: `KPI Evaluation Returned for Revision (${record.quarter.toUpperCase()} ${record.evaluation_year})`,
+            body: `HR requested revisions: ${input.reason}`,
+            url: "/manager/kpi-evaluations",
+            severity: "warning",
+          });
+        }
       }
+
+      return { success: true, id: targetId, status: newStatus };
     }
 
-    return { success: true, id: input.id, status: newStatus };
+    // 2. Try finding in kpi_evaluations (standard/annual evaluation records)
+    const { data: oldRecord } = await (supabase as any)
+      .from("kpi_evaluations")
+      .select("id, employee_id, evaluator_id, evaluation_year, status, summary, notes")
+      .eq("id", targetId)
+      .maybeSingle();
+
+    if (oldRecord) {
+      const evalStatus = input.action === "approve" ? "approved" : "draft";
+      const notes = typeof oldRecord.notes === "object" && oldRecord.notes ? { ...oldRecord.notes } : {};
+      if (input.action === "return" && input.reason) {
+        notes.returnReason = input.reason;
+        notes.growthAreas = (notes.growthAreas ? notes.growthAreas + "\n" : "") + `[HR Return Note]: ${input.reason}`;
+      }
+
+      const updatePayload: Record<string, any> = {
+        status: evalStatus,
+        notes,
+        updated_at: now,
+        ...(input.action === "approve" ? { approved_at: now } : {}),
+      };
+
+      const { error: updErr } = await (supabase as any)
+        .from("kpi_evaluations")
+        .update(updatePayload)
+        .eq("id", targetId);
+
+      if (updErr) throw new Error(`Failed to update evaluation status: ${updErr.message}`);
+
+      // Notify Manager & Employee
+      const evaluatorId = oldRecord.evaluator_id;
+      if (evaluatorId) {
+        if (input.action === "approve") {
+          await notifyKpiAction({
+            userIds: [evaluatorId, oldRecord.employee_id],
+            title: `KPI Evaluation Approved (${oldRecord.evaluation_year})`,
+            body: `The evaluation has been officially approved with a score of ${oldRecord.summary?.totalScore ?? 0}%.`,
+            url: "/admin/kpi-evaluations",
+            severity: "success",
+          });
+        } else {
+          await notifyKpiAction({
+            userIds: [evaluatorId],
+            title: `KPI Evaluation Returned for Revision (${oldRecord.evaluation_year})`,
+            body: `HR requested revisions: ${input.reason}`,
+            url: "/manager/kpi-evaluations",
+            severity: "warning",
+          });
+        }
+      }
+
+      return { success: true, id: targetId, status: evalStatus };
+    }
+
+    throw new Error("Evaluation record not found");
   });
 
 export const listPendingApprovals = createServerFn({ method: "POST" })
@@ -1421,7 +1479,8 @@ export const listPendingApprovals = createServerFn({ method: "POST" })
       throw new Error("Forbidden: Pending approvals workspace is restricted to HR and Admins");
     }
 
-    let query = (supabase as any)
+    // 1. Query kpi_quarterly_evaluations
+    let qQuery = (supabase as any)
       .from("kpi_quarterly_evaluations")
       .select(`
         *,
@@ -1429,8 +1488,8 @@ export const listPendingApprovals = createServerFn({ method: "POST" })
           id,
           full_name,
           emp_code,
-          department:departments(name_en),
-          position:positions(name_en)
+          department:departments!profiles_department_id_fkey(name_en),
+          position:positions!profiles_position_id_fkey(name_en)
         ),
         evaluator:profiles!kpi_quarterly_evaluations_evaluator_id_fkey(
           id,
@@ -1440,19 +1499,82 @@ export const listPendingApprovals = createServerFn({ method: "POST" })
       .eq("status", "submitted")
       .order("submitted_at", { ascending: false });
 
-    if (input.year) query = query.eq("evaluation_year", input.year);
-    if (input.quarter) query = query.eq("quarter", input.quarter);
+    if (input.year) qQuery = qQuery.eq("evaluation_year", input.year);
+    if (input.quarter) qQuery = qQuery.eq("quarter", input.quarter);
 
-    const { data, error } = await query;
-    if (error) throw new Error(`Failed to list pending approvals: ${error.message}`);
+    // 2. Query kpi_evaluations (evaluations submitted through the scorecard workflow)
+    let aQuery = (supabase as any)
+      .from("kpi_evaluations")
+      .select(`
+        *,
+        employee:profiles!kpi_evaluations_employee_id_fkey(
+          id,
+          full_name,
+          emp_code,
+          department:departments!profiles_department_id_fkey(name_en),
+          position:positions!profiles_position_id_fkey(name_en)
+        ),
+        evaluator:profiles!kpi_evaluations_evaluator_id_fkey(
+          id,
+          full_name
+        )
+      `)
+      .eq("status", "submitted")
+      .order("submitted_at", { ascending: false });
 
-    let rows = (data || []) as QuarterlyEvaluationRecord[];
+    if (input.year) aQuery = aQuery.eq("evaluation_year", input.year);
+
+    const [qRes, aRes] = await Promise.all([qQuery, aQuery]);
+    if (qRes.error) throw new Error(`Failed to list pending quarterly approvals: ${qRes.error.message}`);
+    if (aRes.error) throw new Error(`Failed to list pending evaluation approvals: ${aRes.error.message}`);
+
+    const mappedQ = (qRes.data || []).map((r: any) => ({
+      ...r,
+      score: Number(r.score ?? 0),
+      total_score: Number(r.score ?? r.total_score ?? 0),
+      evaluator_name: r.evaluator?.full_name || r.evaluator_name || "Manager",
+      source: "kpi_quarterly_evaluations",
+    }));
+
+    const mappedA = (aRes.data || []).map((r: any) => {
+      const quarters: string[] = [];
+      if (r.scores && typeof r.scores === "object") {
+        for (const crit of Object.values(r.scores) as any[]) {
+          if (crit?.q1?.actual != null) quarters.push("q1");
+          if (crit?.q2?.actual != null) quarters.push("q2");
+          if (crit?.q3?.actual != null) quarters.push("q3");
+          if (crit?.q4?.actual != null) quarters.push("q4");
+        }
+      }
+      const uniqueQs = Array.from(new Set(quarters));
+      return {
+        id: r.id,
+        employee_id: r.employee_id,
+        evaluation_year: r.evaluation_year,
+        quarter: uniqueQs.length === 1 ? uniqueQs[0] : "Annual",
+        quarters: uniqueQs,
+        status: r.status,
+        score: Number(r.summary?.totalScore ?? 0),
+        total_score: Number(r.summary?.totalScore ?? 0),
+        evaluator_id: r.evaluator_id,
+        evaluator_name: r.evaluator_name || r.evaluator?.full_name || "Manager",
+        notes: r.notes || {},
+        submitted_at: r.submitted_at || r.updated_at,
+        employee: r.employee,
+        evaluator: r.evaluator,
+        template_type: r.template_type,
+        source: "kpi_evaluations",
+      };
+    });
+
+    let rows = [...mappedQ, ...mappedA];
+
     if (input.search && input.search.trim()) {
       const s = input.search.trim().toLowerCase();
       rows = rows.filter((r) => {
         const empName = (r.employee?.full_name || "").toLowerCase();
         const empCode = (r.employee?.emp_code || "").toLowerCase();
-        const evalName = (r.evaluator?.full_name || "").toLowerCase();
+        const evalName = (r.evaluator_name || r.evaluator?.full_name || "").toLowerCase();
         return empName.includes(s) || empCode.includes(s) || evalName.includes(s);
       });
     }
@@ -1532,8 +1654,8 @@ export const getKpiEvaluation = createServerFn({ method: "POST" })
           id,
           full_name,
           emp_code,
-          department:departments(name_en),
-          position:positions(name_en)
+          department:departments!profiles_department_id_fkey(name_en),
+          position:positions!profiles_position_id_fkey(name_en)
         )
       `)
       .eq("employee_id", input.employeeId)
@@ -1573,8 +1695,8 @@ export const listKpiEvaluations = createServerFn({ method: "POST" })
           id,
           full_name,
           emp_code,
-          department:departments(name_en),
-          position:positions(name_en)
+          department:departments!profiles_department_id_fkey(name_en),
+          position:positions!profiles_position_id_fkey(name_en)
         )
       `)
       .order("updated_at", { ascending: false });
@@ -1779,8 +1901,8 @@ export const getMyKpiEvaluation = createServerFn({ method: "POST" })
           id,
           full_name,
           emp_code,
-          department:departments(name_en),
-          position:positions(name_en)
+          department:departments!profiles_department_id_fkey(name_en),
+          position:positions!profiles_position_id_fkey(name_en)
         )
       `)
       .eq("employee_id", userId)
