@@ -36,7 +36,15 @@ const formatDate = (dateString?: string | null) => {
   return dateString;
 };
 
-export function EmployeeCustodyPanel({ employeeId }: { employeeId: string }) {
+export function EmployeeCustodyPanel({
+  employeeId,
+  canManage = true,
+  showHeader = true,
+}: {
+  employeeId: string;
+  canManage?: boolean;
+  showHeader?: boolean;
+}) {
   const { t } = useI18n();
   const qc = useQueryClient();
   const listFn = useServerFn(listEmployeeCustody);
@@ -125,29 +133,63 @@ export function EmployeeCustodyPanel({ employeeId }: { employeeId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="font-display text-lg font-semibold">{t("custody" as any)}</h2>
-          <p className="text-sm text-muted-foreground">{t("custodySubtitle" as any)}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowFilters((v) => !v)}
-            className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-semibold hover:bg-muted"
-          >
-            <Filter className="h-4 w-4" /> {t("filters" as any) ?? "Filters"}
-            {activeFilters > 0 && (
-              <span className="rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground">{activeFilters}</span>
+      {showHeader ? (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-display text-lg font-semibold">{t("custody" as any)}</h2>
+            <p className="text-sm text-muted-foreground">{t("custodySubtitle" as any)}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowFilters((v) => !v)}
+              className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-semibold hover:bg-muted cursor-pointer"
+            >
+              <Filter className="h-4 w-4" /> {t("filters" as any) ?? "Filters"}
+              {activeFilters > 0 && (
+                <span className="rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground">{activeFilters}</span>
+              )}
+            </button>
+            {canManage && (
+              <button
+                onClick={() => setOpenAdd(true)}
+                className="inline-flex items-center gap-2 rounded-full bg-gradient-brand px-4 py-2 text-sm font-semibold text-brand-foreground shadow-brand cursor-pointer"
+              >
+                <Plus className="h-4 w-4" /> {t("addCustody" as any)}
+              </button>
             )}
-          </button>
-          <button
-            onClick={() => setOpenAdd(true)}
-            className="inline-flex items-center gap-2 rounded-full bg-gradient-brand px-4 py-2 text-sm font-semibold text-brand-foreground shadow-brand"
-          >
-            <Plus className="h-4 w-4" /> {t("addCustody" as any)}
-          </button>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="flex items-center justify-between gap-2 pb-1">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-muted-foreground">
+              {t("custody" as any)}
+            </span>
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-mono text-muted-foreground">
+              {items.length}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowFilters((v) => !v)}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-1.5 text-xs font-semibold hover:bg-muted cursor-pointer"
+            >
+              <Filter className="h-3.5 w-3.5" /> {t("filters" as any) ?? "Filters"}
+              {activeFilters > 0 && (
+                <span className="rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground">{activeFilters}</span>
+              )}
+            </button>
+            {canManage && (
+              <button
+                onClick={() => setOpenAdd(true)}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground shadow-brand cursor-pointer"
+              >
+                <Plus className="h-3.5 w-3.5" /> {t("addCustody" as any)}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {showFilters && (
         <div className="grid gap-3 rounded-2xl border border-border bg-card p-4 sm:grid-cols-4">
@@ -175,7 +217,7 @@ export function EmployeeCustodyPanel({ employeeId }: { employeeId: string }) {
           <div className="sm:col-span-4 flex justify-end">
             <button
               onClick={() => setFilters({ from: "", to: "", category: "", model: "" })}
-              className="rounded-full border border-border px-4 py-1.5 text-xs font-semibold hover:bg-muted"
+              className="rounded-full border border-border px-4 py-1.5 text-xs font-semibold hover:bg-muted cursor-pointer"
             >
               {t("clear" as any) ?? "Clear"}
             </button>
@@ -203,7 +245,7 @@ export function EmployeeCustodyPanel({ employeeId }: { employeeId: string }) {
                   <th className="px-4 py-3 text-start">{t("custodySerial" as any)}</th>
                   <th className="px-4 py-3 text-start">{t("custodyCategory" as any)}</th>
                   <th className="px-4 py-3 text-start">{t("status" as any)}</th>
-                  <th className="px-4 py-3" />
+                  {canManage && <th className="px-4 py-3" />}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -215,6 +257,7 @@ export function EmployeeCustodyPanel({ employeeId }: { employeeId: string }) {
                       <td className="px-4 py-3 font-medium">
                         {it.name}
                         {it.model && <div className="text-[11px] text-muted-foreground">{it.model}</div>}
+                        {it.notes && <div className="text-[11px] text-muted-foreground/80 italic mt-0.5">{it.notes}</div>}
                       </td>
                       <td className="px-4 py-3 font-mono text-xs">{it.serial_number ?? "—"}</td>
                       <td className="px-4 py-3">
@@ -245,34 +288,36 @@ export function EmployeeCustodyPanel({ employeeId }: { employeeId: string }) {
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-end">
-                        <div className="flex items-center justify-end gap-1">
-                          {!isReturned && (
+                      {canManage && (
+                        <td className="px-4 py-3 text-end">
+                          <div className="flex items-center justify-end gap-1">
+                            {!isReturned && (
+                              <button
+                                onClick={() => setReturnItem(it)}
+                                className="rounded-full p-2 text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer"
+                                title={t("returnCustody" as any)}
+                              >
+                                <CornerDownLeft className="h-4 w-4" />
+                              </button>
+                            )}
                             <button
-                              onClick={() => setReturnItem(it)}
-                              className="rounded-full p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-                              title={t("returnCustody" as any)}
+                              onClick={() => setEditItem(it)}
+                              className="rounded-full p-2 text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer"
+                              title={t("edit" as any)}
                             >
-                              <CornerDownLeft className="h-4 w-4" />
+                              <Pencil className="h-4 w-4" />
                             </button>
-                          )}
-                          <button
-                            onClick={() => setEditItem(it)}
-                            className="rounded-full p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-                            title={t("edit" as any)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                          <button
-                            disabled={delMut.isPending}
-                            onClick={() => setDeleteItem(it)}
-                            className="rounded-full p-2 text-destructive hover:bg-destructive/10 disabled:opacity-50"
-                            title={t("delete" as any)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
+                            <button
+                              disabled={delMut.isPending}
+                              onClick={() => setDeleteItem(it)}
+                              className="rounded-full p-2 text-destructive hover:bg-destructive/10 disabled:opacity-50 cursor-pointer"
+                              title={t("delete" as any)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
@@ -395,7 +440,7 @@ function CustodyFormModal({
           <h3 className="font-display text-lg font-semibold">
             {item ? t("edit" as any) : t("addCustodyItem" as any)}
           </h3>
-          <button onClick={onClose} className="rounded-full p-2 hover:bg-muted" aria-label="Close">
+          <button onClick={onClose} className="rounded-full p-2 hover:bg-muted cursor-pointer" aria-label="Close">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -443,13 +488,13 @@ function CustodyFormModal({
             <textarea value={form.notes} onChange={(e) => upd("notes", e.target.value)} rows={2} className={inputCls} />
           </label>
           <div className="sm:col-span-2 mt-1 flex justify-end gap-2">
-            <button type="button" onClick={onClose} className="rounded-full border border-border px-4 py-2 text-sm font-semibold">
+            <button type="button" onClick={onClose} className="rounded-full border border-border px-4 py-2 text-sm font-semibold cursor-pointer">
               {t("cancel")}
             </button>
             <button
               type="submit"
               disabled={pending}
-              className="inline-flex items-center gap-2 rounded-full bg-gradient-brand px-4 py-2 text-sm font-semibold text-brand-foreground shadow-brand disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-full bg-gradient-brand px-4 py-2 text-sm font-semibold text-brand-foreground shadow-brand disabled:opacity-50 cursor-pointer"
             >
               {pending && <Loader2 className="h-4 w-4 animate-spin" />} {t("save")}
             </button>
@@ -488,7 +533,7 @@ function ReturnCustodyModal({
       <div className="w-full max-w-sm rounded-3xl border border-border bg-card p-5 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="font-display text-lg font-semibold">{t("returnCustody" as any)}</h3>
-          <button onClick={onClose} className="rounded-full p-2 hover:bg-muted" aria-label="Close">
+          <button onClick={onClose} className="rounded-full p-2 hover:bg-muted cursor-pointer" aria-label="Close">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -529,13 +574,13 @@ function ReturnCustodyModal({
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className={inputCls} />
           </label>
           <div className="mt-2 flex justify-end gap-2">
-            <button type="button" onClick={onClose} className="rounded-full border border-border px-4 py-2 text-sm font-semibold">
+            <button type="button" onClick={onClose} className="rounded-full border border-border px-4 py-2 text-sm font-semibold cursor-pointer">
               {t("cancel")}
             </button>
             <button
               type="submit"
               disabled={pending}
-              className="inline-flex items-center gap-2 rounded-full bg-success px-4 py-2 text-sm font-semibold text-success-foreground disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-full bg-success px-4 py-2 text-sm font-semibold text-success-foreground disabled:opacity-50 cursor-pointer"
             >
               {pending && <Loader2 className="h-4 w-4 animate-spin" />} {t("markAsReturned" as any)}
             </button>

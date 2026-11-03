@@ -8,10 +8,12 @@ import {
   CalendarClock, IdCard, Lock, LogOut, Smartphone, Shield, MapPin,
   Wifi, Check, X, Eye, EyeOff, Signal, Bell, Globe, Fingerprint,
   Banknote, CalendarDays, MessageSquare, ChevronRight, Settings,
-  BadgeCheck, Clock, TrendingUp, Users, BarChart3, Star, Copy,
+  BadgeCheck, Clock, TrendingUp, Users, BarChart3, Star, Copy, Package,
 } from "lucide-react";
 import { getMe, getMyProfileDetails } from "@/backend/functions/auth.functions";
 import { listMyDevices, registerMyDevice, removeMyDevice } from "@/backend/functions/devices.functions";
+import { listEmployeeCustody } from "@/backend/functions/custody.functions";
+import { EmployeeCustodyPanel } from "@/components/admin/EmployeeCustodyPanel";
 import { AvatarUploader } from "@/components/AvatarUploader";
 import { InstallButton } from "@/components/InstallButton";
 import { useI18n, useTranslators } from "@/lib/i18n";
@@ -23,7 +25,7 @@ export const Route = createFileRoute("/manager/profile")({
 });
 
 // ─── Tab Types ────────────────────────────────────────────────────────────────
-type Tab = "overview" | "settings" | "devices" | "access";
+type Tab = "overview" | "custody" | "settings" | "devices" | "access";
 
 function ManagerProfilePage() {
   const { t, lang, setLang } = useI18n();
@@ -61,6 +63,14 @@ function ManagerProfilePage() {
   });
 
   const myDevice = myDevices.find((d: any) => d.id === deviceId);
+
+  const listCustodyFn = useServerFn(listEmployeeCustody);
+  const { data: managerCustodyList = [] } = useQuery({
+    queryKey: ["employee-custody", realProfile?.id],
+    queryFn: () => listCustodyFn({ data: { profileId: realProfile!.id! } }),
+    enabled: !!realProfile?.id,
+  });
+  const activeCustodyCount = managerCustodyList.filter((it: any) => !it.return_date).length;
   const deviceStatus: "approved" | "pending" | "revoked" | "unregistered" =
     myDevice?.status === "approved" ? "approved" :
     myDevice?.status === "pending" ? "pending" :
@@ -86,11 +96,17 @@ function ManagerProfilePage() {
     } catch (e: any) { toast.error(e?.message ?? "Failed to remove device"); }
   }
 
-  const tabs: { id: Tab; label: string; icon: typeof User }[] = [
-    { id: "overview", label: "Overview", icon: User },
-    { id: "settings", label: "Settings", icon: Settings },
-    { id: "devices", label: "Devices", icon: Smartphone },
-    { id: "access", label: "Access", icon: Shield },
+  const tabs: { id: Tab; label: string; icon: any; badge?: number }[] = [
+    { id: "overview", label: lang === "ar" ? "نظرة عامة" : "Overview", icon: User },
+    {
+      id: "custody",
+      label: lang === "ar" ? "العهدة" : "Custody",
+      icon: Package,
+      badge: activeCustodyCount > 0 ? activeCustodyCount : undefined,
+    },
+    { id: "settings", label: lang === "ar" ? "الإعدادات" : "Settings", icon: Settings },
+    { id: "devices", label: lang === "ar" ? "الأجهزة" : "Devices", icon: Smartphone },
+    { id: "access", label: lang === "ar" ? "الصلاحيات" : "Access", icon: Shield },
   ];
 
   function CopyButton({ text, label }: { text?: string | null; label?: string }) {
@@ -279,7 +295,16 @@ function ManagerProfilePage() {
               }`}
             >
               <tab.icon className={`h-4 w-4 ${active ? "text-brand-foreground" : "text-muted-foreground"}`} />
-              {tab.label}
+              <span>{tab.label}</span>
+              {tab.badge !== undefined && (
+                <span
+                  className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                    active ? "bg-white/25 text-white" : "bg-brand/15 text-brand"
+                  }`}
+                >
+                  {tab.badge}
+                </span>
+              )}
             </button>
           );
         })}
@@ -409,6 +434,20 @@ function ManagerProfilePage() {
               ))}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── Tab: Custody ─────────────────────────────────────────────────── */}
+      {activeTab === "custody" && (
+        <div className="space-y-4">
+          {realProfile?.id ? (
+            <EmployeeCustodyPanel employeeId={realProfile.id} canManage={false} />
+          ) : (
+            <div className="rounded-3xl border border-border bg-card p-12 text-center text-muted-foreground text-sm">
+              <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p>{lang === "ar" ? "لا يوجد ملف مستخدم مرتبط" : "No associated profile found"}</p>
+            </div>
+          )}
         </div>
       )}
 

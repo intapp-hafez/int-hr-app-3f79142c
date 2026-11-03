@@ -67,16 +67,34 @@ export const CUSTODY_CATEGORIES = [
 
 export const listEmployeeCustody = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) => z.object({ profileId: z.string().uuid() }).parse(i))
+  .inputValidator((i) => z.object({ profileId: z.string().uuid().optional() }).optional().parse(i))
   .handler(async ({ data, context }) => {
+    const targetProfileId = data?.profileId || context.userId;
     const { data: rows, error } = await (context.supabase as any)
       .from("employee_custody")
       .select("*")
-      .eq("profile_id", data.profileId)
+      .eq("profile_id", targetProfileId)
       .order("custody_date", { ascending: false })
       .order("created_at", { ascending: false });
-    if (error) throw new Error(error.message);
-    return (rows ?? []) as CustodyItem[];
+
+    if (!error && rows) {
+      return rows as CustodyItem[];
+    }
+
+    try {
+      const { supabaseAdmin } = await import("@/backend/server/admin-client.server");
+      const { data: adminRows, error: adminErr } = await (supabaseAdmin as any)
+        .from("employee_custody")
+        .select("*")
+        .eq("profile_id", targetProfileId)
+        .order("custody_date", { ascending: false })
+        .order("created_at", { ascending: false });
+      if (adminErr) throw new Error(adminErr.message);
+      return (adminRows ?? []) as CustodyItem[];
+    } catch {
+      if (error) throw new Error(error.message);
+      return [];
+    }
   });
 
 export const addEmployeeCustody = createServerFn({ method: "POST" })

@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useI18n, useTranslators, LanguageToggle } from "@/lib/i18n";
-import { ChevronRight, Globe, Bell, MapPin, Wifi, Lock, LogOut, Smartphone, Check, ChevronDown, Shield, Signal, CircleDot, X, Eye, EyeOff, CalendarDays, MessageSquare, IdCard, User, Phone, Mail, Building2, UserCog, Briefcase, Fingerprint, Banknote, Clock } from "lucide-react";
+import { ChevronRight, Globe, Bell, MapPin, Wifi, Lock, LogOut, Smartphone, Check, ChevronDown, Shield, Signal, CircleDot, X, Eye, EyeOff, CalendarDays, MessageSquare, IdCard, User, Phone, Mail, Building2, UserCog, Briefcase, Fingerprint, Banknote, Clock, Package } from "lucide-react";
 import { InstallButton } from "@/components/InstallButton";
 import {
   useStore,
@@ -29,6 +29,8 @@ import {
 
 import { FaceAlertPrefsCard } from "./FaceAlertPrefsCard";
 import { EmployeePermissionsPanel } from "@/components/admin/EmployeePermissionsPanel";
+import { EmployeeCustodyPanel } from "@/components/admin/EmployeeCustodyPanel";
+import { listEmployeeCustody } from "@/backend/functions/custody.functions";
 
 export function SettingsPage() {
   const { t, lang, setLang } = useI18n();
@@ -50,6 +52,7 @@ export function SettingsPage() {
   const [openNet, setOpenNet] = useState(false);
   const [openPwd, setOpenPwd] = useState(false);
   const [openPermissions, setOpenPermissions] = useState(false);
+  const [openCustody, setOpenCustody] = useState(false);
   const empUserId = realProfile?.id || session?.employeeId;
 
   const myLocations = locations.filter((l) => l.name === me?.branch);
@@ -75,6 +78,14 @@ export function SettingsPage() {
     myDevice?.status === "blocked" ? "blocked" : "unregistered";
 
   const otherDevices = myDevices.filter((d: any) => d.id !== deviceId);
+
+  const listCustodyFn = useServerFn(listEmployeeCustody);
+  const { data: myCustodyList = [] } = useQuery({
+    queryKey: ["employee-custody", empUserId],
+    queryFn: () => listCustodyFn({ data: { profileId: empUserId! } }),
+    enabled: !!empUserId,
+  });
+  const activeCustodyCount = myCustodyList.filter((it: any) => !it.return_date).length;
   const [confirmReplaceOpen, setConfirmReplaceOpen] = useState(false);
   const [replacingDevice, setReplacingDevice] = useState<any>(null);
 
@@ -213,6 +224,13 @@ export function SettingsPage() {
                 {realProfile?.email || details?.email}
               </span>
             )}
+            {(details?.manager || (me as any)?.manager) && (
+              <span className="inline-flex items-center gap-1.5 rounded-md bg-brand/10 dark:bg-brand/15 text-brand px-2.5 py-1 font-semibold border border-brand/20 shadow-2xs">
+                <UserCog className="h-3.5 w-3.5 shrink-0" />
+                <span className="text-[11px] opacity-80 font-normal">{lang === "ar" ? "المدير:" : "Manager:"}</span>
+                <span className="truncate max-w-[180px]">{details?.manager || (me as any)?.manager}</span>
+              </span>
+            )}
           </div>
         </div>
       </section>
@@ -234,10 +252,48 @@ export function SettingsPage() {
             <ProfileRow icon={IdCard} label={lang === "ar" ? "الرقم القومي" : "National ID"} value={details?.national_id} mono />
             <ProfileRow icon={Building2} label={lang === "ar" ? "القسم" : "Department"} value={details?.department} />
             <ProfileRow icon={Briefcase} label={lang === "ar" ? "المسمى الوظيفي" : "Position"} value={displayPosition} />
-            <ProfileRow icon={UserCog} label={lang === "ar" ? "المدير المباشر" : "Manager"} value={details?.manager} />
+            <ProfileRow icon={UserCog} label={lang === "ar" ? "المدير المباشر" : "Manager"} value={details?.manager || (me as any)?.manager} />
+            {details?.manager_email && (
+              <ProfileRow icon={Mail} label={lang === "ar" ? "بريد المدير المباشر" : "Manager's Email"} value={details.manager_email} />
+            )}
+            {details?.manager_phone && (
+              <ProfileRow icon={Phone} label={lang === "ar" ? "هاتف المدير المباشر" : "Manager's Phone"} value={details.manager_phone} />
+            )}
           </dl>
         </ExpandableRow>
       </section>
+
+      {/* Direct Manager Highlight Card */}
+      {(details?.manager || (me as any)?.manager) && (
+        <section className="overflow-hidden rounded-2xl border border-border bg-card p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand/10 text-brand">
+                <UserCog className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  {lang === "ar" ? "المدير المباشر" : "Direct Manager"}
+                </p>
+                <p className="text-sm font-bold text-foreground truncate">
+                  {details?.manager || (me as any)?.manager}
+                </p>
+              </div>
+            </div>
+            {details?.manager_email && (
+              <a
+                href={`mailto:${details.manager_email}`}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-border/80 bg-background px-3 py-1.5 text-xs font-semibold hover:bg-muted transition-colors shrink-0"
+                title={details.manager_email}
+              >
+                <Mail className="h-3.5 w-3.5 text-brand" />
+                <span className="hidden sm:inline">{details.manager_email}</span>
+                <span className="sm:hidden">{lang === "ar" ? "مراسلة" : "Email"}</span>
+              </a>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Permissions & Request (by default collapsed) */}
       <section className="overflow-hidden rounded-2xl border border-border bg-card">
@@ -250,6 +306,33 @@ export function SettingsPage() {
         >
           <div className="pt-2">
             <EmployeePermissionsPanel employeeId={empUserId} canManage={false} />
+          </div>
+        </ExpandableRow>
+      </section>
+
+      {/* My Custody — العهد المسلمة */}
+      <section className="overflow-hidden rounded-2xl border border-border bg-card">
+        <ExpandableRow
+          icon={Package}
+          label={lang === "ar" ? "العهدة المستلمة" : "My Custody"}
+          hint={
+            activeCustodyCount > 0
+              ? lang === "ar"
+                ? `${activeCustodyCount} عهدة نشطة`
+                : `${activeCustodyCount} active item${activeCustodyCount === 1 ? "" : "s"}`
+              : lang === "ar"
+              ? "الأجهزة والمعدات المستلمة"
+              : "Assigned assets & equipment"
+          }
+          open={openCustody}
+          onToggle={() => setOpenCustody((v) => !v)}
+        >
+          <div className="pt-2">
+            {empUserId ? (
+              <EmployeeCustodyPanel employeeId={empUserId} canManage={false} showHeader={false} />
+            ) : (
+              <p className="text-sm text-muted-foreground py-2">{t("noData" as any)}</p>
+            )}
           </div>
         </ExpandableRow>
       </section>

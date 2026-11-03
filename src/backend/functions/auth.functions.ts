@@ -53,6 +53,9 @@ export type MyProfileDetails = {
   position: string | null;
   position_ar?: string | null;
   manager: string | null;
+  manager_id?: string | null;
+  manager_email?: string | null;
+  manager_phone?: string | null;
   salary_mode: string | null;
   salary_amount: number | null;
   contract_type: string | null;
@@ -71,15 +74,49 @@ export const getMyProfileDetails = createServerFn({ method: "GET" })
       .eq("id", userId)
       .maybeSingle();
     if (!p) return null;
-    const [{ data: dept }, { data: pos }, { data: mgr }] = await Promise.all([
+    let managerIdToFetch = p.manager_id;
+    if (!managerIdToFetch && p.department_id) {
+      try {
+        const { supabaseAdmin } = await import("@/backend/server/admin-client.server");
+        const { data: deptMgr } = await (supabaseAdmin as any)
+          .from("departments")
+          .select("responsible_person_id")
+          .eq("id", p.department_id)
+          .maybeSingle();
+        if (deptMgr?.responsible_person_id && deptMgr.responsible_person_id !== userId) {
+          managerIdToFetch = deptMgr.responsible_person_id;
+        }
+      } catch {}
+    }
+
+    let mgrData: { id?: string; full_name?: string | null; email?: string | null; phone?: string | null } | null = null;
+    if (managerIdToFetch) {
+      const { data: mgrUser } = await supabase
+        .from("profiles")
+        .select("id, full_name, email, phone")
+        .eq("id", managerIdToFetch)
+        .maybeSingle();
+      if (mgrUser) {
+        mgrData = mgrUser;
+      } else {
+        try {
+          const { supabaseAdmin } = await import("@/backend/server/admin-client.server");
+          const { data: adminMgr } = await (supabaseAdmin as any)
+            .from("profiles")
+            .select("id, full_name, email, phone")
+            .eq("id", managerIdToFetch)
+            .maybeSingle();
+          if (adminMgr) mgrData = adminMgr;
+        } catch {}
+      }
+    }
+
+    const [{ data: dept }, { data: pos }] = await Promise.all([
       p.department_id
         ? supabase.from("departments").select("name_en").eq("id", p.department_id).maybeSingle()
         : Promise.resolve({ data: null }),
       p.position_id
         ? supabase.from("positions").select("name_en, name_ar").eq("id", p.position_id).maybeSingle()
-        : Promise.resolve({ data: null }),
-      p.manager_id
-        ? supabase.from("profiles").select("full_name").eq("id", p.manager_id).maybeSingle()
         : Promise.resolve({ data: null }),
     ]);
     const salaryAmount = p.salary_mode === "net"
@@ -101,7 +138,10 @@ export const getMyProfileDetails = createServerFn({ method: "GET" })
       department: (dept as { name_en?: string } | null)?.name_en ?? null,
       position: (pos as { name_en?: string; name_ar?: string } | null)?.name_en ?? null,
       position_ar: (pos as { name_en?: string; name_ar?: string } | null)?.name_ar ?? null,
-      manager: (mgr as { full_name?: string } | null)?.full_name ?? null,
+      manager: mgrData?.full_name ?? null,
+      manager_id: mgrData?.id ?? managerIdToFetch ?? null,
+      manager_email: mgrData?.email ?? null,
+      manager_phone: mgrData?.phone ?? null,
       salary_mode: p.salary_mode ?? null,
       salary_amount: salaryAmount != null ? Number(salaryAmount) : null,
       contract_type: p.contract_type ?? null,
