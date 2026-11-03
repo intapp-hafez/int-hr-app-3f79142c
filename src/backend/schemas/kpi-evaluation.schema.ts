@@ -297,3 +297,28 @@ export const SeedKpiTemplatesSchema = z.object({
   overwrite: z.boolean().default(false).optional(),
 });
 export type SeedKpiTemplatesInput = z.infer<typeof SeedKpiTemplatesSchema>;
+
+export const ImportKpiCriterionItemSchema = z.object({
+  name_en: z.string().min(1, "English name is required").max(200),
+  name_ar: z.string().max(200).optional().default(""),
+  description_en: z.string().max(1000).optional().default(""),
+  description_ar: z.string().max(1000).optional().default(""),
+  criterion_type: KpiCriterionTypeSchema.default("position_specific"),
+  category: KpiCriterionCategorySchema.default("technical"),
+  scoring_scale: KpiScoringScaleSchema.default("percentage"),
+  scoring_direction: KpiScoringDirectionSchema.default("higher_is_better"),
+  unit: z.string().max(30).default("%"),
+  min_value: z.number().default(0),
+  max_value: z.number().default(100),
+  how_measured_en: z.string().max(1000).optional().default(""),
+  how_measured_ar: z.string().max(1000).optional().default(""),
+  default_weight: z.number().positive().max(1.0).default(0.05),
+  is_required: z.boolean().default(true),
+  is_active: z.boolean().default(true),
+  display_order: z.number().int().default(0),
+});
+
+export const BatchImportCriteriaSchema = z.object({
+  items: z.array(ImportKpiCriterionItemSchema).min(1, "At least one criterion is required to import"),
+});
+export type BatchImportCriteriaInput = z.infer<typeof BatchImportCriteriaSchema>;

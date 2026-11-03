@@ -36,6 +36,8 @@ import {
   RotateCcw,
   Copy,
   AlertTriangle,
+  Upload,
+  FileDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -63,6 +65,7 @@ import {
   exportAllKpiEvaluationsToExcel,
   AllEvaluationsExportRow,
 } from "@/lib/kpi/kpi-excel-export";
+import { downloadTemplate, parseExcelFile } from "@/lib/excel";
 import { listEmployeesAdmin } from "@/backend/functions/employees.functions";
 import { getMyTeam } from "@/lib/team.functions";
 import {
@@ -76,6 +79,7 @@ import {
   listKpiCriteria,
   saveKpiCriterion,
   archiveKpiCriterion,
+  batchImportKpiCriteria,
   listKpiTemplates,
   saveKpiTemplate,
   publishKpiTemplate,
@@ -417,6 +421,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
   const listCriteriaFn = useServerFn(listKpiCriteria);
   const saveCriterionFn = useServerFn(saveKpiCriterion);
   const archiveCriterionFn = useServerFn(archiveKpiCriterion);
+  const batchImportCriteriaFn = useServerFn(batchImportKpiCriteria);
   const listTemplatesFn = useServerFn(listKpiTemplates);
   const saveTemplateFn = useServerFn(saveKpiTemplate);
   const publishTemplateFn = useServerFn(publishKpiTemplate);
@@ -826,6 +831,250 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
       refetchCriteria();
     } catch (err: any) {
       toast.error(err.message || "Failed to archive criterion");
+    }
+  };
+
+  const criteriaFileInputRef = React.useRef<HTMLInputElement>(null);
+  const [isImportingCriteria, setIsImportingCriteria] = useState(false);
+
+  // 1. Download ready-made Excel template
+  const handleDownloadCriteriaTemplate = async () => {
+    try {
+      await downloadTemplate(
+        "kpi_criteria_import_template.xlsx",
+        [
+          "name_en",
+          "name_ar",
+          "criterion_type",
+          "category",
+          "scoring_direction",
+          "scoring_scale",
+          "unit",
+          "default_weight",
+          "min_value",
+          "max_value",
+          "description_en",
+          "description_ar",
+          "how_measured_en",
+          "how_measured_ar",
+        ],
+        [
+          {
+            name_en: "On-Time Installation Completion",
+            name_ar: "إنجاز التركيبات بالموعد",
+            criterion_type: "position_specific",
+            category: "technical",
+            scoring_direction: "higher_is_better",
+            scoring_scale: "percentage",
+            unit: "%",
+            default_weight: 15,
+            min_value: 0,
+            max_value: 95,
+            description_en: "Percentage of site installations completed within schedule",
+            description_ar: "نسبة إنجاز أعمال التركيبات في الموقع ضمن الجدول الزمني",
+            how_measured_en: "Completed tasks vs scheduled dates",
+            how_measured_ar: "المهام المنجزة مقارنة بالمواعيد المجدولة",
+          },
+          {
+            name_en: "Attendance & Punctuality",
+            name_ar: "الانضباط ومواعيد الحضور",
+            criterion_type: "common",
+            category: "behavioral",
+            scoring_direction: "higher_is_better",
+            scoring_scale: "percentage",
+            unit: "%",
+            default_weight: 10,
+            min_value: 0,
+            max_value: 98,
+            description_en: "Compliance with working hours and scheduled shifts",
+            description_ar: "الالتزام بساعات العمل والمناوبات المحددة",
+            how_measured_en: "Biometric check-in logs",
+            how_measured_ar: "سجلات الحضور البصمي",
+          },
+          {
+            name_en: "First-Time Compliance with Approved Drawings",
+            name_ar: "المطابقة الأولى للمخططات المعتمدة",
+            criterion_type: "position_specific",
+            category: "quality",
+            scoring_direction: "higher_is_better",
+            scoring_scale: "percentage",
+            unit: "%",
+            default_weight: 15,
+            min_value: 0,
+            max_value: 90,
+            description_en: "Deliveries matching engineering shop drawings without rework",
+            description_ar: "تسليم الأعمال مطابقة للمخططات المعتمدة دون الحاجة لإعادة العمل",
+            how_measured_en: "QC audit reports",
+            how_measured_ar: "تقارير تدقيق الجودة",
+          },
+          {
+            name_en: "Customer Satisfaction Rating",
+            name_ar: "تقييم رضا العملاء",
+            criterion_type: "position_specific",
+            category: "quality",
+            scoring_direction: "rating_5",
+            scoring_scale: "rating_5",
+            unit: "scale",
+            default_weight: 10,
+            min_value: 1,
+            max_value: 5,
+            description_en: "Overall customer and consultant feedback rating",
+            description_ar: "تقييم انطباع العميل والاستشاري العام",
+            how_measured_en: "Post-completion feedback survey",
+            how_measured_ar: "استبيان تقييم ما بعد التنفيذ",
+          },
+          {
+            name_en: "Proposal Turnaround Time",
+            name_ar: "زمن إعداد وتقديم العروض الفنية",
+            criterion_type: "position_specific",
+            category: "productivity",
+            scoring_direction: "lower_is_better",
+            scoring_scale: "count",
+            unit: "days",
+            default_weight: 10,
+            min_value: 1,
+            max_value: 3,
+            description_en: "Number of days to submit technical & financial offer",
+            description_ar: "عدد الأيام المستغرقة لتسليم العرض الفني والمالي",
+            how_measured_en: "ERP quotation timestamps",
+            how_measured_ar: "سجلات نظام العروض",
+          },
+        ]
+      );
+      toast.success(isAr ? "تم تحميل نموذج إكسيل المجهز بنجاح" : "KPI Criteria template downloaded successfully");
+    } catch (err: any) {
+      toast.error(err?.message || (isAr ? "فشل تحميل النموذج" : "Failed to download template"));
+    }
+  };
+
+  // 2. Import KPI criteria from uploaded Excel/CSV file
+  const handleImportCriteriaFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    try {
+      setIsImportingCriteria(true);
+      const rawRows = await parseExcelFile<Record<string, any>>(file);
+      if (!rawRows || rawRows.length === 0) {
+        toast.error(isAr ? "الملف فارغ ولا يحتوي على أي بيانات" : "The selected file is empty or has no data rows.");
+        return;
+      }
+
+      const getVal = (row: Record<string, any>, ...keys: string[]) => {
+        const clean = (s: string) => s.toLowerCase().replace(/[\s_\-():/]/g, "");
+        for (const k of keys) {
+          if (row[k] !== undefined && row[k] !== "") return row[k];
+          const target = clean(k);
+          for (const rowKey of Object.keys(row)) {
+            if (clean(rowKey) === target && row[rowKey] !== undefined && row[rowKey] !== "") {
+              return row[rowKey];
+            }
+          }
+        }
+        return undefined;
+      };
+
+      const parsedItems: any[] = [];
+      for (const [idx, r] of rawRows.entries()) {
+        const nameEn = String(getVal(r, "name_en", "name", "criterion_name", "criterion name", "english name", "اسم المعيار بالانجليزي", "الاسم بالانجليزية") || "").trim();
+        const nameAr = String(getVal(r, "name_ar", "arabic name", "اسم المعيار بالعربي", "الاسم بالعربية", "اسم المعيار") || "").trim();
+
+        if (!nameEn && !nameAr) continue;
+
+        const rawType = String(getVal(r, "criterion_type", "type", "layer", "نوع المعيار", "النوع") || "").toLowerCase();
+        let criterionType: "common" | "position_specific" | "custom" = "position_specific";
+        if (rawType.includes("common") || rawType.includes("عام")) {
+          criterionType = "common";
+        } else if (rawType.includes("custom") || rawType.includes("مخصص")) {
+          criterionType = "custom";
+        }
+
+        const rawCat = String(getVal(r, "category", "الفئة", "التصنيف") || "").toLowerCase();
+        let category: "behavioral" | "technical" | "quality" | "productivity" | "safety" | "coordination" = "technical";
+        if (rawCat.includes("behav") || rawCat.includes("سلوك")) category = "behavioral";
+        else if (rawCat.includes("qual") || rawCat.includes("جود")) category = "quality";
+        else if (rawCat.includes("prod") || rawCat.includes("انتاج")) category = "productivity";
+        else if (rawCat.includes("safe") || rawCat.includes("سلام")) category = "safety";
+        else if (rawCat.includes("coord") || rawCat.includes("تنسيق")) category = "coordination";
+
+        const rawDir = String(getVal(r, "scoring_direction", "direction", "اتجاه القياس") || "").toLowerCase();
+        let direction: "higher_is_better" | "lower_is_better" | "rating_5" | "target_range" = "higher_is_better";
+        if (rawDir.includes("low") || rawDir.includes("اقل") || rawDir.includes("أقل")) direction = "lower_is_better";
+        else if (rawDir.includes("5") || rawDir.includes("rating") || rawDir.includes("تقييم")) direction = "rating_5";
+        else if (rawDir.includes("range") || rawDir.includes("نطاق")) direction = "target_range";
+
+        const rawScale = String(getVal(r, "scoring_scale", "scale", "مقياس التقييم") || "").toLowerCase();
+        let scale: "rating_5" | "percentage" | "count" | "boolean" = direction === "rating_5" ? "rating_5" : "percentage";
+        if (rawScale.includes("count") || rawScale.includes("عدد")) scale = "count";
+        else if (rawScale.includes("bool") || rawScale.includes("نعم")) scale = "boolean";
+        else if (rawScale.includes("5") || rawScale.includes("rating")) scale = "rating_5";
+
+        const rawWeight = getVal(r, "default_weight", "weight", "الوزن", "النسبة");
+        let weight = 0.05;
+        if (rawWeight !== undefined && rawWeight !== "") {
+          const num = typeof rawWeight === "number" ? rawWeight : parseFloat(String(rawWeight).replace("%", ""));
+          if (!isNaN(num) && num > 0) {
+            weight = num > 1 ? Math.min(num / 100, 1.0) : num;
+          }
+        }
+
+        const rawMin = getVal(r, "min_value", "min", "الحد الادنى");
+        const minVal = rawMin !== undefined && !isNaN(parseFloat(rawMin)) ? parseFloat(rawMin) : 0;
+
+        const rawMax = getVal(r, "max_value", "target_benchmark", "target", "المستهدف", "الهدف");
+        const maxVal = rawMax !== undefined && !isNaN(parseFloat(rawMax)) ? parseFloat(rawMax) : (scale === "rating_5" ? 5 : 100);
+
+        const unit = String(getVal(r, "unit", "الوحدة") || (scale === "rating_5" ? "scale" : "%")).trim();
+        const descEn = String(getVal(r, "description_en", "description", "الوصف بالانجليزي") || "").trim();
+        const descAr = String(getVal(r, "description_ar", "الوصف بالعربي", "الوصف") || "").trim();
+        const howEn = String(getVal(r, "how_measured_en", "how_measured", "طريقة القياس بالانجليزي") || "").trim();
+        const howAr = String(getVal(r, "how_measured_ar", "طريقة القياس بالعربي", "طريقة القياس") || "").trim();
+
+        parsedItems.push({
+          name_en: nameEn || nameAr,
+          name_ar: nameAr || nameEn,
+          description_en: descEn,
+          description_ar: descAr,
+          criterion_type: criterionType,
+          category,
+          scoring_scale: scale,
+          scoring_direction: direction,
+          unit,
+          min_value: minVal,
+          max_value: maxVal,
+          how_measured_en: howEn,
+          how_measured_ar: howAr,
+          default_weight: weight,
+          is_required: true,
+          is_active: true,
+          display_order: idx + 1,
+        });
+      }
+
+      if (parsedItems.length === 0) {
+        toast.error(isAr ? "لم يتم العثور على معايير صالحة في الملف المرفوع" : "No valid criteria rows found in the file.");
+        return;
+      }
+
+      const res = await batchImportCriteriaFn({
+        data: {
+          items: parsedItems,
+        },
+      });
+
+      toast.success(
+        isAr
+          ? `تم استيراد ${res.totalCount} معياراً بنجاح (${res.insertedCount} جديد، ${res.updatedCount} تم تحديثه)`
+          : `Successfully imported ${res.totalCount} criteria (${res.insertedCount} new, ${res.updatedCount} updated)`
+      );
+
+      refetchCriteria();
+      queryClient.invalidateQueries({ queryKey: ["kpi-criteria-catalog"] });
+    } catch (err: any) {
+      toast.error(err?.message || (isAr ? "فشل استيراد المعايير من إكسيل" : "Failed to import criteria from Excel"));
+    } finally {
+      setIsImportingCriteria(false);
     }
   };
 
@@ -3459,11 +3708,45 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    onClick={handleDownloadCriteriaTemplate}
+                    variant="outline"
+                    size="sm"
+                    className="rounded-2xl gap-1.5 border-border hover:bg-muted/60 cursor-pointer shadow-xs text-xs font-medium"
+                    title={isAr ? "تحميل نموذج إكسيل مجهز بالمعايير والأمثلة" : "Download ready-made Excel template with sample criteria"}
+                  >
+                    <FileDown className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                    <span>{isAr ? "تحميل نموذج مجهز" : "Download Template"}</span>
+                  </Button>
+
+                  <input
+                    ref={criteriaFileInputRef}
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    onChange={handleImportCriteriaFile}
+                    className="hidden"
+                  />
+                  <Button
+                    onClick={() => criteriaFileInputRef.current?.click()}
+                    variant="outline"
+                    size="sm"
+                    disabled={isImportingCriteria}
+                    className="rounded-2xl gap-1.5 border-border hover:bg-muted/60 cursor-pointer shadow-xs text-xs font-medium"
+                    title={isAr ? "استيراد معايير من ملف إكسيل أو CSV" : "Import criteria from Excel or CSV"}
+                  >
+                    {isImportingCriteria ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-brand" />
+                    ) : (
+                      <Upload className="h-4 w-4 text-brand" />
+                    )}
+                    <span>{isImportingCriteria ? (isAr ? "جاري الاستيراد..." : "Importing...") : (isAr ? "استيراد من إكسيل" : "Import from Excel")}</span>
+                  </Button>
+
                   <Button
                     onClick={handleOpenAddCriterion}
                     size="sm"
-                    className="rounded-2xl gap-1.5 bg-brand text-brand-foreground hover:bg-brand/90 cursor-pointer shadow-xs"
+                    className="rounded-2xl gap-1.5 bg-brand text-brand-foreground hover:bg-brand/90 cursor-pointer shadow-xs text-xs font-medium"
                   >
                     <Plus className="h-4 w-4" />
                     <span>{isAr ? "إضافة معيار جديد" : "Add Criterion"}</span>

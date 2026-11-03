@@ -22,6 +22,7 @@ import {
   ListPendingApprovalsSchema,
   GetQuarterlyHistorySchema,
   SeedKpiTemplatesSchema,
+  BatchImportCriteriaSchema,
 } from "../schemas/kpi-evaluation.schema";
 import { resolveTeamMemberScope } from "@/lib/team.functions";
 import { getRatingFromScore } from "@/lib/kpi/light-current-kpi.data";
@@ -267,6 +268,89 @@ export const archiveKpiCriterion = createServerFn({ method: "POST" })
 
     if (error) throw new Error(`Failed to archive criterion: ${error.message}`);
     return { success: true, id: input.id, is_active: input.active };
+  });
+
+export const batchImportKpiCriteria = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => BatchImportCriteriaSchema.parse(input))
+  .handler(async ({ data: input, context }) => {
+    const { supabase, userId } = context;
+    const { isAdmin } = await assertKpiAccess(supabase, userId);
+    if (!isAdmin) {
+      throw new Error("Forbidden: Only HR or Admins can import KPI criteria");
+    }
+
+    const now = new Date().toISOString();
+
+    const { data: existingList, error: fetchErr } = await (supabase as any)
+      .from("kpi_criteria")
+      .select("id, name_en, name_ar");
+
+    if (fetchErr) throw new Error(`Failed to load existing criteria: ${fetchErr.message}`);
+
+    const existingMap = new Map<string, string>();
+    for (const ex of existingList || []) {
+      if (ex.name_en) existingMap.set(ex.name_en.trim().toLowerCase(), ex.id);
+      if (ex.name_ar) existingMap.set(ex.name_ar.trim().toLowerCase(), ex.id);
+    }
+
+    let insertedCount = 0;
+    let updatedCount = 0;
+
+    for (const [idx, item] of input.items.entries()) {
+      const nameEnKey = item.name_en.trim().toLowerCase();
+      const nameArKey = (item.name_ar || item.name_en).trim().toLowerCase();
+      const existingId = existingMap.get(nameEnKey) || existingMap.get(nameArKey);
+
+      const payload = {
+        name_en: item.name_en.trim(),
+        name_ar: item.name_ar?.trim() || item.name_en.trim(),
+        description_en: item.description_en || "",
+        description_ar: item.description_ar || "",
+        criterion_type: item.criterion_type,
+        category: item.category,
+        scoring_scale: item.scoring_scale,
+        scoring_direction: item.scoring_direction,
+        unit: item.unit || "%",
+        min_value: item.min_value ?? 0,
+        max_value: item.max_value ?? 100,
+        how_measured_en: item.how_measured_en || "",
+        how_measured_ar: item.how_measured_ar || "",
+        default_weight: item.default_weight ?? 0.05,
+        is_required: item.is_required ?? true,
+        is_active: item.is_active ?? true,
+        display_order: item.display_order ?? idx + 1,
+        updated_at: now,
+      };
+
+      if (existingId) {
+        const { error: updErr } = await (supabase as any)
+          .from("kpi_criteria")
+          .update(payload)
+          .eq("id", existingId);
+        if (updErr) throw new Error(`Failed to update criterion "${item.name_en}": ${updErr.message}`);
+        updatedCount++;
+      } else {
+        const { data: newRow, error: insErr } = await (supabase as any)
+          .from("kpi_criteria")
+          .insert({ ...payload, created_at: now })
+          .select("id")
+          .single();
+        if (insErr) throw new Error(`Failed to insert criterion "${item.name_en}": ${insErr.message}`);
+        if (newRow?.id) {
+          existingMap.set(nameEnKey, newRow.id);
+          existingMap.set(nameArKey, newRow.id);
+        }
+        insertedCount++;
+      }
+    }
+
+    return {
+      success: true,
+      totalCount: input.items.length,
+      insertedCount,
+      updatedCount,
+    };
   });
 
 // ─── TEMPLATE BUILDER FUNCTIONS ─────────────────────────────────────────────
