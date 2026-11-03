@@ -4,8 +4,6 @@ import {
   Award,
   Calendar,
   CheckCircle2,
-  ChevronDown,
-  ChevronUp,
   FileSpreadsheet,
   HelpCircle,
   Info,
@@ -65,7 +63,6 @@ export function EmployeeKpiPage() {
   const [activeQuarterFilter, setActiveQuarterFilter] = useState<"all" | "q1" | "q2" | "q3" | "q4">("all");
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
   const [infoModalKpi, setInfoModalKpi] = useState<KpiMetricDefinition | null>(null);
-  const [expandedKpiId, setExpandedKpiId] = useState<number | null>(null);
 
   const getMyKpiFn = useServerFn(getMyKpiEvaluation);
   const listMyKpisFn = useServerFn(listMyKpiEvaluations);
@@ -291,8 +288,8 @@ export function EmployeeKpiPage() {
             </h1>
             <p className="text-xs text-muted-foreground line-clamp-1">
               {isAr
-                ? "تقييم كفاءة مهندس موقع تيار خفيف — مصفوفة الـ 17 مؤشراً"
-                : "Junior ELV Site Engineer competency review — 17 KPIs"}
+                ? "متابعة نتائج التقييم الفصلي والأداء السنوي"
+                : "Quarterly and annual performance evaluation results"}
             </p>
           </div>
         </div>
@@ -481,7 +478,7 @@ export function EmployeeKpiPage() {
           <TabsList className="h-auto w-full justify-start rounded-2xl p-1 bg-muted/60 flex overflow-x-auto no-scrollbar scroll-smooth gap-1 max-w-full [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             <TabsTrigger value="scorecard" className="rounded-xl px-3 py-1.5 text-xs font-semibold gap-1.5 shrink-0 cursor-pointer">
               <FileSpreadsheet className="h-3.5 w-3.5" />
-              <span>{isAr ? "المعايير (17)" : "Scorecard"}</span>
+              <span>{isAr ? "بطاقة الأداء" : "Scorecard"}</span>
             </TabsTrigger>
             <TabsTrigger value="categories" className="rounded-xl px-3 py-1.5 text-xs font-semibold gap-1.5 shrink-0 cursor-pointer">
               <TrendingUp className="h-3.5 w-3.5" />
@@ -508,7 +505,7 @@ export function EmployeeKpiPage() {
                   {isAr ? `تصفية حسب: ${quartersList.find(q => q.q === activeQuarterFilter)?.label_ar}` : `Filter: ${activeQuarterFilter.toUpperCase()}`}
                 </span>
               ) : (
-                <span>{isAr ? "جميع مؤشرات الأداء الـ 17" : "All 17 Performance Metrics"}</span>
+                <span>{isAr ? "مؤشرات الأداء" : "Performance Metrics"}</span>
               )}
             </div>
 
@@ -541,7 +538,6 @@ export function EmployeeKpiPage() {
             <div className="space-y-4">
               {KPI_CATEGORIES.map((category) => {
                 const categoryRows = kpiRows.filter((r) => r.kpi.category === category);
-                const categoryWeight = categoryRows.reduce((acc, r) => acc + r.kpi.weight, 0);
 
                 return (
                   <div key={category} className="space-y-2.5">
@@ -550,16 +546,11 @@ export function EmployeeKpiPage() {
                       <span className="text-xs font-bold uppercase tracking-wider text-brand">
                         {isAr ? (KPI_CATEGORIES_AR[category] || category) : category}
                       </span>
-                      <span className="font-mono text-[11px] text-muted-foreground font-semibold">
-                        {isAr ? `الوزن: ${fmtPercent(categoryWeight, 1)}` : `Weight: ${fmtPercent(categoryWeight, 1)}`}
-                      </span>
                     </div>
 
                     {/* KPI Cards in this category */}
                     <div className="space-y-2.5">
-                      {categoryRows.map(({ kpi, q1, q2, q3, q4, annualScore }) => {
-                        const isExpanded = expandedKpiId === kpi.id;
-
+                      {categoryRows.map(({ kpi, q1, q2, q3, q4 }) => {
                         // Focus on single quarter if filtered, or show all 4
                         const activeQ = activeQuarterFilter;
                         const singleQuarterData =
@@ -568,35 +559,19 @@ export function EmployeeKpiPage() {
                         return (
                           <div
                             key={kpi.id}
-                            className="rounded-2xl border border-border bg-card p-3.5 shadow-2xs space-y-2.5 transition-all hover:border-border/80"
+                            className="rounded-2xl border border-border bg-card p-3 shadow-2xs space-y-2 transition-all hover:border-border/80"
                           >
-                            {/* Card Header: #, Title, Target & Weight */}
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="space-y-0.5">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="font-mono font-bold text-xs text-muted-foreground">
-                                    #{kpi.id}
-                                  </span>
-                                  <h4 className="font-bold text-xs text-foreground leading-snug">
-                                    {isAr ? kpi.name_ar : kpi.name}
-                                  </h4>
-                                </div>
-                                <p className="text-[11px] text-muted-foreground line-clamp-1">
-                                  {isAr ? kpi.definition_ar : kpi.definition}
-                                </p>
-                              </div>
-
-                              <div className="flex items-center gap-1 shrink-0">
-                                <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0">
-                                  {isAr ? `وزن: ${fmtPercent(kpi.weight, 1)}` : `W: ${fmtPercent(kpi.weight, 1)}`}
-                                </Badge>
-                                <Badge variant="secondary" className="text-[10px] font-mono px-1.5 py-0">
-                                  {isAr ? `هدف: ${fmtPercent(kpi.target, 0)}` : `T: ${fmtPercent(kpi.target, 0)}`}
-                                </Badge>
-                              </div>
+                            {/* Card Header: # and Metric Title only */}
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono font-bold text-xs text-muted-foreground shrink-0">
+                                #{kpi.id}
+                              </span>
+                              <h4 className="font-bold text-xs text-foreground leading-snug">
+                                {isAr ? kpi.name_ar : kpi.name}
+                              </h4>
                             </div>
 
-                            {/* Single Quarter Focus vs 4-Quarter Grid */}
+                            {/* Only the Qs: Single Quarter Focus vs 4-Quarter Grid */}
                             {singleQuarterData ? (
                               <div className="rounded-xl bg-muted/30 p-2.5 border border-border/50 flex items-center justify-between text-xs">
                                 <div>
@@ -623,7 +598,7 @@ export function EmployeeKpiPage() {
 
                                 <div className="text-end">
                                   <span className="text-[10px] text-muted-foreground uppercase font-bold">
-                                    {isAr ? "الدرجة الموزونة" : "Weighted Score"}
+                                    {isAr ? "الدرجة" : "Score"}
                                   </span>
                                   <p className="font-mono font-bold text-foreground">
                                     {fmtPercent(singleQuarterData.score, 1)}
@@ -632,7 +607,7 @@ export function EmployeeKpiPage() {
                               </div>
                             ) : (
                               /* 4-Quarters Grid View */
-                              <div className="grid grid-cols-4 gap-1.5 pt-1">
+                              <div className="grid grid-cols-4 gap-1.5">
                                 {[
                                   { label: "Q1", data: q1 },
                                   { label: "Q2", data: q2 },
@@ -641,7 +616,7 @@ export function EmployeeKpiPage() {
                                 ].map(({ label, data }) => (
                                   <div
                                     key={label}
-                                    className="rounded-xl bg-muted/20 p-1.5 text-center border border-border/40"
+                                    className="rounded-xl bg-muted/20 p-2 text-center border border-border/40"
                                   >
                                     <span className="text-[10px] font-bold text-muted-foreground block">{label}</span>
                                     <span className="font-mono text-xs font-bold text-foreground block mt-0.5">
@@ -649,37 +624,6 @@ export function EmployeeKpiPage() {
                                     </span>
                                   </div>
                                 ))}
-                              </div>
-                            )}
-
-                            {/* Card Footer: Annual Average & Expand details */}
-                            <div className="flex items-center justify-between pt-1 border-t border-border/40 text-[11px]">
-                              <span className="text-muted-foreground font-mono">
-                                {isAr ? "المتوسط السنوي: " : "Annual Score: "}
-                                <strong className="text-foreground">{fmtPercent(annualScore, 1)}</strong>
-                              </span>
-
-                              <button
-                                type="button"
-                                onClick={() => setExpandedKpiId(isExpanded ? null : kpi.id)}
-                                className="text-brand font-medium inline-flex items-center gap-1 hover:underline cursor-pointer"
-                              >
-                                <span>{isExpanded ? (isAr ? "إخفاء التفاصيل" : "Less") : (isAr ? "طريقة القياس" : "Details")}</span>
-                                {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                              </button>
-                            </div>
-
-                            {/* Expandable Measurement Standards */}
-                            {isExpanded && (
-                              <div className="pt-2 border-t border-border/40 text-xs space-y-1.5 bg-muted/20 p-2.5 rounded-xl">
-                                <p>
-                                  <strong className="text-foreground font-medium">{isAr ? "التعريف:" : "Definition:"}</strong>{" "}
-                                  <span className="text-muted-foreground">{isAr ? kpi.definition_ar : kpi.definition}</span>
-                                </p>
-                                <p>
-                                  <strong className="text-foreground font-medium">{isAr ? "طريقة القياس المعتمدة:" : "Measurement standard:"}</strong>{" "}
-                                  <span className="text-muted-foreground">{isAr ? kpi.howMeasured_ar : kpi.howMeasured}</span>
-                                </p>
                               </div>
                             )}
                           </div>
@@ -699,26 +643,22 @@ export function EmployeeKpiPage() {
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-border bg-muted/60 text-muted-foreground font-semibold">
-                      <th className="sticky start-0 z-10 bg-muted/95 px-3 py-2.5 text-start min-w-[170px] shadow-2xs">
+                      <th className="sticky start-0 z-10 bg-muted/95 px-3 py-2.5 text-start min-w-[200px] shadow-2xs">
                         {isAr ? "المؤشر (KPI)" : "KPI Metric"}
                       </th>
-                      <th className="px-2 py-2.5 text-center w-12">{isAr ? "الوزن" : "Weight"}</th>
-                      <th className="px-2 py-2.5 text-center w-12">{isAr ? "الهدف" : "Target"}</th>
 
                       {(activeQuarterFilter === "all" || activeQuarterFilter === "q1") && (
-                        <th className="px-2 py-2.5 text-center bg-blue-500/10 text-blue-700 dark:text-blue-300 w-14">Q1</th>
+                        <th className="px-2 py-2.5 text-center bg-blue-500/10 text-blue-700 dark:text-blue-300 w-16">Q1</th>
                       )}
                       {(activeQuarterFilter === "all" || activeQuarterFilter === "q2") && (
-                        <th className="px-2 py-2.5 text-center bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 w-14">Q2</th>
+                        <th className="px-2 py-2.5 text-center bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 w-16">Q2</th>
                       )}
                       {(activeQuarterFilter === "all" || activeQuarterFilter === "q3") && (
-                        <th className="px-2 py-2.5 text-center bg-amber-500/10 text-amber-700 dark:text-amber-300 w-14">Q3</th>
+                        <th className="px-2 py-2.5 text-center bg-amber-500/10 text-amber-700 dark:text-amber-300 w-16">Q3</th>
                       )}
                       {(activeQuarterFilter === "all" || activeQuarterFilter === "q4") && (
-                        <th className="px-2 py-2.5 text-center bg-purple-500/10 text-purple-700 dark:text-purple-300 w-14">Q4</th>
+                        <th className="px-2 py-2.5 text-center bg-purple-500/10 text-purple-700 dark:text-purple-300 w-16">Q4</th>
                       )}
-
-                      <th className="px-2 py-2.5 text-center w-16 bg-muted/80">{isAr ? "السنوي" : "Annual"}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -727,21 +667,15 @@ export function EmployeeKpiPage() {
                       return (
                         <Fragment key={category}>
                           <tr className="bg-muted/40 font-semibold text-foreground">
-                            <td colSpan={10} className="px-3 py-1.5 text-xs text-brand uppercase font-bold">
+                            <td colSpan={5} className="px-3 py-1.5 text-xs text-brand uppercase font-bold">
                               {isAr ? (KPI_CATEGORIES_AR[category] || category) : category}
                             </td>
                           </tr>
 
-                          {categoryRows.map(({ kpi, q1, q2, q3, q4, annualScore }) => (
+                          {categoryRows.map(({ kpi, q1, q2, q3, q4 }) => (
                             <tr key={kpi.id} className="hover:bg-muted/20 transition-colors">
                               <td className="sticky start-0 z-10 bg-card px-3 py-2 text-foreground font-medium text-[11px] shadow-2xs">
                                 #{kpi.id}. {isAr ? kpi.name_ar : kpi.name}
-                              </td>
-                              <td className="px-2 py-2 text-center font-mono text-[11px] text-muted-foreground">
-                                {fmtPercent(kpi.weight, 1)}
-                              </td>
-                              <td className="px-2 py-2 text-center font-mono text-[11px] font-semibold text-foreground">
-                                {fmtPercent(kpi.target, 0)}
                               </td>
 
                               {(activeQuarterFilter === "all" || activeQuarterFilter === "q1") && (
@@ -764,10 +698,6 @@ export function EmployeeKpiPage() {
                                   {fmtPercent(q4.score, 1)}
                                 </td>
                               )}
-
-                              <td className="px-2 py-2 text-center font-mono text-[11px] font-bold text-foreground bg-muted/40">
-                                {fmtPercent(annualScore, 1)}
-                              </td>
                             </tr>
                           ))}
                         </Fragment>
