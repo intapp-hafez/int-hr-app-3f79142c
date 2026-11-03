@@ -837,107 +837,88 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
   const criteriaFileInputRef = React.useRef<HTMLInputElement>(null);
   const [isImportingCriteria, setIsImportingCriteria] = useState(false);
 
-  // 1. Download ready-made Excel template
+  // 1. Download ready-made Excel template with exact modal columns
   const handleDownloadCriteriaTemplate = async () => {
     try {
       await downloadTemplate(
         "kpi_criteria_import_template.xlsx",
         [
-          "name_en",
-          "name_ar",
-          "criterion_type",
-          "category",
-          "scoring_direction",
-          "scoring_scale",
-          "unit",
-          "default_weight",
-          "min_value",
-          "max_value",
-          "description_en",
-          "description_ar",
-          "how_measured_en",
-          "how_measured_ar",
+          "Code",
+          "Criterion Layer",
+          "Name (English)",
+          "Name (Arabic)",
+          "Category (English)",
+          "Category (Arabic)",
+          "Weight (%)",
+          "Target (%)",
+          "Unit",
         ],
         [
           {
-            name_en: "On-Time Installation Completion",
-            name_ar: "إنجاز التركيبات بالموعد",
-            criterion_type: "position_specific",
-            category: "technical",
-            scoring_direction: "higher_is_better",
-            scoring_scale: "percentage",
-            unit: "%",
-            default_weight: 15,
-            min_value: 0,
-            max_value: 95,
-            description_en: "Percentage of site installations completed within schedule",
-            description_ar: "نسبة إنجاز أعمال التركيبات في الموقع ضمن الجدول الزمني",
-            how_measured_en: "Completed tasks vs scheduled dates",
-            how_measured_ar: "المهام المنجزة مقارنة بالمواعيد المجدولة",
+            "Code": "KPI-507",
+            "Criterion Layer": "Position / Role Layer (60%)",
+            "Name (English)": "On-Time Cable Pulling & Termination",
+            "Name (Arabic)": "دقة تمديد وإنهاء الكابلات في المواعيد المحددة",
+            "Category (English)": "Installation & Technical Execution",
+            "Category (Arabic)": "التنفيذ الفني والتركيبات",
+            "Weight (%)": 5,
+            "Target (%)": 95,
+            "Unit": "%",
           },
           {
-            name_en: "Attendance & Punctuality",
-            name_ar: "الانضباط ومواعيد الحضور",
-            criterion_type: "common",
-            category: "behavioral",
-            scoring_direction: "higher_is_better",
-            scoring_scale: "percentage",
-            unit: "%",
-            default_weight: 10,
-            min_value: 0,
-            max_value: 98,
-            description_en: "Compliance with working hours and scheduled shifts",
-            description_ar: "الالتزام بساعات العمل والمناوبات المحددة",
-            how_measured_en: "Biometric check-in logs",
-            how_measured_ar: "سجلات الحضور البصمي",
+            "Code": "KPI-101",
+            "Criterion Layer": "Common Company Layer (40%)",
+            "Name (English)": "Attendance & Punctuality",
+            "Name (Arabic)": "الانضباط ومواعيد الحضور",
+            "Category (English)": "Behavioral & Compliance",
+            "Category (Arabic)": "السلوك والانضباط",
+            "Weight (%)": 10,
+            "Target (%)": 98,
+            "Unit": "%",
           },
           {
-            name_en: "First-Time Compliance with Approved Drawings",
-            name_ar: "المطابقة الأولى للمخططات المعتمدة",
-            criterion_type: "position_specific",
-            category: "quality",
-            scoring_direction: "higher_is_better",
-            scoring_scale: "percentage",
-            unit: "%",
-            default_weight: 15,
-            min_value: 0,
-            max_value: 90,
-            description_en: "Deliveries matching engineering shop drawings without rework",
-            description_ar: "تسليم الأعمال مطابقة للمخططات المعتمدة دون الحاجة لإعادة العمل",
-            how_measured_en: "QC audit reports",
-            how_measured_ar: "تقارير تدقيق الجودة",
+            "Code": "KPI-502",
+            "Criterion Layer": "Position / Role Layer (60%)",
+            "Name (English)": "First-Time Compliance with Approved Drawings",
+            "Name (Arabic)": "المطابقة الأولى للمخططات الهندسية المعتمدة",
+            "Category (English)": "Quality & Engineering Standards",
+            "Category (Arabic)": "الجودة والمعايير الهندسية",
+            "Weight (%)": 15,
+            "Target (%)": 90,
+            "Unit": "%",
           },
           {
-            name_en: "Customer Satisfaction Rating",
-            name_ar: "تقييم رضا العملاء",
-            criterion_type: "position_specific",
-            category: "quality",
-            scoring_direction: "rating_5",
-            scoring_scale: "rating_5",
-            unit: "scale",
-            default_weight: 10,
-            min_value: 1,
-            max_value: 5,
-            description_en: "Overall customer and consultant feedback rating",
-            description_ar: "تقييم انطباع العميل والاستشاري العام",
-            how_measured_en: "Post-completion feedback survey",
-            how_measured_ar: "استبيان تقييم ما بعد التنفيذ",
+            "Code": "KPI-503",
+            "Criterion Layer": "Position / Role Layer (60%)",
+            "Name (English)": "Site Safety & PPE Adherence",
+            "Name (Arabic)": "الالتزام بإجراءات السلامة وارتداء مهمات الوقاية",
+            "Category (English)": "Occupational Safety & Health",
+            "Category (Arabic)": "السلامة والصحة المهنية",
+            "Weight (%)": 10,
+            "Target (%)": 100,
+            "Unit": "%",
           },
           {
-            name_en: "Proposal Turnaround Time",
-            name_ar: "زمن إعداد وتقديم العروض الفنية",
-            criterion_type: "position_specific",
-            category: "productivity",
-            scoring_direction: "lower_is_better",
-            scoring_scale: "count",
-            unit: "days",
-            default_weight: 10,
-            min_value: 1,
-            max_value: 3,
-            description_en: "Number of days to submit technical & financial offer",
-            description_ar: "عدد الأيام المستغرقة لتسليم العرض الفني والمالي",
-            how_measured_en: "ERP quotation timestamps",
-            how_measured_ar: "سجلات نظام العروض",
+            "Code": "KPI-504",
+            "Criterion Layer": "Position / Role Layer (60%)",
+            "Name (English)": "Client & Consultant Satisfaction Rating",
+            "Name (Arabic)": "تقييم رضا العميل والاستشاري",
+            "Category (English)": "Customer Satisfaction",
+            "Category (Arabic)": "خدمة ورضا العملاء",
+            "Weight (%)": 10,
+            "Target (%)": 95,
+            "Unit": "%",
+          },
+          {
+            "Code": "KPI-505",
+            "Criterion Layer": "Position / Role Layer (60%)",
+            "Name (English)": "Project Milestone Execution Rate",
+            "Name (Arabic)": "معدل إنجاز مراحل المشروع حسب الجدول",
+            "Category (English)": "Productivity & Delivery",
+            "Category (Arabic)": "الإنتاجية والتسليم",
+            "Weight (%)": 10,
+            "Target (%)": 95,
+            "Unit": "%",
           },
         ]
       );
@@ -947,7 +928,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
     }
   };
 
-  // 2. Import KPI criteria from uploaded Excel/CSV file
+  // 2. Import KPI criteria from uploaded Excel/CSV file matching the 9 modal columns
   const handleImportCriteriaFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -962,7 +943,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
       }
 
       const getVal = (row: Record<string, any>, ...keys: string[]) => {
-        const clean = (s: string) => s.toLowerCase().replace(/[\s_\-():/]/g, "");
+        const clean = (s: string) => s.toLowerCase().replace(/[\s_\-():/%]/g, "");
         for (const k of keys) {
           if (row[k] !== undefined && row[k] !== "") return row[k];
           const target = clean(k);
@@ -977,40 +958,42 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
 
       const parsedItems: any[] = [];
       for (const [idx, r] of rawRows.entries()) {
-        const nameEn = String(getVal(r, "name_en", "name", "criterion_name", "criterion name", "english name", "اسم المعيار بالانجليزي", "الاسم بالانجليزية") || "").trim();
-        const nameAr = String(getVal(r, "name_ar", "arabic name", "اسم المعيار بالعربي", "الاسم بالعربية", "اسم المعيار") || "").trim();
+        const code = String(getVal(r, "Code", "code", "kpi_code", "كود", "رمز") || "").trim();
+        const nameEn = String(
+          getVal(r, "Name (English)", "name_en", "name", "English Name", "اسم المعيار بالانجليزي", "الاسم بالانجليزية") || ""
+        ).trim();
+        const nameAr = String(
+          getVal(r, "Name (Arabic)", "name_ar", "Arabic Name", "اسم المعيار بالعربي", "الاسم بالعربية", "اسم المعيار") || ""
+        ).trim();
 
         if (!nameEn && !nameAr) continue;
 
-        const rawType = String(getVal(r, "criterion_type", "type", "layer", "نوع المعيار", "النوع") || "").toLowerCase();
+        const rawType = String(
+          getVal(r, "Criterion Layer", "criterion_layer", "layer", "criterion_type", "type", "نوع المعيار", "النوع", "طبقة المعيار") || ""
+        ).toLowerCase();
         let criterionType: "common" | "position_specific" | "custom" = "position_specific";
-        if (rawType.includes("common") || rawType.includes("عام")) {
+        if (rawType.includes("common") || rawType.includes("عام") || rawType.includes("40")) {
           criterionType = "common";
         } else if (rawType.includes("custom") || rawType.includes("مخصص")) {
           criterionType = "custom";
         }
 
-        const rawCat = String(getVal(r, "category", "الفئة", "التصنيف") || "").toLowerCase();
+        const catEn = String(
+          getVal(r, "Category (English)", "category_en", "category", "التصنيف بالانجليزي", "التصنيف بالانجليزية") || ""
+        ).trim();
+        const catAr = String(
+          getVal(r, "Category (Arabic)", "category_ar", "التصنيف بالعربي", "الفئة", "التصنيف") || ""
+        ).trim();
+        const rawCat = (catEn + " " + catAr).toLowerCase();
         let category: "behavioral" | "technical" | "quality" | "productivity" | "safety" | "coordination" = "technical";
-        if (rawCat.includes("behav") || rawCat.includes("سلوك")) category = "behavioral";
+        if (rawCat.includes("behav") || rawCat.includes("سلوك") || rawCat.includes("انضباط")) category = "behavioral";
         else if (rawCat.includes("qual") || rawCat.includes("جود")) category = "quality";
-        else if (rawCat.includes("prod") || rawCat.includes("انتاج")) category = "productivity";
+        else if (rawCat.includes("prod") || rawCat.includes("انتاج") || rawCat.includes("إنجاز") || rawCat.includes("delivery"))
+          category = "productivity";
         else if (rawCat.includes("safe") || rawCat.includes("سلام")) category = "safety";
         else if (rawCat.includes("coord") || rawCat.includes("تنسيق")) category = "coordination";
 
-        const rawDir = String(getVal(r, "scoring_direction", "direction", "اتجاه القياس") || "").toLowerCase();
-        let direction: "higher_is_better" | "lower_is_better" | "rating_5" | "target_range" = "higher_is_better";
-        if (rawDir.includes("low") || rawDir.includes("اقل") || rawDir.includes("أقل")) direction = "lower_is_better";
-        else if (rawDir.includes("5") || rawDir.includes("rating") || rawDir.includes("تقييم")) direction = "rating_5";
-        else if (rawDir.includes("range") || rawDir.includes("نطاق")) direction = "target_range";
-
-        const rawScale = String(getVal(r, "scoring_scale", "scale", "مقياس التقييم") || "").toLowerCase();
-        let scale: "rating_5" | "percentage" | "count" | "boolean" = direction === "rating_5" ? "rating_5" : "percentage";
-        if (rawScale.includes("count") || rawScale.includes("عدد")) scale = "count";
-        else if (rawScale.includes("bool") || rawScale.includes("نعم")) scale = "boolean";
-        else if (rawScale.includes("5") || rawScale.includes("rating")) scale = "rating_5";
-
-        const rawWeight = getVal(r, "default_weight", "weight", "الوزن", "النسبة");
+        const rawWeight = getVal(r, "Weight (%)", "weight", "default_weight", "الوزن", "النسبة");
         let weight = 0.05;
         if (rawWeight !== undefined && rawWeight !== "") {
           const num = typeof rawWeight === "number" ? rawWeight : parseFloat(String(rawWeight).replace("%", ""));
@@ -1019,32 +1002,40 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
           }
         }
 
-        const rawMin = getVal(r, "min_value", "min", "الحد الادنى");
-        const minVal = rawMin !== undefined && !isNaN(parseFloat(rawMin)) ? parseFloat(rawMin) : 0;
+        const rawTarget = getVal(r, "Target (%)", "target", "default_target", "target_benchmark", "max_value", "المستهدف", "الهدف");
+        let targetNum = 95;
+        if (rawTarget !== undefined && rawTarget !== "") {
+          const num = typeof rawTarget === "number" ? rawTarget : parseFloat(String(rawTarget).replace("%", ""));
+          if (!isNaN(num) && num > 0) {
+            targetNum = num;
+          }
+        }
 
-        const rawMax = getVal(r, "max_value", "target_benchmark", "target", "المستهدف", "الهدف");
-        const maxVal = rawMax !== undefined && !isNaN(parseFloat(rawMax)) ? parseFloat(rawMax) : (scale === "rating_5" ? 5 : 100);
-
-        const unit = String(getVal(r, "unit", "الوحدة") || (scale === "rating_5" ? "scale" : "%")).trim();
-        const descEn = String(getVal(r, "description_en", "description", "الوصف بالانجليزي") || "").trim();
-        const descAr = String(getVal(r, "description_ar", "الوصف بالعربي", "الوصف") || "").trim();
-        const howEn = String(getVal(r, "how_measured_en", "how_measured", "طريقة القياس بالانجليزي") || "").trim();
-        const howAr = String(getVal(r, "how_measured_ar", "طريقة القياس بالعربي", "طريقة القياس") || "").trim();
+        const unit = String(getVal(r, "Unit", "unit", "الوحدة", "وحدة القياس") || "%").trim();
+        const isRating5 = unit.toLowerCase() === "scale" || targetNum <= 5;
+        const scale: "rating_5" | "percentage" | "count" | "boolean" = isRating5
+          ? "rating_5"
+          : unit === "%"
+          ? "percentage"
+          : "count";
+        const direction: "higher_is_better" | "lower_is_better" | "rating_5" | "target_range" = isRating5
+          ? "rating_5"
+          : "higher_is_better";
 
         parsedItems.push({
           name_en: nameEn || nameAr,
           name_ar: nameAr || nameEn,
-          description_en: descEn,
-          description_ar: descAr,
+          description_en: catEn || nameEn,
+          description_ar: catAr || nameAr,
           criterion_type: criterionType,
           category,
           scoring_scale: scale,
           scoring_direction: direction,
-          unit,
-          min_value: minVal,
-          max_value: maxVal,
-          how_measured_en: howEn,
-          how_measured_ar: howAr,
+          unit: unit || "%",
+          min_value: isRating5 ? 1 : 0,
+          max_value: targetNum,
+          how_measured_en: catEn,
+          how_measured_ar: catAr,
           default_weight: weight,
           is_required: true,
           is_active: true,
