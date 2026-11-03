@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 import appCss from "../styles.css?url";
 import { LanguageProvider } from "@/lib/i18n";
+import { ThemeProvider } from "@/lib/theme";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { PwaInstallBanner } from "@/components/PwaInstallBanner";
@@ -139,13 +140,15 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <LanguageProvider>
+      <ThemeProvider>
+        <LanguageProvider>
         <AuthSessionWatcher />
         <SharedSettingsSync />
         <Outlet />
         <Toaster position="top-center" richColors />
         <PwaInstallBanner />
       </LanguageProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

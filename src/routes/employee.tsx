@@ -3,6 +3,7 @@ import { Home, ClipboardCheck, FileText, User, Bell, MessageSquare } from "lucid
 import logo from "@/assets/int-logo.png";
 import { AppLogo } from "@/components/AppLogo";
 import { LanguageToggle, useI18n } from "@/lib/i18n";
+import { ThemeToggle } from "@/lib/theme";
 import { useSession, useAuthReady } from "@/lib/auth";
 import { UserMenu } from "@/components/UserMenu";
 import { useQuery } from "@tanstack/react-query";
@@ -77,19 +78,21 @@ function EmployeeLayout() {
   ];
 
   return (
-    <div dir={dir} className="min-h-screen bg-muted/40">
+    <div dir={dir} className="min-h-screen bg-muted/40 dark:bg-[#090a0f]">
       {/* Mobile-first frame, centered on larger screens */}
-      <div className="mx-auto flex min-h-screen max-w-md flex-col bg-background shadow-soft">
-        <header className="sticky top-0 z-20 flex items-center justify-between border-b border-border/50 bg-background/90 px-4 py-3 backdrop-blur-xl shadow-sm">
+      <div className="mx-auto flex min-h-screen max-w-md flex-col bg-background dark:bg-[#0f1118] shadow-soft border-x dark:border-white/5">
+        <header className="sticky top-0 z-20 flex items-center justify-between border-b border-border/50 dark:border-white/10 bg-background/90 dark:bg-[#0f1118]/90 px-4 py-3 backdrop-blur-xl shadow-sm">
           <Link to="/" className="flex items-center gap-2 shrink-0 transition-opacity hover:opacity-80">
             <AppLogo size={24} withWordmark={false} />
             <span className="font-display text-[17px] font-bold tracking-tight text-foreground">INT<span className="text-brand">·</span>HR</span>
           </Link>
           
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <ThemeToggle />
             <div className="scale-90 sm:scale-100 origin-right">
               <LanguageToggle compact />
             </div>
+
             
             <div className="flex items-center gap-1 border-l border-border/60 pl-2 sm:pl-3">
               <Link
