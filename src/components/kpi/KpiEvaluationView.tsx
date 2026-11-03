@@ -38,6 +38,7 @@ import {
   AlertTriangle,
   Upload,
   FileDown,
+  FolderKanban,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -643,8 +644,78 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
 
   // State for Criteria Management
   const [criteriaLayerFilter, setCriteriaLayerFilter] = useState<"all" | "common" | "role" | "custom">("all");
+  const [criteriaCategoryFilter, setCriteriaCategoryFilter] = useState<string>("all");
+  const [groupByCategory, setGroupByCategory] = useState<boolean>(true);
   const [criterionModalOpen, setCriterionModalOpen] = useState(false);
   const [editingCriterion, setEditingCriterion] = useState<any | null>(null);
+
+  // Unique categories in Criteria Catalog for filtering
+  const criteriaCategoriesList = useMemo(() => {
+    const map = new Map<string, { key: string; labelEn: string; labelAr: string; label: string }>();
+    kpiCriteria.forEach((c: any) => {
+      const k = c.category_en || c.category || "operational";
+      if (!map.has(k)) {
+        const titleEn = c.category_en || formatCategoryName(c.category, false);
+        const titleAr = c.category_ar || formatCategoryName(c.category, true);
+        map.set(k, {
+          key: k,
+          labelEn: titleEn,
+          labelAr: titleAr,
+          label: isAr ? titleAr : titleEn,
+        });
+      }
+    });
+    return Array.from(map.values());
+  }, [kpiCriteria, isAr]);
+
+  // Grouped criteria by Category
+  const groupedCriteriaByCategory = useMemo(() => {
+    const filtered = kpiCriteria.filter((crit: any) => {
+      const matchLayer = criteriaLayerFilter === "all" || crit.layer === criteriaLayerFilter;
+      const critCat = crit.category_en || crit.category || "operational";
+      const matchCat =
+        criteriaCategoryFilter === "all" ||
+        critCat === criteriaCategoryFilter ||
+        crit.category === criteriaCategoryFilter;
+      return matchLayer && matchCat;
+    });
+
+    const groups = new Map<
+      string,
+      {
+        categoryKey: string;
+        categoryTitleEn: string;
+        categoryTitleAr: string;
+        categoryTitle: string;
+        items: any[];
+        totalWeight: number;
+      }
+    >();
+
+    filtered.forEach((crit: any) => {
+      const catKey = crit.category_en || crit.category || "operational";
+      const titleEn = crit.category_en || formatCategoryName(crit.category, false);
+      const titleAr = crit.category_ar || formatCategoryName(crit.category, true);
+      const title = isAr ? titleAr : titleEn;
+
+      if (!groups.has(catKey)) {
+        groups.set(catKey, {
+          categoryKey: catKey,
+          categoryTitleEn: titleEn,
+          categoryTitleAr: titleAr,
+          categoryTitle: title,
+          items: [],
+          totalWeight: 0,
+        });
+      }
+
+      const g = groups.get(catKey)!;
+      g.items.push(crit);
+      g.totalWeight += Number(crit.default_weight || 0);
+    });
+
+    return Array.from(groups.values());
+  }, [kpiCriteria, criteriaLayerFilter, criteriaCategoryFilter, isAr]);
   const [criterionForm, setCriterionForm] = useState({
     code: "",
     name_en: "",
@@ -3790,45 +3861,250 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                 </div>
               </div>
 
-              {/* Filter by Layer */}
+              {/* Filter by Layer & Grouping Controls */}
               <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2">
-                <div className="flex items-center gap-1.5 bg-muted/60 p-1 rounded-2xl border border-border text-xs">
-                  {(["all", "common", "role", "custom"] as const).map((layer) => (
-                    <button
-                      key={layer}
-                      type="button"
-                      onClick={() => setCriteriaLayerFilter(layer)}
-                      className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
-                        criteriaLayerFilter === layer
-                          ? "bg-card text-foreground shadow-xs"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      {layer === "all"
-                        ? isAr ? "كل المعايير" : "All Layers"
-                        : layer === "common"
-                        ? isAr ? "عامة (40%)" : "Common (40%)"
-                        : layer === "role"
-                        ? isAr ? "تخصصية (60%)" : "Role Specific (60%)"
-                        : isAr ? "مخصصة" : "Custom"}
-                    </button>
-                  ))}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-1.5 bg-muted/60 p-1 rounded-2xl border border-border text-xs">
+                    {(["all", "common", "role", "custom"] as const).map((layer) => (
+                      <button
+                        key={layer}
+                        type="button"
+                        onClick={() => setCriteriaLayerFilter(layer)}
+                        className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                          criteriaLayerFilter === layer
+                            ? "bg-card text-foreground shadow-xs"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {layer === "all"
+                          ? isAr ? "كل المعايير" : "All Layers"
+                          : layer === "common"
+                          ? isAr ? "عامة (40%)" : "Common (40%)"
+                          : layer === "role"
+                          ? isAr ? "تخصصية (60%)" : "Role Specific (60%)"
+                          : isAr ? "مخصصة" : "Custom"}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Category Filter Dropdown */}
+                  <select
+                    value={criteriaCategoryFilter}
+                    onChange={(e) => setCriteriaCategoryFilter(e.target.value)}
+                    className="rounded-2xl border border-input bg-background px-3 py-1.5 text-xs font-semibold cursor-pointer shadow-xs max-w-[220px]"
+                  >
+                    <option value="all">{isAr ? "جميع الفئات والتصنيفات" : "All Categories"}</option>
+                    {criteriaCategoriesList.map((cat) => (
+                      <option key={cat.key} value={cat.key}>
+                        {cat.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Group by Categories Toggle */}
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant={groupByCategory ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setGroupByCategory(!groupByCategory)}
+                    className={`rounded-2xl text-xs gap-1.5 cursor-pointer shadow-xs ${
+                      groupByCategory
+                        ? "bg-brand text-brand-foreground hover:bg-brand/90"
+                        : "border-border hover:bg-muted/60"
+                    }`}
+                  >
+                    <FolderKanban className="h-3.5 w-3.5" />
+                    <span>{isAr ? "تجميع حسب الفئات" : "Group by Categories"}</span>
+                  </Button>
                 </div>
               </div>
 
-              {/* Criteria Catalog Table */}
+              {/* Criteria Catalog Content */}
               {isLoadingCriteria ? (
                 <div className="p-12 text-center text-xs text-muted-foreground flex flex-col items-center gap-2">
                   <Loader2 className="h-6 w-6 animate-spin text-brand" />
                   <span>{isAr ? "جارٍ تحميل دليل المعايير..." : "Loading criteria..."}</span>
                 </div>
+              ) : groupByCategory ? (
+                /* Grouped by Category View */
+                <div className="space-y-4">
+                  {groupedCriteriaByCategory.length === 0 ? (
+                    <div className="p-12 text-center text-xs text-muted-foreground rounded-2xl border border-dashed border-border bg-card">
+                      {isAr ? "لا توجد معايير مطابقة للفلاتر المحددة" : "No criteria match the selected filters."}
+                    </div>
+                  ) : (
+                    groupedCriteriaByCategory.map((group) => {
+                      const groupWeightPct = (group.totalWeight * 100).toFixed(1);
+                      return (
+                        <div
+                          key={group.categoryKey}
+                          className="rounded-2xl border border-border overflow-hidden bg-card shadow-xs"
+                        >
+                          {/* Category Header */}
+                          <div className="px-4 py-3 bg-muted/40 border-b border-border flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-2.5">
+                              <div className="h-7 w-7 rounded-xl bg-brand/10 text-brand flex items-center justify-center">
+                                <FolderKanban className="h-4 w-4" />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <h3 className="font-bold text-xs text-foreground">
+                                  {group.categoryTitle}
+                                </h3>
+                                {isAr && group.categoryTitleEn !== group.categoryTitle && (
+                                  <span className="text-[10px] text-muted-foreground font-normal">
+                                    ({group.categoryTitleEn})
+                                  </span>
+                                )}
+                                {!isAr && group.categoryTitleAr && (
+                                  <span className="text-[10px] text-muted-foreground font-normal" dir="rtl">
+                                    ({group.categoryTitleAr})
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="font-mono text-[10px] bg-background">
+                                {group.items.length} {isAr ? "معايير" : "Criteria"}
+                              </Badge>
+                              <Badge className="bg-brand/10 text-brand border border-brand/20 font-mono text-[10px]">
+                                {isAr ? "الوزن:" : "Weight:"} {groupWeightPct}%
+                              </Badge>
+                            </div>
+                          </div>
+
+                          {/* Category Criteria Rows */}
+                          <div className="divide-y divide-border">
+                            {group.items.map((crit) => {
+                              const weightPct = crit.default_weight ? (crit.default_weight * 100).toFixed(1) : "—";
+                              const targetPct =
+                                crit.default_target !== undefined && crit.default_target !== null
+                                  ? (crit.default_target <= 1
+                                      ? (crit.default_target * 100).toFixed(0)
+                                      : crit.default_target)
+                                  : crit.max_value !== undefined && crit.max_value !== null
+                                  ? crit.max_value
+                                  : "—";
+
+                              return (
+                                <div
+                                  key={crit.id}
+                                  className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-muted/30 transition-colors"
+                                >
+                                  <div className="space-y-1">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0">
+                                        {crit.code}
+                                      </Badge>
+                                      <span className="font-bold text-xs text-foreground">
+                                        {isAr ? crit.name_ar : crit.name_en}
+                                      </span>
+                                      <Badge
+                                        className={`text-[10px] px-2 py-0 ${
+                                          crit.layer === "common"
+                                            ? "bg-blue-600 text-white"
+                                            : crit.layer === "role"
+                                            ? "bg-emerald-600 text-white"
+                                            : "bg-purple-600 text-white"
+                                        }`}
+                                      >
+                                        {crit.layer === "common"
+                                          ? isAr ? "معيار عام" : "Common"
+                                          : crit.layer === "role"
+                                          ? isAr ? "معيار تخصصي" : "Role"
+                                          : isAr ? "مخصص" : "Custom"}
+                                      </Badge>
+
+                                      {crit.scoring_direction && (
+                                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono text-muted-foreground">
+                                          {crit.scoring_direction === "higher_is_better"
+                                            ? isAr ? "الأعلى أفضل ↑" : "Higher ↑"
+                                            : crit.scoring_direction === "lower_is_better"
+                                            ? isAr ? "الأقل أفضل ↓" : "Lower ↓"
+                                            : crit.scoring_direction === "rating_5"
+                                            ? isAr ? "مقياس 1-5 ★" : "Scale 1-5"
+                                            : crit.scoring_direction}
+                                        </Badge>
+                                      )}
+                                      {crit.unit && (
+                                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono text-muted-foreground">
+                                          {crit.unit}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <p className="text-[11px] text-muted-foreground">
+                                      {isAr ? crit.category_ar : crit.category_en}
+                                      {crit.how_measured_en && (
+                                        <span className="ms-2 text-muted-foreground/80">
+                                          • {isAr ? crit.how_measured_ar : crit.how_measured_en}
+                                        </span>
+                                      )}
+                                    </p>
+                                  </div>
+
+                                  <div className="flex items-center gap-3 shrink-0">
+                                    <div className="text-end font-mono text-xs">
+                                      <span className="text-muted-foreground">{isAr ? "الوزن:" : "Weight:"} </span>
+                                      <strong className="text-foreground">{weightPct}%</strong>
+                                      <span className="ms-2 text-muted-foreground">{isAr ? "الهدف:" : "Target:"} </span>
+                                      <strong className="text-emerald-600">{targetPct}%</strong>
+                                    </div>
+
+                                    <div className="flex items-center gap-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleOpenEditCriterion(crit)}
+                                        className="h-7 w-7 p-0 rounded-lg text-muted-foreground hover:text-brand cursor-pointer"
+                                        title={isAr ? "تعديل" : "Edit"}
+                                      >
+                                        <Pencil className="h-3.5 w-3.5" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleArchiveCriterion(crit.id)}
+                                        className="h-7 w-7 p-0 rounded-lg text-muted-foreground hover:text-rose-600 cursor-pointer"
+                                        title={isAr ? "أرشفة" : "Archive"}
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               ) : (
+                /* Flat List View */
                 <div className="divide-y divide-border rounded-2xl border border-border overflow-hidden bg-card">
                   {kpiCriteria
-                    .filter((crit: any) => criteriaLayerFilter === "all" || crit.layer === criteriaLayerFilter)
+                    .filter((crit: any) => {
+                      const matchLayer = criteriaLayerFilter === "all" || crit.layer === criteriaLayerFilter;
+                      const critCat = crit.category_en || crit.category || "operational";
+                      const matchCat =
+                        criteriaCategoryFilter === "all" ||
+                        critCat === criteriaCategoryFilter ||
+                        crit.category === criteriaCategoryFilter;
+                      return matchLayer && matchCat;
+                    })
                     .map((crit: any) => {
                       const weightPct = crit.default_weight ? (crit.default_weight * 100).toFixed(1) : "—";
-                      const targetPct = crit.default_target ? (crit.default_target * 100).toFixed(0) : "—";
+                      const targetPct =
+                        crit.default_target !== undefined && crit.default_target !== null
+                          ? (crit.default_target <= 1
+                              ? (crit.default_target * 100).toFixed(0)
+                              : crit.default_target)
+                          : crit.max_value !== undefined && crit.max_value !== null
+                          ? crit.max_value
+                          : "—";
 
                       return (
                         <div

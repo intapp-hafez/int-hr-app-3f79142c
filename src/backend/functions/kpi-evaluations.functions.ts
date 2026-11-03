@@ -195,7 +195,61 @@ export const listKpiCriteria = createServerFn({ method: "POST" })
 
     const { data, error } = await query;
     if (error) throw new Error(`Failed to list criteria: ${error.message}`);
-    return data || [];
+
+    const categoryNamesEn: Record<string, string> = {
+      technical: "Technical Execution & Architecture",
+      quality: "Quality, Standards & Review",
+      operational: "Operational Excellence & Delivery",
+      behavioral: "Behavioral Competencies & Teamwork",
+      compliance: "Compliance, Safety & Governance",
+      safety: "Site Safety & PPE Compliance",
+      hse: "HSE & Environmental Health",
+      customer_service: "Customer Service & Stakeholder Care",
+      financial: "Financial Accuracy & Governance",
+      productivity: "Productivity & Turnaround",
+      coordination: "Cross-Discipline Coordination",
+    };
+
+    const categoryNamesAr: Record<string, string> = {
+      technical: "الأداء والتنفيذ الفني والبرمجي",
+      quality: "الجودة والمعايير والتدقيق",
+      operational: "الكفاءة التشغيلية والتسليم",
+      behavioral: "الجدارات السلوكية والعمل الجماعي",
+      compliance: "الالتزام والسلامة والحوكمة",
+      safety: "السلامة المهنية ومهمات الوقاية",
+      hse: "السلامة والصحة المهنية والبيئة",
+      customer_service: "خدمة العملاء ورعاية المستفيدين",
+      financial: "الحوكمة والدقة المالية",
+      productivity: "الإنتاجية ومعدلات الإنجاز",
+      coordination: "التنسيق بين التخصصات",
+    };
+
+    return (data || []).map((r: any, idx: number) => {
+      const rawType = r.criterion_type || "position_specific";
+      const layer =
+        r.layer ||
+        (rawType === "common"
+          ? "common"
+          : rawType === "position_specific"
+          ? "role"
+          : "custom");
+      const catKey = (r.category || "technical").toLowerCase();
+      const catEn = r.category_en || categoryNamesEn[catKey] || r.category || "Technical";
+      const catAr = r.category_ar || categoryNamesAr[catKey] || catEn;
+      const targetNum = r.max_value !== undefined && r.max_value !== null ? Number(r.max_value) : 95;
+
+      return {
+        ...r,
+        code: r.code || `KPI-${String(100 + idx + 1).padStart(3, "0")}`,
+        layer,
+        criterion_type: rawType,
+        category: r.category || "technical",
+        category_en: catEn,
+        category_ar: catAr,
+        default_target: r.default_target ?? (targetNum <= 1 ? targetNum : targetNum / 100),
+        max_value: targetNum,
+      };
+    });
   });
 
 export const saveKpiCriterion = createServerFn({ method: "POST" })
