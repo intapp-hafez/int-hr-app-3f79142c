@@ -1613,7 +1613,7 @@ export const getKpiEvaluation = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const { isAdmin, isManager } = await assertKpiAccess(supabase, userId);
 
-    if (!isAdmin && isManager) {
+    if (!isAdmin && isManager && input.employeeId) {
       const scope = await resolveTeamMemberScope(supabase, userId);
       if (!scope.isAdmin) {
         const { data: empProfile } = await supabase
@@ -1632,7 +1632,7 @@ export const getKpiEvaluation = createServerFn({ method: "POST" })
       }
     }
 
-    const { data: record, error } = await (supabase as any)
+    let query = (supabase as any)
       .from("kpi_evaluations")
       .select(`
         id,
@@ -1657,14 +1657,111 @@ export const getKpiEvaluation = createServerFn({ method: "POST" })
           department:departments!profiles_department_id_fkey(name_en),
           position:positions!profiles_position_id_fkey(name_en)
         )
-      `)
-      .eq("employee_id", input.employeeId)
-      .eq("evaluation_year", input.year)
-      .eq("template_type", input.templateType || "light_current_engineer")
-      .maybeSingle();
+      `);
 
+    if (input.id) {
+      query = query.eq("id", input.id);
+    } else {
+      if (input.employeeId) query = query.eq("employee_id", input.employeeId);
+      if (input.year) query = query.eq("evaluation_year", input.year);
+      if (input.templateType) {
+        query = query.eq("template_type", input.templateType);
+      }
+      query = query.order("updated_at", { ascending: false }).limit(1);
+    }
+
+    const { data: records, error } = await query;
     if (error) throw new Error(`Failed to fetch KPI evaluation: ${error.message}`);
-    return (record as KpiEvaluationRecord) || null;
+    const record = Array.isArray(records) ? records[0] : records;
+
+    if (record) {
+      return (record as KpiEvaluationRecord);
+    }
+
+    // Fallback: check kpi_quarterly_evaluations if not in kpi_evaluations
+    if (input.id || (input.employeeId && input.year)) {
+      let qQuery = (supabase as any)
+        .from("kpi_quarterly_evaluations")
+        .select(`
+          id,
+          employee_id,
+          evaluator_id,
+          evaluation_year,
+          quarter,
+          status,
+          score,
+          rating_tier,
+          notes,
+          submitted_at,
+          returned_at,
+          approved_at,
+          created_at,
+          updated_at,
+          items:kpi_quarterly_items(*),
+          employee:profiles!kpi_quarterly_evaluations_employee_id_fkey(
+            id,
+            full_name,
+            emp_code,
+            department:departments!profiles_department_id_fkey(name_en),
+            position:positions!profiles_position_id_fkey(name_en)
+          ),
+          evaluator:profiles!kpi_quarterly_evaluations_evaluator_id_fkey(
+            id,
+            full_name
+          )
+        `);
+
+      if (input.id) {
+        qQuery = qQuery.eq("id", input.id);
+      } else {
+        if (input.employeeId) qQuery = qQuery.eq("employee_id", input.employeeId);
+        if (input.year) qQuery = qQuery.eq("evaluation_year", input.year);
+        qQuery = qQuery.order("updated_at", { ascending: false }).limit(1);
+      }
+
+      const { data: qRecords } = await qQuery;
+      const qRec = Array.isArray(qRecords) ? qRecords[0] : qRecords;
+      if (qRec) {
+        const scores: Record<string, any> = {};
+        for (const it of (qRec.items || [])) {
+          const key = it.criterion_id || it.id;
+          const qKey = (qRec.quarter || "q1").toLowerCase();
+          scores[key] = {
+            id: key,
+            targetAnnual: it.target_benchmark,
+            [qKey]: {
+              actual: it.actual_value,
+              achievement: it.achievement_rate,
+              score: it.weighted_score,
+            },
+            annualScore: it.weighted_score,
+          };
+        }
+        return {
+          id: qRec.id,
+          employee_id: qRec.employee_id,
+          evaluation_year: qRec.evaluation_year,
+          template_type: qRec.template_id || "quarterly_template",
+          evaluator_id: qRec.evaluator_id,
+          evaluator_name: qRec.evaluator?.full_name || "Manager",
+          status: qRec.status,
+          scores,
+          summary: {
+            totalScore: Number(qRec.score ?? 0),
+            rating: qRec.rating_tier || "Pending Evaluation",
+          },
+          notes: qRec.notes || {},
+          submitted_at: qRec.submitted_at,
+          reviewed_at: qRec.returned_at,
+          approved_at: qRec.approved_at,
+          created_at: qRec.created_at,
+          updated_at: qRec.updated_at,
+          employee: qRec.employee,
+        } as KpiEvaluationRecord;
+      }
+    }
+
+    return null;
   });
 
 export const listKpiEvaluations = createServerFn({ method: "POST" })

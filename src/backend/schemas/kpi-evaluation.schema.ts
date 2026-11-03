@@ -261,9 +261,10 @@ export const SaveKpiEvaluationSchema = z.object({
 export type SaveKpiEvaluationInput = z.infer<typeof SaveKpiEvaluationSchema>;
 
 export const GetKpiEvaluationSchema = z.object({
-  employeeId: z.string().uuid(),
-  year: z.number().int().min(2020).max(2100),
-  templateType: z.string().default("light_current_engineer"),
+  id: z.string().uuid().optional(),
+  employeeId: z.string().uuid().optional(),
+  year: z.number().int().min(2020).max(2100).optional(),
+  templateType: z.string().optional(),
 });
 export type GetKpiEvaluationInput = z.infer<typeof GetKpiEvaluationSchema>;
 

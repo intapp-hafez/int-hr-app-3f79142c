@@ -665,6 +665,33 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
   });
 
   // ── QUARTERLY APPROVAL & RETURN HANDLERS ──
+  const handleNavigateToScorecard = (item: any) => {
+    if (item.employee_id) {
+      setSelectedEmpId(item.employee_id);
+    }
+    if (item.evaluation_year) {
+      setSelectedYear(item.evaluation_year);
+    }
+    const q = (item.quarter || "").toLowerCase();
+    if (q && ["q1", "q2", "q3", "q4"].includes(q)) {
+      setActiveScorecardQuarter(q as any);
+      setActiveQuarterFilter(q as any);
+    } else if (Array.isArray(item.quarters) && item.quarters.length > 0) {
+      const firstQ = item.quarters[0].toLowerCase();
+      if (["q1", "q2", "q3", "q4"].includes(firstQ)) {
+        setActiveScorecardQuarter(firstQ as any);
+      }
+      setActiveQuarterFilter("all");
+    } else {
+      setActiveQuarterFilter("all");
+    }
+    setMainTab("scorecard");
+    if (item.employee_id) {
+      queryClient.invalidateQueries({ queryKey: ["kpi-evaluation", item.employee_id] });
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const handleApprovePending = async (item: any) => {
     try {
       setIsSubmittingReview(true);
@@ -3009,13 +3036,17 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                         className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-muted/30 transition-colors"
                       >
                         {/* Employee & Quarter Info */}
-                        <div className="flex items-start gap-3">
-                          <div className="h-10 w-10 rounded-2xl bg-brand/10 text-brand font-bold text-xs flex items-center justify-center shrink-0 uppercase">
+                        <div
+                          className="flex items-start gap-3 cursor-pointer group"
+                          onClick={() => handleNavigateToScorecard(item)}
+                          title={isAr ? "عرض بطاقة تقييم الموظف" : "View Employee Scorecard"}
+                        >
+                          <div className="h-10 w-10 rounded-2xl bg-brand/10 text-brand font-bold text-xs flex items-center justify-center shrink-0 uppercase group-hover:scale-105 transition-transform">
                             {empName.slice(0, 2)}
                           </div>
                           <div className="space-y-0.5">
                             <div className="flex items-center gap-2">
-                              <span className="font-bold text-sm text-foreground">{empName}</span>
+                              <span className="font-bold text-sm text-foreground group-hover:text-brand transition-colors">{empName}</span>
                               {empCode && (
                                 <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0">
                                   {empCode}
@@ -3055,10 +3086,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => {
-                                setSelectedEmpId(item.employee_id);
-                                setMainTab("scorecard");
-                              }}
+                              onClick={() => handleNavigateToScorecard(item)}
                               className="h-8 rounded-xl text-xs gap-1 cursor-pointer"
                             >
                               <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
