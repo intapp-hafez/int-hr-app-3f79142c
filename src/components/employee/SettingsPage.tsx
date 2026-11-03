@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { toast } from "sonner";
 import { useI18n, useTranslators, LanguageToggle } from "@/lib/i18n";
 import { ChevronRight, Globe, Bell, MapPin, Wifi, Lock, LogOut, Smartphone, Check, ChevronDown, Shield, Signal, CircleDot, X, Eye, EyeOff, CalendarDays, MessageSquare, IdCard, User, Phone, Mail, Building2, UserCog, Briefcase, Fingerprint, Banknote, Clock, Package } from "lucide-react";
