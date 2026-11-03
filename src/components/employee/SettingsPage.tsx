@@ -150,29 +150,69 @@ export function SettingsPage() {
     <div className="space-y-5">
       <h1 className="font-display text-2xl font-semibold tracking-tight">More</h1>
 
-      {/* Avatar + name card */}
-      <section className="rounded-2xl border border-border bg-card p-4">
-        <div className="flex items-center gap-4">
-          {realProfile?.id ? (
-            <AvatarUploader
-              userId={realProfile.id}
-              name={realProfile.full_name ?? realProfile.email ?? me?.name ?? "?"}
-              url={realProfile.avatar_url}
-              size="md"
-              canEdit
-            />
-          ) : (
-            <div className="grid h-14 w-14 place-items-center rounded-full bg-gradient-brand text-brand-foreground font-display text-base font-semibold">
-              {me?.name.split(" ").map((s) => s[0]).slice(0, 2).join("") ?? "??"}
+      {/* Employee ID Card Header */}
+      <section className="relative overflow-hidden rounded-3xl border border-border/80 dark:border-white/10 bg-gradient-to-b from-primary/10 via-card to-card dark:from-primary/15 dark:via-[#13151e] dark:to-[#0f1117] p-6 shadow-md transition-all">
+        {/* Lanyard / Clip slot indicator at the top */}
+        <div className="mx-auto -mt-2 mb-4 h-1.5 w-12 rounded-full bg-border/80 dark:bg-white/20" />
+
+        <div className="flex flex-col items-center text-center">
+          {/* Centered Avatar as ID Photo */}
+          <div className="relative mb-3 flex items-center justify-center">
+            <div className="rounded-full p-1 bg-background dark:bg-[#181a24] shadow-md ring-2 ring-primary/30">
+              {realProfile?.id ? (
+                <AvatarUploader
+                  userId={realProfile.id}
+                  name={realProfile.full_name ?? realProfile.email ?? me?.name ?? "?"}
+                  url={realProfile.avatar_url}
+                  size="lg"
+                  canEdit
+                />
+              ) : (
+                <div className="grid h-20 w-20 place-items-center rounded-full bg-gradient-brand text-brand-foreground font-display text-xl font-bold shadow-inner">
+                  {me?.name.split(" ").map((s) => s[0]).slice(0, 2).join("") ?? "??"}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 1. ID Number ("then ID") */}
+          {(realProfile?.emp_code || details?.emp_code || me?.id) && (
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-foreground/5 dark:bg-white/10 px-3 py-0.5 border border-border/80 dark:border-white/15 shadow-2xs">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">ID</span>
+              <span className="font-mono text-xs font-bold text-foreground">
+                {realProfile?.emp_code || details?.emp_code || me?.id}
+              </span>
             </div>
           )}
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">{realProfile?.full_name ?? me?.name ?? realProfile?.email}</p>
-            <p className="truncate text-xs text-muted-foreground">{displayPosition ? `${displayPosition} • ` : ""}{realProfile?.email ?? `${me?.id} • ${tDept(me?.dept)}`}</p>
-            {realProfile?.emp_code && (
-              <p className="mt-1 inline-block rounded-md bg-muted px-2 py-0.5 font-mono text-[11px] font-semibold text-foreground">
-                {realProfile.emp_code}
-              </p>
+
+          {/* 2. Employee Name ("then name") */}
+          <h2 className="mt-2.5 font-display text-lg sm:text-xl font-bold tracking-tight text-foreground">
+            {realProfile?.full_name ?? details?.full_name ?? me?.name ?? realProfile?.email}
+          </h2>
+
+          {/* 3. "then so on": Job Position / Title */}
+          {displayPosition && (
+            <p className="mt-1 text-sm font-semibold text-primary dark:text-primary-foreground">
+              {displayPosition}
+            </p>
+          )}
+
+          {/* Department, Branch, Email */}
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5 text-xs text-muted-foreground">
+            {(details?.department || me?.dept) && (
+              <span className="inline-flex items-center rounded-md bg-muted/70 dark:bg-white/5 px-2.5 py-1 font-medium border border-border/50 dark:border-white/5">
+                {details?.department || (me?.dept ? tDept(me.dept) : "")}
+              </span>
+            )}
+            {(details?.branch || me?.branch) && (
+              <span className="inline-flex items-center rounded-md bg-muted/70 dark:bg-white/5 px-2.5 py-1 font-medium border border-border/50 dark:border-white/5">
+                {details?.branch || (me?.branch ? tBranch(me.branch) : "")}
+              </span>
+            )}
+            {(realProfile?.email || details?.email) && (
+              <span className="inline-flex items-center rounded-md bg-muted/70 dark:bg-white/5 px-2.5 py-1 font-medium border border-border/50 dark:border-white/5 truncate max-w-[260px]">
+                {realProfile?.email || details?.email}
+              </span>
             )}
           </div>
         </div>
