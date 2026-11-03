@@ -87,7 +87,7 @@ export function AttendanceRulesView() {
                       : "hover:bg-muted/70 text-foreground"
                   }`}
                 >
-                  <EmployeeAvatar id={e.id} name={e.name} className="h-8 w-8 shrink-0" />
+                  <EmployeeAvatar id={e.id} name={e.name} url={e.avatar_url} className="h-8 w-8 shrink-0" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm">{e.name}</p>
                     <span className="block truncate text-[11px] text-muted-foreground">
@@ -100,7 +100,7 @@ export function AttendanceRulesView() {
           </ul>
         </aside>
         {current ? (
-          <RulesEditor key={current.id} employeeId={current.id} name={current.name} />
+          <RulesEditor key={current.id} employeeId={current.id} name={current.name} avatarUrl={current.avatar_url} />
         ) : (
           <div className="grid place-items-center rounded-2xl border border-dashed border-border bg-card/40 p-12 text-center text-sm text-muted-foreground min-h-[300px]">
             <div className="max-w-xs space-y-2">
@@ -117,7 +117,7 @@ export function AttendanceRulesView() {
   );
 }
 
-function RulesEditor({ employeeId, name }: { employeeId: string; name: string }) {
+function RulesEditor({ employeeId, name, avatarUrl }: { employeeId: string; name: string; avatarUrl?: string | null }) {
   const qc = useQueryClient();
   const geoAll = useServerFn(listAllGeofences);
   const netAll = useServerFn(listAllNetworks);
@@ -157,7 +157,7 @@ function RulesEditor({ employeeId, name }: { employeeId: string; name: string })
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4">
-        <EmployeeAvatar id={employeeId} name={name} className="h-10 w-10 shrink-0" />
+        <EmployeeAvatar id={employeeId} name={name} url={avatarUrl} className="h-10 w-10 shrink-0" />
         <div>
           <h2 className="font-display text-lg font-semibold">{name}</h2>
           <p className="text-xs text-muted-foreground">Individual attendance constraints & policy assignment</p>

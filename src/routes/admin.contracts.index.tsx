@@ -35,6 +35,7 @@ type Row = {
   id: string;
   empCode: string | null;
   name: string;
+  avatarUrl?: string | null;
   position: string;
   dept: string;
   start: Date | null;
@@ -60,6 +61,7 @@ function rowsFromApi(api: ApiContractRow[]): Row[] {
       id: r.id,
       empCode: r.emp_code ?? null,
       name: r.full_name || r.emp_code || r.id,
+      avatarUrl: r.avatar_url ?? null,
       position: r.position || r.contract_type || "—",
       dept: r.department || "—",
       start,
@@ -251,7 +253,7 @@ function ContractsPage() {
                   <TableRow key={r.id}>
                     <TableCell>
                       <div className="flex items-center gap-2.5">
-                        <EmployeeAvatar id={r.id} name={r.name} className="h-8 w-8 shrink-0" />
+                        <EmployeeAvatar id={r.id} name={r.name} url={r.avatarUrl} className="h-8 w-8 shrink-0" />
                         <div>
                           <p className="font-semibold text-sm">{r.name}</p>
                           <p className="text-[10px] font-mono text-muted-foreground">{r.empCode || r.id}</p>
@@ -344,7 +346,7 @@ function ContractsPage() {
               <div key={r.id} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
                 <div className="mb-3 flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <EmployeeAvatar id={r.id} name={r.name} fallbackClassName="text-xs" />
+                    <EmployeeAvatar id={r.id} name={r.name} url={r.avatarUrl} fallbackClassName="text-xs" />
                     <div>
                       <p className="font-semibold leading-tight">{r.name}</p>
                       <p className="text-[11px] font-mono text-muted-foreground">{r.empCode || r.id}</p>

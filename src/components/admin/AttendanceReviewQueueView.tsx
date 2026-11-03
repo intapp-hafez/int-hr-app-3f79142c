@@ -222,6 +222,7 @@ export function AttendanceReviewQueueView() {
                         <EmployeeAvatar
                           id={c.employee_id}
                           name={emp?.full_name ?? "Employee"}
+                          url={emp?.avatar_url}
                           className="h-8 w-8"
                         />
                         <div>

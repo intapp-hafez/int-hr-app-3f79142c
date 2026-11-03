@@ -210,6 +210,7 @@ type AttendanceRow = {
   id: string;
   employee_id: string;
   employee_name: string;
+  employee_avatar_url?: string | null;
   date: string;
   in_time: string | null;
   out_time: string | null;
@@ -407,6 +408,7 @@ function AdminAttendance() {
   const empQ = useQuery({ queryKey: ["admin", "attendance", "employees"], queryFn: () => empFn() });
   const employees = empQ.data ?? [];
   const empName = useMemo(() => Object.fromEntries(employees.map((e) => [e.id, e.name])), [employees]);
+  const empAvatar = useMemo(() => Object.fromEntries(employees.map((e: any) => [e.id, e.avatar_url])), [employees]);
 
   const queryKey = ["admin", "attendance", { date: dateFilter, emp: empFilter }] as const;
   const listQ = useQuery({
@@ -726,7 +728,7 @@ function AdminAttendance() {
                   <tr key={row.id} className="border-b border-border last:border-b-0 hover:bg-muted/40">
                     <td className="px-4 py-3 font-medium">
                       <div className="flex items-center gap-2">
-                        <EmployeeAvatar id={row.employee_id} name={row.employee_name} className="h-6 w-6" />
+                        <EmployeeAvatar id={row.employee_id} name={row.employee_name} url={row.employee_avatar_url || empAvatar[row.employee_id]} className="h-6 w-6" />
                         {row.employee_name}
                       </div>
                     </td>

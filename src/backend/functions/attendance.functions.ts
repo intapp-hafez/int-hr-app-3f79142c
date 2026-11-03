@@ -940,7 +940,7 @@ export const adminListAttendance = createServerFn({ method: "POST" })
     let q = context.supabase
       .from("attendance")
       .select(
-        "id, employee_id, date, in_time, out_time, branch, status, note, city, district, street, free_check, lat, lng, out_lat, out_lng, out_city, out_district, out_street, decision, reason_codes, accuracy_m, out_accuracy_m, profiles:employee_id(full_name, email)",
+        "id, employee_id, date, in_time, out_time, branch, status, note, city, district, street, free_check, lat, lng, out_lat, out_lng, out_city, out_district, out_street, decision, reason_codes, accuracy_m, out_accuracy_m, profiles:employee_id(full_name, email, avatar_url)",
       )
       .gte("date", data.from)
       .lte("date", data.to)
@@ -953,6 +953,7 @@ export const adminListAttendance = createServerFn({ method: "POST" })
       id: r.id as string,
       employee_id: r.employee_id as string,
       employee_name: (r.profiles?.full_name ?? r.profiles?.email ?? r.employee_id) as string,
+      employee_avatar_url: (r.profiles?.avatar_url ?? null) as string | null,
       date: r.date as string,
       in_time: r.in_time as string | null,
       out_time: r.out_time as string | null,
@@ -1020,13 +1021,14 @@ export const listEmployeesForAttendance = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
       .from("profiles")
-      .select("id, full_name, email")
+      .select("id, full_name, email, avatar_url")
       .order("full_name", { ascending: true })
       .limit(1000);
     if (error) throw new Error(error.message);
     return (data ?? []).map((r: any) => ({
       id: r.id as string,
       name: (r.full_name ?? r.email ?? r.id) as string,
+      avatar_url: (r.avatar_url ?? null) as string | null,
     }));
   });
 
@@ -1297,7 +1299,7 @@ export const listAttendanceReviewCases = createServerFn({ method: "POST" })
     let q = (context.supabase as any)
       .from("attendance_review_cases")
       .select(
-        "id, attendance_id, employee_id, action, reason_codes, risk_signals, status, reviewer_id, reviewer_note, created_at, resolved_at, profiles:employee_id(full_name, email, emp_code, manager_id), attendance:attendance_id(date, in_time, out_time, branch, lat, lng, accuracy_m, out_lat, out_lng, out_accuracy_m)"
+        "id, attendance_id, employee_id, action, reason_codes, risk_signals, status, reviewer_id, reviewer_note, created_at, resolved_at, profiles:employee_id(full_name, email, emp_code, manager_id, avatar_url), attendance:attendance_id(date, in_time, out_time, branch, lat, lng, accuracy_m, out_lat, out_lng, out_accuracy_m)"
       )
       .order("created_at", { ascending: false })
       .limit(200);
