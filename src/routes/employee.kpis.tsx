@@ -81,10 +81,7 @@ export function EmployeeKpiPage() {
   const [mainTab, setMainTab] = useState<"job_description" | "kpis_records">("job_description");
   const [kpiSubTab, setKpiSubTab] = useState<"quarters" | "scorecard" | "feedback" | "history">("quarters");
   const [collapsedPillars, setCollapsedPillars] = useState<Record<string, boolean>>({});
-  const [showFullJdDetails, setShowFullJdDetails] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
-  const [previewJd, setPreviewJd] = useState<any | null>(null);
-  const [relatedSearch, setRelatedSearch] = useState("");
 
   const togglePillar = (num: string) => {
     setCollapsedPillars((prev) => ({ ...prev, [num]: !prev[num] }));
@@ -94,49 +91,6 @@ export function EmployeeKpiPage() {
   const listMyKpisFn = useServerFn(listMyKpiEvaluations);
   const getProfileFn = useServerFn(getMyProfileDetails);
   const matchTemplateFn = useServerFn(matchKpiTemplate);
-
-  // Fetch all official job descriptions for the "Other Related JD" catalog
-  const { data: allJobDescriptions = [], isPending: isLoadingRelatedJds } = useQuery({
-    queryKey: ["all-job-descriptions-public"],
-    queryFn: async () => {
-      try {
-        const { data, error } = await supabase
-          .from("position_job_descriptions" as any)
-          .select(`
-            id,
-            position_id,
-            job_code,
-            job_category,
-            position_type,
-            location_type,
-            job_grade,
-            job_summary,
-            responsibilities,
-            qualifications,
-            technical_competencies,
-            behavioral_competencies,
-            internal_relations,
-            external_relations,
-            authority,
-            career_path,
-            doc_version,
-            reviewed_by,
-            approved_by,
-            tags,
-            position:positions(id, name_en, name_ar)
-          `)
-          .order("job_code", { ascending: true });
-        if (error) {
-          console.warn("Could not fetch related JDs:", error);
-          return [];
-        }
-        return (data || []) as any[];
-      } catch {
-        return [];
-      }
-    },
-    staleTime: 60_000,
-  });
 
   // Fetch current year evaluation
   const { data: evaluation } = useQuery({
@@ -379,52 +333,6 @@ export function EmployeeKpiPage() {
     }
   };
 
-  const handleDownloadRelatedPdf = async (item: any) => {
-    try {
-      const posTitle = item.position?.name_en || item.job_code || "Position";
-      await exportJobDescriptionPdf({
-        jobTitle: posTitle,
-        jobCode: item.job_code,
-        department: "Integrated Technics Operations",
-        jobCategory: item.job_category || "Non-managerial",
-        positionType: item.position_type || "Full-time",
-        locationType: item.location_type || "On-site",
-        jobGrade: item.job_grade,
-        reportingTo: "Department Head",
-        jobSummary: item.job_summary || "",
-        responsibilities: item.responsibilities || [],
-        qualifications: item.qualifications,
-        technicalCompetencies: item.technical_competencies || [],
-        behavioralCompetencies: item.behavioral_competencies || [],
-        internalRelations: item.internal_relations,
-        externalRelations: item.external_relations,
-        authority: item.authority || [],
-        careerPath: item.career_path || [],
-        docVersion: item.doc_version || "v1.0",
-        reviewedBy: item.reviewed_by,
-        approvedBy: item.approved_by,
-      });
-      toast.success(isAr ? `تم تحميل ملف PDF لـ ${posTitle}` : `Downloaded PDF for ${posTitle}`);
-    } catch (err) {
-      console.error(err);
-      toast.error(isAr ? "تعذر تحميل ملف PDF" : "Failed to download PDF");
-    }
-  };
-
-  const filteredRelatedJds = useMemo(() => {
-    return allJobDescriptions.filter((item) => {
-      const isCurrent = effectivePositionId && item.position_id === effectivePositionId;
-      if (isCurrent) return false;
-      const term = relatedSearch.toLowerCase().trim();
-      if (!term) return true;
-      const en = (item.position?.name_en || "").toLowerCase();
-      const ar = (item.position?.name_ar || "").toLowerCase();
-      const code = (item.job_code || "").toLowerCase();
-      const summary = (item.job_summary || "").toLowerCase();
-      return en.includes(term) || ar.includes(term) || code.includes(term) || summary.includes(term);
-    });
-  }, [allJobDescriptions, effectivePositionId, relatedSearch]);
-
   const rawStatus = (evaluation?.status || "draft").toLowerCase();
 
   const quartersList = [
@@ -544,30 +452,8 @@ export function EmployeeKpiPage() {
               </div>
             </div>
 
-            {/* Employee Information & Role Attributes Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 pt-3 border-t border-border/60">
-              {/* Employee Name */}
-              <div className="rounded-2xl border border-border/60 bg-muted/20 p-2.5">
-                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                  <User className="h-3.5 w-3.5 text-brand" />
-                  <span>{isAr ? "الموظف" : "Employee"}</span>
-                </div>
-                <p className="text-xs sm:text-sm font-bold text-foreground mt-1 truncate" title={profileDetails?.full_name || session?.name || "Employee"}>
-                  {profileDetails?.full_name || session?.name || "Employee"}
-                </p>
-              </div>
-
-              {/* Employee Code */}
-              <div className="rounded-2xl border border-border/60 bg-muted/20 p-2.5">
-                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                  <IdCard className="h-3.5 w-3.5 text-brand" />
-                  <span>{isAr ? "كود الموظف" : "Employee Code"}</span>
-                </div>
-                <p className="text-xs sm:text-sm font-bold font-mono text-foreground mt-1 truncate">
-                  {jobDescData.employeeCode}
-                </p>
-              </div>
-
+            {/* Role Attributes Grid (Clean 4 Pills matching employee identity) */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-3 border-t border-border/60">
               {/* Department */}
               <div className="rounded-2xl border border-border/60 bg-muted/20 p-2.5">
                 <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
@@ -590,6 +476,17 @@ export function EmployeeKpiPage() {
                 </p>
               </div>
 
+              {/* Employee Code */}
+              <div className="rounded-2xl border border-border/60 bg-muted/20 p-2.5">
+                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                  <IdCard className="h-3.5 w-3.5 text-brand" />
+                  <span>{isAr ? "كود الموظف" : "Employee Code"}</span>
+                </div>
+                <p className="text-xs sm:text-sm font-bold font-mono text-foreground mt-1 truncate">
+                  {jobDescData.employeeCode}
+                </p>
+              </div>
+
               {/* Contract Type */}
               <div className="rounded-2xl border border-border/60 bg-muted/20 p-2.5">
                 <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
@@ -600,52 +497,22 @@ export function EmployeeKpiPage() {
                   {jobDescData.contractType}
                 </p>
               </div>
-
-              {/* Location Type */}
-              <div className="rounded-2xl border border-border/60 bg-muted/20 p-2.5">
-                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                  <MapPin className="h-3.5 w-3.5 text-brand" />
-                  <span>{isAr ? "موقع العمل" : "Location"}</span>
-                </div>
-                <p className="text-xs sm:text-sm font-bold text-foreground mt-1 truncate">
-                  {jobDescData.locationType || "On-site"}
-                </p>
-              </div>
             </div>
 
-            {/* Quick Action Bar: Download PDF & Toggle Full Details */}
+            {/* Action Bar: Download Official JD (PDF) */}
             <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  onClick={handleDownloadMyJdPdf}
-                  disabled={isExportingPdf}
-                  className="h-9 gap-2 rounded-xl bg-brand text-brand-foreground font-semibold shadow-xs hover:brightness-105"
-                >
-                  {isExportingPdf ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <FileDown className="h-4 w-4" />
-                  )}
-                  {isAr ? "تحميل بطاقة الوصف الوظيفي (PDF)" : "Download Official JD (PDF)"}
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowFullJdDetails((v) => !v)}
-                  className="h-9 gap-1.5 rounded-xl border-border/70 text-xs font-semibold"
-                >
-                  {showFullJdDetails ? (
-                    <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4 text-brand" />
-                  )}
-                  {showFullJdDetails
-                    ? (isAr ? "طي المواصفات التفصيلية" : "Collapse Full Specs")
-                    : (isAr ? "عرض المواصفات التفصيلية الكاملة" : "View Full Specifications")}
-                </Button>
-              </div>
+              <Button
+                onClick={handleDownloadMyJdPdf}
+                disabled={isExportingPdf}
+                className="h-9 gap-2 rounded-xl bg-brand text-brand-foreground font-semibold shadow-xs hover:brightness-105"
+              >
+                {isExportingPdf ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <FileDown className="h-4 w-4" />
+                )}
+                {isAr ? "تحميل بطاقة الوصف الوظيفي (PDF)" : "Download Official JD (PDF)"}
+              </Button>
 
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span className="font-mono font-bold text-foreground">
@@ -657,621 +524,26 @@ export function EmployeeKpiPage() {
             </div>
           </div>
 
-          {/* 2. Executive Highlights Card ("SHOW ABIT" — Clean, uncluttered view) */}
-          <div className="space-y-4">
-            {/* Job Purpose & Summary */}
-            <div className="rounded-3xl border border-border bg-card p-4 sm:p-5 shadow-2xs space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="grid h-8 w-8 place-items-center rounded-xl bg-brand/10 text-brand">
-                  <Compass className="h-4 w-4" />
-                </span>
-                <div>
-                  <h3 className="font-bold text-sm text-foreground">
-                    {isAr ? "الهدف العام ونطاق الدور الوظيفي" : "Job Purpose & Operational Scope"}
-                  </h3>
-                  <p className="text-[11px] text-muted-foreground">
-                    {isAr ? "المهام المحورية والمسؤولية التشغيلية في المنظمة" : "Primary mission, reporting framework, and core objectives"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-border/70 bg-muted/20 p-3.5 sm:p-4 text-xs sm:text-sm leading-relaxed text-foreground">
-                <p>{isAr ? jobDescData.purposeAr : jobDescData.purposeEn}</p>
-              </div>
-            </div>
-
-            {/* Core Responsibilities Snapshot */}
-            <div className="rounded-3xl border border-border bg-card p-4 sm:p-5 shadow-2xs space-y-3.5">
-              <div className="flex items-center justify-between pb-1 border-b border-border/40">
-                <div className="flex items-center gap-2.5">
-                  <span className="grid h-8 w-8 place-items-center rounded-xl bg-brand/10 text-brand">
-                    <CheckCheck className="h-4 w-4" />
-                  </span>
-                  <div>
-                    <h3 className="font-bold text-sm text-foreground">
-                      {isAr ? "أبرز المهام والمسؤوليات الرئيسية" : "Key Responsibilities & Deliverables"}
-                    </h3>
-                    <p className="text-[11px] text-muted-foreground">
-                      {isAr ? "نظرة تنفيذية سريعة على أهم المهام اليومية للدور" : "Executive snapshot of operational deliverables"}
-                    </p>
-                  </div>
-                </div>
-
-                <Badge variant="outline" className="text-[11px] font-mono px-2.5 py-0.5">
-                  {savedJobDescription?.responsibilities?.length || jobDescData.totalMetricsCount}{" "}
-                  {isAr ? "مهام معتمدة" : "Total Duties"}
-                </Badge>
-              </div>
-
-              {/* Top 4 Duties Snippet */}
-              <div className="space-y-2">
-                {(savedJobDescription?.responsibilities?.length
-                  ? savedJobDescription.responsibilities.slice(0, 4)
-                  : jobDescData.pillars.flatMap((p) => p.duties.map((d) => (isAr ? d.nameAr : d.nameEn))).slice(0, 4)
-                ).map((duty, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-start gap-2.5 rounded-xl border border-border/60 bg-muted/15 p-3 text-xs leading-relaxed"
-                  >
-                    <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-brand/10 text-brand mt-0.5 font-bold font-mono text-[10px]">
-                      {idx + 1}
-                    </span>
-                    <span className="text-foreground flex-1 font-medium">{duty}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Expansion helper if more duties exist */}
-              {((savedJobDescription?.responsibilities?.length || jobDescData.totalMetricsCount) > 4) && (
-                <div className="flex items-center justify-between text-xs text-muted-foreground pt-1 px-1">
-                  <span>
-                    {isAr
-                      ? `يوجد ${(savedJobDescription?.responsibilities?.length || jobDescData.totalMetricsCount) - 4} مهام إضافية مسجلة في وثيقة الـ PDF الرسمية.`
-                      : `+${(savedJobDescription?.responsibilities?.length || jobDescData.totalMetricsCount) - 4} more operational duties detailed in the official PDF document.`}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="link"
-                    size="sm"
-                    onClick={() => setShowFullJdDetails(true)}
-                    className="h-auto p-0 text-brand text-xs font-semibold"
-                  >
-                    {isAr ? "عرض كل المهام بالتفصيل" : "View all duties online"}
-                  </Button>
-                </div>
-              )}
-            </div>
-
-            {/* Core Competencies Snapshot */}
-            <div className="rounded-3xl border border-border bg-card p-4 sm:p-5 shadow-2xs space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="grid h-8 w-8 place-items-center rounded-xl bg-brand/10 text-brand">
-                  <Sparkles className="h-4 w-4" />
-                </span>
-                <div>
-                  <h3 className="font-bold text-sm text-foreground">
-                    {isAr ? "أبرز الجدارات والمهارات المطلوبة" : "Core Competencies & Skills"}
-                  </h3>
-                  <p className="text-[11px] text-muted-foreground">
-                    {isAr ? "المعايير الفنية والسلوكية المحددة لشغل الدور" : "Key technical capabilities and behavioral traits"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
-                {/* Technical */}
-                <div className="rounded-2xl border border-border/70 bg-muted/15 p-3 space-y-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block">
-                    {isAr ? "الجدارات الفنية التخصصية" : "Technical Skills"}
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {jobDescData.technicalCompetencies.slice(0, 5).map((comp, idx) => (
-                      <Badge key={idx} variant="secondary" className="text-[11px] font-medium">
-                        {isAr ? comp.ar : comp.en}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Behavioral */}
-                <div className="rounded-2xl border border-border/70 bg-muted/15 p-3 space-y-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block">
-                    {isAr ? "الجدارات السلوكية والقيادية" : "Behavioral Competencies"}
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {jobDescData.behavioralCompetencies.slice(0, 5).map((comp, idx) => (
-                      <Badge key={idx} variant="outline" className="text-[11px] font-medium">
-                        {isAr ? comp.ar : comp.en}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Official PDF Callout Banner */}
-            <div className="rounded-3xl border border-brand/30 bg-gradient-to-r from-brand/5 via-brand/10 to-transparent p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-start gap-3">
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-brand text-brand-foreground shadow-2xs">
-                  <FileCheck className="h-5 w-5" />
-                </span>
-                <div className="space-y-0.5">
-                  <h4 className="font-bold text-sm text-foreground">
-                    {isAr ? "وثيقة الوصف الوظيفي الرسمية المعتمدة (10 أقسام)" : "Official 10-Section Job Description Document"}
-                  </h4>
-                  <p className="text-xs text-muted-foreground max-w-xl leading-relaxed">
-                    {isAr
-                      ? "تتضمن معايير التقييم ومصفوفة الأوزان، حدود الصلاحيات، مسار الترقي، وشيت إقرار وتوقيع الموظف المعتمد لدى Integrated Technics."
-                      : "Formatted to Integrated Technics standards: includes KPI weighting, authority limits, reporting relations, and employee sign-off sheet."}
-                  </p>
-                </div>
-              </div>
-
-              <Button
-                onClick={handleDownloadMyJdPdf}
-                disabled={isExportingPdf}
-                className="gap-2 rounded-xl bg-brand text-brand-foreground shrink-0 font-bold shadow-xs hover:brightness-105"
-              >
-                {isExportingPdf ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <FileDown className="h-4 w-4" />
-                )}
-                {isAr ? "تحميل PDF الرسمي" : "Download Official PDF"}
-              </Button>
-            </div>
-          </div>
-
-          {/* 3. Collapsible Full Specifications (All 10 Sections Online) */}
-          {showFullJdDetails && (
-            <div className="space-y-4 pt-2 border-t border-border/60 animate-in fade-in-50 duration-300">
-              <div className="flex items-center justify-between">
-                <h3 className="font-bold text-sm text-foreground flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-brand" />
-                  {isAr ? "المواصفات التشغيلية والتفصيلية الكاملة للدور" : "Full Operational Role Specifications"}
+          {/* Job Purpose & Summary */}
+          <div className="rounded-3xl border border-border bg-card p-4 sm:p-5 shadow-2xs space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="grid h-8 w-8 place-items-center rounded-xl bg-brand/10 text-brand">
+                <Compass className="h-4 w-4" />
+              </span>
+              <div>
+                <h3 className="font-bold text-sm text-foreground">
+                  {isAr ? "الهدف العام ونطاق الدور الوظيفي" : "Job Purpose & Operational Scope"}
                 </h3>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowFullJdDetails(false)}
-                  className="h-7 text-xs text-muted-foreground gap-1"
-                >
-                  <ChevronUp className="h-3.5 w-3.5" />
-                  {isAr ? "إخفاء التفاصيل" : "Collapse"}
-                </Button>
-              </div>
-
-              {/* Stacked Pillars Flow */}
-              <div className="space-y-3">
-                {jobDescData.pillars.map((pillar) => {
-                  const isCollapsed = !!collapsedPillars[pillar.number];
-                  return (
-                    <div
-                      key={pillar.number}
-                      className="rounded-2xl border border-border/80 bg-card transition-all overflow-hidden"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => togglePillar(pillar.number)}
-                        className="w-full p-3 sm:p-3.5 flex items-center justify-between gap-3 text-start hover:bg-muted/30 transition-colors focus:outline-none"
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl font-mono text-xs font-bold border border-brand/30 bg-brand/10 text-brand">
-                            {pillar.number}
-                          </span>
-                          <h4 className="font-semibold text-xs sm:text-sm text-foreground leading-snug">
-                            {isAr ? pillar.titleAr : pillar.titleEn}
-                          </h4>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <Badge variant="outline" className="text-[10px] font-mono px-2 py-0.5 bg-background/60">
-                            {pillar.duties.length} {isAr ? "مهام" : "Duties"}
-                          </Badge>
-                          <div className="text-muted-foreground">
-                            {isCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-                          </div>
-                        </div>
-                      </button>
-
-                      {!isCollapsed && (
-                        <div className="px-3 pb-3 sm:px-3.5 sm:pb-3.5 pt-1 space-y-2">
-                          {pillar.duties.map((duty) => (
-                            <div
-                              key={duty.id}
-                              className="rounded-xl border border-border/60 bg-background/80 p-3 space-y-1 shadow-2xs"
-                            >
-                              <p className="font-semibold text-xs text-foreground leading-snug">
-                                {isAr ? duty.nameAr : duty.nameEn}
-                              </p>
-                              {(isAr ? duty.descriptionAr : duty.descriptionEn) && (
-                                <p className="text-[11px] text-muted-foreground leading-relaxed">
-                                  {isAr ? duty.descriptionAr : duty.descriptionEn}
-                                </p>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Performance Architecture & Weighting */}
-              <div className="rounded-3xl border border-border bg-card p-4 sm:p-5 shadow-2xs space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className="grid h-8 w-8 place-items-center rounded-xl bg-brand/10 text-brand">
-                    <Target className="h-4 w-4" />
-                  </span>
-                  <div>
-                    <h3 className="font-bold text-sm text-foreground">
-                      {isAr ? "هيكل تقييم مؤشرات الأداء (KPIs)" : "KPI Evaluation Architecture"}
-                    </h3>
-                    <p className="text-[11px] text-muted-foreground">
-                      {isAr ? "توزيع أوزان التقييم المعتمدة للدور" : "Official evaluation weight distribution"}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-2 pt-1">
-                  <div className="rounded-2xl border border-border/80 bg-muted/20 p-3 flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-bold text-foreground">
-                        {isAr ? "الجدارات المشتركة والسلوكية" : "Common & Behavioral Competencies"}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground">
-                        {isAr ? "الانضباط، السلامة، والتواصل" : "Discipline, safety, and teamwork"}
-                      </p>
-                    </div>
-                    <Badge className="bg-brand text-brand-foreground font-mono text-xs px-2.5 py-0.5">
-                      {jobDescData.commonWeightPct}%
-                    </Badge>
-                  </div>
-
-                  <div className="rounded-2xl border border-border/80 bg-muted/20 p-3 flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-bold text-foreground">
-                        {isAr ? "الأهداف التخصصية والتنفيذ الفني" : "Role-Specific Technical Execution"}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground">
-                        {isAr ? "مخرجات العمل، التسليم، والجودة" : "Site deliverables, milestones & quality"}
-                      </p>
-                    </div>
-                    <Badge className="bg-emerald-600 text-white font-mono text-xs px-2.5 py-0.5">
-                      {jobDescData.positionWeightPct}%
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-
-              {/* Relationships & Authority & Career Path */}
-              {(jobDescData.internalRelations || jobDescData.externalRelations || (jobDescData.authority && jobDescData.authority.length > 0) || (jobDescData.careerPath && jobDescData.careerPath.length > 0)) && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                  {/* Relationships & Authority */}
-                  {(jobDescData.internalRelations || jobDescData.externalRelations || (jobDescData.authority && jobDescData.authority.length > 0)) && (
-                    <div className="rounded-3xl border border-border bg-card p-4 sm:p-5 shadow-2xs space-y-3">
-                      <div className="flex items-center gap-2">
-                        <span className="grid h-8 w-8 place-items-center rounded-xl bg-brand/10 text-brand">
-                          <Shield className="h-4 w-4" />
-                        </span>
-                        <div>
-                          <h3 className="font-bold text-sm text-foreground">
-                            {isAr ? "نطاق الصلاحيات والتواصل" : "Relationships & Authority"}
-                          </h3>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2 pt-1 text-xs">
-                        {jobDescData.internalRelations && (
-                          <div className="rounded-xl border border-border/70 bg-muted/20 p-2.5">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-0.5">
-                              {isAr ? "التواصل الداخلي" : "Internal Communications"}
-                            </span>
-                            <p className="text-foreground">{jobDescData.internalRelations}</p>
-                          </div>
-                        )}
-                        {jobDescData.externalRelations && (
-                          <div className="rounded-xl border border-border/70 bg-muted/20 p-2.5">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-0.5">
-                              {isAr ? "التواصل الخارجي" : "External Communications"}
-                            </span>
-                            <p className="text-foreground">{jobDescData.externalRelations}</p>
-                          </div>
-                        )}
-                        {jobDescData.authority && jobDescData.authority.length > 0 && (
-                          <div className="space-y-1 pt-1">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block">
-                              {isAr ? "صلاحيات شاغل الوظيفة" : "Authority of Job Holder"}
-                            </span>
-                            <ul className="space-y-1 text-muted-foreground">
-                              {jobDescData.authority.map((auth, aIdx) => (
-                                <li key={aIdx} className="flex items-start gap-1.5">
-                                  <Check className="h-3.5 w-3.5 text-brand shrink-0 mt-0.5" />
-                                  <span className="text-foreground">{auth}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Career Path */}
-                  {jobDescData.careerPath && jobDescData.careerPath.length > 0 && (
-                    <div className="rounded-3xl border border-border bg-card p-4 sm:p-5 shadow-2xs space-y-3">
-                      <div className="flex items-center gap-2">
-                        <span className="grid h-8 w-8 place-items-center rounded-xl bg-brand/10 text-brand">
-                          <TrendingUp className="h-4 w-4" />
-                        </span>
-                        <div>
-                          <h3 className="font-bold text-sm text-foreground">
-                            {isAr ? "المسار الوظيفي والترقي" : "Career Path"}
-                          </h3>
-                        </div>
-                      </div>
-
-                      <div className="space-y-1.5 pt-1">
-                        {jobDescData.careerPath.map((step, idx) => (
-                          <div
-                            key={idx}
-                            className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-muted/15 p-2 text-xs text-foreground"
-                          >
-                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-background font-mono text-[10px] font-bold">
-                              {idx + 1}
-                            </span>
-                            <span className="flex-1">{step}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Document Control Footer */}
-              <div className="rounded-2xl border border-border/60 bg-muted/15 p-3 flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground">
-                <span className="font-mono font-semibold text-foreground">
-                  {jobDescData.jobCode || "JD-001"} · {jobDescData.docVersion || "v1.0"}
-                </span>
-                <div className="flex items-center gap-3">
-                  {jobDescData.reviewedBy && <span>{isAr ? "مراجعة: " : "Reviewed by: "}<strong className="text-foreground">{jobDescData.reviewedBy}</strong></span>}
-                  {jobDescData.approvedBy && <span>{isAr ? "اعتماد: " : "Approved by: "}<strong className="text-foreground">{jobDescData.approvedBy}</strong></span>}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ══════════════════════════════════════════════════════════════════ */}
-          {/* 4. OTHER RELATED JOB DESCRIPTIONS IN ORGANIZATION               */}
-          {/* ══════════════════════════════════════════════════════════════════ */}
-          <div className="rounded-3xl border border-border bg-card p-4 sm:p-6 shadow-xs space-y-4 mt-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-border/50">
-              <div className="flex items-center gap-2.5">
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-brand/10 text-brand">
-                  <Layers className="h-5 w-5" />
-                </span>
-                <div>
-                  <h3 className="font-bold text-base text-foreground leading-tight">
-                    {isAr ? "أوصاف وظيفية أخرى بالمنظمة" : "Other Organization Job Descriptions"}
-                  </h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {isAr
-                      ? "استعرض بطاقات الوصف الوظيفي المعتمدة لجميع الوظائف والمسارات المهنية"
-                      : "Explore official position descriptions, competencies, and career paths across Integrated Technics"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="relative w-full sm:w-64">
-                <Search className="absolute start-3 top-2.5 size-3.5 text-muted-foreground" />
-                <Input
-                  className="ps-8 h-8.5 rounded-xl text-xs"
-                  placeholder={isAr ? "بحث في الوظائف…" : "Search other roles…"}
-                  value={relatedSearch}
-                  onChange={(e) => setRelatedSearch(e.target.value)}
-                />
+                <p className="text-[11px] text-muted-foreground">
+                  {isAr ? "المهام المحورية والمسؤولية التشغيلية في المنظمة" : "Primary mission, reporting framework, and core objectives"}
+                </p>
               </div>
             </div>
 
-            {/* Grid of Other Roles */}
-            {isLoadingRelatedJds ? (
-              <div className="flex items-center justify-center py-8 text-muted-foreground gap-2">
-                <Loader2 className="h-4 w-4 animate-spin text-brand" />
-                <span className="text-xs">{isAr ? "جاري تحميل الوظائف…" : "Loading related roles…"}</span>
-              </div>
-            ) : filteredRelatedJds.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground text-xs">
-                {isAr ? "لا توجد وظائف مطابقة للبحث." : "No matching job descriptions found."}
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {filteredRelatedJds.map((item) => {
-                  const titleEn = item.position?.name_en || "Position";
-                  const titleAr = item.position?.name_ar || "";
-                  const dutiesCount = item.responsibilities?.length || 0;
-
-                  return (
-                    <div
-                      key={item.id}
-                      className="rounded-2xl border border-border/70 bg-muted/10 hover:border-brand/40 hover:bg-muted/20 transition-all p-3.5 flex flex-col justify-between gap-3 shadow-2xs"
-                    >
-                      <div className="space-y-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <h4 className="font-bold text-xs sm:text-sm text-foreground truncate">
-                              {isAr ? titleAr || titleEn : titleEn}
-                            </h4>
-                            <p className="text-[11px] text-muted-foreground truncate">
-                              {isAr ? titleEn : titleAr}
-                            </p>
-                          </div>
-                          <Badge variant="outline" className="text-[10px] font-mono text-brand border-brand/30 shrink-0">
-                            {item.job_code || "JD"}
-                          </Badge>
-                        </div>
-
-                        {/* Pills */}
-                        <div className="flex flex-wrap gap-1.5">
-                          {item.job_grade && (
-                            <Badge variant="secondary" className="text-[10px] px-2 py-0">
-                              {item.job_grade}
-                            </Badge>
-                          )}
-                          <Badge variant="outline" className="text-[10px] px-2 py-0 text-muted-foreground">
-                            {item.job_category || "Role"}
-                          </Badge>
-                          {dutiesCount > 0 && (
-                            <Badge variant="outline" className="text-[10px] px-2 py-0 text-muted-foreground">
-                              {dutiesCount} {isAr ? "مهام" : "duties"}
-                            </Badge>
-                          )}
-                        </div>
-
-                        {/* Summary preview */}
-                        {item.job_summary && (
-                          <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                            {item.job_summary}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Card Actions */}
-                      <div className="flex items-center gap-2 pt-2 border-t border-border/50">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDownloadRelatedPdf(item)}
-                          className="h-8 flex-1 gap-1 text-[11px] rounded-xl font-semibold border-border/70 hover:border-brand/40"
-                          title={isAr ? "تحميل PDF" : "Download PDF"}
-                        >
-                          <FileDown className="h-3.5 w-3.5 text-brand" />
-                          <span>PDF</span>
-                        </Button>
-
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setPreviewJd(item)}
-                          className="h-8 gap-1 text-[11px] rounded-xl text-muted-foreground hover:text-foreground"
-                          title={isAr ? "معاينة سريعة" : "Quick View"}
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                          <span>{isAr ? "معاينة" : "Preview"}</span>
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            <div className="rounded-2xl border border-border/70 bg-muted/20 p-3.5 sm:p-4 text-xs sm:text-sm leading-relaxed text-foreground">
+              <p>{isAr ? jobDescData.purposeAr : jobDescData.purposeEn}</p>
+            </div>
           </div>
-
-          {/* Quick Preview Modal for Any Role */}
-          <Dialog open={!!previewJd} onOpenChange={(open) => !open && setPreviewJd(null)}>
-            <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-              {previewJd && (
-                <div className="space-y-4">
-                  <DialogHeader>
-                    <div className="flex items-center gap-2">
-                      <Badge className="bg-brand text-brand-foreground font-mono text-xs">
-                        {previewJd.job_code || "JD"}
-                      </Badge>
-                      <Badge variant="outline" className="text-xs">
-                        {previewJd.job_grade || "Grade"}
-                      </Badge>
-                    </div>
-                    <DialogTitle className="text-lg font-bold">
-                      {previewJd.position?.name_en}
-                    </DialogTitle>
-                    {previewJd.position?.name_ar && (
-                      <DialogDescription className="text-xs text-muted-foreground">
-                        {previewJd.position.name_ar}
-                      </DialogDescription>
-                    )}
-                  </DialogHeader>
-
-                  {/* Summary */}
-                  <div className="rounded-xl border border-border/70 bg-muted/20 p-3 space-y-1">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block">
-                      {isAr ? "ملخص الدور الوظيفي" : "Job Purpose & Scope"}
-                    </span>
-                    <p className="text-xs leading-relaxed text-foreground">
-                      {previewJd.job_summary || "Official position description."}
-                    </p>
-                  </div>
-
-                  {/* Responsibilities */}
-                  {previewJd.responsibilities?.length > 0 && (
-                    <div className="space-y-2">
-                      <span className="text-xs font-bold text-foreground block">
-                        {isAr ? "المهام والمسؤوليات الرئيسية:" : "Key Responsibilities:"}
-                      </span>
-                      <ul className="space-y-1.5 text-xs text-muted-foreground">
-                        {previewJd.responsibilities.map((r: string, idx: number) => (
-                          <li key={idx} className="flex items-start gap-2">
-                            <span className="text-brand font-bold">→</span>
-                            <span className="text-foreground">{r}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Qualifications */}
-                  {previewJd.qualifications && (
-                    <div className="rounded-xl border border-border/70 bg-muted/15 p-3 space-y-1">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block">
-                        {isAr ? "المؤهلات المطلوبة" : "Qualifications & Experience"}
-                      </span>
-                      <p className="text-xs leading-relaxed text-foreground">
-                        {previewJd.qualifications}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Competencies */}
-                  {previewJd.technical_competencies?.length > 0 && (
-                    <div className="space-y-1.5">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block">
-                        {isAr ? "الجدارات الفنية" : "Technical Competencies"}
-                      </span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {previewJd.technical_competencies.map((c: string, idx: number) => (
-                          <Badge key={idx} variant="secondary" className="text-[10px]">
-                            {c}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="pt-3 border-t border-border flex items-center justify-between">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setPreviewJd(null)}
-                      className="text-xs"
-                    >
-                      {isAr ? "إغلاق" : "Close"}
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        handleDownloadRelatedPdf(previewJd);
-                      }}
-                      className="gap-1.5 text-xs rounded-xl bg-brand font-semibold"
-                    >
-                      <FileDown className="h-3.5 w-3.5" />
-                      {isAr ? "تحميل PDF الرسمي" : "Download Official PDF"}
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </DialogContent>
-          </Dialog>
         </TabsContent>
 
         {/* ══════════════════════════════════════════════════════════════════ */}
