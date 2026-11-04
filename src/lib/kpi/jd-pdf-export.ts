@@ -1,5 +1,6 @@
 import type { jsPDF } from "jspdf";
 import type { UserOptions } from "jspdf-autotable";
+import { COMPANY_LOGO_BASE64 } from "./company-logo-base64";
 
 export interface JdPdfEmployeeInfo {
   fullName?: string | null;
@@ -49,34 +50,50 @@ export async function exportJobDescriptionPdf(
   const margin = 40;
   const contentWidth = pageWidth - margin * 2;
 
-  // Primary brand palette (Integrated Technics Brand)
+  // Primary brand palette (Integrated Technics Corporate Identity)
   const brandOrange = [234, 88, 12]; // #ea580c
   const darkNavy = [15, 23, 42];     // #0f172a
   const slateMuted = [100, 116, 139];// #64748b
   const lightBg = [248, 250, 252];   // #f8fafc
   const borderGray = [226, 232, 240];// #e2e8f0
 
-  let currentY = margin;
+  let currentY = margin - 6;
 
-  // ── Header Banner on First Page ──────────────────────────────────────────
-  // Decorative top color accent bar
-  doc.setFillColor(brandOrange[0], brandOrange[1], brandOrange[2]);
-  doc.rect(margin, currentY, contentWidth, 4, "F");
-  currentY += 16;
+  // ── 1. Top Header: Company Logo & Brand Identity ────────────────────────
+  // Logo on Left (439 x 149 px, aspect ratio ~2.946)
+  const logoWidth = 118;
+  const logoHeight = 40;
+  try {
+    doc.addImage(COMPANY_LOGO_BASE64, "PNG", margin, currentY, logoWidth, logoHeight);
+  } catch (err) {
+    console.warn("Could not render logo in PDF, fallback to text:", err);
+  }
 
-  // Company Name & Doc Title
+  // Company Name & Official Document Title on Right
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(18);
+  doc.setFontSize(15);
   doc.setTextColor(darkNavy[0], darkNavy[1], darkNavy[2]);
-  doc.text("INTEGRATED TECHNICS", margin, currentY);
+  doc.text("INTEGRATED TECHNICS", pageWidth - margin, currentY + 14, { align: "right" });
 
-  doc.setFont("helvetica", "normal");
+  doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.setTextColor(brandOrange[0], brandOrange[1], brandOrange[2]);
-  doc.text("Official Job Description", pageWidth - margin, currentY, { align: "right" });
-  currentY += 16;
+  doc.text("OFFICIAL JOB DESCRIPTION", pageWidth - margin, currentY + 27, { align: "right" });
 
-  // Sub-header role stripe
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
+  doc.text("Human Resources & Organizational Development", pageWidth - margin, currentY + 38, { align: "right" });
+
+  currentY += logoHeight + 10;
+
+  // Crisp separator rule below the top brand header
+  doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
+  doc.setLineWidth(0.75);
+  doc.line(margin, currentY, pageWidth - margin, currentY);
+  currentY += 12;
+
+  // ── Role Stripe Banner ──────────────────────────────────────────────────
   doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
   doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
   doc.roundedRect(margin, currentY, contentWidth, 34, 4, 4, "FD");
@@ -84,17 +101,17 @@ export async function exportJobDescriptionPdf(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.setTextColor(darkNavy[0], darkNavy[1], darkNavy[2]);
-  doc.text(`ROLE: ${jd.jobTitle.toUpperCase()}`, margin + 12, currentY + 16);
+  doc.text(`ROLE: ${jd.jobTitle.toUpperCase()}`, margin + 12, currentY + 15);
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
   const subInfo = [
-    jd.department ? `Dept: ${jd.department}` : null,
+    jd.department ? `Dept: ${jd.department}` : (employee?.department ? `Dept: ${employee.department}` : null),
     jd.jobCode ? `Code: ${jd.jobCode}` : null,
     jd.docVersion ? `Version: ${jd.docVersion}` : "v1.0",
   ].filter(Boolean).join("   |   ");
-  doc.text(subInfo, margin + 12, currentY + 28);
+  doc.text(subInfo, margin + 12, currentY + 27);
 
   const activeBadgeX = pageWidth - margin - 85;
   doc.setFillColor(16, 185, 129); // emerald
@@ -106,26 +123,29 @@ export async function exportJobDescriptionPdf(
 
   currentY += 46;
 
-  // ── Helper: Section Title ────────────────────────────────────────────────
+  // ── Helper: Section Title with Clean Spacing ─────────────────────────────
   function printSectionTitle(num: string, title: string) {
-    if (currentY > pageHeight - 120) {
+    if (currentY > pageHeight - 130) {
       doc.addPage();
-      currentY = margin + 20;
+      currentY = margin + 25;
     }
+    const badgeW = num.length > 1 ? 22 : 18;
+    const badgeH = 14;
+
     doc.setFillColor(brandOrange[0], brandOrange[1], brandOrange[2]);
-    doc.roundedRect(margin, currentY - 2, 18, 14, 2, 2, "F");
+    doc.roundedRect(margin, currentY, badgeW, badgeH, 2.5, 2.5, "F");
 
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
+    doc.setFontSize(8.5);
     doc.setTextColor(255, 255, 255);
-    doc.text(num, margin + 9, currentY + 8, { align: "center" });
+    doc.text(num, margin + badgeW / 2, currentY + 10, { align: "center" });
 
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
+    doc.setFontSize(10.5);
     doc.setTextColor(darkNavy[0], darkNavy[1], darkNavy[2]);
-    doc.text(title.toUpperCase(), margin + 26, currentY + 9);
+    doc.text(title.toUpperCase(), margin + badgeW + 8, currentY + 11);
 
-    currentY += 16;
+    currentY += 22; // Clean breathing room so following tables/text never collide!
   }
 
   // ── 1. JOB IDENTIFICATION ────────────────────────────────────────────────
@@ -212,7 +232,7 @@ export async function exportJobDescriptionPdf(
     ? jd.responsibilities
     : ["Ensure timely and standard execution of all assigned operational deliverables."];
 
-  const respTableRows = respItems.map((r, i) => [
+  const respTableRows = respItems.map((r) => [
     { content: `→`, styles: { fontStyle: "bold", textColor: brandOrange, halign: "center", cellWidth: 20 } },
     { content: r, styles: { cellWidth: contentWidth - 20 } },
   ]);
@@ -394,9 +414,9 @@ export async function exportJobDescriptionPdf(
   currentY = (doc as any).lastAutoTable.finalY + 18;
 
   // ── 10. EMPLOYEE ACKNOWLEDGEMENT ─────────────────────────────────────────
-  if (currentY > pageHeight - 160) {
+  if (currentY > pageHeight - 170) {
     doc.addPage();
-    currentY = margin + 20;
+    currentY = margin + 25;
   }
 
   printSectionTitle("10", "Employee Acknowledgement & Signatures");
@@ -405,12 +425,12 @@ export async function exportJobDescriptionPdf(
   doc.setFontSize(8.5);
   doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
   doc.text(
-    'I confirm that I have read, understood, and received a copy of this official Job Description. I agree to perform the duties and adhere to the standards outlined herein.',
+    "I confirm that I have read, understood, and received a copy of this official Job Description. I agree to perform the duties and adhere to the standards outlined herein.",
     margin,
     currentY,
     { maxWidth: contentWidth }
   );
-  currentY += 22;
+  currentY += 18;
 
   // Signatures table
   const empName = employee?.fullName || "_________________________________";
@@ -438,29 +458,42 @@ export async function exportJobDescriptionPdf(
     styles: { fontSize: 8.5, cellPadding: 7, textColor: [30, 41, 59] },
   });
 
-  // ── Running Footers on All Pages ─────────────────────────────────────────
+  // ── Running Headers & Footers on All Pages ──────────────────────────────
   const totalPages = (doc as any).internal.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
 
+    // Running top header on page 2+
+    if (i > 1) {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
+      doc.text("INTEGRATED TECHNICS  ·  JOB DESCRIPTION", margin, 24);
+      doc.setFont("helvetica", "normal");
+      doc.text(jd.jobTitle.toUpperCase(), pageWidth - margin, 24, { align: "right" });
+      doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
+      doc.setLineWidth(0.5);
+      doc.line(margin, 28, pageWidth - margin, 28);
+    }
+
     // Footer divider line
     doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
     doc.setLineWidth(0.5);
-    doc.line(margin, pageHeight - 28, pageWidth - margin, pageHeight - 28);
+    doc.line(margin, pageHeight - 26, pageWidth - margin, pageHeight - 26);
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7.5);
     doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
 
     // Left: Company Name
-    doc.text("INTEGRATED TECHNICS", margin, pageHeight - 16);
+    doc.text("Integrated Technics for Systems & Technology", margin, pageHeight - 14);
 
     // Center: Job Code & Doc Version
     const centerText = `${jd.jobCode || "JD-CORP"}   ·   ${jd.docVersion || "v1.0"}`;
-    doc.text(centerText, pageWidth / 2, pageHeight - 16, { align: "center" });
+    doc.text(centerText, pageWidth / 2, pageHeight - 14, { align: "center" });
 
     // Right: Page X of Y
-    doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin, pageHeight - 16, { align: "right" });
+    doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin, pageHeight - 14, { align: "right" });
   }
 
   // Save the PDF
@@ -468,4 +501,3 @@ export async function exportJobDescriptionPdf(
   const safeCode = (employee?.empCode || "template").replace(/[^a-z0-9]+/gi, "_");
   doc.save(`Job_Description_${safeTitle}_${safeCode}.pdf`);
 }
-
