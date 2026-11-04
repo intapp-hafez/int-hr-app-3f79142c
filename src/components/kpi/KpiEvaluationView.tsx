@@ -3527,11 +3527,21 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                 {kpiCriteria.length}
               </Badge>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setTemplateSubTab("job-descriptions")}
+              className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
+                templateSubTab === "job-descriptions"
+                  ? "bg-brand text-brand-foreground shadow-xs"
+                  : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+            >
+              <FileText className="h-4 w-4" />
+              <span>{isAr ? "الأوصاف الوظيفية" : "Job Descriptions"}</span>
+            </button>
           </div>
 
-          <Button variant={templateSubTab === "job-descriptions" ? "default" : "secondary"} onClick={() => setTemplateSubTab("job-descriptions")} className="gap-2 text-xs font-bold">
-            <FileText className="size-4" />{isAr ? "الأوصاف الوظيفية" : "Job descriptions"}
-          </Button>
           {templateSubTab === "job-descriptions" && <JobDescriptionsTab />}
           {/* ═════════════════════════════════════════════════════════════════ */}
           {/* VIEW A: TEMPLATES MANAGER                                         */}
