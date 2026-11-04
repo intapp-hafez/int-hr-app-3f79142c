@@ -2475,6 +2475,513 @@ export type Database = {
         }
         Relationships: []
       }
+      kpi_criteria: {
+        Row: {
+          category: string
+          created_at: string
+          criterion_type: string
+          default_weight: number
+          description_ar: string | null
+          description_en: string | null
+          display_order: number
+          how_measured_ar: string | null
+          how_measured_en: string | null
+          id: string
+          is_active: boolean
+          is_required: boolean
+          max_scale_value: number
+          max_value: number | null
+          min_value: number | null
+          name_ar: string
+          name_en: string
+          scoring_direction: string | null
+          scoring_scale: string
+          unit: string | null
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          criterion_type: string
+          default_weight?: number
+          description_ar?: string | null
+          description_en?: string | null
+          display_order?: number
+          how_measured_ar?: string | null
+          how_measured_en?: string | null
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          max_scale_value?: number
+          max_value?: number | null
+          min_value?: number | null
+          name_ar: string
+          name_en: string
+          scoring_direction?: string | null
+          scoring_scale?: string
+          unit?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          criterion_type?: string
+          default_weight?: number
+          description_ar?: string | null
+          description_en?: string | null
+          display_order?: number
+          how_measured_ar?: string | null
+          how_measured_en?: string | null
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          max_scale_value?: number
+          max_value?: number | null
+          min_value?: number | null
+          name_ar?: string
+          name_en?: string
+          scoring_direction?: string | null
+          scoring_scale?: string
+          unit?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      kpi_evaluation_transitions: {
+        Row: {
+          actor_id: string
+          actor_name: string | null
+          created_at: string
+          evaluation_id: string
+          from_status: string
+          id: string
+          reason: string | null
+          to_status: string
+        }
+        Insert: {
+          actor_id: string
+          actor_name?: string | null
+          created_at?: string
+          evaluation_id: string
+          from_status: string
+          id?: string
+          reason?: string | null
+          to_status: string
+        }
+        Update: {
+          actor_id?: string
+          actor_name?: string | null
+          created_at?: string
+          evaluation_id?: string
+          from_status?: string
+          id?: string
+          reason?: string | null
+          to_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kpi_evaluation_transitions_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kpi_evaluation_transitions_evaluation_id_fkey"
+            columns: ["evaluation_id"]
+            isOneToOne: false
+            referencedRelation: "kpi_quarterly_evaluations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kpi_evaluations: {
+        Row: {
+          approved_at: string | null
+          created_at: string
+          employee_id: string
+          evaluation_year: number
+          evaluator_id: string | null
+          evaluator_name: string | null
+          id: string
+          notes: Json
+          reviewed_at: string | null
+          scores: Json
+          status: string
+          submitted_at: string | null
+          summary: Json
+          template_type: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          created_at?: string
+          employee_id: string
+          evaluation_year: number
+          evaluator_id?: string | null
+          evaluator_name?: string | null
+          id?: string
+          notes?: Json
+          reviewed_at?: string | null
+          scores?: Json
+          status?: string
+          submitted_at?: string | null
+          summary?: Json
+          template_type?: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          created_at?: string
+          employee_id?: string
+          evaluation_year?: number
+          evaluator_id?: string | null
+          evaluator_name?: string | null
+          id?: string
+          notes?: Json
+          reviewed_at?: string | null
+          scores?: Json
+          status?: string
+          submitted_at?: string | null
+          summary?: Json
+          template_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kpi_evaluations_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kpi_evaluations_evaluator_id_fkey"
+            columns: ["evaluator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kpi_quarterly_evaluations: {
+        Row: {
+          approved_at: string | null
+          common_score: number | null
+          created_at: string
+          custom_score: number | null
+          employee_id: string
+          evaluation_year: number
+          evaluator_id: string
+          id: string
+          notes: Json
+          position_score: number | null
+          quarter: string
+          rating_tier: string | null
+          return_reason: string | null
+          returned_at: string | null
+          score: number
+          status: string
+          submitted_at: string | null
+          template_id: string | null
+          template_version: number
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          common_score?: number | null
+          created_at?: string
+          custom_score?: number | null
+          employee_id: string
+          evaluation_year: number
+          evaluator_id: string
+          id?: string
+          notes?: Json
+          position_score?: number | null
+          quarter: string
+          rating_tier?: string | null
+          return_reason?: string | null
+          returned_at?: string | null
+          score?: number
+          status?: string
+          submitted_at?: string | null
+          template_id?: string | null
+          template_version?: number
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          common_score?: number | null
+          created_at?: string
+          custom_score?: number | null
+          employee_id?: string
+          evaluation_year?: number
+          evaluator_id?: string
+          id?: string
+          notes?: Json
+          position_score?: number | null
+          quarter?: string
+          rating_tier?: string | null
+          return_reason?: string | null
+          returned_at?: string | null
+          score?: number
+          status?: string
+          submitted_at?: string | null
+          template_id?: string | null
+          template_version?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kpi_quarterly_evaluations_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kpi_quarterly_evaluations_evaluator_id_fkey"
+            columns: ["evaluator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kpi_quarterly_evaluations_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "kpi_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kpi_quarterly_items: {
+        Row: {
+          achievement_rate: number | null
+          actual_value: number | null
+          category: string
+          comments: string | null
+          created_at: string
+          criterion_id: string | null
+          criterion_name_ar: string
+          criterion_name_en: string
+          criterion_type: string
+          display_order: number
+          evaluation_id: string
+          id: string
+          scoring_direction: string | null
+          scoring_scale: string
+          target_benchmark: number
+          unit: string | null
+          weight: number
+          weighted_score: number | null
+        }
+        Insert: {
+          achievement_rate?: number | null
+          actual_value?: number | null
+          category?: string
+          comments?: string | null
+          created_at?: string
+          criterion_id?: string | null
+          criterion_name_ar: string
+          criterion_name_en: string
+          criterion_type: string
+          display_order?: number
+          evaluation_id: string
+          id?: string
+          scoring_direction?: string | null
+          scoring_scale?: string
+          target_benchmark?: number
+          unit?: string | null
+          weight: number
+          weighted_score?: number | null
+        }
+        Update: {
+          achievement_rate?: number | null
+          actual_value?: number | null
+          category?: string
+          comments?: string | null
+          created_at?: string
+          criterion_id?: string | null
+          criterion_name_ar?: string
+          criterion_name_en?: string
+          criterion_type?: string
+          display_order?: number
+          evaluation_id?: string
+          id?: string
+          scoring_direction?: string | null
+          scoring_scale?: string
+          target_benchmark?: number
+          unit?: string | null
+          weight?: number
+          weighted_score?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kpi_quarterly_items_criterion_id_fkey"
+            columns: ["criterion_id"]
+            isOneToOne: false
+            referencedRelation: "kpi_criteria"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kpi_quarterly_items_evaluation_id_fkey"
+            columns: ["evaluation_id"]
+            isOneToOne: false
+            referencedRelation: "kpi_quarterly_evaluations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kpi_template_items: {
+        Row: {
+          created_at: string
+          criterion_id: string
+          display_order: number
+          id: string
+          max_value: number | null
+          min_value: number | null
+          scoring_direction: string | null
+          target_benchmark: number
+          template_id: string
+          unit: string | null
+          weight: number
+        }
+        Insert: {
+          created_at?: string
+          criterion_id: string
+          display_order?: number
+          id?: string
+          max_value?: number | null
+          min_value?: number | null
+          scoring_direction?: string | null
+          target_benchmark?: number
+          template_id: string
+          unit?: string | null
+          weight: number
+        }
+        Update: {
+          created_at?: string
+          criterion_id?: string
+          display_order?: number
+          id?: string
+          max_value?: number | null
+          min_value?: number | null
+          scoring_direction?: string | null
+          target_benchmark?: number
+          template_id?: string
+          unit?: string | null
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kpi_template_items_criterion_id_fkey"
+            columns: ["criterion_id"]
+            isOneToOne: false
+            referencedRelation: "kpi_criteria"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kpi_template_items_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "kpi_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kpi_templates: {
+        Row: {
+          common_weight_pct: number
+          created_at: string
+          department_id: string | null
+          description: string | null
+          effective_quarter: string | null
+          effective_year: number | null
+          id: string
+          is_active: boolean
+          job_grade_id: string | null
+          name_ar: string
+          name_en: string
+          parent_template_id: string | null
+          position_id: string | null
+          position_weight_pct: number
+          published_at: string | null
+          status: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          common_weight_pct?: number
+          created_at?: string
+          department_id?: string | null
+          description?: string | null
+          effective_quarter?: string | null
+          effective_year?: number | null
+          id?: string
+          is_active?: boolean
+          job_grade_id?: string | null
+          name_ar: string
+          name_en: string
+          parent_template_id?: string | null
+          position_id?: string | null
+          position_weight_pct?: number
+          published_at?: string | null
+          status?: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          common_weight_pct?: number
+          created_at?: string
+          department_id?: string | null
+          description?: string | null
+          effective_quarter?: string | null
+          effective_year?: number | null
+          id?: string
+          is_active?: boolean
+          job_grade_id?: string | null
+          name_ar?: string
+          name_en?: string
+          parent_template_id?: string | null
+          position_id?: string | null
+          position_weight_pct?: number
+          published_at?: string | null
+          status?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kpi_templates_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kpi_templates_job_grade_id_fkey"
+            columns: ["job_grade_id"]
+            isOneToOne: false
+            referencedRelation: "job_grades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kpi_templates_parent_template_id_fkey"
+            columns: ["parent_template_id"]
+            isOneToOne: false
+            referencedRelation: "kpi_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kpi_templates_position_id_fkey"
+            columns: ["position_id"]
+            isOneToOne: false
+            referencedRelation: "positions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kpis: {
         Row: {
           created_at: string
