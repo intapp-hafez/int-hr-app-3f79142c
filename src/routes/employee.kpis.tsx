@@ -16,7 +16,6 @@ import {
   Target,
   UserCog,
   Building2,
-  IdCard,
   Sparkles,
   CheckCheck,
   Compass,
@@ -452,48 +451,37 @@ export function EmployeeKpiPage() {
               </div>
             </div>
 
-            {/* Role Attributes Grid (Clean 4 Pills matching employee identity) */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-3 border-t border-border/60">
+            {/* Role Attributes Grid (Clean 3 Cards matching employee identity) */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-border/60">
               {/* Department */}
-              <div className="rounded-2xl border border-border/60 bg-muted/20 p-2.5">
-                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                  <Building2 className="h-3.5 w-3.5 text-brand" />
-                  <span>{isAr ? "الإدارة / القسم" : "Department"}</span>
+              <div className="rounded-2xl border border-border/60 bg-muted/20 p-3 flex flex-col justify-between">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Building2 className="h-4 w-4 text-brand shrink-0" />
+                  <span className="font-medium">{isAr ? "الإدارة / القسم" : "Department"}</span>
                 </div>
-                <p className="text-xs sm:text-sm font-bold text-foreground mt-1 truncate">
+                <p className="text-sm font-bold text-foreground mt-1.5 break-words">
                   {isAr ? jobDescData.departmentNameAr : jobDescData.departmentNameEn}
                 </p>
               </div>
 
               {/* Direct Manager */}
-              <div className="rounded-2xl border border-border/60 bg-muted/20 p-2.5">
-                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                  <UserCog className="h-3.5 w-3.5 text-brand" />
-                  <span>{isAr ? "المدير المباشر" : "Direct Manager"}</span>
+              <div className="rounded-2xl border border-border/60 bg-muted/20 p-3 flex flex-col justify-between">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <UserCog className="h-4 w-4 text-brand shrink-0" />
+                  <span className="font-medium">{isAr ? "المدير المباشر" : "Direct Manager"}</span>
                 </div>
-                <p className="text-xs sm:text-sm font-bold text-foreground mt-1 truncate" title={jobDescData.managerName}>
+                <p className="text-sm font-bold text-foreground mt-1.5 break-words" title={jobDescData.managerName}>
                   {jobDescData.managerName}
                 </p>
               </div>
 
-              {/* Employee Code */}
-              <div className="rounded-2xl border border-border/60 bg-muted/20 p-2.5">
-                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                  <IdCard className="h-3.5 w-3.5 text-brand" />
-                  <span>{isAr ? "كود الموظف" : "Employee Code"}</span>
-                </div>
-                <p className="text-xs sm:text-sm font-bold font-mono text-foreground mt-1 truncate">
-                  {jobDescData.employeeCode}
-                </p>
-              </div>
-
               {/* Contract Type */}
-              <div className="rounded-2xl border border-border/60 bg-muted/20 p-2.5">
-                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                  <FileText className="h-3.5 w-3.5 text-brand" />
-                  <span>{isAr ? "نوع التعاقد" : "Contract"}</span>
+              <div className="rounded-2xl border border-border/60 bg-muted/20 p-3 flex flex-col justify-between">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <FileText className="h-4 w-4 text-brand shrink-0" />
+                  <span className="font-medium">{isAr ? "نوع التعاقد" : "Contract Type"}</span>
                 </div>
-                <p className="text-xs sm:text-sm font-bold text-foreground mt-1 truncate">
+                <p className="text-sm font-bold text-foreground mt-1.5 break-words">
                   {jobDescData.contractType}
                 </p>
               </div>
