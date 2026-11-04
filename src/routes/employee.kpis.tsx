@@ -14,21 +14,14 @@ import {
   Briefcase,
   FileText,
   Target,
-  TrendingUp,
   UserCog,
   Building2,
   IdCard,
-  User,
   Sparkles,
   CheckCheck,
-  Wrench,
-  Shield,
-  HardHat,
-  FileCheck,
   Compass,
   Check,
-  ChevronDown,
-  ChevronUp,
+  FileCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
@@ -37,9 +30,6 @@ import { useSession } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import {
   LIGHT_CURRENT_ENGINEER_KPIS,
-  KPI_CATEGORIES,
-  KPI_CATEGORIES_AR,
-  KpiMetricDefinition,
   KpiRowState,
   getRatingFromScore,
 } from "@/lib/kpi/light-current-kpi.data";
@@ -50,6 +40,7 @@ import {
   matchKpiTemplate,
 } from "@/backend/functions/kpi-evaluations.functions";
 import { getMyProfileDetails } from "@/backend/functions/auth.functions";
+import { buildDynamicJobDescription } from "@/lib/kpi/dynamic-job-description";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -93,16 +84,63 @@ export function EmployeeKpiPage() {
     enabled: !!session,
   });
 
-  // Fetch matched template for Job Description
+  // Fetch matched template for Job Description and criteria
   const { data: matchedTemplate } = useQuery({
     queryKey: ["my-matched-template", session?.employeeId],
     queryFn: () => matchTemplateFn({ data: { employeeId: session!.employeeId! } }),
     enabled: !!session?.employeeId,
   });
 
-  // Compute scorecard values
+  // Build fully dynamic job description from profile and matched template
+  const jobDescData = useMemo(() => {
+    return buildDynamicJobDescription(
+      profileDetails,
+      matchedTemplate,
+      isAr ? "المدير المباشر" : "Direct Manager"
+    );
+  }, [profileDetails, matchedTemplate, isAr]);
+
+  // Compute scorecard values dynamically from matched template criteria or default KPI set
   const kpiRows = useMemo(() => {
     const scores = (evaluation?.scores as Record<string, any>) || {};
+
+    if (matchedTemplate?.items && matchedTemplate.items.length > 0) {
+      return matchedTemplate.items.map((it: any, index: number) => {
+        const crit = it.criterion;
+        const cid = crit?.id || it.criterion_id || String(index + 1);
+        const saved = scores[String(cid)] || scores[cid] || scores[String(index + 1)] || {};
+
+        return {
+          kpi: {
+            id: index + 1,
+            category: crit?.category || "technical",
+            category_ar:
+              crit?.category === "safety"
+                ? "السلامة المهنية"
+                : crit?.category === "quality"
+                ? "الجودة والامتثال"
+                : crit?.category === "productivity"
+                ? "الإنتاجية والإنجاز"
+                : crit?.category === "behavioral"
+                ? "السلوك المهني"
+                : "التنفيذ الفني والتخصصي",
+            name: crit?.name_en || `Metric ${index + 1}`,
+            name_ar: crit?.name_ar || crit?.name_en || `معيار ${index + 1}`,
+            definition: crit?.description_en || crit?.how_measured_en || "",
+            definition_ar: crit?.description_ar || crit?.how_measured_ar || "",
+            weight: Number(it.weight || crit?.default_weight || 0.1),
+            target: Number(it.target_benchmark ? it.target_benchmark / 100 : 1.0),
+            unit: it.unit || crit?.unit || "%",
+          },
+          q1: saved?.q1 || { actual: null, achievement: null, score: null },
+          q2: saved?.q2 || { actual: null, achievement: null, score: null },
+          q3: saved?.q3 || { actual: null, achievement: null, score: null },
+          q4: saved?.q4 || { actual: null, achievement: null, score: null },
+          annualScore: saved?.annualScore ?? null,
+        };
+      });
+    }
+
     return LIGHT_CURRENT_ENGINEER_KPIS.map((kpi) => {
       const saved = scores[String(kpi.id)] || scores[kpi.id];
       return {
@@ -114,7 +152,7 @@ export function EmployeeKpiPage() {
         annualScore: saved?.annualScore ?? null,
       };
     });
-  }, [evaluation]);
+  }, [evaluation, matchedTemplate]);
 
   // Quarterly summary totals
   const summaryTotals = useMemo(() => {
@@ -202,13 +240,6 @@ export function EmployeeKpiPage() {
     { q: "q4", label: "Q4", label_ar: "الربع الرابع", date: isAr ? "أكتوبر – ديسمبر" : "Oct – Dec", score: summaryTotals.q4Score, target: 0.25 },
   ] as const;
 
-  // Resolve display titles and department for Job Description
-  const positionTitleEn = profileDetails?.position || matchedTemplate?.name_en || "Site Engineer";
-  const positionTitleAr = profileDetails?.position_ar || matchedTemplate?.name_ar || "مهندس موقع";
-  const departmentName = profileDetails?.department || (matchedTemplate?.department as any)?.name_en || "Engineering";
-  const managerName = profileDetails?.manager || (isAr ? "المدير المباشر" : "Direct Manager");
-  const jobGrade = (session as any)?.jobGrade || "G04 - Senior Officer";
-
   return (
     <div dir={dir} className="space-y-4 pb-16 print:p-0 print:space-y-3">
       {/* Top Header / Back Bar */}
@@ -286,7 +317,7 @@ export function EmployeeKpiPage() {
         </div>
 
         {/* ══════════════════════════════════════════════════════════════════ */}
-        {/* ── TAB 1: JOB DESCRIPTION (الوصف الوظيفي) ── */}
+        {/* ── TAB 1: JOB DESCRIPTION (الوصف الوظيفي الديناميكي) ── */}
         {/* ══════════════════════════════════════════════════════════════════ */}
         <TabsContent value="job_description" className="space-y-4">
           {/* Position Identity Card */}
@@ -299,14 +330,14 @@ export function EmployeeKpiPage() {
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <h1 className="font-display text-base sm:text-xl font-bold tracking-tight text-foreground">
-                      {isAr ? positionTitleAr : positionTitleEn}
+                      {isAr ? jobDescData.positionTitleAr : jobDescData.positionTitleEn}
                     </h1>
                     <Badge variant="outline" className="text-[11px] font-semibold text-brand border-brand/30 bg-brand/5">
-                      {jobGrade}
+                      {jobDescData.jobGrade}
                     </Badge>
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                    {isAr ? positionTitleEn : positionTitleAr}
+                    {isAr ? jobDescData.positionTitleEn : jobDescData.positionTitleAr}
                   </p>
                 </div>
               </div>
@@ -327,7 +358,7 @@ export function EmployeeKpiPage() {
                   <span>{isAr ? "القسم" : "Department"}</span>
                 </div>
                 <p className="text-xs sm:text-sm font-bold text-foreground mt-1 truncate">
-                  {departmentName}
+                  {isAr ? jobDescData.departmentNameAr : jobDescData.departmentNameEn}
                 </p>
               </div>
 
@@ -336,8 +367,8 @@ export function EmployeeKpiPage() {
                   <UserCog className="h-3.5 w-3.5 text-brand" />
                   <span>{isAr ? "المدير المباشر" : "Direct Manager"}</span>
                 </div>
-                <p className="text-xs sm:text-sm font-bold text-foreground mt-1 truncate" title={managerName}>
-                  {managerName}
+                <p className="text-xs sm:text-sm font-bold text-foreground mt-1 truncate" title={jobDescData.managerName}>
+                  {jobDescData.managerName}
                 </p>
               </div>
 
@@ -347,7 +378,7 @@ export function EmployeeKpiPage() {
                   <span>{isAr ? "كود الموظف" : "Employee Code"}</span>
                 </div>
                 <p className="text-xs sm:text-sm font-bold font-mono text-foreground mt-1 truncate">
-                  {profileDetails?.emp_code || session?.empCode || "EMP-0001"}
+                  {jobDescData.employeeCode}
                 </p>
               </div>
 
@@ -357,7 +388,7 @@ export function EmployeeKpiPage() {
                   <span>{isAr ? "نوع التعاقد" : "Contract"}</span>
                 </div>
                 <p className="text-xs sm:text-sm font-bold text-foreground mt-1 truncate">
-                  {profileDetails?.contract_type || "FullTime"}
+                  {jobDescData.contractType}
                 </p>
               </div>
             </div>
@@ -380,25 +411,11 @@ export function EmployeeKpiPage() {
             </div>
 
             <div className="rounded-2xl border border-border/70 bg-muted/20 p-3.5 sm:p-4 text-xs sm:text-sm leading-relaxed text-foreground">
-              {matchedTemplate?.description ? (
-                <p>{matchedTemplate.description}</p>
-              ) : isAr ? (
-                <p>
-                  المسؤولية الكاملة عن الإشراف والتنفيذ والتشغيل والاختبار لأنظمة التيار الخفيف والأنظمة الهندسية
-                  الميدانية في مواقع العمل وفقاً لأعلى معايير الجودة، مع الالتزام بالجداول الزمنية المحددة،
-                  والتنسيق المتكامل مع مهندسي الموقع والمقاولين والعملاء لضمان التسليم المعتمد دون عوائق فنية.
-                </p>
-              ) : (
-                <p>
-                  Responsible for supervising, installing, commissioning, and testing low current / ELV engineering
-                  systems on project sites. Ensures full compliance with project specifications, shop drawings, quality
-                  standards, and scheduled milestones while effectively coordinating with site teams, subcontractors, and clients.
-                </p>
-              )}
+              <p>{isAr ? jobDescData.purposeAr : jobDescData.purposeEn}</p>
             </div>
           </div>
 
-          {/* Key Operational Duties & Responsibilities */}
+          {/* Key Operational Duties & Responsibilities (Dynamic Pillars) */}
           <div className="rounded-3xl border border-border bg-card p-4 sm:p-5 shadow-2xs space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -415,118 +432,70 @@ export function EmployeeKpiPage() {
                 </div>
               </div>
               <Badge variant="outline" className="text-[10px] font-mono">
-                5 {isAr ? "محاور رئيسية" : "Pillars"}
+                {jobDescData.pillars.length} {isAr ? "محاور رئيسية" : "Pillars"}
               </Badge>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {/* Pillar 1 */}
-              <div className="rounded-2xl border border-border/80 bg-muted/15 p-3.5 space-y-2">
-                <div className="flex items-center gap-2 text-xs font-bold text-foreground">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 font-mono text-[11px]">
-                    01
-                  </span>
-                  <span>{isAr ? "التنفيذ الفني والتركيبات الميدانية" : "Technical Execution & Installation"}</span>
-                </div>
-                <ul className="text-xs text-muted-foreground space-y-1.5 ps-1">
-                  <li className="flex items-start gap-1.5">
-                    <Check className="h-3.5 w-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                    <span>{isAr ? "مراجعة المخططات التنفيذية ومطابقة مسارات الكابلات والمواسير بالموقع." : "Review approved shop drawings and verify site conduit/cable tray routing."}</span>
-                  </li>
-                  <li className="flex items-start gap-1.5">
-                    <Check className="h-3.5 w-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                    <span>{isAr ? "الإشراف على سحب الكابلات وتركيب وتثبيت الأجهزة والحساسات والكاميرات بدقة." : "Supervise cable pulling, termination, and device mounting (sensors, cameras, panels)."}</span>
-                  </li>
-                  <li className="flex items-start gap-1.5">
-                    <Check className="h-3.5 w-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                    <span>{isAr ? "تنظيم وتوثيق كبائن الاتصالات وتأريض اللوحات وفقاً للأصول الفنية." : "Execute rack dressing, cable labelling, and grounding per technical engineering norms."}</span>
-                  </li>
-                </ul>
-              </div>
+              {jobDescData.pillars.map((pillar) => (
+                <div
+                  key={pillar.number}
+                  className={`rounded-2xl border border-border/80 bg-muted/15 p-3.5 space-y-2.5 ${
+                    jobDescData.pillars.length % 2 !== 0 && pillar.number === String(jobDescData.pillars.length).padStart(2, "0")
+                      ? "md:col-span-2"
+                      : ""
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-xs font-bold text-foreground min-w-0">
+                      <span
+                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg font-mono text-[11px] ${
+                          pillar.color === "emerald"
+                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                            : pillar.color === "blue"
+                            ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                            : pillar.color === "purple"
+                            ? "bg-purple-500/10 text-purple-600 dark:text-purple-400"
+                            : pillar.color === "amber"
+                            ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                            : pillar.color === "rose"
+                            ? "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                            : "bg-teal-500/10 text-teal-600 dark:text-teal-400"
+                        }`}
+                      >
+                        {pillar.number}
+                      </span>
+                      <span className="truncate">{isAr ? pillar.titleAr : pillar.titleEn}</span>
+                    </div>
+                    <Badge variant="outline" className="text-[9px] font-mono shrink-0">
+                      {pillar.duties.length} {isAr ? "مهام" : "Duties"}
+                    </Badge>
+                  </div>
 
-              {/* Pillar 2 */}
-              <div className="rounded-2xl border border-border/80 bg-muted/15 p-3.5 space-y-2">
-                <div className="flex items-center gap-2 text-xs font-bold text-foreground">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 font-mono text-[11px]">
-                    02
-                  </span>
-                  <span>{isAr ? "التشغيل والبرمجة والتسليم" : "Commissioning, Programming & Acceptance"}</span>
+                  <ul className="text-xs text-muted-foreground space-y-2.5 ps-1">
+                    {pillar.duties.map((duty) => (
+                      <li key={duty.id} className="flex items-start gap-2">
+                        <Check className="h-3.5 w-3.5 text-brand shrink-0 mt-0.5" />
+                        <div className="space-y-0.5 min-w-0">
+                          <p className="font-semibold text-foreground text-xs">
+                            {isAr ? duty.nameAr : duty.nameEn}
+                          </p>
+                          {(isAr ? duty.descriptionAr : duty.descriptionEn) && (
+                            <p className="text-[11px] text-muted-foreground leading-relaxed">
+                              {isAr ? duty.descriptionAr : duty.descriptionEn}
+                            </p>
+                          )}
+                          {duty.benchmark && (
+                            <span className="inline-block font-mono text-[10px] text-brand bg-brand/10 px-1.5 py-0.2 rounded-md">
+                              {isAr ? "المستهدف: " : "Benchmark: "}{duty.benchmark}
+                            </span>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <ul className="text-xs text-muted-foreground space-y-1.5 ps-1">
-                  <li className="flex items-start gap-1.5">
-                    <Check className="h-3.5 w-3.5 text-blue-600 shrink-0 mt-0.5" />
-                    <span>{isAr ? "تهيئة العناوين الرقمية (IPs) وضبط معلمات الأجهزة والبرمجيات المركزية." : "Configure network IP addressing, firmware parameters, and central software."}</span>
-                  </li>
-                  <li className="flex items-start gap-1.5">
-                    <Check className="h-3.5 w-3.5 text-blue-600 shrink-0 mt-0.5" />
-                    <span>{isAr ? "إجراء الفحوصات التشغيلية الأولية واختبارات التكامل الوظيفي للأنظمة." : "Conduct initial operational dry-runs and end-to-end subsystem integration testing."}</span>
-                  </li>
-                  <li className="flex items-start gap-1.5">
-                    <Check className="h-3.5 w-3.5 text-blue-600 shrink-0 mt-0.5" />
-                    <span>{isAr ? "حضور وتسليم الاختبارات الميدانية الرسمية (T&C) مع استشاري المشروع." : "Prepare and lead formal Testing & Commissioning (T&C) walkthroughs with consultants."}</span>
-                  </li>
-                </ul>
-              </div>
-
-              {/* Pillar 3 */}
-              <div className="rounded-2xl border border-border/80 bg-muted/15 p-3.5 space-y-2">
-                <div className="flex items-center gap-2 text-xs font-bold text-foreground">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-purple-500/10 text-purple-600 font-mono text-[11px]">
-                    03
-                  </span>
-                  <span>{isAr ? "تكامل الأنظمة والتنسيق المشترك" : "System Integration & Site Coordination"}</span>
-                </div>
-                <ul className="text-xs text-muted-foreground space-y-1.5 ps-1">
-                  <li className="flex items-start gap-1.5">
-                    <Check className="h-3.5 w-3.5 text-purple-600 shrink-0 mt-0.5" />
-                    <span>{isAr ? "تنسيق الربط بين أنظمة الإنذار والمراقبة والتحكم بالدخول مع إدارة المبنى (BMS)." : "Interface ELV subsystems (Fire Alarm, Access Control, CCTV, Public Address, BMS)."}</span>
-                  </li>
-                  <li className="flex items-start gap-1.5">
-                    <Check className="h-3.5 w-3.5 text-purple-600 shrink-0 mt-0.5" />
-                    <span>{isAr ? "التنسيق المستمر مع مقاولي الأعمال الكهروميكانيكية والشبكات لتفادي التعارضات." : "Proactively interface with MEP, civil, and network contractors to eliminate clashes."}</span>
-                  </li>
-                </ul>
-              </div>
-
-              {/* Pillar 4 */}
-              <div className="rounded-2xl border border-border/80 bg-muted/15 p-3.5 space-y-2">
-                <div className="flex items-center gap-2 text-xs font-bold text-foreground">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 font-mono text-[11px]">
-                    04
-                  </span>
-                  <span>{isAr ? "استكشاف الأعطال والدعم الفني" : "Fault Troubleshooting & Maintenance"}</span>
-                </div>
-                <ul className="text-xs text-muted-foreground space-y-1.5 ps-1">
-                  <li className="flex items-start gap-1.5">
-                    <Check className="h-3.5 w-3.5 text-amber-600 shrink-0 mt-0.5" />
-                    <span>{isAr ? "تشخيص الأعطال الفنية وانقطاع الإشارة وأخطاء التوصيلات وحلها الفوري." : "Diagnose wiring faults, signal attenuation, and offline devices using diagnostic tools."}</span>
-                  </li>
-                  <li className="flex items-start gap-1.5">
-                    <Check className="h-3.5 w-3.5 text-amber-600 shrink-0 mt-0.5" />
-                    <span>{isAr ? "تنفيذ برامج الصيانة الدورية والاستجابة السريعة لبلاغات الأعطال الطارئة." : "Execute preventative maintenance rounds and respond promptly to emergency tickets."}</span>
-                  </li>
-                </ul>
-              </div>
-
-              {/* Pillar 5 */}
-              <div className="rounded-2xl border border-border/80 bg-muted/15 p-3.5 space-y-2 md:col-span-2">
-                <div className="flex items-center gap-2 text-xs font-bold text-foreground">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-rose-500/10 text-rose-600 font-mono text-[11px]">
-                    05
-                  </span>
-                  <span>{isAr ? "التقارير الميدانية والسلامة المهنية (HSE)" : "Site Reporting, Documentation & HSE"}</span>
-                </div>
-                <ul className="text-xs text-muted-foreground space-y-1.5 ps-1">
-                  <li className="flex items-start gap-1.5">
-                    <Check className="h-3.5 w-3.5 text-rose-600 shrink-0 mt-0.5" />
-                    <span>{isAr ? "إعداد ورفع التقارير اليومية وملاحظات تقدم الأعمال الميدانية وسجل المواد." : "Prepare daily site diaries, delivery inspection requests (DIR), and progress logs."}</span>
-                  </li>
-                  <li className="flex items-start gap-1.5">
-                    <Check className="h-3.5 w-3.5 text-rose-600 shrink-0 mt-0.5" />
-                    <span>{isAr ? "الالتزام الصارم بتعليمات السلامة والصحة المهنية (PPE) وارتداء مهمات الوقاية." : "Maintain strict adherence to occupational safety (HSE), PPE regulations, and audit readiness."}</span>
-                  </li>
-                </ul>
-              </div>
+              ))}
             </div>
           </div>
 
@@ -554,12 +523,11 @@ export function EmployeeKpiPage() {
                     {isAr ? "الجدارات الفنية التخصصية" : "Technical Skills"}
                   </span>
                   <div className="flex flex-wrap gap-1.5">
-                    <Badge variant="secondary" className="text-[11px] font-medium">Low Current / ELV</Badge>
-                    <Badge variant="secondary" className="text-[11px] font-medium">CCTV & VMS</Badge>
-                    <Badge variant="secondary" className="text-[11px] font-medium">Access Control</Badge>
-                    <Badge variant="secondary" className="text-[11px] font-medium">Fire Alarm</Badge>
-                    <Badge variant="secondary" className="text-[11px] font-medium">IP Networking</Badge>
-                    <Badge variant="secondary" className="text-[11px] font-medium">AutoCAD / Schematics</Badge>
+                    {jobDescData.technicalCompetencies.map((comp, idx) => (
+                      <Badge key={idx} variant="secondary" className="text-[11px] font-medium">
+                        {isAr ? comp.ar : comp.en}
+                      </Badge>
+                    ))}
                   </div>
                 </div>
 
@@ -568,10 +536,11 @@ export function EmployeeKpiPage() {
                     {isAr ? "الجدارات السلوكية والقيادية" : "Behavioral Competencies"}
                   </span>
                   <div className="flex flex-wrap gap-1.5">
-                    <Badge variant="outline" className="text-[11px] font-medium">{isAr ? "حل المشكلات الفنية" : "Problem Solving"}</Badge>
-                    <Badge variant="outline" className="text-[11px] font-medium">{isAr ? "الالتزام بالمواعيد" : "Punctuality & Discipline"}</Badge>
-                    <Badge variant="outline" className="text-[11px] font-medium">{isAr ? "العمل الجماعي" : "Team Collaboration"}</Badge>
-                    <Badge variant="outline" className="text-[11px] font-medium">{isAr ? "التواصل الفعال" : "Client Communication"}</Badge>
+                    {jobDescData.behavioralCompetencies.map((comp, idx) => (
+                      <Badge key={idx} variant="outline" className="text-[11px] font-medium">
+                        {isAr ? comp.ar : comp.en}
+                      </Badge>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -604,7 +573,7 @@ export function EmployeeKpiPage() {
                     </p>
                   </div>
                   <Badge className="bg-brand text-brand-foreground font-mono text-xs px-2.5 py-0.5">
-                    {matchedTemplate?.common_weight_pct ?? 40}%
+                    {jobDescData.commonWeightPct}%
                   </Badge>
                 </div>
 
@@ -618,13 +587,15 @@ export function EmployeeKpiPage() {
                     </p>
                   </div>
                   <Badge className="bg-emerald-600 text-white font-mono text-xs px-2.5 py-0.5">
-                    {matchedTemplate?.position_weight_pct ?? 60}%
+                    {jobDescData.positionWeightPct}%
                   </Badge>
                 </div>
 
                 <div className="pt-1 flex items-center justify-between text-[11px] text-muted-foreground">
                   <span>{isAr ? "دورة التقييم: ربع سنوية (Q1, Q2, Q3, Q4)" : "Cycle: Quarterly (Q1, Q2, Q3, Q4)"}</span>
-                  <span className="font-bold text-foreground">{isAr ? "الإجمالي: 100%" : "Total: 100%"}</span>
+                  <span className="font-bold text-foreground">
+                    {isAr ? `إجمالي المعايير: ${jobDescData.totalMetricsCount}` : `Total Metrics: ${jobDescData.totalMetricsCount}`}
+                  </span>
                 </div>
               </div>
             </div>
