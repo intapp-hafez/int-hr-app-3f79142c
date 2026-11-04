@@ -180,14 +180,14 @@ export async function exportJobDescriptionPdf(
     [
       { content: "Employee Name", styles: { fontStyle: "bold", fillColor: lightBg } },
       employee?.fullName || "Standard Role Profile (All Incumbents)",
-      { content: "Employee Code", styles: { fontStyle: "bold", fillColor: lightBg } },
-      employee?.empCode || "—",
+      { content: "Document Version", styles: { fontStyle: "bold", fillColor: lightBg } },
+      jd.docVersion || "v1.0",
     ],
     [
       { content: "Date Assigned / Reviewed", styles: { fontStyle: "bold", fillColor: lightBg } },
       todayStr,
-      { content: "Document Version", styles: { fontStyle: "bold", fillColor: lightBg } },
-      jd.docVersion || "v1.0",
+      { content: "Authorization Status", styles: { fontStyle: "bold", fillColor: lightBg } },
+      "Approved & Enacted",
     ],
   ];
 
@@ -232,9 +232,9 @@ export async function exportJobDescriptionPdf(
     ? jd.responsibilities
     : ["Ensure timely and standard execution of all assigned operational deliverables."];
 
-  const respTableRows = respItems.map((r) => [
-    { content: `→`, styles: { fontStyle: "bold", textColor: brandOrange, halign: "center", cellWidth: 20 } },
-    { content: r, styles: { cellWidth: contentWidth - 20 } },
+  const respTableRows = respItems.map((r, i) => [
+    { content: String(i + 1).padStart(2, "0"), styles: { fontStyle: "bold", textColor: brandOrange, halign: "center", cellWidth: 24, fontSize: 8 } },
+    { content: r, styles: { cellWidth: contentWidth - 24 } },
   ]);
 
   autoTable(doc, {
@@ -356,9 +356,9 @@ export async function exportJobDescriptionPdf(
   if (jd.authority && jd.authority.length > 0) {
     printSectionTitle("7", "Authority of Job Holder");
 
-    const authRows = jd.authority.map((a) => [
-      { content: `→`, styles: { fontStyle: "bold", textColor: brandOrange, halign: "center", cellWidth: 20 } },
-      { content: a, styles: { cellWidth: contentWidth - 20 } },
+    const authRows = jd.authority.map((a, i) => [
+      { content: String(i + 1).padStart(2, "0"), styles: { fontStyle: "bold", textColor: brandOrange, halign: "center", cellWidth: 24, fontSize: 8 } },
+      { content: a, styles: { cellWidth: contentWidth - 24 } },
     ]);
 
     autoTable(doc, {
@@ -375,13 +375,64 @@ export async function exportJobDescriptionPdf(
   if (jd.careerPath && jd.careerPath.length > 0) {
     printSectionTitle("8", "Career Path Progression");
 
-    const pathText = jd.careerPath.join("   >>   ");
+    const rawSteps = jd.careerPath.flatMap((item) =>
+      item.split(/\s*(?:>>|->|→)\s*/).map((s) => s.trim()).filter(Boolean)
+    );
+
+    const stepRows = rawSteps.map((step, idx) => {
+      const isCurrent =
+        step.toLowerCase().trim() === (jd.jobTitle || "").toLowerCase().trim() ||
+        (jd.jobTitle || "").toLowerCase().includes(step.toLowerCase()) ||
+        step.toLowerCase().includes((jd.jobTitle || "").toLowerCase());
+      const numStr = String(idx + 1).padStart(2, "0");
+      const stageLabel =
+        idx === 0
+          ? "Entry / Foundation Level"
+          : idx === rawSteps.length - 1
+          ? "Executive / Leadership Horizon"
+          : "Career Advancement Track";
+
+      return [
+        {
+          content: numStr,
+          styles: {
+            halign: "center" as const,
+            fontStyle: "bold" as const,
+            textColor: isCurrent ? brandOrange : darkNavy,
+            fillColor: isCurrent ? [255, 237, 213] : lightBg,
+            cellWidth: 32,
+          },
+        },
+        {
+          content: isCurrent ? `${step}   (Current Target Position)` : step,
+          styles: {
+            fontStyle: isCurrent ? ("bold" as const) : ("normal" as const),
+            textColor: isCurrent ? brandOrange : darkNavy,
+            fillColor: isCurrent ? [255, 247, 237] : [255, 255, 255],
+          },
+        },
+        {
+          content: isCurrent ? "★ Current Role" : stageLabel,
+          styles: {
+            halign: "right" as const,
+            fontStyle: isCurrent ? ("bold" as const) : ("normal" as const),
+            textColor: isCurrent ? brandOrange : slateMuted,
+            fontSize: 7.5,
+            fillColor: isCurrent ? [255, 247, 237] : [255, 255, 255],
+            cellWidth: 140,
+          },
+        },
+      ];
+    });
+
     autoTable(doc, {
       startY: currentY,
       margin: { left: margin, right: margin },
-      body: [[{ content: `→ Progression:  ${pathText}`, styles: { fontStyle: "bold", textColor: darkNavy, cellPadding: 6 } }]],
-      theme: "grid",
-      styles: { fontSize: 8.5, fillColor: lightBg },
+      body: stepRows as any,
+      theme: "plain",
+      styles: { fontSize: 8.5, cellPadding: 4.5 },
+      tableLineColor: borderGray,
+      tableLineWidth: 0.5,
     });
     currentY = (doc as any).lastAutoTable.finalY + 16;
   }
@@ -434,7 +485,6 @@ export async function exportJobDescriptionPdf(
 
   // Signatures table
   const empName = employee?.fullName || "_________________________________";
-  const empCodeStr = employee?.empCode ? `Code: ${employee.empCode}` : "Code: ____________";
   const mgrName = employee?.managerName || "_________________________________";
 
   autoTable(doc, {
@@ -449,7 +499,7 @@ export async function exportJobDescriptionPdf(
     ],
     body: [
       [
-        `Name: ${empName}\n${empCodeStr}\n\nSignature: _______________________\nDate: ___________________________`,
+        `Name: ${empName}\nRole: ${jd.jobTitle}\n\nSignature: _______________________\nDate: ___________________________`,
         `Direct Manager: ${mgrName}\nTitle: Line Manager\n\nSignature: _______________________\nDate: ___________________________`,
         `HR Director: Human Resources\nIntegrated Technics Management\n\nSignature: _______________________\nDate: ___________________________`,
       ],
@@ -498,6 +548,5 @@ export async function exportJobDescriptionPdf(
 
   // Save the PDF
   const safeTitle = jd.jobTitle.replace(/[^a-z0-9]+/gi, "_").toLowerCase();
-  const safeCode = (employee?.empCode || "template").replace(/[^a-z0-9]+/gi, "_");
-  doc.save(`Job_Description_${safeTitle}_${safeCode}.pdf`);
+  doc.save(`Job_Description_${safeTitle}.pdf`);
 }
