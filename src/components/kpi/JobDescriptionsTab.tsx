@@ -5,11 +5,12 @@ import {
   FileText, Loader2, Pencil, Plus, Search, Save, Trash2,
   ChevronDown, ChevronUp, GraduationCap, Users, Shield,
   TrendingUp, FileCheck, MapPin, Briefcase, Clock, Sparkles,
-  FileSpreadsheet, Upload,
+  FileSpreadsheet, Upload, FileDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
+import { exportJobDescriptionPdf } from "@/lib/kpi/jd-pdf-export";
 import {
   jobDescriptionSchema,
   parseJobTags,
@@ -589,6 +590,39 @@ export function JobDescriptionsTab() {
     }
   };
 
+  const handleExportRowPdf = async (row: SavedJobDescription) => {
+    try {
+      const p = positions.data?.find((pos) => pos.id === row.position_id);
+      const title = p?.name_en || row.job_code || "Job Role";
+      await exportJobDescriptionPdf({
+        jobTitle: title,
+        jobCode: row.job_code,
+        department: "Integrated Technics Operations",
+        jobCategory: row.job_category || "Non-managerial",
+        positionType: row.position_type || "Full-time",
+        locationType: row.location_type || "On-site",
+        jobGrade: row.job_grade,
+        reportingTo: "Department Head",
+        jobSummary: row.job_summary || "",
+        responsibilities: row.responsibilities || [],
+        qualifications: row.qualifications,
+        technicalCompetencies: row.technical_competencies || [],
+        behavioralCompetencies: row.behavioral_competencies || [],
+        internalRelations: row.internal_relations,
+        externalRelations: row.external_relations,
+        authority: row.authority || [],
+        careerPath: row.career_path || [],
+        docVersion: row.doc_version || "v1.0",
+        reviewedBy: row.reviewed_by,
+        approvedBy: row.approved_by,
+      });
+      toast.success(isAr ? `تم تصدير PDF لـ ${title}` : `Exported PDF for ${title}`);
+    } catch (err) {
+      console.error(err);
+      toast.error(isAr ? "تعذر إنشاء ملف PDF" : "Failed to generate PDF");
+    }
+  };
+
   const loadError = records.error || positions.error;
   const rows = (records.data ?? []).filter((row) =>
     `${posName(row.position_id)} ${row.job_summary} ${row.tags?.join(" ")}`.toLowerCase()
@@ -718,15 +752,26 @@ export function JobDescriptionsTab() {
                   </td>
                   <td className="p-3 align-top text-xs font-mono">{row.job_grade || "—"}</td>
                   <td className="p-3 align-top text-end">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => startEdit(row)}
-                      title={isAr ? "تعديل" : "Edit"}
-                      className="rounded-lg"
-                    >
-                      <Pencil className="size-4" />
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => handleExportRowPdf(row)}
+                        title={isAr ? "تحميل PDF الرسمي" : "Download Official PDF"}
+                        className="rounded-lg text-brand hover:text-brand"
+                      >
+                        <FileDown className="size-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => startEdit(row)}
+                        title={isAr ? "تعديل" : "Edit"}
+                        className="rounded-lg"
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
