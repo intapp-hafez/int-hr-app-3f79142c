@@ -34,18 +34,32 @@ export interface DynamicJobDescriptionData {
   positionTitleAr: string;
   departmentNameEn: string;
   departmentNameAr: string;
+  jobCode?: string;
   jobGrade: string;
+  jobCategory?: string;
+  positionType?: string;
+  locationType?: string;
   managerName: string;
   employeeCode: string;
   contractType: string;
   purposeEn: string;
   purposeAr: string;
   pillars: JobDutyPillar[];
+  qualifications?: string;
   technicalCompetencies: CompetencyBadge[];
   behavioralCompetencies: CompetencyBadge[];
   commonWeightPct: number;
   positionWeightPct: number;
   totalMetricsCount: number;
+  // Official JD template sections
+  internalRelations?: string;
+  externalRelations?: string;
+  authority?: string[];
+  careerPath?: string[];
+  docVersion?: string;
+  reviewedBy?: string;
+  approvedBy?: string;
+  isOfficialSavedJd?: boolean;
 }
 
 const PILLAR_COLORS: ("emerald" | "blue" | "purple" | "amber" | "rose" | "teal" | "indigo")[] = [
@@ -101,12 +115,14 @@ const CATEGORY_NAMES: Record<string, { en: string; ar: string }> = {
 };
 
 /**
- * Builds a dynamic Job Description from employee profile and matched template.
+ * Builds a dynamic Job Description from employee profile and matched template,
+ * overlaying official saved position job description when available.
  */
 export function buildDynamicJobDescription(
   profile: any,
   template: any,
-  managerFallback?: string
+  managerFallback?: string,
+  savedJd?: any
 ): DynamicJobDescriptionData {
   const positionTitleEn =
     profile?.position ||
@@ -127,20 +143,23 @@ export function buildDynamicJobDescription(
     template?.department?.name_ar ||
     departmentNameEn;
 
-  const jobGrade = profile?.job_grade || template?.job_grade?.name_en || "Senior Officer / G04";
+  const jobGrade = savedJd?.job_grade?.trim() || profile?.job_grade || template?.job_grade?.name_en || "Senior Officer / G04";
   const managerName = profile?.manager || managerFallback || "Direct Manager";
   const employeeCode = profile?.emp_code || "EMP-0001";
-  const contractType = profile?.contract_type || "FullTime";
+  const contractType = savedJd?.position_type || profile?.contract_type || "FullTime";
+  const jobCategory = savedJd?.job_category || "Non-managerial";
+  const locationType = savedJd?.location_type || "On-site";
+  const jobCode = savedJd?.job_code || "JD-001";
 
-  // 1. Dynamic Purpose Synthesis
-  let purposeEn = template?.description?.trim() || "";
+  // 1. Dynamic Purpose Synthesis (or saved summary)
+  let purposeEn = savedJd?.job_summary?.trim() || template?.description?.trim() || "";
   let purposeAr = "";
 
   if (!purposeEn) {
     purposeEn = `Directly responsible for executing and overseeing ${positionTitleEn} responsibilities within the ${departmentNameEn} department. Ensures operational excellence, strict adherence to quality and engineering standards, and achievement of organizational goals within approved timelines.`;
     purposeAr = `المسؤولية المباشرة عن قيادة وتنفيذ مهام ومسؤوليات ${positionTitleAr} ضمن إدارة ${departmentNameAr}، وضمان التميز التشغيلي والالتزام الصارم بمعايير الجودة والأداء المؤسسي والأهداف المعتمدة وفقاً للجدول الزمني.`;
   } else {
-    purposeAr = `المسؤولية التنفيذية والمهنية المعتمدة لـ ${positionTitleAr} ضمن إدارة ${departmentNameAr}، والالتزام بمعايير الأداء والتقييم المؤسسي المعتمد.`;
+    purposeAr = savedJd?.job_summary?.trim() || `المسؤولية التنفيذية والمهنية المعتمدة لـ ${positionTitleAr} ضمن إدارة ${departmentNameAr}، والالتزام بمعايير الأداء والتقييم المؤسسي المعتمد.`;
   }
 
   // 2. Dynamic Pillars & Duties from Template Criteria
@@ -277,23 +296,76 @@ export function buildDynamicJobDescription(
     );
   }
 
+  // If official responsibilities were saved in position_job_descriptions, prepend them as Pillar 1
+  if (savedJd?.responsibilities && Array.isArray(savedJd.responsibilities) && savedJd.responsibilities.length > 0) {
+    const officialDuties: JobDutyItem[] = savedJd.responsibilities.map((resp: string, rIdx: number) => ({
+      id: `saved-resp-${rIdx + 1}`,
+      nameEn: resp,
+      nameAr: resp,
+      descriptionEn: "",
+      descriptionAr: "",
+    }));
+
+    pillars.unshift({
+      number: "01",
+      titleEn: "Core Role Deliverables & Responsibilities",
+      titleAr: "المهام والمسؤوليات الأساسية المعتمدة",
+      color: "emerald",
+      duties: officialDuties,
+    });
+
+    // Re-index pillar numbers & colors
+    pillars.forEach((p, idx) => {
+      p.number = String(idx + 1).padStart(2, "0");
+      p.color = PILLAR_COLORS[idx % PILLAR_COLORS.length];
+    });
+  }
+
+  // Override competencies if provided in saved JD
+  if (savedJd?.technical_competencies && Array.isArray(savedJd.technical_competencies) && savedJd.technical_competencies.length > 0) {
+    technicalCompetencies.length = 0;
+    savedJd.technical_competencies.forEach((tc: string) => {
+      technicalCompetencies.push({ en: tc, ar: tc });
+    });
+  }
+
+  if (savedJd?.behavioral_competencies && Array.isArray(savedJd.behavioral_competencies) && savedJd.behavioral_competencies.length > 0) {
+    behavioralCompetencies.length = 0;
+    savedJd.behavioral_competencies.forEach((bc: string) => {
+      behavioralCompetencies.push({ en: bc, ar: bc });
+    });
+  }
+
   return {
     positionTitleEn,
     positionTitleAr,
     departmentNameEn,
     departmentNameAr,
+    jobCode,
     jobGrade,
+    jobCategory,
+    positionType: contractType,
+    locationType,
     managerName,
     employeeCode,
     contractType,
     purposeEn,
     purposeAr,
     pillars,
+    qualifications: savedJd?.qualifications,
     technicalCompetencies,
     behavioralCompetencies,
     commonWeightPct: Number(template?.common_weight_pct ?? 40),
     positionWeightPct: Number(template?.position_weight_pct ?? 60),
     totalMetricsCount: items.length || pillars.reduce((sum, p) => sum + p.duties.length, 0),
+    internalRelations: savedJd?.internal_relations,
+    externalRelations: savedJd?.external_relations,
+    authority: savedJd?.authority,
+    careerPath: savedJd?.career_path,
+    docVersion: savedJd?.doc_version || "v1.0",
+    reviewedBy: savedJd?.reviewed_by,
+    approvedBy: savedJd?.approved_by,
+    isOfficialSavedJd: !!(savedJd?.id || savedJd?.job_summary || savedJd?.responsibilities?.length),
   };
 }
 

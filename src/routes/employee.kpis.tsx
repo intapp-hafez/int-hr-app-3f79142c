@@ -24,6 +24,11 @@ import {
   FileCheck,
   ChevronDown,
   ChevronUp,
+  GraduationCap,
+  Users,
+  Shield,
+  TrendingUp,
+  MapPin,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
@@ -43,6 +48,8 @@ import {
 } from "@/backend/functions/kpi-evaluations.functions";
 import { getMyProfileDetails } from "@/backend/functions/auth.functions";
 import { buildDynamicJobDescription } from "@/lib/kpi/dynamic-job-description";
+import { JD_SELECT_COLUMNS, type SavedJobDescription } from "@/lib/job-descriptions";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -98,14 +105,38 @@ export function EmployeeKpiPage() {
     enabled: !!session?.employeeId,
   });
 
-  // Build fully dynamic job description from profile and matched template
+  // Fetch official saved job description from position_job_descriptions if available
+  const effectivePositionId = profileDetails?.position_id || matchedTemplate?.position_id || (matchedTemplate as any)?.position?.id;
+
+  const { data: savedJobDescription } = useQuery({
+    queryKey: ["position-job-description", effectivePositionId],
+    queryFn: async () => {
+      if (!effectivePositionId) return null;
+      try {
+        const { data, error } = await supabase
+          .from("position_job_descriptions" as any)
+          .select(JD_SELECT_COLUMNS)
+          .eq("position_id", effectivePositionId)
+          .maybeSingle();
+        if (error) return null;
+        return data as SavedJobDescription | null;
+      } catch {
+        return null;
+      }
+    },
+    enabled: !!effectivePositionId,
+    staleTime: 60_000,
+  });
+
+  // Build fully dynamic job description from profile and matched template, overlaying official JD if saved
   const jobDescData = useMemo(() => {
     return buildDynamicJobDescription(
       profileDetails,
       matchedTemplate,
-      isAr ? "المدير المباشر" : "Direct Manager"
+      isAr ? "المدير المباشر" : "Direct Manager",
+      savedJobDescription
     );
-  }, [profileDetails, matchedTemplate, isAr]);
+  }, [profileDetails, matchedTemplate, savedJobDescription, isAr]);
 
   // Compute scorecard values dynamically from matched template criteria or default KPI set
   const kpiRows = useMemo(() => {
@@ -680,6 +711,129 @@ export function EmployeeKpiPage() {
                   </span>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Sections from Official JD: Relationships & Authority & Career Path */}
+          {(jobDescData.internalRelations || jobDescData.externalRelations || (jobDescData.authority && jobDescData.authority.length > 0) || (jobDescData.careerPath && jobDescData.careerPath.length > 0)) && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              {/* § 6 Relationships & § 7 Authority */}
+              {(jobDescData.internalRelations || jobDescData.externalRelations || (jobDescData.authority && jobDescData.authority.length > 0)) && (
+                <div className="rounded-3xl border border-border bg-card p-4 sm:p-5 shadow-2xs space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="grid h-8 w-8 place-items-center rounded-xl bg-brand/10 text-brand">
+                      <Shield className="h-4 w-4" />
+                    </span>
+                    <div>
+                      <h3 className="font-bold text-sm text-foreground">
+                        {isAr ? "نطاق الصلاحيات والتواصل" : "Relationships & Authority"}
+                      </h3>
+                      <p className="text-[11px] text-muted-foreground">
+                        {isAr ? "حدود الصلاحيات الممنوحة وقنوات التواصل الرسمية" : "Internal/external comms & authorized mandate"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2.5 pt-1 text-xs">
+                    {jobDescData.internalRelations && (
+                      <div className="rounded-xl border border-border/70 bg-muted/20 p-2.5">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-0.5">
+                          {isAr ? "التواصل الداخلي" : "Internal Communications"}
+                        </span>
+                        <p className="text-foreground">{jobDescData.internalRelations}</p>
+                      </div>
+                    )}
+                    {jobDescData.externalRelations && (
+                      <div className="rounded-xl border border-border/70 bg-muted/20 p-2.5">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-0.5">
+                          {isAr ? "التواصل الخارجي" : "External Communications"}
+                        </span>
+                        <p className="text-foreground">{jobDescData.externalRelations}</p>
+                      </div>
+                    )}
+                    {jobDescData.authority && jobDescData.authority.length > 0 && (
+                      <div className="space-y-1 pt-1">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block">
+                          {isAr ? "صلاحيات شاغل الوظيفة" : "Authority of Job Holder"}
+                        </span>
+                        <ul className="space-y-1 text-muted-foreground">
+                          {jobDescData.authority.map((auth, aIdx) => (
+                            <li key={aIdx} className="flex items-start gap-1.5">
+                              <Check className="h-3.5 w-3.5 text-brand shrink-0 mt-0.5" />
+                              <span className="text-foreground">{auth}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* § 8 Career Path */}
+              {jobDescData.careerPath && jobDescData.careerPath.length > 0 && (
+                <div className="rounded-3xl border border-border bg-card p-4 sm:p-5 shadow-2xs space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="grid h-8 w-8 place-items-center rounded-xl bg-brand/10 text-brand">
+                      <TrendingUp className="h-4 w-4" />
+                    </span>
+                    <div>
+                      <h3 className="font-bold text-sm text-foreground">
+                        {isAr ? "المسار الوظيفي والترقي" : "Career Path"}
+                      </h3>
+                      <p className="text-[11px] text-muted-foreground">
+                        {isAr ? "التدرج والنمو المهني المتوقع للدور" : "Professional progression and development milestones"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 pt-1">
+                    <div className="flex flex-col gap-1.5">
+                      {jobDescData.careerPath.map((step, idx) => {
+                        const isCurrent = step.toLowerCase().includes(jobDescData.positionTitleEn.toLowerCase()) || idx === 1;
+                        return (
+                          <div
+                            key={idx}
+                            className={`flex items-center gap-2.5 rounded-xl border p-2.5 text-xs transition-all ${
+                              isCurrent
+                                ? "border-brand/40 bg-brand/10 font-bold text-foreground"
+                                : "border-border/60 bg-muted/15 text-muted-foreground"
+                            }`}
+                          >
+                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-background font-mono text-[10px] font-bold">
+                              {idx + 1}
+                            </span>
+                            <span className="flex-1">{step}</span>
+                            {isCurrent && (
+                              <Badge className="bg-brand text-brand-foreground text-[9px] px-1.5 py-0">
+                                {isAr ? "المستوى الحالي" : "Current"}
+                              </Badge>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* § 9 Document Control Footer */}
+          <div className="rounded-2xl border border-border/60 bg-muted/15 p-3 flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <span className="font-mono font-semibold text-foreground">
+                {jobDescData.jobCode || "JD-001"} · {jobDescData.docVersion || "v1.0"}
+              </span>
+              {jobDescData.isOfficialSavedJd && (
+                <Badge variant="outline" className="text-[9px] bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
+                  {isAr ? "معتمد رسمياً" : "Official Approved JD"}
+                </Badge>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              {jobDescData.reviewedBy && <span>{isAr ? "مراجعة: " : "Reviewed by: "}<strong className="text-foreground">{jobDescData.reviewedBy}</strong></span>}
+              {jobDescData.approvedBy && <span>{isAr ? "اعتماد: " : "Approved by: "}<strong className="text-foreground">{jobDescData.approvedBy}</strong></span>}
             </div>
           </div>
         </TabsContent>

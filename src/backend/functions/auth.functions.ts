@@ -52,6 +52,7 @@ export type MyProfileDetails = {
   department: string | null;
   position: string | null;
   position_ar?: string | null;
+  position_id?: string | null;
   manager: string | null;
   manager_id?: string | null;
   manager_email?: string | null;
@@ -190,6 +191,7 @@ export const getMyProfileDetails = createServerFn({ method: "GET" })
       department: (dept as { name_en?: string } | null)?.name_en ?? null,
       position: (pos as { name_en?: string; name_ar?: string } | null)?.name_en ?? null,
       position_ar: (pos as { name_en?: string; name_ar?: string } | null)?.name_ar ?? null,
+      position_id: p.position_id ?? null,
       manager: mgrData?.full_name ?? null,
       manager_id: mgrData?.id ?? managerIdToFetch ?? null,
       manager_email: mgrData?.email ?? null,
