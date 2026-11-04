@@ -262,9 +262,9 @@ export function SettingsPage() {
                 {details?.department || (me?.dept ? tDept(me.dept) : "")}
               </span>
             )}
-            {(details?.branch || me?.branch) && (
+            {me?.branch && (
               <span className="inline-flex items-center rounded-md bg-muted/70 dark:bg-white/5 px-2.5 py-1 font-medium border border-border/50 dark:border-white/5">
-                {details?.branch || (me?.branch ? tBranch(me.branch) : "")}
+                {tBranch(me.branch)}
               </span>
             )}
             {(realProfile?.email || details?.email) && (

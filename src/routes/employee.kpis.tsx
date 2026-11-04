@@ -227,7 +227,7 @@ export function EmployeeKpiPage() {
 
     await exportKpiEvaluationToExcel({
       employeeName: session?.name || profileDetails?.full_name || "Employee",
-      employeeCode: session?.empCode || profileDetails?.emp_code || "",
+      employeeCode: profileDetails?.emp_code || "",
       evaluatorName: evaluation.evaluator_name || profileDetails?.manager || "Manager",
       evaluationState: stateMap,
       notes: evaluation.notes || { strengths: "", growthAreas: "", recommendations: "" },

@@ -460,19 +460,19 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
   // ── DIRECTORY DATA QUERIES (DEPARTMENTS, POSITIONS, GRADES) ──
   const { data: departmentsData = [] } = useQuery({
     queryKey: ["kpi-departments-list"],
-    queryFn: () => listDepartmentsFn({ data: {} }),
+    queryFn: () => listDepartmentsFn(),
     enabled: !!session,
   });
 
   const { data: positionsData = [] } = useQuery({
     queryKey: ["kpi-positions-list"],
-    queryFn: () => listPositionsFn({ data: {} }),
+    queryFn: () => listPositionsFn(),
     enabled: !!session,
   });
 
   const { data: jobGradesData = [] } = useQuery({
     queryKey: ["kpi-job-grades-list"],
-    queryFn: () => listJobGradesFn({ data: {} }),
+    queryFn: () => listJobGradesFn(),
     enabled: !!session,
   });
 
@@ -1942,7 +1942,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
 
     const evaluatedScores = employeesWithEvaluations
       .map((e) => e.totalScore)
-      .filter((s) => s !== null && s > 0);
+      .filter((s): s is number => s !== null && s > 0);
 
     const avgScore = evaluatedScores.length > 0
       ? (evaluatedScores.reduce((a, b) => a + b, 0) / evaluatedScores.length).toFixed(1)
@@ -2012,11 +2012,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
       approvedDate: item.approvedAt ? new Date(item.approvedAt).toLocaleDateString() : "—",
     }));
 
-    exportAllKpiEvaluationsToExcel({
-      year: selectedYear,
-      rows: exportRows,
-      companyName: isAr ? "شركة إنترجريتد تكنيكس" : "Integrated Technics",
-    });
+    exportAllKpiEvaluationsToExcel(exportRows, selectedYear, isAr);
     toast.success(isAr ? "تم تصدير سجل تقييمات الموظفين بنجاح" : "Exported all KPI evaluations to Excel");
   };
 
@@ -3533,6 +3529,9 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
             </button>
           </div>
 
+          <Button variant={templateSubTab === "job-descriptions" ? "default" : "secondary"} onClick={() => setTemplateSubTab("job-descriptions")} className="gap-2 text-xs font-bold">
+            <FileText className="size-4" />{isAr ? "الأوصاف الوظيفية" : "Job descriptions"}
+          </Button>
           {templateSubTab === "job-descriptions" && <JobDescriptionsTab />}
           {/* ═════════════════════════════════════════════════════════════════ */}
           {/* VIEW A: TEMPLATES MANAGER                                         */}

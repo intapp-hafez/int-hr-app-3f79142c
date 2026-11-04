@@ -30,6 +30,7 @@ export interface KpiQuarterValues {
 
 export interface KpiRowState {
   id: number;
+  targetAnnual?: number;
   q1: KpiQuarterValues;
   q2: KpiQuarterValues;
   q3: KpiQuarterValues;

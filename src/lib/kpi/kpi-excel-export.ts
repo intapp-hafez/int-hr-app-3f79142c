@@ -37,7 +37,7 @@ export function exportKpiEvaluationToExcel(
   possibleMeta?: EvaluationExportMeta
 ) {
   const isSingleArg = !possibleMeta && stateOrMeta && typeof stateOrMeta === "object" && "employeeName" in stateOrMeta;
-  const meta: EvaluationExportMeta = (isSingleArg ? stateOrMeta : possibleMeta) || {
+  const meta: EvaluationExportMeta = (isSingleArg ? stateOrMeta as EvaluationExportMeta : possibleMeta) || {
     employeeName: "Employee",
     evaluatorName: "Evaluator",
     year: new Date().getFullYear(),
