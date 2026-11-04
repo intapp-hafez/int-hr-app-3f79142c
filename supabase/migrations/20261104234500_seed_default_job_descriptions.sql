@@ -137,3 +137,4 @@ BEGIN
       updated_at = now();
   END IF;
 END $$;
+

@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   FileText, Loader2, Pencil, Plus, Search, Save, Trash2,
   ChevronDown, ChevronUp, GraduationCap, Users, Shield,
   TrendingUp, FileCheck, MapPin, Briefcase, Clock, Sparkles,
+  FileSpreadsheet, Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -313,6 +314,281 @@ export function JobDescriptionsTab() {
     setOpen(true);
   };
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+
+  // ── Excel Export Handler
+  const handleExportExcel = async () => {
+    if (!records.data?.length) {
+      toast.error(isAr ? "لا توجد أوصاف وظيفية للتصدير" : "No job descriptions to export");
+      return;
+    }
+    setIsExporting(true);
+    try {
+      const XLSX = await import("xlsx");
+      const exportRows = records.data.map((r) => {
+        const p = positions.data?.find((pos) => pos.id === r.position_id);
+        return {
+          "Job Code": r.job_code || "",
+          "Position Name (EN)": p?.name_en || "",
+          "Position Name (AR)": p?.name_ar || "",
+          "Position ID": r.position_id,
+          "Grade": r.job_grade || "",
+          "Category": r.job_category || "Non-managerial",
+          "Position Type": r.position_type || "Full-time",
+          "Location Type": r.location_type || "On-site",
+          "Job Summary": r.job_summary || "",
+          "Responsibilities": (r.responsibilities || []).map((x, i) => `${i + 1}. ${x}`).join("\n"),
+          "Qualifications & Experience": r.qualifications || "",
+          "Technical Competencies": (r.technical_competencies || []).join("\n"),
+          "Behavioral Competencies": (r.behavioral_competencies || []).join("\n"),
+          "Internal Relations": r.internal_relations || "",
+          "External Relations": r.external_relations || "",
+          "Authority & Decision Making": (r.authority || []).map((x, i) => `${i + 1}. ${x}`).join("\n"),
+          "Career Path": (r.career_path || []).map((x, i) => `${i + 1}. ${x}`).join("\n"),
+          "Document Version": r.doc_version || "v1.0",
+          "Reviewed By": r.reviewed_by || "",
+          "Approved By": r.approved_by || "",
+          "Tags": (r.tags || []).join(", "),
+        };
+      });
+
+      const ws = XLSX.utils.json_to_sheet(exportRows);
+      ws["!cols"] = [
+        { wch: 14 },
+        { wch: 28 },
+        { wch: 28 },
+        { wch: 38 },
+        { wch: 16 },
+        { wch: 16 },
+        { wch: 14 },
+        { wch: 14 },
+        { wch: 45 },
+        { wch: 55 },
+        { wch: 45 },
+        { wch: 30 },
+        { wch: 30 },
+        { wch: 30 },
+        { wch: 30 },
+        { wch: 35 },
+        { wch: 30 },
+        { wch: 12 },
+        { wch: 20 },
+        { wch: 20 },
+        { wch: 25 },
+      ];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Job Descriptions");
+      XLSX.writeFile(wb, `Job_Descriptions_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      toast.success(isAr ? "تم تصدير ملف الإكسيل بنجاح" : "Excel file exported successfully");
+    } catch (err: unknown) {
+      console.error("Export error:", err);
+      toast.error(err instanceof Error ? err.message : "Export failed");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // ── Excel Import Handler
+  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsImporting(true);
+    try {
+      const XLSX = await import("xlsx");
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: "array" });
+      const firstSheetName = wb.SheetNames[0];
+      if (!firstSheetName) throw new Error(isAr ? "ملف الإكسيل فارغ" : "Excel sheet is empty");
+      const ws = wb.Sheets[firstSheetName];
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws);
+
+      if (!rows.length) {
+        toast.error(isAr ? "لم يتم العثور على أي صفوف في الملف" : "No rows found in file");
+        return;
+      }
+
+      const availablePositions = positions.data ?? [];
+      const splitList = (val: unknown): string[] => {
+        if (!val) return [];
+        if (Array.isArray(val)) return val.map(String).map((s) => s.trim()).filter(Boolean);
+        const str = String(val);
+        return str
+          .split(/[\r\n;,]+/)
+          .map((s) => s.replace(/^\s*(\d+[\.\)]|\*|•|-)\s*/, "").trim())
+          .filter(Boolean);
+      };
+
+      const normalizeCategory = (cat: unknown): "Non-managerial" | "Managerial" => {
+        const s = String(cat || "").toLowerCase();
+        if (s.includes("manag") && !s.includes("non")) return "Managerial";
+        if (s.includes("إداري") && !s.includes("غير")) return "Managerial";
+        return "Non-managerial";
+      };
+
+      const normalizePosType = (pt: unknown): "Full-time" | "Part-time" | "Contract" => {
+        const s = String(pt || "").toLowerCase();
+        if (s.includes("part") || s.includes("جزئي")) return "Part-time";
+        if (s.includes("contract") || s.includes("عقد")) return "Contract";
+        return "Full-time";
+      };
+
+      const normalizeLocType = (lt: unknown): "On-site" | "Remote" | "Hybrid" => {
+        const s = String(lt || "").toLowerCase();
+        if (s.includes("remote") || s.includes("عن بعد")) return "Remote";
+        if (s.includes("hybrid") || s.includes("هجين")) return "Hybrid";
+        return "On-site";
+      };
+
+      let successCount = 0;
+      let skippedCount = 0;
+
+      for (const row of rows) {
+        const rawPosId = String(
+          row["Position ID"] ||
+          row["position_id"] ||
+          row["معرف الوظيفة"] ||
+          ""
+        ).trim();
+
+        const titleEn = String(
+          row["Position Name (EN)"] ||
+          row["Position Title (EN)"] ||
+          row["Position"] ||
+          row["Job Title"] ||
+          row["المسمى بالإنجليزية"] ||
+          ""
+        ).trim();
+
+        const titleAr = String(
+          row["Position Name (AR)"] ||
+          row["Position Title (AR)"] ||
+          row["المسمى بالعربية"] ||
+          row["المسمى"] ||
+          ""
+        ).trim();
+
+        let matchedPos = availablePositions.find((p) => p.id === rawPosId);
+        if (!matchedPos && titleEn) {
+          matchedPos = availablePositions.find(
+            (p) => p.name_en?.toLowerCase().trim() === titleEn.toLowerCase()
+          );
+        }
+        if (!matchedPos && titleAr) {
+          matchedPos = availablePositions.find(
+            (p) => p.name_ar?.trim() === titleAr
+          );
+        }
+
+        if (!matchedPos) {
+          skippedCount++;
+          continue;
+        }
+
+        const jobCodeVal = String(
+          row["Job Code"] || row["job_code"] || row["كود الوظيفة"] || row["Code"] || ""
+        ).trim();
+
+        const jobSummaryVal = String(
+          row["Job Summary"] || row["job_summary"] || row["ملخص الوظيفة"] || row["Summary"] || ""
+        ).trim();
+
+        const responsibilitiesVal = splitList(
+          row["Responsibilities"] || row["responsibilities"] || row["المسؤوليات"] || row["المهام والمسؤوليات"]
+        );
+
+        const qualificationsVal = String(
+          row["Qualifications & Experience"] || row["qualifications"] || row["المؤهلات والخبرة"] || row["Qualifications"] || ""
+        ).trim();
+
+        const technicalCompsVal = splitList(
+          row["Technical Competencies"] || row["technical_competencies"] || row["الكفاءات الفنية"]
+        );
+
+        const behavioralCompsVal = splitList(
+          row["Behavioral Competencies"] || row["behavioral_competencies"] || row["الكفاءات السلوكية"]
+        );
+
+        const internalRelVal = String(
+          row["Internal Relations"] || row["internal_relations"] || row["العلاقات الداخلية"] || ""
+        ).trim();
+
+        const externalRelVal = String(
+          row["External Relations"] || row["external_relations"] || row["العلاقات الخارجية"] || ""
+        ).trim();
+
+        const authorityVal = splitList(
+          row["Authority & Decision Making"] || row["authority"] || row["الصلاحيات"] || row["Authority"]
+        );
+
+        const careerPathVal = splitList(
+          row["Career Path"] || row["career_path"] || row["المسار الوظيفي"]
+        );
+
+        const tagsVal = splitList(
+          row["Tags"] || row["tags"] || row["الوسوم"]
+        );
+
+        const payload = {
+          position_id: matchedPos.id,
+          job_code: jobCodeVal || undefined,
+          job_category: normalizeCategory(row["Category"] || row["job_category"] || row["الفئة"]),
+          position_type: normalizePosType(row["Position Type"] || row["position_type"] || row["نوع التوظيف"]),
+          location_type: normalizeLocType(row["Location Type"] || row["location_type"] || row["موقع العمل"]),
+          job_grade: String(row["Grade"] || row["job_grade"] || row["الدرجة"] || "").trim() || undefined,
+          job_summary: jobSummaryVal || `Official role description for ${matchedPos.name_en}`,
+          responsibilities: responsibilitiesVal.length ? responsibilitiesVal : ["Core position responsibilities and duties."],
+          qualifications: qualificationsVal || undefined,
+          technical_competencies: technicalCompsVal,
+          behavioral_competencies: behavioralCompsVal,
+          internal_relations: internalRelVal || undefined,
+          external_relations: externalRelVal || undefined,
+          authority: authorityVal,
+          career_path: careerPathVal,
+          doc_version: String(row["Document Version"] || row["doc_version"] || row["إصدار الوثيقة"] || "v1.0").trim(),
+          reviewed_by: String(row["Reviewed By"] || row["reviewed_by"] || row["مراجعة"] || "").trim() || undefined,
+          approved_by: String(row["Approved By"] || row["approved_by"] || row["اعتماد"] || "").trim() || undefined,
+          tags: tagsVal,
+          updated_at: new Date().toISOString(),
+        };
+
+        const { error: upsertErr } = await db
+          .from("position_job_descriptions")
+          .upsert(payload, { onConflict: "position_id" });
+
+        if (upsertErr) {
+          console.error("Upsert error for", matchedPos.name_en, upsertErr);
+          skippedCount++;
+        } else {
+          successCount++;
+        }
+      }
+
+      await qc.invalidateQueries({ queryKey: ["position-job-descriptions"] });
+      if (successCount > 0) {
+        toast.success(
+          isAr
+            ? `تم استيراد ${successCount} وصف وظيفي بنجاح${skippedCount ? ` (تم تخطي ${skippedCount})` : ""}`
+            : `Successfully imported ${successCount} job description(s)${skippedCount ? ` (${skippedCount} skipped)` : ""}`
+        );
+      } else {
+        toast.error(
+          isAr
+            ? `لم يتم استيراد أي وصف وظيفي. تأكد من تطابق المسميات أو معرف الوظيفة.`
+            : `No job descriptions imported. Check position matching or file format.`
+        );
+      }
+    } catch (err: unknown) {
+      console.error("Import error:", err);
+      toast.error(err instanceof Error ? err.message : "Import failed");
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   const loadError = records.error || positions.error;
   const rows = (records.data ?? []).filter((row) =>
     `${posName(row.position_id)} ${row.job_summary} ${row.tags?.join(" ")}`.toLowerCase()
@@ -332,14 +608,55 @@ export function JobDescriptionsTab() {
             {isAr ? "إدارة وتوثيق الأوصاف الوظيفية الرسمية لجميع الوظائف في المنظمة" : "Manage and maintain official role descriptions across all positions"}
           </p>
         </div>
-        <Button
-          onClick={() => startEdit(null)}
-          disabled={!!loadError || positions.isPending || records.isPending}
-          className="gap-2 rounded-xl"
-        >
-          <Plus className="size-4" />
-          {isAr ? "إضافة وصف وظيفي" : "Add Job Description"}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImportExcel}
+            accept=".xlsx,.xls,.csv"
+            className="hidden"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleExportExcel}
+            disabled={isExporting || !records.data?.length}
+            className="h-9 gap-1.5 rounded-xl border-border/70 text-xs font-semibold"
+          >
+            {isExporting ? (
+              <Loader2 className="size-3.5 animate-spin text-emerald-600" />
+            ) : (
+              <FileSpreadsheet className="size-3.5 text-emerald-600" />
+            )}
+            {isAr ? "تصدير إكسيل" : "Export Excel"}
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isImporting || positions.isPending}
+            className="h-9 gap-1.5 rounded-xl border-border/70 text-xs font-semibold"
+          >
+            {isImporting ? (
+              <Loader2 className="size-3.5 animate-spin text-brand" />
+            ) : (
+              <Upload className="size-3.5 text-brand" />
+            )}
+            {isAr ? "استيراد إكسيل" : "Import Excel"}
+          </Button>
+
+          <Button
+            onClick={() => startEdit(null)}
+            disabled={!!loadError || positions.isPending || records.isPending}
+            className="h-9 gap-2 rounded-xl text-xs font-semibold shadow-xs"
+          >
+            <Plus className="size-4" />
+            {isAr ? "إضافة وصف وظيفي" : "Add Job Description"}
+          </Button>
+        </div>
       </div>
 
       {/* Search Bar */}
