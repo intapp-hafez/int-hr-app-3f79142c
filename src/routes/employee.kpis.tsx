@@ -22,6 +22,8 @@ import {
   Compass,
   Check,
   FileCheck,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
@@ -57,6 +59,11 @@ export function EmployeeKpiPage() {
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [mainTab, setMainTab] = useState<"job_description" | "kpis_records">("job_description");
   const [kpiSubTab, setKpiSubTab] = useState<"quarters" | "scorecard" | "feedback" | "history">("quarters");
+  const [collapsedPillars, setCollapsedPillars] = useState<Record<string, boolean>>({});
+
+  const togglePillar = (num: string) => {
+    setCollapsedPillars((prev) => ({ ...prev, [num]: !prev[num] }));
+  };
 
   const getMyKpiFn = useServerFn(getMyKpiEvaluation);
   const listMyKpisFn = useServerFn(listMyKpiEvaluations);
@@ -417,85 +424,160 @@ export function EmployeeKpiPage() {
 
           {/* Key Operational Duties & Responsibilities (Dynamic Pillars) */}
           <div className="rounded-3xl border border-border bg-card p-4 sm:p-5 shadow-2xs space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="grid h-8 w-8 place-items-center rounded-xl bg-brand/10 text-brand">
-                  <CheckCheck className="h-4 w-4" />
+            {/* Section Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1 border-b border-border/40">
+              <div className="flex items-start sm:items-center gap-2.5">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand/10 text-brand">
+                  <CheckCheck className="h-4.5 w-4.5" />
                 </span>
                 <div>
-                  <h3 className="font-bold text-sm text-foreground">
+                  <h3 className="font-bold text-sm sm:text-base text-foreground leading-tight">
                     {isAr ? "المهام والمسؤوليات الرئيسية" : "Core Duties & Key Result Areas"}
                   </h3>
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">
                     {isAr ? "المسؤوليات اليومية والتنفيذية المحددة لشاغل الوظيفة" : "Operational deliverables and day-to-day responsibilities"}
                   </p>
                 </div>
               </div>
-              <Badge variant="outline" className="text-[10px] font-mono">
-                {jobDescData.pillars.length} {isAr ? "محاور رئيسية" : "Pillars"}
-              </Badge>
+              <div className="flex items-center gap-1.5 self-start sm:self-auto">
+                <Badge variant="secondary" className="text-[11px] font-medium px-2.5 py-0.5">
+                  {jobDescData.pillars.length} {isAr ? "محاور رئيسية" : "Pillars"}
+                </Badge>
+                <Badge variant="outline" className="text-[11px] font-medium px-2.5 py-0.5">
+                  {jobDescData.totalMetricsCount} {isAr ? "مؤشرات عمل" : "Duties"}
+                </Badge>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {jobDescData.pillars.map((pillar) => (
-                <div
-                  key={pillar.number}
-                  className={`rounded-2xl border border-border/80 bg-muted/15 p-3.5 space-y-2.5 ${
-                    jobDescData.pillars.length % 2 !== 0 && pillar.number === String(jobDescData.pillars.length).padStart(2, "0")
-                      ? "md:col-span-2"
-                      : ""
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 text-xs font-bold text-foreground min-w-0">
-                      <span
-                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg font-mono text-[11px] ${
-                          pillar.color === "emerald"
-                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                            : pillar.color === "blue"
-                            ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
-                            : pillar.color === "purple"
-                            ? "bg-purple-500/10 text-purple-600 dark:text-purple-400"
-                            : pillar.color === "amber"
-                            ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                            : pillar.color === "rose"
-                            ? "bg-rose-500/10 text-rose-600 dark:text-rose-400"
-                            : "bg-teal-500/10 text-teal-600 dark:text-teal-400"
-                        }`}
-                      >
-                        {pillar.number}
-                      </span>
-                      <span className="truncate">{isAr ? pillar.titleAr : pillar.titleEn}</span>
-                    </div>
-                    <Badge variant="outline" className="text-[9px] font-mono shrink-0">
-                      {pillar.duties.length} {isAr ? "مهام" : "Duties"}
-                    </Badge>
-                  </div>
+            {/* Stacked Pillars Flow */}
+            <div className="space-y-3">
+              {jobDescData.pillars.map((pillar) => {
+                const isCollapsed = !!collapsedPillars[pillar.number];
 
-                  <ul className="text-xs text-muted-foreground space-y-2.5 ps-1">
-                    {pillar.duties.map((duty) => (
-                      <li key={duty.id} className="flex items-start gap-2">
-                        <Check className="h-3.5 w-3.5 text-brand shrink-0 mt-0.5" />
-                        <div className="space-y-0.5 min-w-0">
-                          <p className="font-semibold text-foreground text-xs">
-                            {isAr ? duty.nameAr : duty.nameEn}
-                          </p>
-                          {(isAr ? duty.descriptionAr : duty.descriptionEn) && (
-                            <p className="text-[11px] text-muted-foreground leading-relaxed">
-                              {isAr ? duty.descriptionAr : duty.descriptionEn}
-                            </p>
-                          )}
-                          {duty.benchmark && (
-                            <span className="inline-block font-mono text-[10px] text-brand bg-brand/10 px-1.5 py-0.2 rounded-md">
-                              {isAr ? "المستهدف: " : "Benchmark: "}{duty.benchmark}
-                            </span>
+                const themeStyles = {
+                  emerald: {
+                    badge: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
+                    border: "border-emerald-500/20 hover:border-emerald-500/40",
+                    bg: "bg-emerald-500/[0.02]",
+                    iconBg: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+                  },
+                  blue: {
+                    badge: "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30",
+                    border: "border-blue-500/20 hover:border-blue-500/40",
+                    bg: "bg-blue-500/[0.02]",
+                    iconBg: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+                  },
+                  purple: {
+                    badge: "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30",
+                    border: "border-purple-500/20 hover:border-purple-500/40",
+                    bg: "bg-purple-500/[0.02]",
+                    iconBg: "bg-purple-500/10 text-purple-600 dark:text-purple-400",
+                  },
+                  amber: {
+                    badge: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
+                    border: "border-amber-500/20 hover:border-amber-500/40",
+                    bg: "bg-amber-500/[0.02]",
+                    iconBg: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+                  },
+                  rose: {
+                    badge: "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30",
+                    border: "border-rose-500/20 hover:border-rose-500/40",
+                    bg: "bg-rose-500/[0.02]",
+                    iconBg: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
+                  },
+                  teal: {
+                    badge: "bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/30",
+                    border: "border-teal-500/20 hover:border-teal-500/40",
+                    bg: "bg-teal-500/[0.02]",
+                    iconBg: "bg-teal-500/10 text-teal-600 dark:text-teal-400",
+                  },
+                  indigo: {
+                    badge: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/30",
+                    border: "border-indigo-500/20 hover:border-indigo-500/40",
+                    bg: "bg-indigo-500/[0.02]",
+                    iconBg: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400",
+                  },
+                }[pillar.color] || {
+                  badge: "bg-primary/10 text-primary border-primary/20",
+                  border: "border-border hover:border-primary/30",
+                  bg: "bg-muted/10",
+                  iconBg: "bg-brand/10 text-brand",
+                };
+
+                return (
+                  <div
+                    key={pillar.number}
+                    className={`rounded-2xl border transition-all duration-200 overflow-hidden ${themeStyles.border} ${themeStyles.bg}`}
+                  >
+                    {/* Pillar Card Header (Collapsible trigger) */}
+                    <button
+                      type="button"
+                      onClick={() => togglePillar(pillar.number)}
+                      className="w-full p-3 sm:p-3.5 flex items-center justify-between gap-3 text-start hover:bg-muted/30 transition-colors focus:outline-none"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span
+                          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-xl font-mono text-xs font-bold border ${themeStyles.badge}`}
+                        >
+                          {pillar.number}
+                        </span>
+                        <h4 className="font-semibold text-xs sm:text-sm text-foreground leading-snug">
+                          {isAr ? pillar.titleAr : pillar.titleEn}
+                        </h4>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Badge variant="outline" className="text-[10px] font-mono px-2 py-0.5 bg-background/60">
+                          {pillar.duties.length} {isAr ? "مهام" : "Duties"}
+                        </Badge>
+                        <div className="text-muted-foreground">
+                          {isCollapsed ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronUp className="h-4 w-4" />
                           )}
                         </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
+                      </div>
+                    </button>
+
+                    {/* Duty Items List */}
+                    {!isCollapsed && (
+                      <div className="px-3 pb-3 sm:px-3.5 sm:pb-3.5 pt-1 space-y-2">
+                        {pillar.duties.map((duty) => (
+                          <div
+                            key={duty.id}
+                            className="rounded-xl border border-border/60 bg-background/80 p-3 space-y-1.5 shadow-2xs"
+                          >
+                            <div className="flex items-start gap-2.5">
+                              <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full mt-0.5 ${themeStyles.iconBg}`}>
+                                <Check className="h-3 w-3" />
+                              </span>
+                              <div className="space-y-1 min-w-0 flex-1">
+                                <p className="font-semibold text-xs sm:text-sm text-foreground leading-snug">
+                                  {isAr ? duty.nameAr : duty.nameEn}
+                                </p>
+                                {(isAr ? duty.descriptionAr : duty.descriptionEn) && (
+                                  <p className="text-[11px] sm:text-xs text-muted-foreground leading-relaxed">
+                                    {isAr ? duty.descriptionAr : duty.descriptionEn}
+                                  </p>
+                                )}
+                                {duty.benchmark && (
+                                  <div className="pt-0.5">
+                                    <span className="inline-flex items-center gap-1 font-mono text-[10px] sm:text-[11px] font-medium text-brand bg-brand/10 border border-brand/20 px-2 py-0.5 rounded-md">
+                                      <span className="opacity-70">{isAr ? "المستهدف:" : "Target:"}</span>
+                                      <span className="font-semibold">{duty.benchmark}</span>
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
 

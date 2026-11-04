@@ -58,13 +58,46 @@ const PILLAR_COLORS: ("emerald" | "blue" | "purple" | "amber" | "rose" | "teal" 
   "indigo",
 ];
 
+export function formatBenchmark(
+  value: any,
+  unit?: string,
+  scale?: string
+): string | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  const num = Number(value);
+  if (isNaN(num)) return String(value);
+
+  const cleanUnit = (unit || "").trim().toLowerCase();
+  const cleanScale = (scale || "").trim().toLowerCase();
+
+  if (cleanUnit === "%" || cleanUnit === "percentage") {
+    return `${num}%`;
+  }
+  if (cleanUnit === "scale" || cleanUnit === "rating_5" || cleanScale === "rating_5" || cleanScale === "scale") {
+    return `${num} / 5`;
+  }
+  if (cleanUnit === "count") {
+    return `${num} ${num === 1 ? "count" : "counts"}`;
+  }
+  if (cleanUnit === "days" || cleanUnit === "day") {
+    return `${num} ${num === 1 ? "day" : "days"}`;
+  }
+  if (cleanUnit) {
+    return `${num} ${cleanUnit}`;
+  }
+  if (num <= 5 && (cleanScale === "rating_5" || cleanScale === "scale")) {
+    return `${num} / 5`;
+  }
+  return `${num}%`;
+}
+
 const CATEGORY_NAMES: Record<string, { en: string; ar: string }> = {
   technical: { en: "Technical Execution & Core Deliverables", ar: "التنفيذ التخصصي والمهام الفنية" },
-  quality: { en: "Quality Assurance & Compliance", ar: "معايير الجودة والامتثال" },
+  quality: { en: "Quality Assurance & Standards", ar: "معايير الجودة والامتثال" },
   productivity: { en: "Productivity & Milestones Delivery", ar: "الإنتاجية ومواعيد الإنجاز" },
   safety: { en: "Occupational Safety & Site HSE", ar: "السلامة المهنية وضوابط العمل" },
   coordination: { en: "Cross-Discipline Coordination", ar: "التنسيق المشترك وإدارة العمليات" },
-  behavioral: { en: "Professional Conduct & Standards", ar: "السلوك المهني ومعايير العمل" },
+  behavioral: { en: "Professional Conduct & Discipline", ar: "السلوك المهني والانضباط" },
 };
 
 /**
@@ -146,7 +179,7 @@ export function buildDynamicJobDescription(
             nameAr: it.criterion?.name_ar || it.criterion?.name_en || `المسؤولية ${dIdx + 1}`,
             descriptionEn: it.criterion?.how_measured_en || it.criterion?.description_en || "",
             descriptionAr: it.criterion?.how_measured_ar || it.criterion?.description_ar || "",
-            benchmark: it.target_benchmark ? `${it.target_benchmark}${it.unit || "%"}` : undefined,
+            benchmark: formatBenchmark(it.target_benchmark, it.unit || it.criterion?.unit, it.criterion?.scoring_scale),
             weight: it.weight ? Number(it.weight) * 100 : undefined,
             category: it.criterion?.category,
           })),
@@ -180,7 +213,7 @@ export function buildDynamicJobDescription(
             nameAr: it.criterion?.name_ar || it.criterion?.name_en || `المسؤولية ${dIdx + 1}`,
             descriptionEn: it.criterion?.description_en || it.criterion?.how_measured_en || "",
             descriptionAr: it.criterion?.description_ar || it.criterion?.how_measured_ar || "",
-            benchmark: it.target_benchmark ? `${it.target_benchmark}${it.unit || "%"}` : undefined,
+            benchmark: formatBenchmark(it.target_benchmark, it.unit || it.criterion?.unit, it.criterion?.scoring_scale),
             weight: it.weight ? Number(it.weight) * 100 : undefined,
             category: it.criterion?.category,
           })),
