@@ -294,7 +294,7 @@ export type DeleteKpiEvaluationInput = z.infer<typeof DeleteKpiEvaluationSchema>
 
 export const GetMyKpiEvaluationSchema = z.object({
   year: z.number().int().min(2020).max(2100).optional(),
-  templateType: z.string().default("light_current_engineer"),
+  templateType: z.string().optional(),
 });
 export type GetMyKpiEvaluationInput = z.infer<typeof GetMyKpiEvaluationSchema>;
 
