@@ -165,8 +165,49 @@ export function EmployeeKpiPage() {
     enabled: !!session?.employeeId,
   });
 
+  // Fetch template specified directly in the evaluation (if template_type is a UUID)
+  const evalTemplateId =
+    evaluation?.template_type && evaluation.template_type.length > 20
+      ? evaluation.template_type
+      : null;
+  const { data: evalTemplate } = useQuery({
+    queryKey: ["evaluation-linked-template", evalTemplateId],
+    queryFn: async () => {
+      if (!evalTemplateId) return null;
+      try {
+        const { data, error } = await supabase
+          .from("kpi_templates" as any)
+          .select(`
+            *,
+            items:kpi_template_items(
+              id,
+              criterion_id,
+              weight,
+              target_benchmark,
+              scoring_direction,
+              unit,
+              display_order,
+              criterion:kpi_criteria(*)
+            )
+          `)
+          .eq("id", evalTemplateId)
+          .maybeSingle();
+        if (error) return null;
+        return data;
+      } catch {
+        return null;
+      }
+    },
+    enabled: !!evalTemplateId,
+  });
+
+  const effectiveTemplate = (matchedTemplate?.items?.length ? matchedTemplate : evalTemplate) || null;
+
   // Fetch official saved job description from position_job_descriptions if available
-  const effectivePositionId = profileDetails?.position_id || (matchedTemplate as any)?.position_id || (matchedTemplate as any)?.position?.id;
+  const effectivePositionId =
+    profileDetails?.position_id ||
+    (effectiveTemplate as any)?.position_id ||
+    (effectiveTemplate as any)?.position?.id;
 
   const { data: savedJobDescription } = useQuery({
     queryKey: ["position-job-description", effectivePositionId],
@@ -192,11 +233,11 @@ export function EmployeeKpiPage() {
   const jobDescData = useMemo(() => {
     return buildDynamicJobDescription(
       profileDetails,
-      matchedTemplate,
+      effectiveTemplate,
       isAr ? "المدير المباشر" : "Direct Manager",
       savedJobDescription
     );
-  }, [profileDetails, matchedTemplate, savedJobDescription, isAr]);
+  }, [profileDetails, effectiveTemplate, savedJobDescription, isAr]);
 
   // Compute scorecard values dynamically from matched template criteria or default KPI set.
   // Also merges per-criterion scores from quarterly evaluation items when kpi_evaluations.scores is empty.
@@ -232,13 +273,14 @@ export function EmployeeKpiPage() {
     mergeItems(q3Eval, "q3");
     mergeItems(q4Eval, "q4");
 
-    if (matchedTemplate?.items && matchedTemplate.items.length > 0) {
-      return matchedTemplate.items.map((it: any, index: number) => {
+    const templateItems = effectiveTemplate?.items;
+    if (templateItems && templateItems.length > 0) {
+      return templateItems.map((it: any, index: number) => {
         const crit = it.criterion;
         const cid = crit?.id || it.criterion_id || String(index + 1);
-        const saved = scores[String(cid)] || scores[cid] || scores[String(index + 1)] || {};
+        const saved = scores[String(cid)] || scores[cid] || scores[String(it.id)] || scores[String(index + 1)] || {};
         // Also try quarterly items fallback
-        const qFallback = qItemsMap[cid] || qItemsMap[String(index + 1)] || {};
+        const qFallback = qItemsMap[cid] || qItemsMap[String(it.id)] || qItemsMap[String(index + 1)] || {};
 
         return {
           kpi: {
@@ -248,12 +290,12 @@ export function EmployeeKpiPage() {
               crit?.category === "safety"
                 ? "السلامة المهنية"
                 : crit?.category === "quality"
-                ? "الجودة والامتثال"
-                : crit?.category === "productivity"
-                ? "الإنتاجية والإنجاز"
-                : crit?.category === "behavioral"
-                ? "السلوك المهني"
-                : "التنفيذ الفني والتخصصي",
+                  ? "الجودة والامتثال"
+                  : crit?.category === "productivity"
+                    ? "الإنتاجية والإنجاز"
+                    : crit?.category === "behavioral"
+                      ? "السلوك المهني"
+                      : "التنفيذ الفني والتخصصي",
             name: crit?.name_en || `Metric ${index + 1}`,
             name_ar: crit?.name_ar || crit?.name_en || `معيار ${index + 1}`,
             definition: crit?.description_en || crit?.how_measured_en || "",
@@ -271,8 +313,14 @@ export function EmployeeKpiPage() {
       });
     }
 
-    return LIGHT_CURRENT_ENGINEER_KPIS.map((kpi) => {
-      const saved = scores[String(kpi.id)] || scores[kpi.id];
+    return LIGHT_CURRENT_ENGINEER_KPIS.map((kpi, idx) => {
+      let saved = scores[String(kpi.id)] || scores[kpi.id];
+      if (!saved || (saved.q1?.score === null && saved.annualScore === null)) {
+        const entries = Object.entries(scores);
+        if (entries[idx]) {
+          saved = entries[idx][1];
+        }
+      }
       const qFallback = qItemsMap[String(kpi.id)] || {};
       return {
         kpi,
@@ -283,7 +331,7 @@ export function EmployeeKpiPage() {
         annualScore: saved?.annualScore ?? null,
       };
     });
-  }, [evaluation, matchedTemplate, q1Eval, q2Eval, q3Eval, q4Eval]);
+  }, [evaluation, effectiveTemplate, q1Eval, q2Eval, q3Eval, q4Eval]);
 
   // Quarterly summary totals
   const summaryTotals = useMemo(() => {
@@ -302,13 +350,24 @@ export function EmployeeKpiPage() {
       if (row.annualScore !== null) { annualSum += row.annualScore; hasData = true; }
     });
 
+    const savedTotalScore = evaluation?.summary?.totalScore != null ? Number(evaluation.summary.totalScore) : null;
+    if (savedTotalScore !== null && savedTotalScore > 0) {
+      hasData = true;
+    }
+
     const completedQuarters = [q1Sum, q2Sum, q3Sum, q4Sum].filter((_, idx) =>
       kpiRows.some((r) => (idx === 0 ? r.q1 : idx === 1 ? r.q2 : idx === 2 ? r.q3 : r.q4).score !== null)
     );
     const completedQuartersCount = completedQuarters.length;
-    const trueAnnualAvg = completedQuartersCount > 0
-      ? completedQuarters.reduce((a, b) => a + b, 0) / completedQuartersCount
-      : (annualSum > 0 ? annualSum : 0);
+
+    let trueAnnualAvg = 0;
+    if (completedQuartersCount > 0) {
+      trueAnnualAvg = completedQuarters.reduce((a, b) => a + b, 0) / completedQuartersCount;
+    } else if (annualSum > 0) {
+      trueAnnualAvg = annualSum;
+    } else if (savedTotalScore !== null) {
+      trueAnnualAvg = savedTotalScore > 1 ? savedTotalScore / 100 : savedTotalScore;
+    }
 
     return {
       q1Score: q1Sum,
@@ -316,10 +375,10 @@ export function EmployeeKpiPage() {
       q3Score: q3Sum,
       q4Score: q4Sum,
       annualWeightedSum: trueAnnualAvg,
-      completedQuartersCount,
+      completedQuartersCount: completedQuartersCount > 0 ? completedQuartersCount : (savedTotalScore ? 1 : 0),
       hasData,
     };
-  }, [kpiRows]);
+  }, [kpiRows, evaluation]);
 
   const ratingTier = useMemo(() => {
     return getRatingFromScore(summaryTotals.annualWeightedSum, summaryTotals.hasData);
@@ -465,34 +524,52 @@ export function EmployeeKpiPage() {
 
   const rawStatus = (evaluation?.status || "draft").toLowerCase();
 
-  // Real quarterly scores from kpi_quarterly_evaluations (submitted/approved = show score, draft = null)
+  // Real quarterly scores from either quarterly evaluations OR annual evaluation scores
+  const getQuarterData = (
+    qEval: typeof q1Eval | typeof q2Eval | typeof q3Eval | typeof q4Eval,
+    qScore: number
+  ) => {
+    if (qEval && qEval.status !== "draft" && qEval.score !== null) {
+      return { score: qEval.score, status: qEval.status };
+    }
+    if (qScore > 0) {
+      return { score: Number((qScore * 100).toFixed(1)), status: rawStatus };
+    }
+    return { score: null, status: qEval?.status ?? null };
+  };
+
+  const q1Data = getQuarterData(q1Eval, summaryTotals.q1Score);
+  const q2Data = getQuarterData(q2Eval, summaryTotals.q2Score);
+  const q3Data = getQuarterData(q3Eval, summaryTotals.q3Score);
+  const q4Data = getQuarterData(q4Eval, summaryTotals.q4Score);
+
   const quartersList = [
     {
       q: "q1", label: "Q1", label_ar: "الربع الأول",
       date: isAr ? "يناير – مارس" : "Jan – Mar",
-      score: (q1Eval && q1Eval.status !== "draft") ? (q1Eval.score ?? null) : null,
-      status: q1Eval?.status ?? null,
+      score: q1Data.score,
+      status: q1Data.status,
       target: 25,
     },
     {
       q: "q2", label: "Q2", label_ar: "الربع الثاني",
       date: isAr ? "أبريل – يونيو" : "Apr – Jun",
-      score: (q2Eval && q2Eval.status !== "draft") ? (q2Eval.score ?? null) : null,
-      status: q2Eval?.status ?? null,
+      score: q2Data.score,
+      status: q2Data.status,
       target: 25,
     },
     {
       q: "q3", label: "Q3", label_ar: "الربع الثالث",
       date: isAr ? "يوليو – سبتمبر" : "Jul – Sep",
-      score: (q3Eval && q3Eval.status !== "draft") ? (q3Eval.score ?? null) : null,
-      status: q3Eval?.status ?? null,
+      score: q3Data.score,
+      status: q3Data.status,
       target: 25,
     },
     {
       q: "q4", label: "Q4", label_ar: "الربع الرابع",
       date: isAr ? "أكتوبر – ديسمبر" : "Oct – Dec",
-      score: (q4Eval && q4Eval.status !== "draft") ? (q4Eval.score ?? null) : null,
-      status: q4Eval?.status ?? null,
+      score: q4Data.score,
+      status: q4Data.status,
       target: 25,
     },
   ] as const;
@@ -637,7 +714,7 @@ export function EmployeeKpiPage() {
                   )}
                 </div>
                 <h2 className="font-display text-lg font-bold tracking-tight text-foreground sm:text-xl">
-                  {isAr ? `تقرير الأداء السنوي لعام ${selectedYear}` : `Annual Performance — Year ${selectedYear}`}
+                  {isAr ? `تقرير الأداء السنوي لعام ${selectedYear}` : `KIPS Performance — Year ${selectedYear}`}
                 </h2>
                 <p className="text-xs text-muted-foreground line-clamp-1">
                   {isAr
@@ -670,11 +747,10 @@ export function EmployeeKpiPage() {
 
                 <Badge
                   variant={summaryTotals.hasData ? "default" : "outline"}
-                  className={`text-xs px-2.5 py-0.5 font-semibold flex items-center gap-1.5 ${
-                    summaryTotals.hasData
+                  className={`text-xs px-2.5 py-0.5 font-semibold flex items-center gap-1.5 ${summaryTotals.hasData
                       ? ratingTier.badgeClass
                       : "bg-muted text-muted-foreground border-border"
-                  }`}
+                    }`}
                 >
                   {summaryTotals.hasData ? (
                     <>
@@ -693,8 +769,8 @@ export function EmployeeKpiPage() {
                             ? "بانتظار الاعتماد"
                             : "Under Review"
                           : isAr
-                          ? "بانتظار التقييم"
-                          : "Pending Evaluation"}
+                            ? "بانتظار التقييم"
+                            : "Pending Evaluation"}
                       </span>
                     </>
                   )}
@@ -744,11 +820,10 @@ export function EmployeeKpiPage() {
                 <button
                   type="button"
                   onClick={() => setKpiSubTab("quarters")}
-                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-                    kpiSubTab === "quarters"
+                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${kpiSubTab === "quarters"
                       ? "bg-background text-foreground shadow-2xs font-bold"
                       : "text-muted-foreground hover:text-foreground"
-                  }`}
+                    }`}
                 >
                   <Calendar className="h-3.5 w-3.5" />
                   <span>{isAr ? "النتائج الفصلية" : "Quarterly Results"}</span>
@@ -757,11 +832,10 @@ export function EmployeeKpiPage() {
                 <button
                   type="button"
                   onClick={() => setKpiSubTab("scorecard")}
-                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-                    kpiSubTab === "scorecard"
+                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${kpiSubTab === "scorecard"
                       ? "bg-background text-foreground shadow-2xs font-bold"
                       : "text-muted-foreground hover:text-foreground"
-                  }`}
+                    }`}
                 >
                   <FileCheck className="h-3.5 w-3.5" />
                   <span>{isAr ? "سجل المعايير والدرجات" : "Scorecard"}</span>
@@ -770,11 +844,10 @@ export function EmployeeKpiPage() {
                 <button
                   type="button"
                   onClick={() => setKpiSubTab("feedback")}
-                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-                    kpiSubTab === "feedback"
+                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${kpiSubTab === "feedback"
                       ? "bg-background text-foreground shadow-2xs font-bold"
                       : "text-muted-foreground hover:text-foreground"
-                  }`}
+                    }`}
                 >
                   <CheckCircle2 className="h-3.5 w-3.5" />
                   <span>{isAr ? "ملاحظات المدير" : "Feedback"}</span>
@@ -783,11 +856,10 @@ export function EmployeeKpiPage() {
                 <button
                   type="button"
                   onClick={() => setKpiSubTab("history")}
-                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-                    kpiSubTab === "history"
+                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${kpiSubTab === "history"
                       ? "bg-background text-foreground shadow-2xs font-bold"
                       : "text-muted-foreground hover:text-foreground"
-                  }`}
+                    }`}
                 >
                   <Layers className="h-3.5 w-3.5" />
                   <span>{isAr ? "السجل" : "History"}</span>
@@ -800,28 +872,28 @@ export function EmployeeKpiPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 {quartersList.map((item) => {
                   // score is 0-100 (direct from kpi_quarterly_evaluations.score)
-                  const isApproved  = item.status === "approved";
+                  const isApproved = item.status === "approved";
                   const isSubmitted = item.status === "submitted";
-                  const isReturned  = item.status === "returned";
-                  const hasScore    = item.score !== null;
+                  const isReturned = item.status === "returned";
+                  const hasScore = item.score !== null;
                   // progress: score / target * 100 (both are 0-100)
                   const progress = hasScore ? Math.min(100, Math.round((item.score! / item.target) * 100)) : 0;
 
                   const badgeClass = isApproved
                     ? "bg-emerald-600 text-white"
                     : isSubmitted
-                    ? "bg-blue-600 text-white"
-                    : isReturned
-                    ? "bg-amber-500 text-white"
-                    : "text-muted-foreground border-border";
+                      ? "bg-blue-600 text-white"
+                      : isReturned
+                        ? "bg-amber-500 text-white"
+                        : "text-muted-foreground border-border";
 
                   const badgeLabel = isApproved
                     ? (isAr ? "معتمد" : "Approved")
                     : isSubmitted
-                    ? (isAr ? "بانتظار المراجعة" : "Pending Review")
-                    : isReturned
-                    ? (isAr ? "مُعاد" : "Returned")
-                    : (isAr ? "قيد التقييم" : "Not Started");
+                      ? (isAr ? "بانتظار المراجعة" : "Pending Review")
+                      : isReturned
+                        ? (isAr ? "مُعاد" : "Returned")
+                        : (isAr ? "قيد التقييم" : "Not Started");
 
                   return (
                     <div
@@ -880,17 +952,16 @@ export function EmployeeKpiPage() {
                         </div>
                         <div className="h-2 w-full rounded-full bg-muted/80 overflow-hidden">
                           <div
-                            className={`h-full rounded-full transition-all duration-500 ${
-                              progress >= 90
+                            className={`h-full rounded-full transition-all duration-500 ${progress >= 90
                                 ? "bg-emerald-500"
                                 : progress >= 75
-                                ? "bg-blue-500"
-                                : progress >= 60
-                                ? "bg-amber-500"
-                                : progress > 0
-                                ? "bg-rose-500"
-                                : "bg-transparent"
-                            }`}
+                                  ? "bg-blue-500"
+                                  : progress >= 60
+                                    ? "bg-amber-500"
+                                    : progress > 0
+                                      ? "bg-rose-500"
+                                      : "bg-transparent"
+                              }`}
                             style={{ width: `${progress}%` }}
                           />
                         </div>
@@ -1055,9 +1126,8 @@ export function EmployeeKpiPage() {
                     allEvaluations.map((ev) => (
                       <div
                         key={ev.id}
-                        className={`flex items-center justify-between p-3.5 transition-colors ${
-                          ev.evaluation_year === selectedYear ? "bg-brand/5 font-semibold" : "hover:bg-muted/30"
-                        }`}
+                        className={`flex items-center justify-between p-3.5 transition-colors ${ev.evaluation_year === selectedYear ? "bg-brand/5 font-semibold" : "hover:bg-muted/30"
+                          }`}
                       >
                         <div className="space-y-0.5">
                           <div className="flex items-center gap-1.5">
