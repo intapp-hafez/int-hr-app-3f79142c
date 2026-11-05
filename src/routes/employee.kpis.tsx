@@ -4,9 +4,7 @@ import {
   Award,
   Calendar,
   CheckCircle2,
-  FileSpreadsheet,
   Layers,
-  Printer,
   ShieldCheck,
   Clock,
   ArrowLeft,
@@ -379,39 +377,16 @@ export function EmployeeKpiPage() {
           <span>{isAr ? "الرئيسية" : "Dashboard"}</span>
         </Link>
 
-        {/* Year Selector & Export */}
-        <div className="flex items-center gap-1.5">
-          <select
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(Number(e.target.value))}
-            className="rounded-xl border border-input bg-background px-2.5 py-1 text-xs font-semibold shadow-2xs focus:ring-1 focus:ring-brand"
-          >
-            <option value={currentYear}>{currentYear}</option>
-            <option value={currentYear - 1}>{currentYear - 1}</option>
-            <option value={currentYear + 1}>{currentYear + 1}</option>
-          </select>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExport}
-            className="h-7.5 rounded-xl gap-1 text-xs px-2.5 cursor-pointer"
-            title={isAr ? "تصدير إكسيل" : "Export Excel"}
-          >
-            <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
-            <span className="hidden sm:inline">{isAr ? "إكسيل" : "Excel"}</span>
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => window.print()}
-            className="h-7.5 rounded-xl gap-1 text-xs px-2 cursor-pointer"
-            title={isAr ? "طباعة" : "Print"}
-          >
-            <Printer className="h-3.5 w-3.5" />
-          </Button>
-        </div>
+        {/* Year Selector */}
+        <select
+          value={selectedYear}
+          onChange={(e) => setSelectedYear(Number(e.target.value))}
+          className="rounded-xl border border-input bg-background px-2.5 py-1 text-xs font-semibold shadow-2xs focus:ring-1 focus:ring-brand"
+        >
+          <option value={currentYear}>{currentYear}</option>
+          <option value={currentYear - 1}>{currentYear - 1}</option>
+          <option value={currentYear + 1}>{currentYear + 1}</option>
+        </select>
       </div>
 
       {/* ── 2 MAIN TABS: JOB DESCRIPTION & KPIS RECORDS ── */}
