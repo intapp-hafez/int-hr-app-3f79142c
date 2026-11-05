@@ -201,7 +201,7 @@ export function EmployeeKpiPage() {
     enabled: !!evalTemplateId,
   });
 
-  const effectiveTemplate = (matchedTemplate?.items?.length ? matchedTemplate : evalTemplate) || null;
+  const effectiveTemplate = ((matchedTemplate as any)?.items?.length ? matchedTemplate : evalTemplate) as any || null;
 
   // Fetch official saved job description from position_job_descriptions if available
   const effectivePositionId =
@@ -880,12 +880,12 @@ export function EmployeeKpiPage() {
                   const progress = hasScore ? Math.min(100, Math.round((item.score! / item.target) * 100)) : 0;
 
                   const badgeClass = isApproved
-                    ? "bg-emerald-600 text-white"
+                    ? "bg-emerald-600 text-white border-transparent"
                     : isSubmitted
-                      ? "bg-blue-600 text-white"
+                      ? "bg-blue-600 text-white border-transparent"
                       : isReturned
-                        ? "bg-amber-500 text-white"
-                        : "text-muted-foreground border-border";
+                        ? "bg-amber-500 text-white border-transparent"
+                        : "";
 
                   const badgeLabel = isApproved
                     ? (isAr ? "معتمد" : "Approved")
@@ -893,7 +893,7 @@ export function EmployeeKpiPage() {
                       ? (isAr ? "بانتظار المراجعة" : "Pending Review")
                       : isReturned
                         ? (isAr ? "مُعاد" : "Returned")
-                        : (isAr ? "قيد التقييم" : "Not Started");
+                        : null;
 
                   return (
                     <div
@@ -912,12 +912,14 @@ export function EmployeeKpiPage() {
                             <p className="text-[10px] text-muted-foreground">{item.date}</p>
                           </div>
                         </div>
-                        <Badge
-                          variant={isApproved ? "default" : "outline"}
-                          className={`text-[10px] px-2 py-0.5 font-semibold ${badgeClass}`}
-                        >
-                          {badgeLabel}
-                        </Badge>
+                        {badgeLabel && (
+                          <Badge
+                            variant="default"
+                            className={`text-[10px] px-2 py-0.5 font-semibold whitespace-nowrap ${badgeClass}`}
+                          >
+                            {badgeLabel}
+                          </Badge>
+                        )}
                       </div>
 
                       <div className="grid grid-cols-3 gap-2 rounded-2xl bg-muted/30 p-2.5 text-center border border-border/50">
