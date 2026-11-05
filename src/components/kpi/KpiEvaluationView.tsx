@@ -39,6 +39,7 @@ import {
   Upload,
   FileDown,
   FolderKanban,
+  Target,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -111,6 +112,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { JobDescriptionsTab } from "@/components/kpi/JobDescriptionsTab";
+import { KpisDefinitionTab } from "@/components/kpi/KpisDefinitionTab";
 
 export interface ScorecardItem {
   id: string;
@@ -599,7 +601,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
   }, [activeScorecardItems]);
 
   // ── TEMPLATE BUILDER & DUPLICATION STATE ──
-  const [templateSubTab, setTemplateSubTab] = useState<"templates" | "criteria" | "job-descriptions">("templates");
+  const [templateSubTab, setTemplateSubTab] = useState<"templates" | "criteria" | "job-descriptions" | "kpis-definition">("templates");
   const [templateSearch, setTemplateSearch] = useState("");
   const [templateDeptFilter, setTemplateDeptFilter] = useState("all");
   const [templateStatusFilter, setTemplateStatusFilter] = useState("all");
@@ -3612,13 +3614,36 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                 <FileText className="h-4 w-4" />
                 <span>{isAr ? "الأوصاف الوظيفية" : "Job Descriptions"}</span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => setTemplateSubTab("kpis-definition")}
+                className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-xs font-bold transition-all cursor-pointer ${templateSubTab === "kpis-definition"
+                  ? "bg-brand text-brand-foreground shadow-xs"
+                  : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  }`}
+              >
+                <Target className="h-4 w-4" />
+                <span>{isAr ? "تعريف المؤشرات" : "KPIs Definition"}</span>
+              </button>
             </div>
 
             {templateSubTab === "job-descriptions" && <JobDescriptionsTab />}
+            {templateSubTab === "kpis-definition" && (
+              <KpisDefinitionTab
+                employeesList={employeesList}
+                selectedEmpId={selectedEmpId}
+                onSelectEmployee={setSelectedEmpId}
+                activeScorecardItems={activeScorecardItems}
+                matchedTemplateData={matchedTemplateData}
+                kpiTemplates={kpiTemplates}
+                selectedYear={selectedYear}
+              />
+            )}
             {/* ═════════════════════════════════════════════════════════════════ */}
             {/* VIEW A: TEMPLATES MANAGER                                         */}
             {/* ═════════════════════════════════════════════════════════════════ */}
-            {templateSubTab === "job-descriptions" ? null : templateSubTab === "templates" ? (
+            {templateSubTab === "job-descriptions" || templateSubTab === "kpis-definition" ? null : templateSubTab === "templates" ? (
               <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-sm space-y-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
                   <div>
