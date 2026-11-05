@@ -30,6 +30,8 @@ import {
   User,
   Search,
   Loader2,
+  Info,
+  Filter,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
@@ -44,6 +46,10 @@ import {
 import { exportKpiEvaluationToExcel } from "@/lib/kpi/kpi-excel-export";
 import { exportJobDescriptionPdf } from "@/lib/kpi/jd-pdf-export";
 import { exportKpiDefinitionPdf } from "@/lib/kpi/kpi-definition-pdf-export";
+import {
+  formatCategoryName,
+  ScorecardItem,
+} from "@/components/kpi/KpiEvaluationView";
 import {
   getMyKpiEvaluation,
   listMyKpiEvaluations,
@@ -100,6 +106,8 @@ export function EmployeeKpiPage() {
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [mainTab, setMainTab] = useState<"job_description" | "kpis_records" | "kpis_definition">("job_description");
   const [kpiSubTab, setKpiSubTab] = useState<"quarters" | "scorecard" | "feedback">("quarters");
+  const [activeQuarterFilter, setActiveQuarterFilter] = useState<"all" | "q1" | "q2" | "q3" | "q4">("all");
+  const [infoModalKpi, setInfoModalKpi] = useState<ScorecardItem | null>(null);
   const [collapsedPillars, setCollapsedPillars] = useState<Record<string, boolean>>({});
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingKpiDefPdf, setIsExportingKpiDefPdf] = useState(false);
@@ -201,7 +209,148 @@ export function EmployeeKpiPage() {
     enabled: !!evalTemplateId,
   });
 
-  const effectiveTemplate = ((matchedTemplate as any)?.items?.length ? matchedTemplate : evalTemplate) as any || null;
+  // Priority 1: evaluation's linked template; Priority 2: matched position/role template
+  const effectiveTemplate =
+    evalTemplate ||
+    (matchedTemplate as any)?.template ||
+    (matchedTemplate as any)?.items?.length
+      ? matchedTemplate
+      : null;
+
+  // Active scorecard items matching Admin/Manager KpiEvaluationView logic
+  const activeScorecardItems = useMemo<ScorecardItem[]>(() => {
+    const rawItems =
+      evalTemplate?.items && evalTemplate.items.length > 0
+        ? evalTemplate.items
+        : (matchedTemplate as any)?.template?.items && (matchedTemplate as any).template.items.length > 0
+        ? (matchedTemplate as any).template.items
+        : (matchedTemplate as any)?.items && (matchedTemplate as any).items.length > 0
+        ? (matchedTemplate as any).items
+        : null;
+
+    if (rawItems && rawItems.length > 0) {
+      const sorted = [...rawItems].sort(
+        (a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0)
+      );
+      return sorted.map((it: any, idx: number) => {
+        const crit = it.criterion || {};
+        const weight =
+          Number(it.weight) > 1 ? Number(it.weight) / 100 : Number(it.weight || 0);
+        const target = Number(it.target_benchmark ?? crit.default_target ?? 100);
+        const direction = (it.scoring_direction ||
+          crit.scoring_direction ||
+          "higher_is_better") as "higher_is_better" | "lower_is_better" | "rating_5";
+        const unit = it.unit || crit.unit || "%";
+        const inputType =
+          direction === "rating_5" || unit === "scale"
+            ? "rating_5"
+            : unit === "%"
+            ? "percentage"
+            : "numeric";
+        const keyId = String(it.criterion_id || crit.id || it.id || idx + 1);
+
+        return {
+          id: keyId,
+          numericIndex: idx + 1,
+          code: crit.code || `KPI-${idx + 1}`,
+          name: crit.name_en || `Metric ${idx + 1}`,
+          name_ar: crit.name_ar || crit.name_en || `معيار ${idx + 1}`,
+          category: crit.category || "operational",
+          category_ar: crit.category_ar,
+          definition: crit.description_en || crit.how_measured_en || "",
+          definition_ar: crit.description_ar || crit.how_measured_ar || "",
+          weight,
+          target,
+          unit,
+          direction,
+          inputType,
+          howMeasured: crit.how_measured_en || "",
+          howMeasured_ar: crit.how_measured_ar || "",
+        };
+      });
+    }
+
+    return LIGHT_CURRENT_ENGINEER_KPIS.map((k) => ({
+      id: String(k.id),
+      numericIndex: k.id,
+      code: `KPI-${k.id}`,
+      name: k.name,
+      name_ar: k.name_ar,
+      category: k.category,
+      category_ar: k.category_ar,
+      definition: k.definition,
+      definition_ar: k.definition_ar,
+      weight: k.weight,
+      target: k.target,
+      unit: k.inputType === "rating_5" ? "scale" : "%",
+      direction: (k.inputType === "rating_5"
+        ? "rating_5"
+        : "higher_is_better") as "higher_is_better" | "lower_is_better" | "rating_5",
+      inputType: k.inputType,
+      howMeasured: k.definition,
+      howMeasured_ar: k.definition_ar,
+    }));
+  }, [evalTemplate, matchedTemplate]);
+
+  // Group items by category with total weights
+  const activeCategories = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        category: string;
+        category_ar?: string;
+        totalWeight: number;
+        items: ScorecardItem[];
+      }
+    >();
+
+    for (const item of activeScorecardItems) {
+      const cat = item.category || "operational";
+      if (!map.has(cat)) {
+        map.set(cat, {
+          category: cat,
+          category_ar: item.category_ar,
+          totalWeight: 0,
+          items: [],
+        });
+      }
+      const entry = map.get(cat)!;
+      entry.totalWeight += item.weight;
+      entry.items.push(item);
+    }
+
+    return Array.from(map.values());
+  }, [activeScorecardItems]);
+
+  // Hydrate recorded scorecard state directly from evaluation.scores
+  const kpiState = useMemo<Record<string, KpiRowState>>(() => {
+    const scores = (evaluation?.scores as Record<string, any>) || {};
+    const state: Record<string, KpiRowState> = {};
+
+    activeScorecardItems.forEach((it, idx) => {
+      // Lookup scores by criterion UUID, display index, or item id
+      const saved =
+        scores[it.id] ||
+        scores[String(idx + 1)] ||
+        scores[idx + 1] ||
+        {};
+
+      state[it.id] = {
+        id: it.id as any,
+        targetAnnual: it.target,
+        q1: saved.q1 ?? { actual: null, achievement: null, score: null },
+        q2: saved.q2 ?? { actual: null, achievement: null, score: null },
+        q3: saved.q3 ?? { actual: null, achievement: null, score: null },
+        q4: saved.q4 ?? { actual: null, achievement: null, score: null },
+        annualScore: saved.annualScore ?? null,
+        adminNotes: saved.adminNotes || saved.notes || "",
+        notes: saved.notes || "",
+        isReturned: saved.isReturned ?? false,
+      };
+    });
+
+    return state;
+  }, [activeScorecardItems, evaluation]);
 
   // Fetch official saved job description from position_job_descriptions if available
   const effectivePositionId =
@@ -239,99 +388,42 @@ export function EmployeeKpiPage() {
     );
   }, [profileDetails, effectiveTemplate, savedJobDescription, isAr]);
 
-  // Compute scorecard values dynamically from matched template criteria or default KPI set.
-  // Also merges per-criterion scores from quarterly evaluation items when kpi_evaluations.scores is empty.
+  // Backward-compatible kpiRows for exports and summary calculations
   const kpiRows = useMemo<EmpKpiRow[]>(() => {
-    const scores = (evaluation?.scores as Record<string, any>) || {};
-
-    // Build a lookup of criterion scores from quarterly items (q1..q4)
-    // keyed by criterion_id or display_order index (1-based)
-    const qItemsMap: Record<string, { q1: EmpKpiQuarter; q2: EmpKpiQuarter; q3: EmpKpiQuarter; q4: EmpKpiQuarter }> = {};
-    const mergeItems = (qEval: typeof q1Eval | typeof q2Eval | typeof q3Eval | typeof q4Eval, qKey: "q1" | "q2" | "q3" | "q4") => {
-      if (!qEval || qEval.status === "draft") return;
-      const items = (qEval as any).items as any[] | undefined;
-      if (!items) return;
-      items.forEach((item: any, idx: number) => {
-        const key = item.criterion_id || String(idx + 1);
-        if (!qItemsMap[key]) {
-          qItemsMap[key] = {
-            q1: { actual: null, achievement: null, score: null },
-            q2: { actual: null, achievement: null, score: null },
-            q3: { actual: null, achievement: null, score: null },
-            q4: { actual: null, achievement: null, score: null },
-          };
-        }
-        qItemsMap[key][qKey] = {
-          actual: item.actual_value ?? null,
-          achievement: item.achievement_rate ?? null,
-          score: item.weighted_score ?? null,
-        };
-      });
-    };
-    mergeItems(q1Eval, "q1");
-    mergeItems(q2Eval, "q2");
-    mergeItems(q3Eval, "q3");
-    mergeItems(q4Eval, "q4");
-
-    const templateItems = effectiveTemplate?.items;
-    if (templateItems && templateItems.length > 0) {
-      return templateItems.map((it: any, index: number) => {
-        const crit = it.criterion;
-        const cid = crit?.id || it.criterion_id || String(index + 1);
-        const saved = scores[String(cid)] || scores[cid] || scores[String(it.id)] || scores[String(index + 1)] || {};
-        // Also try quarterly items fallback
-        const qFallback = qItemsMap[cid] || qItemsMap[String(it.id)] || qItemsMap[String(index + 1)] || {};
-
-        return {
-          kpi: {
-            id: index + 1,
-            category: crit?.category || "technical",
-            category_ar:
-              crit?.category === "safety"
-                ? "السلامة المهنية"
-                : crit?.category === "quality"
-                  ? "الجودة والامتثال"
-                  : crit?.category === "productivity"
-                    ? "الإنتاجية والإنجاز"
-                    : crit?.category === "behavioral"
-                      ? "السلوك المهني"
-                      : "التنفيذ الفني والتخصصي",
-            name: crit?.name_en || `Metric ${index + 1}`,
-            name_ar: crit?.name_ar || crit?.name_en || `معيار ${index + 1}`,
-            definition: crit?.description_en || crit?.how_measured_en || "",
-            definition_ar: crit?.description_ar || crit?.how_measured_ar || "",
-            weight: Number(it.weight || crit?.default_weight || 0.1),
-            target: Number(it.target_benchmark ? it.target_benchmark / 100 : 1.0),
-            unit: it.unit || crit?.unit || "%",
-          },
-          q1: saved?.q1 || qFallback?.q1 || { actual: null, achievement: null, score: null },
-          q2: saved?.q2 || qFallback?.q2 || { actual: null, achievement: null, score: null },
-          q3: saved?.q3 || qFallback?.q3 || { actual: null, achievement: null, score: null },
-          q4: saved?.q4 || qFallback?.q4 || { actual: null, achievement: null, score: null },
-          annualScore: saved?.annualScore ?? null,
-        };
-      });
-    }
-
-    return LIGHT_CURRENT_ENGINEER_KPIS.map((kpi, idx) => {
-      let saved = scores[String(kpi.id)] || scores[kpi.id];
-      if (!saved || (saved.q1?.score === null && saved.annualScore === null)) {
-        const entries = Object.entries(scores);
-        if (entries[idx]) {
-          saved = entries[idx][1];
-        }
-      }
-      const qFallback = qItemsMap[String(kpi.id)] || {};
-      return {
-        kpi,
-        q1: saved?.q1 || qFallback?.q1 || { actual: null, achievement: null, score: null },
-        q2: saved?.q2 || qFallback?.q2 || { actual: null, achievement: null, score: null },
-        q3: saved?.q3 || qFallback?.q3 || { actual: null, achievement: null, score: null },
-        q4: saved?.q4 || qFallback?.q4 || { actual: null, achievement: null, score: null },
-        annualScore: saved?.annualScore ?? null,
+    return activeScorecardItems.map((it) => {
+      const st = kpiState[it.id] || {
+        id: it.id as any,
+        targetAnnual: it.target,
+        q1: { actual: null, achievement: null, score: null },
+        q2: { actual: null, achievement: null, score: null },
+        q3: { actual: null, achievement: null, score: null },
+        q4: { actual: null, achievement: null, score: null },
+        annualScore: null,
       };
+
+      return {
+        kpi: {
+          id: it.numericIndex,
+          category: it.category,
+          category_ar: it.category_ar || formatCategoryName(it.category, true),
+          name: it.name,
+          name_ar: it.name_ar,
+          definition: it.definition,
+          definition_ar: it.definition_ar,
+          weight: it.weight,
+          target: it.target > 1 ? it.target / 100 : it.target,
+          unit: it.unit,
+        },
+        q1: st.q1,
+        q2: st.q2,
+        q3: st.q3,
+        q4: st.q4,
+        annualScore: st.annualScore,
+        adminNotes: st.adminNotes,
+        isReturned: st.isReturned,
+      } as any;
     });
-  }, [evaluation, effectiveTemplate, q1Eval, q2Eval, q3Eval, q4Eval]);
+  }, [activeScorecardItems, kpiState]);
 
   // Quarterly summary totals
   const summaryTotals = useMemo(() => {
@@ -387,6 +479,34 @@ export function EmployeeKpiPage() {
   const fmtPercent = (val: number | null | undefined, decimals = 1): string => {
     if (val === null || val === undefined) return "—";
     return `${(val * 100).toFixed(decimals)}%`;
+  };
+
+  const fmtRawScore = (val: number | null | undefined): string => {
+    if (val === null || val === undefined) return "—";
+    return `${(val * 100).toFixed(2)}%`;
+  };
+
+  const formatTargetDisplay = (target: number, unit: string) => {
+    if (unit === "%") {
+      const pctVal = target > 1 ? target : target * 100;
+      return `${pctVal.toFixed(0)}%`;
+    }
+    if (unit === "scale") {
+      return `${target}/5`;
+    }
+    return `${target} ${unit || ""}`.trim();
+  };
+
+  const formatActualDisplay = (val: number | null | undefined, inputType: string, unit: string) => {
+    if (val === null || val === undefined) return "";
+    if (inputType === "rating_5" || unit === "scale") {
+      return (val * 5).toFixed(1);
+    }
+    if (unit === "%") {
+      const pctVal = val > 1 ? val : val * 100;
+      return `${pctVal.toFixed(0)}%`;
+    }
+    return String(val);
   };
 
   const handleExport = async () => {
@@ -962,88 +1082,343 @@ export function EmployeeKpiPage() {
               </div>
             )}
 
-            {/* Sub-view 2: Scorecard & Detailed Criteria Records */}
+            {/* Sub-view 2: Scorecard & Detailed Criteria Records (Matching Admin / Manager Layout) */}
             {kpiSubTab === "scorecard" && (
               <div className="rounded-3xl border border-border bg-card p-4 sm:p-5 shadow-2xs space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-border/50">
                   <div>
-                    <h3 className="font-bold text-sm text-foreground">
-                      {isAr ? "سجل بطاقة الأداء والمعايير المعتمدة" : "Detailed Criteria Scorecard"}
+                    <h3 className="font-bold text-sm sm:text-base text-foreground flex items-center gap-2">
+                      <FileCheck className="h-4 w-4 text-brand" />
+                      <span>{isAr ? "سجل بطاقة الأداء والمعايير المعتمدة" : "Detailed Criteria Scorecard"}</span>
                     </h3>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       {isAr
-                        ? "جميع معايير التقييم وأوزانها والأهداف ودرجة الإنجاز"
+                        ? "جميع معايير التقييم وأوزانها والأهداف ودرجة الإنجاز الفعلية والمحققة"
                         : "All assigned evaluation metrics, weights, targets, and quarterly actuals"}
                     </p>
                   </div>
-                  <Badge variant="outline" className="font-mono text-xs">
-                    {kpiRows.length} {isAr ? "معيار" : "Metrics"}
-                  </Badge>
+
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[11px] text-muted-foreground font-semibold flex items-center gap-1">
+                      <Filter className="h-3.5 w-3.5" />
+                      {isAr ? "الأرباع:" : "Quarters:"}
+                    </span>
+                    {(["all", "q1", "q2", "q3", "q4"] as const).map((qKey) => (
+                      <button
+                        key={qKey}
+                        type="button"
+                        onClick={() => setActiveQuarterFilter(qKey)}
+                        className={`rounded-xl px-2.5 py-1 text-xs font-semibold cursor-pointer transition-colors ${
+                          activeQuarterFilter === qKey
+                            ? "bg-orange-600 text-white font-bold shadow-xs"
+                            : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                        }`}
+                      >
+                        {qKey === "all" ? (isAr ? "الكل" : "All") : qKey.toUpperCase()}
+                      </button>
+                    ))}
+                    <Badge variant="outline" className="font-mono text-xs">
+                      {activeScorecardItems.length} {isAr ? "معيار" : "Metrics"}
+                    </Badge>
+                  </div>
                 </div>
 
-                <div className="divide-y divide-border/60 rounded-2xl border border-border/80 overflow-hidden">
-                  {kpiRows.map((row) => (
-                    <div key={row.kpi.id} className="p-3 sm:p-4 hover:bg-muted/15 transition-colors space-y-2">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-                        <div className="space-y-0.5 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-xs font-bold text-brand bg-brand/10 px-1.5 py-0.5 rounded-lg">
-                              KPI-{String(row.kpi.id).padStart(2, "0")}
-                            </span>
-                            <h4 className="font-bold text-xs sm:text-sm text-foreground">
-                              {isAr ? row.kpi.name_ar : row.kpi.name}
-                            </h4>
-                          </div>
-                          <p className="text-[11px] text-muted-foreground line-clamp-1">
-                            {isAr ? row.kpi.definition_ar : row.kpi.definition}
-                          </p>
-                        </div>
+                {/* Scorecard Table matching Admin/Manager Panel */}
+                <div className="overflow-x-auto rounded-2xl border border-border">
+                  <table className="w-full text-xs text-start border-collapse">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/60 text-muted-foreground font-semibold">
+                        <th className="px-3 py-3 text-center w-10">#</th>
+                        <th className="px-3 py-3 text-start min-w-[220px]">
+                          {isAr ? "اسم المؤشر / المعيار" : "KPI / Metric Name"}
+                        </th>
+                        <th className="px-3 py-3 text-center w-16">{isAr ? "الوزن" : "Weight"}</th>
+                        <th className="px-3 py-3 text-center w-20">{isAr ? "المستهدف" : "Target"}</th>
 
-                        <div className="flex items-center gap-2 shrink-0">
-                          <Badge variant="outline" className="text-[10px] font-mono">
-                            {isAr ? "الوزن: " : "Weight: "} {(row.kpi.weight * 100).toFixed(0)}%
-                          </Badge>
-                          <Badge variant="secondary" className="text-[10px] font-mono">
-                            {isAr ? "الهدف: " : "Target: "} {(row.kpi.target * 100).toFixed(0)}%
-                          </Badge>
-                        </div>
-                      </div>
+                        {/* Q1 Columns */}
+                        {(activeQuarterFilter === "all" || activeQuarterFilter === "q1") && (
+                          <>
+                            <th className="px-2 py-3 text-center bg-blue-500/5 text-blue-700 dark:text-blue-300 w-20">
+                              {isAr ? "Q1 الفعلي" : "Q1 Actual"}
+                            </th>
+                            <th className="px-2 py-3 text-center bg-blue-500/5 text-blue-700 dark:text-blue-300 w-16">
+                              {isAr ? "Q1 التحقيق" : "Q1 Achv%"}
+                            </th>
+                            <th className="px-2 py-3 text-center bg-blue-500/5 text-blue-700 dark:text-blue-300 w-16">
+                              {isAr ? "Q1 الدرجة" : "Q1 Score"}
+                            </th>
+                          </>
+                        )}
 
-                      {/* Quarters mini scores row */}
-                      <div className="grid grid-cols-5 gap-1.5 pt-1 text-center font-mono text-[10px]">
-                        <div className="rounded-xl bg-muted/30 p-1.5">
-                          <span className="text-muted-foreground block text-[9px]">Q1</span>
-                          <span className="font-bold text-foreground">
-                            {row.q1.score !== null ? fmtPercent(row.q1.score, 1) : "—"}
-                          </span>
-                        </div>
-                        <div className="rounded-xl bg-muted/30 p-1.5">
-                          <span className="text-muted-foreground block text-[9px]">Q2</span>
-                          <span className="font-bold text-foreground">
-                            {row.q2.score !== null ? fmtPercent(row.q2.score, 1) : "—"}
-                          </span>
-                        </div>
-                        <div className="rounded-xl bg-muted/30 p-1.5">
-                          <span className="text-muted-foreground block text-[9px]">Q3</span>
-                          <span className="font-bold text-foreground">
-                            {row.q3.score !== null ? fmtPercent(row.q3.score, 1) : "—"}
-                          </span>
-                        </div>
-                        <div className="rounded-xl bg-muted/30 p-1.5">
-                          <span className="text-muted-foreground block text-[9px]">Q4</span>
-                          <span className="font-bold text-foreground">
-                            {row.q4.score !== null ? fmtPercent(row.q4.score, 1) : "—"}
-                          </span>
-                        </div>
-                        <div className="rounded-xl bg-brand/10 p-1.5 text-brand">
-                          <span className="block text-[9px] font-bold">{isAr ? "السنوي" : "Annual"}</span>
-                          <span className="font-bold">
-                            {row.annualScore !== null ? fmtPercent(row.annualScore, 1) : "—"}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                        {/* Q2 Columns */}
+                        {(activeQuarterFilter === "all" || activeQuarterFilter === "q2") && (
+                          <>
+                            <th className="px-2 py-3 text-center bg-emerald-500/5 text-emerald-700 dark:text-emerald-300 w-20">
+                              {isAr ? "Q2 الفعلي" : "Q2 Actual"}
+                            </th>
+                            <th className="px-2 py-3 text-center bg-emerald-500/5 text-emerald-700 dark:text-emerald-300 w-16">
+                              {isAr ? "Q2 التحقيق" : "Q2 Achv%"}
+                            </th>
+                            <th className="px-2 py-3 text-center bg-emerald-500/5 text-emerald-700 dark:text-emerald-300 w-16">
+                              {isAr ? "Q2 الدرجة" : "Q2 Score"}
+                            </th>
+                          </>
+                        )}
+
+                        {/* Q3 Columns */}
+                        {(activeQuarterFilter === "all" || activeQuarterFilter === "q3") && (
+                          <>
+                            <th className="px-2 py-3 text-center bg-amber-500/5 text-amber-700 dark:text-amber-300 w-20">
+                              {isAr ? "Q3 الفعلي" : "Q3 Actual"}
+                            </th>
+                            <th className="px-2 py-3 text-center bg-amber-500/5 text-amber-700 dark:text-amber-300 w-16">
+                              {isAr ? "Q3 التحقيق" : "Q3 Achv%"}
+                            </th>
+                            <th className="px-2 py-3 text-center bg-amber-500/5 text-amber-700 dark:text-amber-300 w-16">
+                              {isAr ? "Q3 الدرجة" : "Q3 Score"}
+                            </th>
+                          </>
+                        )}
+
+                        {/* Q4 Columns */}
+                        {(activeQuarterFilter === "all" || activeQuarterFilter === "q4") && (
+                          <>
+                            <th className="px-2 py-3 text-center bg-purple-500/5 text-purple-700 dark:text-purple-300 w-20">
+                              {isAr ? "Q4 الفعلي" : "Q4 Actual"}
+                            </th>
+                            <th className="px-2 py-3 text-center bg-purple-500/5 text-purple-700 dark:text-purple-300 w-16">
+                              {isAr ? "Q4 التحقيق" : "Q4 Achv%"}
+                            </th>
+                            <th className="px-2 py-3 text-center bg-purple-500/5 text-purple-700 dark:text-purple-300 w-16">
+                              {isAr ? "Q4 الدرجة" : "Q4 Score"}
+                            </th>
+                          </>
+                        )}
+
+                        {/* Annual Summary */}
+                        <th className="px-3 py-3 text-center bg-muted/80 font-bold w-20">
+                          {isAr ? "المتوسط السنوي" : "Annual Avg"}
+                        </th>
+                        <th className="px-2 py-3 text-center w-10"></th>
+                      </tr>
+                    </thead>
+
+                    <tbody className="divide-y divide-border">
+                      {activeCategories.map((cat, catIdx) => {
+                        const categoryWeight = cat.totalWeight;
+                        return (
+                          <React.Fragment key={cat.category || catIdx}>
+                            {/* Category Header Row */}
+                            <tr className="bg-muted/40 font-semibold text-foreground">
+                              <td colSpan={19} className="px-4 py-2">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs uppercase tracking-wider text-brand font-bold">
+                                      {formatCategoryName(cat.category, isAr)}
+                                    </span>
+                                    <Badge variant="outline" className="text-[9px] px-1.5 py-0 font-medium text-muted-foreground border-border">
+                                      {cat.items.length} {isAr ? "معايير" : "criteria"}
+                                    </Badge>
+                                  </div>
+                                  <span className="font-mono text-[11px] text-muted-foreground">
+                                    {isAr ? `وزن الفئة: ${fmtPercent(categoryWeight, 1)}` : `Category Weight: ${fmtPercent(categoryWeight, 1)}`}
+                                  </span>
+                                </div>
+                              </td>
+                            </tr>
+
+                            {cat.items.map((kpi) => {
+                              const row = kpiState[kpi.id] || {
+                                id: kpi.id as any,
+                                targetAnnual: kpi.target,
+                                q1: { actual: null, achievement: null, score: null },
+                                q2: { actual: null, achievement: null, score: null },
+                                q3: { actual: null, achievement: null, score: null },
+                                q4: { actual: null, achievement: null, score: null },
+                                annualScore: null,
+                                adminNotes: "",
+                                notes: "",
+                                isReturned: false,
+                              };
+
+                              const q1ActualStr = formatActualDisplay(row.q1.actual, kpi.inputType, kpi.unit);
+                              const q2ActualStr = formatActualDisplay(row.q2.actual, kpi.inputType, kpi.unit);
+                              const q3ActualStr = formatActualDisplay(row.q3.actual, kpi.inputType, kpi.unit);
+                              const q4ActualStr = formatActualDisplay(row.q4.actual, kpi.inputType, kpi.unit);
+
+                              return (
+                                <tr key={kpi.id} className="hover:bg-muted/20 transition-colors">
+                                  <td className="px-3 py-2 text-muted-foreground font-mono font-medium text-center">
+                                    {kpi.numericIndex}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <div className="space-y-0.5">
+                                      <div className="font-semibold text-foreground leading-snug flex items-center gap-1.5">
+                                        <span>{isAr ? kpi.name_ar : kpi.name}</span>
+                                        {kpi.direction === "lower_is_better" && (
+                                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 font-normal">
+                                            {isAr ? "الأقل أفضل" : "Lower is better"}
+                                          </span>
+                                        )}
+                                        {row.isReturned && (
+                                          <Badge className="bg-amber-500/15 text-amber-700 border-amber-500/30 text-[9px] px-1.5 py-0">
+                                            {isAr ? "مُعاد" : "Returned"}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      <p className="text-[11px] text-muted-foreground line-clamp-1">
+                                        {isAr ? kpi.definition_ar : kpi.definition}
+                                      </p>
+                                      {row.adminNotes && (
+                                        <div className="text-[10px] text-amber-600 bg-amber-500/10 border border-amber-500/20 rounded-md px-2 py-0.5 mt-1 inline-block">
+                                          <strong>{isAr ? "ملاحظة: " : "Note: "}</strong>{row.adminNotes}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-3 py-2 text-center font-mono font-medium">
+                                    {fmtPercent(kpi.weight, 1)}
+                                  </td>
+                                  <td className="px-3 py-2 text-center font-mono font-semibold text-muted-foreground">
+                                    {formatTargetDisplay(kpi.target, kpi.unit)}
+                                  </td>
+
+                                  {/* Q1 Columns */}
+                                  {(activeQuarterFilter === "all" || activeQuarterFilter === "q1") && (
+                                    <>
+                                      <td className="px-2 py-2 text-center bg-blue-500/5 font-mono">
+                                        {q1ActualStr ? (
+                                          <span className="px-2 py-0.5 rounded-lg bg-background border border-blue-500/20 text-blue-900 dark:text-blue-200 font-medium">
+                                            {q1ActualStr}
+                                          </span>
+                                        ) : (
+                                          <span className="text-muted-foreground">—</span>
+                                        )}
+                                      </td>
+                                      <td className="px-2 py-2 text-center font-mono bg-blue-500/5">
+                                        {row.q1.achievement !== null ? `${Math.round(row.q1.achievement * 100)}%` : "—"}
+                                      </td>
+                                      <td className="px-2 py-2 text-center font-mono font-bold bg-blue-500/5 text-blue-700 dark:text-blue-300">
+                                        {fmtRawScore(row.q1.score)}
+                                      </td>
+                                    </>
+                                  )}
+
+                                  {/* Q2 Columns */}
+                                  {(activeQuarterFilter === "all" || activeQuarterFilter === "q2") && (
+                                    <>
+                                      <td className="px-2 py-2 text-center bg-emerald-500/5 font-mono">
+                                        {q2ActualStr ? (
+                                          <span className="px-2 py-0.5 rounded-lg bg-background border border-emerald-500/20 text-emerald-900 dark:text-emerald-200 font-medium">
+                                            {q2ActualStr}
+                                          </span>
+                                        ) : (
+                                          <span className="text-muted-foreground">—</span>
+                                        )}
+                                      </td>
+                                      <td className="px-2 py-2 text-center font-mono bg-emerald-500/5">
+                                        {row.q2.achievement !== null ? `${Math.round(row.q2.achievement * 100)}%` : "—"}
+                                      </td>
+                                      <td className="px-2 py-2 text-center font-mono font-bold bg-emerald-500/5 text-emerald-700 dark:text-emerald-300">
+                                        {fmtRawScore(row.q2.score)}
+                                      </td>
+                                    </>
+                                  )}
+
+                                  {/* Q3 Columns */}
+                                  {(activeQuarterFilter === "all" || activeQuarterFilter === "q3") && (
+                                    <>
+                                      <td className="px-2 py-2 text-center bg-amber-500/5 font-mono">
+                                        {q3ActualStr ? (
+                                          <span className="px-2 py-0.5 rounded-lg bg-background border border-amber-500/20 text-amber-900 dark:text-amber-200 font-medium">
+                                            {q3ActualStr}
+                                          </span>
+                                        ) : (
+                                          <span className="text-muted-foreground">—</span>
+                                        )}
+                                      </td>
+                                      <td className="px-2 py-2 text-center font-mono bg-amber-500/5">
+                                        {row.q3.achievement !== null ? `${Math.round(row.q3.achievement * 100)}%` : "—"}
+                                      </td>
+                                      <td className="px-2 py-2 text-center font-mono font-bold bg-amber-500/5 text-amber-700 dark:text-amber-300">
+                                        {fmtRawScore(row.q3.score)}
+                                      </td>
+                                    </>
+                                  )}
+
+                                  {/* Q4 Columns */}
+                                  {(activeQuarterFilter === "all" || activeQuarterFilter === "q4") && (
+                                    <>
+                                      <td className="px-2 py-2 text-center bg-purple-500/5 font-mono">
+                                        {q4ActualStr ? (
+                                          <span className="px-2 py-0.5 rounded-lg bg-background border border-purple-500/20 text-purple-900 dark:text-purple-200 font-medium">
+                                            {q4ActualStr}
+                                          </span>
+                                        ) : (
+                                          <span className="text-muted-foreground">—</span>
+                                        )}
+                                      </td>
+                                      <td className="px-2 py-2 text-center font-mono bg-purple-500/5">
+                                        {row.q4.achievement !== null ? `${Math.round(row.q4.achievement * 100)}%` : "—"}
+                                      </td>
+                                      <td className="px-2 py-2 text-center font-mono font-bold bg-purple-500/5 text-purple-700 dark:text-purple-300">
+                                        {fmtRawScore(row.q4.score)}
+                                      </td>
+                                    </>
+                                  )}
+
+                                  {/* Annual Score */}
+                                  <td className="px-3 py-2 text-center font-mono font-bold bg-muted/40 text-foreground">
+                                    {fmtRawScore(row.annualScore)}
+                                  </td>
+
+                                  {/* Info Trigger */}
+                                  <td className="px-2 py-2 text-center">
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => setInfoModalKpi(kpi)}
+                                      className="h-6 w-6 rounded-lg text-muted-foreground hover:text-foreground cursor-pointer"
+                                      title={isAr ? "معلومات وطريقة قياس المؤشر" : "Metric Measurement & Definition"}
+                                    >
+                                      <Info className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Scorecard Summary Footer Bar */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 rounded-2xl bg-muted/40 border border-border">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {activeCategories.map((c) => (
+                      <span key={c.category} className="text-[11px] text-muted-foreground font-mono">
+                        <strong className="text-foreground">{formatCategoryName(c.category, isAr)}:</strong>{" "}
+                        {fmtPercent(c.totalWeight, 0)}
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-xs text-muted-foreground">
+                      {isAr ? "المتوسط السنوي الإجمالي:" : "Total Annual Score:"}
+                    </span>
+                    <span className="font-mono text-sm font-extrabold text-brand">
+                      {summaryTotals.hasData ? fmtPercent(summaryTotals.annualWeightedSum, 2) : "—"}
+                    </span>
+                    {summaryTotals.hasData && (
+                      <Badge className={`${ratingTier.badgeClass} text-[10px] px-2 py-0.5`}>
+                        {isAr ? ratingTier.name_ar : ratingTier.name}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -1095,6 +1470,56 @@ export function EmployeeKpiPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Metric Detail Info Dialog */}
+      <Dialog open={!!infoModalKpi} onOpenChange={(open) => !open && setInfoModalKpi(null)}>
+        <DialogContent className="sm:max-w-md rounded-3xl" dir={dir}>
+          <DialogHeader>
+            <div className="flex items-center gap-2 text-brand">
+              <Info className="h-5 w-5" />
+              <DialogTitle className="text-base font-bold font-display">
+                #{infoModalKpi?.numericIndex}. {isAr ? infoModalKpi?.name_ar : infoModalKpi?.name}
+              </DialogTitle>
+            </div>
+            <DialogDescription className="text-xs text-muted-foreground">
+              {infoModalKpi?.code} • {formatCategoryName(infoModalKpi?.category, isAr)}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 pt-2 text-xs">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge variant="outline" className="font-mono text-[10px]">
+                {isAr ? `الوزن: ${fmtPercent(infoModalKpi?.weight, 1)}` : `Weight: ${fmtPercent(infoModalKpi?.weight, 1)}`}
+              </Badge>
+              <Badge variant="secondary" className="font-mono text-[10px]">
+                {isAr
+                  ? `الهدف: ${infoModalKpi ? formatTargetDisplay(infoModalKpi.target, infoModalKpi.unit) : "—"}`
+                  : `Target: ${infoModalKpi ? formatTargetDisplay(infoModalKpi.target, infoModalKpi.unit) : "—"}`}
+              </Badge>
+            </div>
+
+            <div className="space-y-1.5">
+              <strong className="text-foreground block">
+                {isAr ? "التعريف (ما الذي يقيسه هذا المؤشر):" : "Definition (What it measures):"}
+              </strong>
+              <p className="text-muted-foreground leading-relaxed">
+                {(isAr ? infoModalKpi?.definition_ar : infoModalKpi?.definition) || (isAr ? "لا يوجد تفصيل إضافي." : "No additional description.")}
+              </p>
+            </div>
+
+            {infoModalKpi?.howMeasured && (
+              <div className="space-y-1.5 bg-muted/40 p-3 rounded-2xl border border-border">
+                <strong className="text-foreground block">
+                  {isAr ? "طريقة القياس المعتمدة:" : "How it is measured:"}
+                </strong>
+                <p className="text-muted-foreground leading-relaxed">
+                  {isAr ? (infoModalKpi.howMeasured_ar || infoModalKpi.howMeasured) : infoModalKpi.howMeasured}
+                </p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

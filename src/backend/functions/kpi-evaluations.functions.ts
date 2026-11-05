@@ -1267,24 +1267,31 @@ export const getQuarterlyEvaluation = createServerFn({ method: "POST" })
   .inputValidator((input) => GetQuarterlyEvaluationSchema.parse(input))
   .handler(async ({ data: input, context }) => {
     const { supabase, userId } = context;
-    const { isAdmin, isManager } = await assertKpiAccess(supabase, userId);
+    const isSelf = input.employeeId === userId;
+    let isAdmin = false;
+    let isManager = false;
 
-    // Manager scoping verification
-    if (!isAdmin && isManager) {
-      const scope = await resolveTeamMemberScope(supabase, userId);
-      if (!scope.isAdmin) {
-        const { data: empProfile } = await supabase
-          .from("profiles")
-          .select("id, manager_id, department_id")
-          .eq("id", input.employeeId)
-          .maybeSingle();
+    if (!isSelf) {
+      const access = await assertKpiAccess(supabase, userId);
+      isAdmin = access.isAdmin;
+      isManager = access.isManager;
 
-        const isDirect = empProfile?.manager_id === userId;
-        const isDeptManaged = empProfile?.department_id && scope.managedDeptIds?.includes(empProfile.department_id);
-        const isSelf = input.employeeId === userId;
+      // Manager scoping verification
+      if (!isAdmin && isManager) {
+        const scope = await resolveTeamMemberScope(supabase, userId);
+        if (!scope.isAdmin) {
+          const { data: empProfile } = await supabase
+            .from("profiles")
+            .select("id, manager_id, department_id")
+            .eq("id", input.employeeId)
+            .maybeSingle();
 
-        if (!isDirect && !isDeptManaged && !isSelf) {
-          throw new Error("Forbidden: You do not have permission to view this employee's quarterly evaluation");
+          const isDirect = empProfile?.manager_id === userId;
+          const isDeptManaged = empProfile?.department_id && scope.managedDeptIds?.includes(empProfile.department_id);
+
+          if (!isDirect && !isDeptManaged) {
+            throw new Error("Forbidden: You do not have permission to view this employee's quarterly evaluation");
+          }
         }
       }
     }
@@ -2197,13 +2204,25 @@ export const getMyKpiEvaluation = createServerFn({ method: "POST" })
       query = query.eq("template_type", input.templateType);
     }
 
-    const { data: records, error } = await query
-      .order("updated_at", { ascending: false })
-      .limit(1);
-
+    const { data: records, error } = await query;
     if (error) throw new Error(`Failed to fetch your KPI evaluation: ${error.message}`);
-    const record = Array.isArray(records) && records.length > 0 ? records[0] : null;
-    return (record as KpiEvaluationRecord) || null;
+    if (!records || records.length === 0) return null;
+
+    // Prioritize approved > reviewed > submitted > draft, breaking ties by updated_at desc
+    const statusWeight: Record<string, number> = {
+      approved: 4,
+      reviewed: 3,
+      submitted: 2,
+      draft: 1,
+    };
+    const sorted = [...records].sort((a: any, b: any) => {
+      const wa = statusWeight[a.status?.toLowerCase()] || 0;
+      const wb = statusWeight[b.status?.toLowerCase()] || 0;
+      if (wa !== wb) return wb - wa;
+      return new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime();
+    });
+
+    return (sorted[0] as KpiEvaluationRecord) || null;
   });
 
 export const listMyKpiEvaluations = createServerFn({ method: "POST" })

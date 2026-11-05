@@ -494,8 +494,8 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
   const activeScorecardItems = useMemo<ScorecardItem[]>(() => {
     const rawItems =
       matchedTemplateData?.matched &&
-      matchedTemplateData.template?.items &&
-      matchedTemplateData.template.items.length > 0
+        matchedTemplateData.template?.items &&
+        matchedTemplateData.template.items.length > 0
         ? matchedTemplateData.template.items
         : null;
 
@@ -516,8 +516,8 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
           direction === "rating_5" || unit === "scale"
             ? "rating_5"
             : unit === "%"
-            ? "percentage"
-            : "numeric";
+              ? "percentage"
+              : "numeric";
         const keyId = String(it.criterion_id || it.id || idx + 1);
 
         return {
@@ -1194,8 +1194,8 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
         const scale: "rating_5" | "percentage" | "count" | "boolean" = isRating5
           ? "rating_5"
           : unit === "%"
-          ? "percentage"
-          : "count";
+            ? "percentage"
+            : "count";
         const direction: "higher_is_better" | "lower_is_better" | "rating_5" | "target_range" = isRating5
           ? "rating_5"
           : "higher_is_better";
@@ -1662,7 +1662,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
       } else if (vars.targetStatus === "submitted") {
         toast.success(isAr ? "تم إرسال التقييم بنجاح لمراجعة الموارد البشرية" : "Evaluation submitted for HR review");
       } else if (vars.targetStatus === "approved") {
-        toast.success(isAr ? "تم اعتماد التقييم السنوي رسمياً" : "Annual KPI evaluation officially approved");
+        toast.success(isAr ? "تم اعتماد التقييم السنوي رسمياً" : "KPI Evaluation officially approved");
       } else {
         toast.success(isAr ? "تم تحديث حالة التقييم بنجاح" : "Evaluation status updated successfully");
       }
@@ -2069,12 +2069,12 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
         item.status === "approved"
           ? isAr ? "معتمد" : "Approved"
           : item.status === "submitted"
-          ? isAr ? "مقدم للمراجعة" : "Submitted"
-          : item.status === "reviewed"
-          ? isAr ? "تمت المراجعة" : "Reviewed"
-          : item.status === "draft"
-          ? isAr ? "مسودة" : "Draft"
-          : isAr ? "لم يبدأ" : "Not Started",
+            ? isAr ? "مقدم للمراجعة" : "Submitted"
+            : item.status === "reviewed"
+              ? isAr ? "تمت المراجعة" : "Reviewed"
+              : item.status === "draft"
+                ? isAr ? "مسودة" : "Draft"
+                : isAr ? "لم يبدأ" : "Not Started",
       evaluator: item.evaluator || "—",
       approvedDate: item.approvedAt ? new Date(item.approvedAt).toLocaleDateString() : "—",
     }));
@@ -2121,12 +2121,12 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
               {role === "manager"
                 ? isAr ? "بوابة المدير" : "Manager Portal"
                 : role === "hr"
-                ? isAr ? "بوابة الموارد البشرية" : "HR Portal"
-                : isAr ? "بوابة الإدارة العامة" : "Admin Portal"}
+                  ? isAr ? "بوابة الموارد البشرية" : "HR Portal"
+                  : isAr ? "بوابة الإدارة العامة" : "Admin Portal"}
             </Badge>
           </div>
           <h1 className="font-display text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            {isAr ? "التقييم السنوي لمؤشرات الأداء" : "Annual KPI Evaluation"}
+            {isAr ? "التقييم السنوي لمؤشرات الأداء" : "KPI Evaluation"}
             {isFetchingEval && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
           </h1>
           <p className="text-sm text-muted-foreground">
@@ -2340,11 +2340,10 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                             setEmpSelectorOpen(false);
                             setEmpSelectorSearch("");
                           }}
-                          className={`w-full flex items-center justify-between p-2 rounded-xl text-xs transition-colors cursor-pointer text-start ${
-                            isSelected
-                              ? "bg-brand/10 text-brand font-semibold"
-                              : "hover:bg-muted/60 text-foreground"
-                          }`}
+                          className={`w-full flex items-center justify-between p-2 rounded-xl text-xs transition-colors cursor-pointer text-start ${isSelected
+                            ? "bg-brand/10 text-brand font-semibold"
+                            : "hover:bg-muted/60 text-foreground"
+                            }`}
                         >
                           <div className="min-w-0 flex items-center gap-2.5">
                             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand/10 text-brand font-bold text-[11px] shrink-0">
@@ -2449,11 +2448,10 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                   key={q}
                   type="button"
                   onClick={() => setActiveQuarterFilter(q)}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all cursor-pointer ${
-                    activeQuarterFilter === q
-                      ? "bg-card text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
+                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all cursor-pointer ${activeQuarterFilter === q
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                    }`}
                 >
                   {q === "all" ? (isAr ? "الكل" : "ALL") : q.toUpperCase()}
                 </button>
@@ -2648,9 +2646,8 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                       return (
                         <tr
                           key={item.id}
-                          className={`hover:bg-muted/30 transition-colors ${
-                            isCurrent ? "bg-brand/5 font-medium" : ""
-                          }`}
+                          className={`hover:bg-muted/30 transition-colors ${isCurrent ? "bg-brand/5 font-medium" : ""
+                            }`}
                         >
                           <td className="px-3 py-3 text-muted-foreground font-mono">{item.index}</td>
                           <td className="px-3 py-3">
@@ -2724,9 +2721,8 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                                 setSelectedEmpId(item.id);
                                 setMainTab("scorecard");
                               }}
-                              className={`h-7 text-xs rounded-xl px-2.5 cursor-pointer ${
-                                item.hasEvaluation ? "bg-brand text-brand-foreground hover:bg-brand/90" : ""
-                              }`}
+                              className={`h-7 text-xs rounded-xl px-2.5 cursor-pointer ${item.hasEvaluation ? "bg-brand text-brand-foreground hover:bg-brand/90" : ""
+                                }`}
                             >
                               {item.hasEvaluation ? (isAr ? "فتح" : "Open") : (isAr ? "تقييم" : "Evaluate")}
                             </Button>
@@ -2739,7 +2735,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
               </table>
             </div>
 
-            
+
 
             {/* Pagination Controls Footer */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border/70 p-3.5 bg-muted/20 text-xs">
@@ -2790,11 +2786,10 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                         key={pageNum}
                         type="button"
                         onClick={() => setCurrentPage(pageNum)}
-                        className={`h-8 w-8 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                          isCur
-                            ? "bg-brand text-white shadow-xs"
-                            : "border border-border bg-card text-muted-foreground hover:bg-muted/40 hover:text-foreground"
-                        }`}
+                        className={`h-8 w-8 rounded-xl text-xs font-bold transition-all cursor-pointer ${isCur
+                          ? "bg-brand text-white shadow-xs"
+                          : "border border-border bg-card text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+                          }`}
                       >
                         {pageNum}
                       </button>
@@ -2849,8 +2844,8 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                 const qLabel = q.toUpperCase();
                 const qPeriod = q === "q1" ? (isAr ? "يناير - مارس" : "Jan - Mar")
                   : q === "q2" ? (isAr ? "أبريل - يونيو" : "Apr - Jun")
-                  : q === "q3" ? (isAr ? "يوليو - سبتمبر" : "Jul - Sep")
-                  : (isAr ? "أكتوبر - ديسمبر" : "Oct - Dec");
+                    : q === "q3" ? (isAr ? "يوليو - سبتمبر" : "Jul - Sep")
+                      : (isAr ? "أكتوبر - ديسمبر" : "Oct - Dec");
                 const isSelected = activeScorecardQuarter === q;
                 return (
                   <button
@@ -2859,11 +2854,10 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                     onClick={() => {
                       setActiveScorecardQuarter(q);
                     }}
-                    className={`rounded-xl px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-                      isSelected
-                        ? "bg-brand text-white shadow-xs"
-                        : "border border-border bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground"
-                    }`}
+                    className={`rounded-xl px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${isSelected
+                      ? "bg-brand text-white shadow-xs"
+                      : "border border-border bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground"
+                      }`}
                   >
                     <span>{qLabel}</span>
                     <span className="text-[10px] font-normal opacity-80">({qPeriod})</span>
@@ -3189,11 +3183,10 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                                       variant="ghost"
                                       size="icon"
                                       onClick={() => handleOpenMetricReturnModal(kpi)}
-                                      className={`h-6 w-6 rounded-lg cursor-pointer transition-colors ${
-                                        row.adminNotes || row.isReturned
-                                          ? "text-amber-600 bg-amber-500/15 hover:bg-amber-500/25 ring-1 ring-amber-500/40"
-                                          : "text-muted-foreground hover:text-amber-600 hover:bg-amber-500/10"
-                                      }`}
+                                      className={`h-6 w-6 rounded-lg cursor-pointer transition-colors ${row.adminNotes || row.isReturned
+                                        ? "text-amber-600 bg-amber-500/15 hover:bg-amber-500/25 ring-1 ring-amber-500/40"
+                                        : "text-muted-foreground hover:text-amber-600 hover:bg-amber-500/10"
+                                        }`}
                                       title={
                                         row.adminNotes
                                           ? (isAr ? `ملاحظة الإعادة: ${row.adminNotes}` : `Return note: ${row.adminNotes}`)
@@ -3268,7 +3261,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
             </div>
           </div>
 
-          
+
 
           {/* Qualitative Assessment & Formal Sign-off (Integrated into Scorecard) */}
           <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-sm space-y-6">
@@ -3388,945 +3381,165 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
         {/* ── TAB: PENDING APPROVALS (HR ADMIN) ── */}
         {!isManagerMode && (
           <TabsContent value="pending-approvals" className="space-y-4">
-          <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-sm space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-600">
-                    <Clock className="h-3.5 w-3.5" />
-                    {isAr ? "معاملات الاعتماد والتدقيق" : "Quarterly Review Queue"}
-                  </span>
-                  <Badge className="bg-amber-500 text-white text-[10px] font-mono px-2 py-0.5">
-                    {pendingApprovals.length} {isAr ? "بانتظار الإجراء" : "Pending Action"}
-                  </Badge>
+            <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-sm space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-600">
+                      <Clock className="h-3.5 w-3.5" />
+                      {isAr ? "معاملات الاعتماد والتدقيق" : "Quarterly Review Queue"}
+                    </span>
+                    <Badge className="bg-amber-500 text-white text-[10px] font-mono px-2 py-0.5">
+                      {pendingApprovals.length} {isAr ? "بانتظار الإجراء" : "Pending Action"}
+                    </Badge>
+                  </div>
+                  <h2 className="font-display text-lg font-bold text-foreground mt-1">
+                    {isAr ? "طلبات اعتماد تقييمات الأداء الربع سنوية" : "Quarterly Evaluation Approval Requests"}
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    {isAr
+                      ? "مراجعة تقييمات الأداء الربع سنوية المقدمة من المشرفين والمديرين لاعتمادها رسمياً أو إعادتها للمراجعة مع ذكر السبب."
+                      : "Review submitted quarterly evaluations from direct supervisors. Approve formally or return for revision with feedback."}
+                  </p>
                 </div>
-                <h2 className="font-display text-lg font-bold text-foreground mt-1">
-                  {isAr ? "طلبات اعتماد تقييمات الأداء الربع سنوية" : "Quarterly Evaluation Approval Requests"}
-                </h2>
-                <p className="text-xs text-muted-foreground">
-                  {isAr
-                    ? "مراجعة تقييمات الأداء الربع سنوية المقدمة من المشرفين والمديرين لاعتمادها رسمياً أو إعادتها للمراجعة مع ذكر السبب."
-                    : "Review submitted quarterly evaluations from direct supervisors. Approve formally or return for revision with feedback."}
-                </p>
-              </div>
 
-              {/* Quarter Filter Chips */}
-              <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-2xl border border-border text-xs shrink-0">
-                {(["all", "q1", "q2", "q3", "q4"] as const).map((q) => (
-                  <button
-                    key={q}
-                    type="button"
-                    onClick={() => setPendingQuarterFilter(q)}
-                    className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
-                      pendingQuarterFilter === q
+                {/* Quarter Filter Chips */}
+                <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-2xl border border-border text-xs shrink-0">
+                  {(["all", "q1", "q2", "q3", "q4"] as const).map((q) => (
+                    <button
+                      key={q}
+                      type="button"
+                      onClick={() => setPendingQuarterFilter(q)}
+                      className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${pendingQuarterFilter === q
                         ? "bg-card text-foreground shadow-xs"
                         : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {q === "all" ? (isAr ? "الكل" : "All") : q.toUpperCase()}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* List / Table of Pending Approvals */}
-            {isLoadingPending ? (
-              <div className="p-12 text-center text-xs text-muted-foreground flex flex-col items-center gap-2">
-                <Loader2 className="h-6 w-6 animate-spin text-brand" />
-                <span>{isAr ? "جارٍ تحميل المعاملات المعلقة..." : "Loading pending approvals..."}</span>
-              </div>
-            ) : pendingApprovals.length === 0 ? (
-              <div className="p-12 text-center rounded-2xl border border-dashed border-border bg-muted/20 space-y-2">
-                <ShieldCheck className="h-8 w-8 text-emerald-500 mx-auto" />
-                <h3 className="font-semibold text-sm text-foreground">
-                  {isAr ? "لا توجد أي تقييمات معلقة بانتظار الاعتماد" : "No Pending Approvals"}
-                </h3>
-                <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                  {isAr
-                    ? "تمت مراجعة واعتماد كافة التقييمات المقدمة لعام " + selectedYear
-                    : "All quarterly submissions for year " + selectedYear + " have been reviewed and approved."}
-                </p>
-              </div>
-            ) : (
-              <div className="divide-y divide-border rounded-2xl border border-border overflow-hidden bg-card">
-                {pendingApprovals
-                  .filter((item: any) => {
-                    if (pendingQuarterFilter === "all") return true;
-                    const q = (item.quarter || "").toLowerCase();
-                    if (q === pendingQuarterFilter || q === "annual") return true;
-                    if (Array.isArray(item.quarters) && item.quarters.includes(pendingQuarterFilter)) return true;
-                    return false;
-                  })
-                  .map((item: any) => {
-                    const empName = item.employee?.full_name || (isAr ? "موظف" : "Employee");
-                    const empCode = item.employee?.emp_code;
-                    const position = item.employee?.position?.name_en || (isAr ? "مهندس موقع" : "Site Engineer");
-                    const dept = item.employee?.department?.name_en || (isAr ? "الهندسة" : "Engineering");
-                    const quarterUpper = (item.quarter || "q1").toUpperCase();
-                    const score = Number(item.total_score ?? item.score ?? 0);
-                    const rating = getRatingFromScore(score / 100, true);
-
-                    return (
-                      <div
-                        key={item.id}
-                        className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-muted/30 transition-colors"
-                      >
-                        {/* Employee & Quarter Info */}
-                        <div
-                          className="flex items-start gap-3 cursor-pointer group"
-                          onClick={() => handleNavigateToScorecard(item)}
-                          title={isAr ? "عرض بطاقة تقييم الموظف" : "View Employee Scorecard"}
-                        >
-                          <div className="h-10 w-10 rounded-2xl bg-brand/10 text-brand font-bold text-xs flex items-center justify-center shrink-0 uppercase group-hover:scale-105 transition-transform">
-                            {empName.slice(0, 2)}
-                          </div>
-                          <div className="space-y-0.5">
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-sm text-foreground group-hover:text-brand transition-colors">{empName}</span>
-                              {empCode && (
-                                <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0">
-                                  {empCode}
-                                </Badge>
-                              )}
-                              <Badge className="bg-brand text-brand-foreground text-[10px] font-bold px-2 py-0">
-                                {quarterUpper === "ANNUAL" ? (isAr ? "تقييم سنوي وفصلي" : "Annual / Qs") : `${quarterUpper} ${item.evaluation_year}`}
-                              </Badge>
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                              {position} • {dept}
-                            </p>
-                            <p className="text-[11px] text-muted-foreground">
-                              {isAr ? "المُقيّم: " : "Submitted by: "}
-                              <strong className="text-foreground">{item.evaluator_name || "Manager"}</strong>
-                              {item.submitted_at && (
-                                <span className="ms-2 font-mono text-[10px]">
-                                  ({new Date(item.submitted_at).toLocaleDateString()})
-                                </span>
-                              )}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Score & Actions */}
-                        <div className="flex flex-wrap items-center gap-3 justify-between md:justify-end">
-                          <div className="text-start md:text-end pe-2">
-                            <div className="font-mono font-extrabold text-sm text-foreground">
-                              {score.toFixed(1)}%
-                            </div>
-                            <span className="text-[10px] font-medium text-muted-foreground">
-                              {isAr ? rating.tier_ar : rating.tier}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleNavigateToScorecard(item)}
-                              className="h-8 rounded-xl text-xs gap-1 cursor-pointer"
-                            >
-                              <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
-                              <span>{isAr ? "عرض التفاصيل" : "Scorecard"}</span>
-                            </Button>
-
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleOpenReturnModal(item)}
-                              disabled={isSubmittingReview}
-                              className="h-8 rounded-xl text-xs gap-1 border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 cursor-pointer"
-                            >
-                              <RotateCcw className="h-3.5 w-3.5" />
-                              <span>{isAr ? "إعادة للتعديل" : "Return"}</span>
-                            </Button>
-
-                            <Button
-                              size="sm"
-                              onClick={() => handleApprovePending(item)}
-                              disabled={isSubmittingReview}
-                              className="h-8 rounded-xl text-xs gap-1 bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer shadow-xs"
-                            >
-                              <Check className="h-3.5 w-3.5" />
-                              <span>{isAr ? "اعتماد رسمي" : "Approve"}</span>
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
-            )}
-          </div>
-        </TabsContent>
-        )}
-
-        {/* ── TAB: TEMPLATES & CRITERIA CATALOG (HR ADMIN) ── */}
-        {!isManagerMode && (
-        <TabsContent value="templates-criteria" className="space-y-4">
-          {/* Sub-tab Navigation: Templates vs Criteria */}
-          <div className="flex flex-wrap items-center gap-2 border-b border-border pb-3">
-            <button
-              type="button"
-              onClick={() => setTemplateSubTab("templates")}
-              className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
-                templateSubTab === "templates"
-                  ? "bg-brand text-brand-foreground shadow-xs"
-                  : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
-              }`}
-            >
-              <Layers className="h-4 w-4" />
-              <span>{isAr ? "قوالب التقييم الوظيفية" : "Job Role Templates"}</span>
-              <Badge
-                variant="outline"
-                className={`text-[10px] px-1.5 py-0 font-mono ${
-                  templateSubTab === "templates" ? "border-brand-foreground/30 text-brand-foreground" : ""
-                }`}
-              >
-                {kpiTemplates.length}
-              </Badge>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setTemplateSubTab("criteria")}
-              className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
-                templateSubTab === "criteria"
-                  ? "bg-brand text-brand-foreground shadow-xs"
-                  : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
-              }`}
-            >
-              <Award className="h-4 w-4" />
-              <span>{isAr ? "دليل ومكتبة المعايير" : "Criteria Library"}</span>
-              <Badge
-                variant="outline"
-                className={`text-[10px] px-1.5 py-0 font-mono ${
-                  templateSubTab === "criteria" ? "border-brand-foreground/30 text-brand-foreground" : ""
-                }`}
-              >
-                {kpiCriteria.length}
-              </Badge>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setTemplateSubTab("job-descriptions")}
-              className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
-                templateSubTab === "job-descriptions"
-                  ? "bg-brand text-brand-foreground shadow-xs"
-                  : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
-              }`}
-            >
-              <FileText className="h-4 w-4" />
-              <span>{isAr ? "الأوصاف الوظيفية" : "Job Descriptions"}</span>
-            </button>
-          </div>
-
-          {templateSubTab === "job-descriptions" && <JobDescriptionsTab />}
-          {/* ═════════════════════════════════════════════════════════════════ */}
-          {/* VIEW A: TEMPLATES MANAGER                                         */}
-          {/* ═════════════════════════════════════════════════════════════════ */}
-          {templateSubTab === "job-descriptions" ? null : templateSubTab === "templates" ? (
-            <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-sm space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-semibold text-brand">
-                      <Layers className="h-3.5 w-3.5" />
-                      {isAr ? "محرك قوالب التقييم" : "Template Engine"}
-                    </span>
-                    <Badge variant="outline" className="text-[10px] font-mono">
-                      {kpiTemplates.length} {isAr ? "قوالب" : "Templates"}
-                    </Badge>
-                  </div>
-                  <h2 className="font-display text-lg font-bold text-foreground mt-1">
-                    {isAr ? "قوالب تقييم الوظائف والمستويات المهنية" : "Job Role Evaluation Templates"}
-                  </h2>
-                  <p className="text-xs text-muted-foreground">
-                    {isAr
-                      ? "إدارة قوالب التقييم وفق الهيكل: الإدارة ← المسمى الوظيفي ← المستوى المهني (Junior, Mid, Senior, Lead). يجب أن يساوي مجموع الأوزان 100% بالضبط للنشر."
-                      : "Configure templates tailored by Department → Position → Seniority Level. Sum of criteria weights must equal exactly 100% to publish."}
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    onClick={handleSeedDefaultTemplates}
-                    variant="outline"
-                    size="sm"
-                    disabled={isSeedingTemplates}
-                    className="rounded-2xl gap-1.5 cursor-pointer text-xs border-brand/30 hover:bg-brand/5"
-                    title={isAr ? "إدراج قوالب الوظائف الافتراضية (هندسة، برمجيات، موارد بشرية، محاسبة، مبيعات)" : "Seed standard templates for Engineering, IT, HR, Finance, Sales"}
-                  >
-                    {isSeedingTemplates ? <Loader2 className="h-4 w-4 animate-spin text-brand" /> : <Sparkles className="h-4 w-4 text-brand" />}
-                    <span>{isAr ? "إدراج القوالب الافتراضية" : "Seed Default Templates"}</span>
-                  </Button>
-                  <Button
-                    onClick={handleOpenCreateTemplate}
-                    size="sm"
-                    className="rounded-2xl gap-1.5 bg-brand text-brand-foreground hover:bg-brand/90 cursor-pointer shadow-xs"
-                  >
-                    <Plus className="h-4 w-4" />
-                    <span>{isAr ? "إنشاء قالب جديد" : "Create New Template"}</span>
-                  </Button>
-                </div>
-              </div>
-
-              {/* Filter bar */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="relative">
-                  <Input
-                    value={templateSearch}
-                    onChange={(e) => setTemplateSearch(e.target.value)}
-                    placeholder={isAr ? "بحث بالاسم أو المنصب أو القسم..." : "Search templates, roles, depts..."}
-                    className="rounded-xl text-xs"
-                  />
-                </div>
-
-                <div>
-                  <select
-                    value={templateDeptFilter}
-                    onChange={(e) => setTemplateDeptFilter(e.target.value)}
-                    className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold"
-                  >
-                    <option value="all">{isAr ? "جميع الأقسام" : "All Departments"}</option>
-                    {(departmentsData || []).map((dept: any) => (
-                      <option key={dept.id} value={dept.id}>
-                        {isAr ? dept.name_ar || dept.name_en : dept.name_en || dept.name_ar}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <select
-                    value={templateStatusFilter}
-                    onChange={(e) => setTemplateStatusFilter(e.target.value)}
-                    className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold"
-                  >
-                    <option value="all">{isAr ? "جميع الحالات" : "All Statuses"}</option>
-                    <option value="published">{isAr ? "معتمد ومنشور" : "Published"}</option>
-                    <option value="draft">{isAr ? "مسودة" : "Draft"}</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Templates Grid */}
-              {isLoadingTemplates ? (
-                <div className="p-12 text-center text-xs text-muted-foreground flex flex-col items-center gap-2">
-                  <Loader2 className="h-6 w-6 animate-spin text-brand" />
-                  <span>{isAr ? "جارٍ تحميل القوالب..." : "Loading templates..."}</span>
-                </div>
-              ) : filteredTemplates.length === 0 ? (
-                <div className="p-12 text-center rounded-2xl border border-dashed border-border bg-muted/20 space-y-3">
-                  <Layers className="h-10 w-10 text-muted-foreground/60 mx-auto" />
-                  <p className="text-xs font-semibold text-foreground">
-                    {isAr ? "لا توجد قوالب تطابق البحث" : "No templates found matching your criteria"}
-                  </p>
-                  <div className="flex items-center justify-center gap-2 pt-1">
-                    <Button
-                      size="sm"
-                      onClick={handleSeedDefaultTemplates}
-                      disabled={isSeedingTemplates}
-                      className="rounded-xl text-xs gap-1.5 cursor-pointer bg-brand text-brand-foreground hover:bg-brand/90"
-                    >
-                      {isSeedingTemplates ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                      <span>{isAr ? "إدراج القوالب الافتراضية الجاهزة" : "Seed Default Templates"}</span>
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={handleOpenCreateTemplate}
-                      className="rounded-xl text-xs gap-1.5 cursor-pointer"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      <span>{isAr ? "إنشاء قالب مخصص" : "Create Custom Template"}</span>
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {filteredTemplates.map((tmpl: any) => {
-                    const totalWeight = Math.round(
-                      (tmpl.items || []).reduce((acc: number, it: any) => acc + Number(it.weight || 0), 0) * 100
-                    );
-                    const is100 = totalWeight === 100;
-                    const isPublished = tmpl.status === "published";
-                    const version = tmpl.version || 1;
-
-                    return (
-                      <div
-                        key={tmpl.id}
-                        className="rounded-2xl border border-border bg-card p-4 shadow-xs hover:border-brand/40 transition-all flex flex-col justify-between space-y-4"
-                      >
-                        <div className="space-y-3">
-                          {/* Card Header */}
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="space-y-0.5">
-                              <h3 className="font-bold text-sm text-foreground leading-tight">
-                                {isAr ? tmpl.name_ar || tmpl.name_en : tmpl.name_en}
-                              </h3>
-                              {tmpl.name_ar && !isAr && (
-                                <p className="text-[11px] text-muted-foreground font-arabic" dir="rtl">
-                                  {tmpl.name_ar}
-                                </p>
-                              )}
-                              {tmpl.name_en && isAr && (
-                                <p className="text-[11px] text-muted-foreground font-mono">
-                                  {tmpl.name_en}
-                                </p>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0 bg-muted/40">
-                                v{version}
-                              </Badge>
-                              {isPublished ? (
-                                <Badge className="bg-emerald-600 text-white text-[10px] px-2 py-0">
-                                  {isAr ? "معتمد" : "Published"}
-                                </Badge>
-                              ) : (
-                                <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 text-[10px] px-2 py-0">
-                                  {isAr ? "مسودة" : "Draft"}
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Role Badges */}
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <Badge variant="secondary" className="text-[10px] px-2 py-0.5 font-medium">
-                              {tmpl.department ? (isAr ? tmpl.department.name_ar || tmpl.department.name_en : tmpl.department.name_en) : (isAr ? "كل الأقسام" : "All Departments")}
-                            </Badge>
-                            <Badge variant="secondary" className="text-[10px] px-2 py-0.5 font-medium bg-brand/10 text-brand">
-                              {tmpl.position ? (isAr ? tmpl.position.name_ar || tmpl.position.name_en : tmpl.position.name_en) : (isAr ? "كل المناصب" : "All Positions")}
-                            </Badge>
-                            {tmpl.job_grade && (
-                              <Badge variant="outline" className="text-[10px] px-2 py-0.5 font-semibold text-purple-600 border-purple-300 dark:border-purple-800">
-                                {isAr ? tmpl.job_grade.name_ar || tmpl.job_grade.name_en : tmpl.job_grade.name_en}
-                              </Badge>
-                            )}
-                          </div>
-
-                          {/* Weight & Criteria Count Banner */}
-                          <div className="flex items-center justify-between p-2 rounded-xl bg-muted/40 border border-border/60 text-xs">
-                            <span className="text-muted-foreground flex items-center gap-1">
-                              <Award className="h-3 w-3 text-brand" />
-                              <span>{tmpl.items?.length || 0} {isAr ? "معايير" : "KPIs"}</span>
-                            </span>
-                            <span className={`font-mono font-bold text-xs ${is100 ? "text-emerald-600" : "text-amber-600"}`}>
-                              {isAr ? `مجموع الأوزان: ${totalWeight}%` : `Weight: ${totalWeight}%`}
-                            </span>
-                          </div>
-
-                          {/* Items Preview */}
-                          <div className="space-y-1">
-                            {(tmpl.items || []).slice(0, 3).map((it: any, iIdx: number) => {
-                              const critName = isAr
-                                ? it.criterion?.name_ar || it.criterion?.name_en || `#${iIdx + 1}`
-                                : it.criterion?.name_en || it.criterion?.name_ar || `#${iIdx + 1}`;
-                              const itWeight = Math.round(Number(it.weight || 0) * 100);
-                              return (
-                                <div key={it.id || iIdx} className="flex items-center justify-between text-[11px] text-muted-foreground">
-                                  <span className="truncate max-w-[200px]">• {critName}</span>
-                                  <span className="font-mono text-[10px] shrink-0 font-semibold">{itWeight}%</span>
-                                </div>
-                              );
-                            })}
-                            {(tmpl.items || []).length > 3 && (
-                              <p className="text-[10px] text-muted-foreground/80 italic text-end">
-                                + {(tmpl.items || []).length - 3} {isAr ? "معايير أخرى" : "more criteria"}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Card Actions */}
-                        <div className="pt-3 border-t border-border flex items-center justify-between gap-1.5">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleOpenEditTemplate(tmpl)}
-                            className="h-7 text-xs rounded-xl px-2.5 gap-1 cursor-pointer"
-                          >
-                            <Pencil className="h-3 w-3" />
-                            <span>{isAr ? "تعديل" : "Edit"}</span>
-                          </Button>
-
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleOpenDuplicateTemplate(tmpl)}
-                            className="h-7 text-xs rounded-xl px-2.5 gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
-                          >
-                            <Copy className="h-3 w-3" />
-                            <span>{isAr ? "استنساخ" : "Duplicate"}</span>
-                          </Button>
-
-                          {!isPublished && (
-                            <Button
-                              size="sm"
-                              onClick={() => handlePublishTemplateDirectly(tmpl.id)}
-                              disabled={!is100}
-                              className={`h-7 text-xs rounded-xl px-2.5 gap-1 cursor-pointer ${
-                                is100 ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "opacity-50 cursor-not-allowed"
-                              }`}
-                              title={!is100 ? (isAr ? "يتطلب مجموع 100% للنشر" : "Requires 100% total weight") : ""}
-                            >
-                              <ShieldCheck className="h-3 w-3" />
-                              <span>{isAr ? "نشر" : "Publish"}</span>
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          ) : (
-            /* ═════════════════════════════════════════════════════════════════ */
-            /* VIEW B: CRITERIA LIBRARY                                         */
-            /* ═════════════════════════════════════════════════════════════════ */
-            <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-sm space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-semibold text-brand">
-                      <Award className="h-3.5 w-3.5" />
-                      {isAr ? "دليل المعايير والمؤشرات" : "Criteria Catalog"}
-                    </span>
-                    <Badge variant="outline" className="text-[10px] font-mono">
-                      {kpiCriteria.length} {isAr ? "معياراً مسجلاً" : "Criteria"}
-                    </Badge>
-                  </div>
-                  <h2 className="font-display text-lg font-bold text-foreground mt-1">
-                    {isAr ? "إدارة بنك معايير ومؤشرات الأداء" : "KPI Criteria Library & Measurement Definitions"}
-                  </h2>
-                  <p className="text-xs text-muted-foreground">
-                    {isAr
-                      ? "المعايير المعتمدة المتاحة لإدراجها في قوالب تقييم الوظائف المختلفة مع اتجاهات القياس والوحدات."
-                      : "Approved metric definitions with scoring directions (Higher is better, Lower is better, 1-5 scale) and target benchmarks."}
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    onClick={handleDownloadCriteriaTemplate}
-                    variant="outline"
-                    size="sm"
-                    className="rounded-2xl gap-1.5 border-border hover:bg-muted/60 cursor-pointer shadow-xs text-xs font-medium"
-                    title={isAr ? "تحميل نموذج إكسيل مجهز بالمعايير والأمثلة" : "Download ready-made Excel template with sample criteria"}
-                  >
-                    <FileDown className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                    <span>{isAr ? "تحميل نموذج مجهز" : "Download Template"}</span>
-                  </Button>
-
-                  <input
-                    ref={criteriaFileInputRef}
-                    type="file"
-                    accept=".xlsx,.xls,.csv"
-                    onChange={handleImportCriteriaFile}
-                    className="hidden"
-                  />
-                  <Button
-                    onClick={() => criteriaFileInputRef.current?.click()}
-                    variant="outline"
-                    size="sm"
-                    disabled={isImportingCriteria}
-                    className="rounded-2xl gap-1.5 border-border hover:bg-muted/60 cursor-pointer shadow-xs text-xs font-medium"
-                    title={isAr ? "استيراد معايير من ملف إكسيل أو CSV" : "Import criteria from Excel or CSV"}
-                  >
-                    {isImportingCriteria ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-brand" />
-                    ) : (
-                      <Upload className="h-4 w-4 text-brand" />
-                    )}
-                    <span>{isImportingCriteria ? (isAr ? "جاري الاستيراد..." : "Importing...") : (isAr ? "استيراد من إكسيل" : "Import from Excel")}</span>
-                  </Button>
-
-                  <Button
-                    onClick={handleOpenAddCriterion}
-                    size="sm"
-                    className="rounded-2xl gap-1.5 bg-brand text-brand-foreground hover:bg-brand/90 cursor-pointer shadow-xs text-xs font-medium"
-                  >
-                    <Plus className="h-4 w-4" />
-                    <span>{isAr ? "إضافة معيار جديد" : "Add Criterion"}</span>
-                  </Button>
-                </div>
-              </div>
-
-              {/* Architecture 3-Layer Weight Summary Banner */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-                <div className="p-4 rounded-2xl border border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-900/40 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-blue-700 dark:text-blue-400">
-                      {isAr ? "1. المعايير العامة للشركة" : "1. Company Common Layer"}
-                    </span>
-                    <Badge className="bg-blue-600 text-white font-mono text-[10px]">40.0%</Badge>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    {isAr
-                      ? "الانضباط والمواعيد، السلوك المهني والسياسات، العمل الجماعي، والمبادرة والمسؤولية."
-                      : "Attendance & punctuality, code of conduct, teamwork, initiative & ownership."}
-                  </p>
-                </div>
-
-                <div className="p-4 rounded-2xl border border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/20 dark:border-emerald-900/40 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
-                      {isAr ? "2. معايير التخصص والمنصب" : "2. Position / Role Layer"}
-                    </span>
-                    <Badge className="bg-emerald-600 text-white font-mono text-[10px]">60.0%</Badge>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    {isAr
-                      ? "الكفاءات الفنية الميدانية لكل مسمى وظيفي ومجال تخصص."
-                      : "Field competencies tailored to job role and discipline."}
-                  </p>
-                </div>
-
-                <div className="p-4 rounded-2xl border border-brand/30 bg-brand/5 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-brand">
-                      {isAr ? "3. مجموع الأوزان المستهدف" : "3. Target Weight Validation"}
-                    </span>
-                    <Badge className="bg-brand text-brand-foreground font-mono text-[10px]">100.0%</Badge>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    {isAr
-                      ? "التحقق الصارم من توازن الأوزان المئوية لتساوي دائماً 100% بدقة قبل اعتماد القوالب."
-                      : "Strict mathematical enforcement ensuring sum of all category weights equals exactly 100%."}
-                  </p>
-                </div>
-              </div>
-
-              {/* Filter by Layer & Grouping Controls */}
-              <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="flex items-center gap-1.5 bg-muted/60 p-1 rounded-2xl border border-border text-xs">
-                    {(["all", "common", "role", "custom"] as const).map((layer) => (
-                      <button
-                        key={layer}
-                        type="button"
-                        onClick={() => setCriteriaLayerFilter(layer)}
-                        className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
-                          criteriaLayerFilter === layer
-                            ? "bg-card text-foreground shadow-xs"
-                            : "text-muted-foreground hover:text-foreground"
                         }`}
-                      >
-                        {layer === "all"
-                          ? isAr ? "كل المعايير" : "All Layers"
-                          : layer === "common"
-                          ? isAr ? "عامة (40%)" : "Common (40%)"
-                          : layer === "role"
-                          ? isAr ? "تخصصية (60%)" : "Role Specific (60%)"
-                          : isAr ? "مخصصة" : "Custom"}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Category Filter Dropdown */}
-                  <select
-                    value={criteriaCategoryFilter}
-                    onChange={(e) => setCriteriaCategoryFilter(e.target.value)}
-                    className="rounded-2xl border border-input bg-background px-3 py-1.5 text-xs font-semibold cursor-pointer shadow-xs max-w-[220px]"
-                  >
-                    <option value="all">{isAr ? "جميع الفئات والتصنيفات" : "All Categories"}</option>
-                    {criteriaCategoriesList.map((cat) => (
-                      <option key={cat.key} value={cat.key}>
-                        {cat.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Group by Categories Toggle */}
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant={groupByCategory ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setGroupByCategory(!groupByCategory)}
-                    className={`rounded-2xl text-xs gap-1.5 cursor-pointer shadow-xs ${
-                      groupByCategory
-                        ? "bg-brand text-brand-foreground hover:bg-brand/90"
-                        : "border-border hover:bg-muted/60"
-                    }`}
-                  >
-                    <FolderKanban className="h-3.5 w-3.5" />
-                    <span>{isAr ? "تجميع حسب الفئات" : "Group by Categories"}</span>
-                  </Button>
+                    >
+                      {q === "all" ? (isAr ? "الكل" : "All") : q.toUpperCase()}
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              {/* Criteria Catalog Content */}
-              {isLoadingCriteria ? (
+              {/* List / Table of Pending Approvals */}
+              {isLoadingPending ? (
                 <div className="p-12 text-center text-xs text-muted-foreground flex flex-col items-center gap-2">
                   <Loader2 className="h-6 w-6 animate-spin text-brand" />
-                  <span>{isAr ? "جارٍ تحميل دليل المعايير..." : "Loading criteria..."}</span>
+                  <span>{isAr ? "جارٍ تحميل المعاملات المعلقة..." : "Loading pending approvals..."}</span>
                 </div>
-              ) : groupByCategory ? (
-                /* Grouped by Category View */
-                <div className="space-y-4">
-                  {groupedCriteriaByCategory.length === 0 ? (
-                    <div className="p-12 text-center text-xs text-muted-foreground rounded-2xl border border-dashed border-border bg-card">
-                      {isAr ? "لا توجد معايير مطابقة للفلاتر المحددة" : "No criteria match the selected filters."}
-                    </div>
-                  ) : (
-                    groupedCriteriaByCategory.map((group) => {
-                      const groupWeightPct = (group.totalWeight * 100).toFixed(1);
+              ) : pendingApprovals.length === 0 ? (
+                <div className="p-12 text-center rounded-2xl border border-dashed border-border bg-muted/20 space-y-2">
+                  <ShieldCheck className="h-8 w-8 text-emerald-500 mx-auto" />
+                  <h3 className="font-semibold text-sm text-foreground">
+                    {isAr ? "لا توجد أي تقييمات معلقة بانتظار الاعتماد" : "No Pending Approvals"}
+                  </h3>
+                  <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                    {isAr
+                      ? "تمت مراجعة واعتماد كافة التقييمات المقدمة لعام " + selectedYear
+                      : "All quarterly submissions for year " + selectedYear + " have been reviewed and approved."}
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y divide-border rounded-2xl border border-border overflow-hidden bg-card">
+                  {pendingApprovals
+                    .filter((item: any) => {
+                      if (pendingQuarterFilter === "all") return true;
+                      const q = (item.quarter || "").toLowerCase();
+                      if (q === pendingQuarterFilter || q === "annual") return true;
+                      if (Array.isArray(item.quarters) && item.quarters.includes(pendingQuarterFilter)) return true;
+                      return false;
+                    })
+                    .map((item: any) => {
+                      const empName = item.employee?.full_name || (isAr ? "موظف" : "Employee");
+                      const empCode = item.employee?.emp_code;
+                      const position = item.employee?.position?.name_en || (isAr ? "مهندس موقع" : "Site Engineer");
+                      const dept = item.employee?.department?.name_en || (isAr ? "الهندسة" : "Engineering");
+                      const quarterUpper = (item.quarter || "q1").toUpperCase();
+                      const score = Number(item.total_score ?? item.score ?? 0);
+                      const rating = getRatingFromScore(score / 100, true);
+
                       return (
                         <div
-                          key={group.categoryKey}
-                          className="rounded-2xl border border-border overflow-hidden bg-card shadow-xs"
+                          key={item.id}
+                          className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-muted/30 transition-colors"
                         >
-                          {/* Category Header */}
-                          <div className="px-4 py-3 bg-muted/40 border-b border-border flex flex-wrap items-center justify-between gap-2">
-                            <div className="flex items-center gap-2.5">
-                              <div className="h-7 w-7 rounded-xl bg-brand/10 text-brand flex items-center justify-center">
-                                <FolderKanban className="h-4 w-4" />
-                              </div>
+                          {/* Employee & Quarter Info */}
+                          <div
+                            className="flex items-start gap-3 cursor-pointer group"
+                            onClick={() => handleNavigateToScorecard(item)}
+                            title={isAr ? "عرض بطاقة تقييم الموظف" : "View Employee Scorecard"}
+                          >
+                            <div className="h-10 w-10 rounded-2xl bg-brand/10 text-brand font-bold text-xs flex items-center justify-center shrink-0 uppercase group-hover:scale-105 transition-transform">
+                              {empName.slice(0, 2)}
+                            </div>
+                            <div className="space-y-0.5">
                               <div className="flex items-center gap-2">
-                                <h3 className="font-bold text-xs text-foreground">
-                                  {group.categoryTitle}
-                                </h3>
-                                {isAr && group.categoryTitleEn !== group.categoryTitle && (
-                                  <span className="text-[10px] text-muted-foreground font-normal">
-                                    ({group.categoryTitleEn})
-                                  </span>
+                                <span className="font-bold text-sm text-foreground group-hover:text-brand transition-colors">{empName}</span>
+                                {empCode && (
+                                  <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0">
+                                    {empCode}
+                                  </Badge>
                                 )}
-                                {!isAr && group.categoryTitleAr && (
-                                  <span className="text-[10px] text-muted-foreground font-normal" dir="rtl">
-                                    ({group.categoryTitleAr})
-                                  </span>
-                                )}
+                                <Badge className="bg-brand text-brand-foreground text-[10px] font-bold px-2 py-0">
+                                  {quarterUpper === "ANNUAL" ? (isAr ? "تقييم سنوي وفصلي" : "Annual / Qs") : `${quarterUpper} ${item.evaluation_year}`}
+                                </Badge>
                               </div>
+                              <p className="text-xs text-muted-foreground">
+                                {position} • {dept}
+                              </p>
+                              <p className="text-[11px] text-muted-foreground">
+                                {isAr ? "المُقيّم: " : "Submitted by: "}
+                                <strong className="text-foreground">{item.evaluator_name || "Manager"}</strong>
+                                {item.submitted_at && (
+                                  <span className="ms-2 font-mono text-[10px]">
+                                    ({new Date(item.submitted_at).toLocaleDateString()})
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Score & Actions */}
+                          <div className="flex flex-wrap items-center gap-3 justify-between md:justify-end">
+                            <div className="text-start md:text-end pe-2">
+                              <div className="font-mono font-extrabold text-sm text-foreground">
+                                {score.toFixed(1)}%
+                              </div>
+                              <span className="text-[10px] font-medium text-muted-foreground">
+                                {isAr ? rating.tier_ar : rating.tier}
+                              </span>
                             </div>
 
                             <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="font-mono text-[10px] bg-background">
-                                {group.items.length} {isAr ? "معايير" : "Criteria"}
-                              </Badge>
-                              <Badge className="bg-brand/10 text-brand border border-brand/20 font-mono text-[10px]">
-                                {isAr ? "الوزن:" : "Weight:"} {groupWeightPct}%
-                              </Badge>
-                            </div>
-                          </div>
-
-                          {/* Category Criteria Rows */}
-                          <div className="divide-y divide-border">
-                            {group.items.map((crit) => {
-                              const weightPct = crit.default_weight ? (crit.default_weight * 100).toFixed(1) : "—";
-                              const targetPct =
-                                crit.default_target !== undefined && crit.default_target !== null
-                                  ? (crit.default_target <= 1
-                                      ? (crit.default_target * 100).toFixed(0)
-                                      : crit.default_target)
-                                  : crit.max_value !== undefined && crit.max_value !== null
-                                  ? crit.max_value
-                                  : "—";
-
-                              return (
-                                <div
-                                  key={crit.id}
-                                  className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-muted/30 transition-colors"
-                                >
-                                  <div className="space-y-1">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0">
-                                        {crit.code}
-                                      </Badge>
-                                      <span className="font-bold text-xs text-foreground">
-                                        {isAr ? crit.name_ar : crit.name_en}
-                                      </span>
-                                      <Badge
-                                        className={`text-[10px] px-2 py-0 ${
-                                          crit.layer === "common"
-                                            ? "bg-blue-600 text-white"
-                                            : crit.layer === "role"
-                                            ? "bg-emerald-600 text-white"
-                                            : "bg-purple-600 text-white"
-                                        }`}
-                                      >
-                                        {crit.layer === "common"
-                                          ? isAr ? "معيار عام" : "Common"
-                                          : crit.layer === "role"
-                                          ? isAr ? "معيار تخصصي" : "Role"
-                                          : isAr ? "مخصص" : "Custom"}
-                                      </Badge>
-
-                                      {crit.scoring_direction && (
-                                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono text-muted-foreground">
-                                          {crit.scoring_direction === "higher_is_better"
-                                            ? isAr ? "الأعلى أفضل ↑" : "Higher ↑"
-                                            : crit.scoring_direction === "lower_is_better"
-                                            ? isAr ? "الأقل أفضل ↓" : "Lower ↓"
-                                            : crit.scoring_direction === "rating_5"
-                                            ? isAr ? "مقياس 1-5 ★" : "Scale 1-5"
-                                            : crit.scoring_direction}
-                                        </Badge>
-                                      )}
-                                      {crit.unit && (
-                                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono text-muted-foreground">
-                                          {crit.unit}
-                                        </Badge>
-                                      )}
-                                    </div>
-                                    <p className="text-[11px] text-muted-foreground">
-                                      {isAr ? crit.category_ar : crit.category_en}
-                                      {crit.how_measured_en && crit.how_measured_en !== crit.category_en && (
-                                        <span className="ms-2 text-muted-foreground/80">
-                                          • {isAr ? crit.how_measured_ar : crit.how_measured_en}
-                                        </span>
-                                      )}
-                                    </p>
-                                  </div>
-
-                                  <div className="flex items-center gap-3 shrink-0">
-                                    <div className="text-end font-mono text-xs">
-                                      <span className="text-muted-foreground">{isAr ? "الوزن:" : "Weight:"} </span>
-                                      <strong className="text-foreground">{weightPct}%</strong>
-                                      <span className="ms-2 text-muted-foreground">{isAr ? "الهدف:" : "Target:"} </span>
-                                      <strong className="text-emerald-600">{targetPct}%</strong>
-                                    </div>
-
-                                    <div className="flex items-center gap-1">
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => handleOpenEditCriterion(crit)}
-                                        className="h-7 w-7 p-0 rounded-lg text-muted-foreground hover:text-brand cursor-pointer"
-                                        title={isAr ? "تعديل" : "Edit"}
-                                      >
-                                        <Pencil className="h-3.5 w-3.5" />
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => handleArchiveCriterion(crit.id)}
-                                        className="h-7 w-7 p-0 rounded-lg text-muted-foreground hover:text-rose-600 cursor-pointer"
-                                        title={isAr ? "أرشفة" : "Archive"}
-                                      >
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                      </Button>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              ) : (
-                /* Flat List View */
-                <div className="divide-y divide-border rounded-2xl border border-border overflow-hidden bg-card">
-                  {kpiCriteria
-                    .filter((crit: any) => {
-                      const matchLayer = criteriaLayerFilter === "all" || crit.layer === criteriaLayerFilter;
-                      const critCat = crit.category_en || crit.category || "operational";
-                      const matchCat =
-                        criteriaCategoryFilter === "all" ||
-                        critCat === criteriaCategoryFilter ||
-                        crit.category === criteriaCategoryFilter;
-                      return matchLayer && matchCat;
-                    })
-                    .map((crit: any) => {
-                      const weightPct = crit.default_weight ? (crit.default_weight * 100).toFixed(1) : "—";
-                      const targetPct =
-                        crit.default_target !== undefined && crit.default_target !== null
-                          ? (crit.default_target <= 1
-                              ? (crit.default_target * 100).toFixed(0)
-                              : crit.default_target)
-                          : crit.max_value !== undefined && crit.max_value !== null
-                          ? crit.max_value
-                          : "—";
-
-                      return (
-                        <div
-                          key={crit.id}
-                          className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-muted/30 transition-colors"
-                        >
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0">
-                                {crit.code}
-                              </Badge>
-                              <span className="font-bold text-xs text-foreground">
-                                {isAr ? crit.name_ar : crit.name_en}
-                              </span>
-                              <Badge
-                                className={`text-[10px] px-2 py-0 ${
-                                  crit.layer === "common"
-                                    ? "bg-blue-600 text-white"
-                                    : crit.layer === "role"
-                                    ? "bg-emerald-600 text-white"
-                                    : "bg-purple-600 text-white"
-                                }`}
-                              >
-                                {crit.layer === "common"
-                                  ? isAr ? "معيار عام" : "Common"
-                                  : crit.layer === "role"
-                                  ? isAr ? "معيار تخصصي" : "Role"
-                                  : isAr ? "مخصص" : "Custom"}
-                              </Badge>
-
-                              {crit.scoring_direction && (
-                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono text-muted-foreground">
-                                  {crit.scoring_direction === "higher_is_better"
-                                    ? isAr ? "الأعلى أفضل ↑" : "Higher ↑"
-                                    : crit.scoring_direction === "lower_is_better"
-                                    ? isAr ? "الأقل أفضل ↓" : "Lower ↓"
-                                    : crit.scoring_direction === "rating_5"
-                                    ? isAr ? "مقياس 1-5 ★" : "Scale 1-5"
-                                    : crit.scoring_direction}
-                                </Badge>
-                              )}
-                              {crit.unit && (
-                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono text-muted-foreground">
-                                  {crit.unit}
-                                </Badge>
-                              )}
-                            </div>
-                            <p className="text-[11px] text-muted-foreground">
-                              {isAr ? crit.category_ar : crit.category_en}
-                              {crit.how_measured_en && crit.how_measured_en !== crit.category_en && (
-                                <span className="ms-2 text-muted-foreground/80">
-                                  • {isAr ? crit.how_measured_ar : crit.how_measured_en}
-                                </span>
-                              )}
-                            </p>
-                          </div>
-
-                          <div className="flex items-center gap-3 shrink-0">
-                            <div className="text-end font-mono text-xs">
-                              <span className="text-muted-foreground">{isAr ? "الوزن:" : "Weight:"} </span>
-                              <strong className="text-foreground">{weightPct}%</strong>
-                              <span className="ms-2 text-muted-foreground">{isAr ? "الهدف:" : "Target:"} </span>
-                              <strong className="text-emerald-600">{targetPct}%</strong>
-                            </div>
-
-                            <div className="flex items-center gap-1">
                               <Button
-                                variant="ghost"
+                                variant="outline"
                                 size="sm"
-                                onClick={() => handleOpenEditCriterion(crit)}
-                                className="h-7 w-7 p-0 rounded-lg text-muted-foreground hover:text-brand cursor-pointer"
-                                title={isAr ? "تعديل" : "Edit"}
+                                onClick={() => handleNavigateToScorecard(item)}
+                                className="h-8 rounded-xl text-xs gap-1 cursor-pointer"
                               >
-                                <Pencil className="h-3.5 w-3.5" />
+                                <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+                                <span>{isAr ? "عرض التفاصيل" : "Scorecard"}</span>
                               </Button>
+
                               <Button
-                                variant="ghost"
+                                variant="outline"
                                 size="sm"
-                                onClick={() => handleArchiveCriterion(crit.id)}
-                                className="h-7 w-7 p-0 rounded-lg text-muted-foreground hover:text-rose-600 cursor-pointer"
-                                title={isAr ? "أرشفة" : "Archive"}
+                                onClick={() => handleOpenReturnModal(item)}
+                                disabled={isSubmittingReview}
+                                className="h-8 rounded-xl text-xs gap-1 border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 cursor-pointer"
                               >
-                                <Trash2 className="h-3.5 w-3.5" />
+                                <RotateCcw className="h-3.5 w-3.5" />
+                                <span>{isAr ? "إعادة للتعديل" : "Return"}</span>
+                              </Button>
+
+                              <Button
+                                size="sm"
+                                onClick={() => handleApprovePending(item)}
+                                disabled={isSubmittingReview}
+                                className="h-8 rounded-xl text-xs gap-1 bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer shadow-xs"
+                              >
+                                <Check className="h-3.5 w-3.5" />
+                                <span>{isAr ? "اعتماد رسمي" : "Approve"}</span>
                               </Button>
                             </div>
                           </div>
@@ -4336,8 +3549,777 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                 </div>
               )}
             </div>
-          )}
-        </TabsContent>
+          </TabsContent>
+        )}
+
+        {/* ── TAB: TEMPLATES & CRITERIA CATALOG (HR ADMIN) ── */}
+        {!isManagerMode && (
+          <TabsContent value="templates-criteria" className="space-y-4">
+            {/* Sub-tab Navigation: Templates vs Criteria */}
+            <div className="flex flex-wrap items-center gap-2 border-b border-border pb-3">
+              <button
+                type="button"
+                onClick={() => setTemplateSubTab("templates")}
+                className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-xs font-bold transition-all cursor-pointer ${templateSubTab === "templates"
+                  ? "bg-brand text-brand-foreground shadow-xs"
+                  : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  }`}
+              >
+                <Layers className="h-4 w-4" />
+                <span>{isAr ? "قوالب التقييم الوظيفية" : "Job Role Templates"}</span>
+                <Badge
+                  variant="outline"
+                  className={`text-[10px] px-1.5 py-0 font-mono ${templateSubTab === "templates" ? "border-brand-foreground/30 text-brand-foreground" : ""
+                    }`}
+                >
+                  {kpiTemplates.length}
+                </Badge>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setTemplateSubTab("criteria")}
+                className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-xs font-bold transition-all cursor-pointer ${templateSubTab === "criteria"
+                  ? "bg-brand text-brand-foreground shadow-xs"
+                  : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  }`}
+              >
+                <Award className="h-4 w-4" />
+                <span>{isAr ? "دليل ومكتبة المعايير" : "Criteria Library"}</span>
+                <Badge
+                  variant="outline"
+                  className={`text-[10px] px-1.5 py-0 font-mono ${templateSubTab === "criteria" ? "border-brand-foreground/30 text-brand-foreground" : ""
+                    }`}
+                >
+                  {kpiCriteria.length}
+                </Badge>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setTemplateSubTab("job-descriptions")}
+                className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-xs font-bold transition-all cursor-pointer ${templateSubTab === "job-descriptions"
+                  ? "bg-brand text-brand-foreground shadow-xs"
+                  : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  }`}
+              >
+                <FileText className="h-4 w-4" />
+                <span>{isAr ? "الأوصاف الوظيفية" : "Job Descriptions"}</span>
+              </button>
+            </div>
+
+            {templateSubTab === "job-descriptions" && <JobDescriptionsTab />}
+            {/* ═════════════════════════════════════════════════════════════════ */}
+            {/* VIEW A: TEMPLATES MANAGER                                         */}
+            {/* ═════════════════════════════════════════════════════════════════ */}
+            {templateSubTab === "job-descriptions" ? null : templateSubTab === "templates" ? (
+              <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-sm space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-semibold text-brand">
+                        <Layers className="h-3.5 w-3.5" />
+                        {isAr ? "محرك قوالب التقييم" : "Template Engine"}
+                      </span>
+                      <Badge variant="outline" className="text-[10px] font-mono">
+                        {kpiTemplates.length} {isAr ? "قوالب" : "Templates"}
+                      </Badge>
+                    </div>
+                    <h2 className="font-display text-lg font-bold text-foreground mt-1">
+                      {isAr ? "قوالب تقييم الوظائف والمستويات المهنية" : "Job Role Evaluation Templates"}
+                    </h2>
+                    <p className="text-xs text-muted-foreground">
+                      {isAr
+                        ? "إدارة قوالب التقييم وفق الهيكل: الإدارة ← المسمى الوظيفي ← المستوى المهني (Junior, Mid, Senior, Lead). يجب أن يساوي مجموع الأوزان 100% بالضبط للنشر."
+                        : "Configure templates tailored by Department → Position → Seniority Level. Sum of criteria weights must equal exactly 100% to publish."}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={handleSeedDefaultTemplates}
+                      variant="outline"
+                      size="sm"
+                      disabled={isSeedingTemplates}
+                      className="rounded-2xl gap-1.5 cursor-pointer text-xs border-brand/30 hover:bg-brand/5"
+                      title={isAr ? "إدراج قوالب الوظائف الافتراضية (هندسة، برمجيات، موارد بشرية، محاسبة، مبيعات)" : "Seed standard templates for Engineering, IT, HR, Finance, Sales"}
+                    >
+                      {isSeedingTemplates ? <Loader2 className="h-4 w-4 animate-spin text-brand" /> : <Sparkles className="h-4 w-4 text-brand" />}
+                      <span>{isAr ? "إدراج القوالب الافتراضية" : "Seed Default Templates"}</span>
+                    </Button>
+                    <Button
+                      onClick={handleOpenCreateTemplate}
+                      size="sm"
+                      className="rounded-2xl gap-1.5 bg-brand text-brand-foreground hover:bg-brand/90 cursor-pointer shadow-xs"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span>{isAr ? "إنشاء قالب جديد" : "Create New Template"}</span>
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Filter bar */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="relative">
+                    <Input
+                      value={templateSearch}
+                      onChange={(e) => setTemplateSearch(e.target.value)}
+                      placeholder={isAr ? "بحث بالاسم أو المنصب أو القسم..." : "Search templates, roles, depts..."}
+                      className="rounded-xl text-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <select
+                      value={templateDeptFilter}
+                      onChange={(e) => setTemplateDeptFilter(e.target.value)}
+                      className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold"
+                    >
+                      <option value="all">{isAr ? "جميع الأقسام" : "All Departments"}</option>
+                      {(departmentsData || []).map((dept: any) => (
+                        <option key={dept.id} value={dept.id}>
+                          {isAr ? dept.name_ar || dept.name_en : dept.name_en || dept.name_ar}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <select
+                      value={templateStatusFilter}
+                      onChange={(e) => setTemplateStatusFilter(e.target.value)}
+                      className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold"
+                    >
+                      <option value="all">{isAr ? "جميع الحالات" : "All Statuses"}</option>
+                      <option value="published">{isAr ? "معتمد ومنشور" : "Published"}</option>
+                      <option value="draft">{isAr ? "مسودة" : "Draft"}</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Templates Grid */}
+                {isLoadingTemplates ? (
+                  <div className="p-12 text-center text-xs text-muted-foreground flex flex-col items-center gap-2">
+                    <Loader2 className="h-6 w-6 animate-spin text-brand" />
+                    <span>{isAr ? "جارٍ تحميل القوالب..." : "Loading templates..."}</span>
+                  </div>
+                ) : filteredTemplates.length === 0 ? (
+                  <div className="p-12 text-center rounded-2xl border border-dashed border-border bg-muted/20 space-y-3">
+                    <Layers className="h-10 w-10 text-muted-foreground/60 mx-auto" />
+                    <p className="text-xs font-semibold text-foreground">
+                      {isAr ? "لا توجد قوالب تطابق البحث" : "No templates found matching your criteria"}
+                    </p>
+                    <div className="flex items-center justify-center gap-2 pt-1">
+                      <Button
+                        size="sm"
+                        onClick={handleSeedDefaultTemplates}
+                        disabled={isSeedingTemplates}
+                        className="rounded-xl text-xs gap-1.5 cursor-pointer bg-brand text-brand-foreground hover:bg-brand/90"
+                      >
+                        {isSeedingTemplates ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                        <span>{isAr ? "إدراج القوالب الافتراضية الجاهزة" : "Seed Default Templates"}</span>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleOpenCreateTemplate}
+                        className="rounded-xl text-xs gap-1.5 cursor-pointer"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span>{isAr ? "إنشاء قالب مخصص" : "Create Custom Template"}</span>
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredTemplates.map((tmpl: any) => {
+                      const totalWeight = Math.round(
+                        (tmpl.items || []).reduce((acc: number, it: any) => acc + Number(it.weight || 0), 0) * 100
+                      );
+                      const is100 = totalWeight === 100;
+                      const isPublished = tmpl.status === "published";
+                      const version = tmpl.version || 1;
+
+                      return (
+                        <div
+                          key={tmpl.id}
+                          className="rounded-2xl border border-border bg-card p-4 shadow-xs hover:border-brand/40 transition-all flex flex-col justify-between space-y-4"
+                        >
+                          <div className="space-y-3">
+                            {/* Card Header */}
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="space-y-0.5">
+                                <h3 className="font-bold text-sm text-foreground leading-tight">
+                                  {isAr ? tmpl.name_ar || tmpl.name_en : tmpl.name_en}
+                                </h3>
+                                {tmpl.name_ar && !isAr && (
+                                  <p className="text-[11px] text-muted-foreground font-arabic" dir="rtl">
+                                    {tmpl.name_ar}
+                                  </p>
+                                )}
+                                {tmpl.name_en && isAr && (
+                                  <p className="text-[11px] text-muted-foreground font-mono">
+                                    {tmpl.name_en}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0 bg-muted/40">
+                                  v{version}
+                                </Badge>
+                                {isPublished ? (
+                                  <Badge className="bg-emerald-600 text-white text-[10px] px-2 py-0">
+                                    {isAr ? "معتمد" : "Published"}
+                                  </Badge>
+                                ) : (
+                                  <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 text-[10px] px-2 py-0">
+                                    {isAr ? "مسودة" : "Draft"}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Role Badges */}
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <Badge variant="secondary" className="text-[10px] px-2 py-0.5 font-medium">
+                                {tmpl.department ? (isAr ? tmpl.department.name_ar || tmpl.department.name_en : tmpl.department.name_en) : (isAr ? "كل الأقسام" : "All Departments")}
+                              </Badge>
+                              <Badge variant="secondary" className="text-[10px] px-2 py-0.5 font-medium bg-brand/10 text-brand">
+                                {tmpl.position ? (isAr ? tmpl.position.name_ar || tmpl.position.name_en : tmpl.position.name_en) : (isAr ? "كل المناصب" : "All Positions")}
+                              </Badge>
+                              {tmpl.job_grade && (
+                                <Badge variant="outline" className="text-[10px] px-2 py-0.5 font-semibold text-purple-600 border-purple-300 dark:border-purple-800">
+                                  {isAr ? tmpl.job_grade.name_ar || tmpl.job_grade.name_en : tmpl.job_grade.name_en}
+                                </Badge>
+                              )}
+                            </div>
+
+                            {/* Weight & Criteria Count Banner */}
+                            <div className="flex items-center justify-between p-2 rounded-xl bg-muted/40 border border-border/60 text-xs">
+                              <span className="text-muted-foreground flex items-center gap-1">
+                                <Award className="h-3 w-3 text-brand" />
+                                <span>{tmpl.items?.length || 0} {isAr ? "معايير" : "KPIs"}</span>
+                              </span>
+                              <span className={`font-mono font-bold text-xs ${is100 ? "text-emerald-600" : "text-amber-600"}`}>
+                                {isAr ? `مجموع الأوزان: ${totalWeight}%` : `Weight: ${totalWeight}%`}
+                              </span>
+                            </div>
+
+                            {/* Items Preview */}
+                            <div className="space-y-1">
+                              {(tmpl.items || []).slice(0, 3).map((it: any, iIdx: number) => {
+                                const critName = isAr
+                                  ? it.criterion?.name_ar || it.criterion?.name_en || `#${iIdx + 1}`
+                                  : it.criterion?.name_en || it.criterion?.name_ar || `#${iIdx + 1}`;
+                                const itWeight = Math.round(Number(it.weight || 0) * 100);
+                                return (
+                                  <div key={it.id || iIdx} className="flex items-center justify-between text-[11px] text-muted-foreground">
+                                    <span className="truncate max-w-[200px]">• {critName}</span>
+                                    <span className="font-mono text-[10px] shrink-0 font-semibold">{itWeight}%</span>
+                                  </div>
+                                );
+                              })}
+                              {(tmpl.items || []).length > 3 && (
+                                <p className="text-[10px] text-muted-foreground/80 italic text-end">
+                                  + {(tmpl.items || []).length - 3} {isAr ? "معايير أخرى" : "more criteria"}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Card Actions */}
+                          <div className="pt-3 border-t border-border flex items-center justify-between gap-1.5">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenEditTemplate(tmpl)}
+                              className="h-7 text-xs rounded-xl px-2.5 gap-1 cursor-pointer"
+                            >
+                              <Pencil className="h-3 w-3" />
+                              <span>{isAr ? "تعديل" : "Edit"}</span>
+                            </Button>
+
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenDuplicateTemplate(tmpl)}
+                              className="h-7 text-xs rounded-xl px-2.5 gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
+                            >
+                              <Copy className="h-3 w-3" />
+                              <span>{isAr ? "استنساخ" : "Duplicate"}</span>
+                            </Button>
+
+                            {!isPublished && (
+                              <Button
+                                size="sm"
+                                onClick={() => handlePublishTemplateDirectly(tmpl.id)}
+                                disabled={!is100}
+                                className={`h-7 text-xs rounded-xl px-2.5 gap-1 cursor-pointer ${is100 ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "opacity-50 cursor-not-allowed"
+                                  }`}
+                                title={!is100 ? (isAr ? "يتطلب مجموع 100% للنشر" : "Requires 100% total weight") : ""}
+                              >
+                                <ShieldCheck className="h-3 w-3" />
+                                <span>{isAr ? "نشر" : "Publish"}</span>
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* ═════════════════════════════════════════════════════════════════ */
+              /* VIEW B: CRITERIA LIBRARY                                         */
+              /* ═════════════════════════════════════════════════════════════════ */
+              <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-sm space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-semibold text-brand">
+                        <Award className="h-3.5 w-3.5" />
+                        {isAr ? "دليل المعايير والمؤشرات" : "Criteria Catalog"}
+                      </span>
+                      <Badge variant="outline" className="text-[10px] font-mono">
+                        {kpiCriteria.length} {isAr ? "معياراً مسجلاً" : "Criteria"}
+                      </Badge>
+                    </div>
+                    <h2 className="font-display text-lg font-bold text-foreground mt-1">
+                      {isAr ? "إدارة بنك معايير ومؤشرات الأداء" : "KPI Criteria Library & Measurement Definitions"}
+                    </h2>
+                    <p className="text-xs text-muted-foreground">
+                      {isAr
+                        ? "المعايير المعتمدة المتاحة لإدراجها في قوالب تقييم الوظائف المختلفة مع اتجاهات القياس والوحدات."
+                        : "Approved metric definitions with scoring directions (Higher is better, Lower is better, 1-5 scale) and target benchmarks."}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      onClick={handleDownloadCriteriaTemplate}
+                      variant="outline"
+                      size="sm"
+                      className="rounded-2xl gap-1.5 border-border hover:bg-muted/60 cursor-pointer shadow-xs text-xs font-medium"
+                      title={isAr ? "تحميل نموذج إكسيل مجهز بالمعايير والأمثلة" : "Download ready-made Excel template with sample criteria"}
+                    >
+                      <FileDown className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                      <span>{isAr ? "تحميل نموذج مجهز" : "Download Template"}</span>
+                    </Button>
+
+                    <input
+                      ref={criteriaFileInputRef}
+                      type="file"
+                      accept=".xlsx,.xls,.csv"
+                      onChange={handleImportCriteriaFile}
+                      className="hidden"
+                    />
+                    <Button
+                      onClick={() => criteriaFileInputRef.current?.click()}
+                      variant="outline"
+                      size="sm"
+                      disabled={isImportingCriteria}
+                      className="rounded-2xl gap-1.5 border-border hover:bg-muted/60 cursor-pointer shadow-xs text-xs font-medium"
+                      title={isAr ? "استيراد معايير من ملف إكسيل أو CSV" : "Import criteria from Excel or CSV"}
+                    >
+                      {isImportingCriteria ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-brand" />
+                      ) : (
+                        <Upload className="h-4 w-4 text-brand" />
+                      )}
+                      <span>{isImportingCriteria ? (isAr ? "جاري الاستيراد..." : "Importing...") : (isAr ? "استيراد من إكسيل" : "Import from Excel")}</span>
+                    </Button>
+
+                    <Button
+                      onClick={handleOpenAddCriterion}
+                      size="sm"
+                      className="rounded-2xl gap-1.5 bg-brand text-brand-foreground hover:bg-brand/90 cursor-pointer shadow-xs text-xs font-medium"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span>{isAr ? "إضافة معيار جديد" : "Add Criterion"}</span>
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Architecture 3-Layer Weight Summary Banner */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                  <div className="p-4 rounded-2xl border border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-900/40 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-blue-700 dark:text-blue-400">
+                        {isAr ? "1. المعايير العامة للشركة" : "1. Company Common Layer"}
+                      </span>
+                      <Badge className="bg-blue-600 text-white font-mono text-[10px]">40.0%</Badge>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      {isAr
+                        ? "الانضباط والمواعيد، السلوك المهني والسياسات، العمل الجماعي، والمبادرة والمسؤولية."
+                        : "Attendance & punctuality, code of conduct, teamwork, initiative & ownership."}
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl border border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/20 dark:border-emerald-900/40 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                        {isAr ? "2. معايير التخصص والمنصب" : "2. Position / Role Layer"}
+                      </span>
+                      <Badge className="bg-emerald-600 text-white font-mono text-[10px]">60.0%</Badge>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      {isAr
+                        ? "الكفاءات الفنية الميدانية لكل مسمى وظيفي ومجال تخصص."
+                        : "Field competencies tailored to job role and discipline."}
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl border border-brand/30 bg-brand/5 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-brand">
+                        {isAr ? "3. مجموع الأوزان المستهدف" : "3. Target Weight Validation"}
+                      </span>
+                      <Badge className="bg-brand text-brand-foreground font-mono text-[10px]">100.0%</Badge>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      {isAr
+                        ? "التحقق الصارم من توازن الأوزان المئوية لتساوي دائماً 100% بدقة قبل اعتماد القوالب."
+                        : "Strict mathematical enforcement ensuring sum of all category weights equals exactly 100%."}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Filter by Layer & Grouping Controls */}
+                <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-1.5 bg-muted/60 p-1 rounded-2xl border border-border text-xs">
+                      {(["all", "common", "role", "custom"] as const).map((layer) => (
+                        <button
+                          key={layer}
+                          type="button"
+                          onClick={() => setCriteriaLayerFilter(layer)}
+                          className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${criteriaLayerFilter === layer
+                            ? "bg-card text-foreground shadow-xs"
+                            : "text-muted-foreground hover:text-foreground"
+                            }`}
+                        >
+                          {layer === "all"
+                            ? isAr ? "كل المعايير" : "All Layers"
+                            : layer === "common"
+                              ? isAr ? "عامة (40%)" : "Common (40%)"
+                              : layer === "role"
+                                ? isAr ? "تخصصية (60%)" : "Role Specific (60%)"
+                                : isAr ? "مخصصة" : "Custom"}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Category Filter Dropdown */}
+                    <select
+                      value={criteriaCategoryFilter}
+                      onChange={(e) => setCriteriaCategoryFilter(e.target.value)}
+                      className="rounded-2xl border border-input bg-background px-3 py-1.5 text-xs font-semibold cursor-pointer shadow-xs max-w-[220px]"
+                    >
+                      <option value="all">{isAr ? "جميع الفئات والتصنيفات" : "All Categories"}</option>
+                      {criteriaCategoriesList.map((cat) => (
+                        <option key={cat.key} value={cat.key}>
+                          {cat.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Group by Categories Toggle */}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant={groupByCategory ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setGroupByCategory(!groupByCategory)}
+                      className={`rounded-2xl text-xs gap-1.5 cursor-pointer shadow-xs ${groupByCategory
+                        ? "bg-brand text-brand-foreground hover:bg-brand/90"
+                        : "border-border hover:bg-muted/60"
+                        }`}
+                    >
+                      <FolderKanban className="h-3.5 w-3.5" />
+                      <span>{isAr ? "تجميع حسب الفئات" : "Group by Categories"}</span>
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Criteria Catalog Content */}
+                {isLoadingCriteria ? (
+                  <div className="p-12 text-center text-xs text-muted-foreground flex flex-col items-center gap-2">
+                    <Loader2 className="h-6 w-6 animate-spin text-brand" />
+                    <span>{isAr ? "جارٍ تحميل دليل المعايير..." : "Loading criteria..."}</span>
+                  </div>
+                ) : groupByCategory ? (
+                  /* Grouped by Category View */
+                  <div className="space-y-4">
+                    {groupedCriteriaByCategory.length === 0 ? (
+                      <div className="p-12 text-center text-xs text-muted-foreground rounded-2xl border border-dashed border-border bg-card">
+                        {isAr ? "لا توجد معايير مطابقة للفلاتر المحددة" : "No criteria match the selected filters."}
+                      </div>
+                    ) : (
+                      groupedCriteriaByCategory.map((group) => {
+                        const groupWeightPct = (group.totalWeight * 100).toFixed(1);
+                        return (
+                          <div
+                            key={group.categoryKey}
+                            className="rounded-2xl border border-border overflow-hidden bg-card shadow-xs"
+                          >
+                            {/* Category Header */}
+                            <div className="px-4 py-3 bg-muted/40 border-b border-border flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex items-center gap-2.5">
+                                <div className="h-7 w-7 rounded-xl bg-brand/10 text-brand flex items-center justify-center">
+                                  <FolderKanban className="h-4 w-4" />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <h3 className="font-bold text-xs text-foreground">
+                                    {group.categoryTitle}
+                                  </h3>
+                                  {isAr && group.categoryTitleEn !== group.categoryTitle && (
+                                    <span className="text-[10px] text-muted-foreground font-normal">
+                                      ({group.categoryTitleEn})
+                                    </span>
+                                  )}
+                                  {!isAr && group.categoryTitleAr && (
+                                    <span className="text-[10px] text-muted-foreground font-normal" dir="rtl">
+                                      ({group.categoryTitleAr})
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="font-mono text-[10px] bg-background">
+                                  {group.items.length} {isAr ? "معايير" : "Criteria"}
+                                </Badge>
+                                <Badge className="bg-brand/10 text-brand border border-brand/20 font-mono text-[10px]">
+                                  {isAr ? "الوزن:" : "Weight:"} {groupWeightPct}%
+                                </Badge>
+                              </div>
+                            </div>
+
+                            {/* Category Criteria Rows */}
+                            <div className="divide-y divide-border">
+                              {group.items.map((crit) => {
+                                const weightPct = crit.default_weight ? (crit.default_weight * 100).toFixed(1) : "—";
+                                const targetPct =
+                                  crit.default_target !== undefined && crit.default_target !== null
+                                    ? (crit.default_target <= 1
+                                      ? (crit.default_target * 100).toFixed(0)
+                                      : crit.default_target)
+                                    : crit.max_value !== undefined && crit.max_value !== null
+                                      ? crit.max_value
+                                      : "—";
+
+                                return (
+                                  <div
+                                    key={crit.id}
+                                    className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-muted/30 transition-colors"
+                                  >
+                                    <div className="space-y-1">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0">
+                                          {crit.code}
+                                        </Badge>
+                                        <span className="font-bold text-xs text-foreground">
+                                          {isAr ? crit.name_ar : crit.name_en}
+                                        </span>
+                                        <Badge
+                                          className={`text-[10px] px-2 py-0 ${crit.layer === "common"
+                                            ? "bg-blue-600 text-white"
+                                            : crit.layer === "role"
+                                              ? "bg-emerald-600 text-white"
+                                              : "bg-purple-600 text-white"
+                                            }`}
+                                        >
+                                          {crit.layer === "common"
+                                            ? isAr ? "معيار عام" : "Common"
+                                            : crit.layer === "role"
+                                              ? isAr ? "معيار تخصصي" : "Role"
+                                              : isAr ? "مخصص" : "Custom"}
+                                        </Badge>
+
+                                        {crit.scoring_direction && (
+                                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono text-muted-foreground">
+                                            {crit.scoring_direction === "higher_is_better"
+                                              ? isAr ? "الأعلى أفضل ↑" : "Higher ↑"
+                                              : crit.scoring_direction === "lower_is_better"
+                                                ? isAr ? "الأقل أفضل ↓" : "Lower ↓"
+                                                : crit.scoring_direction === "rating_5"
+                                                  ? isAr ? "مقياس 1-5 ★" : "Scale 1-5"
+                                                  : crit.scoring_direction}
+                                          </Badge>
+                                        )}
+                                        {crit.unit && (
+                                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono text-muted-foreground">
+                                            {crit.unit}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      <p className="text-[11px] text-muted-foreground">
+                                        {isAr ? crit.category_ar : crit.category_en}
+                                        {crit.how_measured_en && crit.how_measured_en !== crit.category_en && (
+                                          <span className="ms-2 text-muted-foreground/80">
+                                            • {isAr ? crit.how_measured_ar : crit.how_measured_en}
+                                          </span>
+                                        )}
+                                      </p>
+                                    </div>
+
+                                    <div className="flex items-center gap-3 shrink-0">
+                                      <div className="text-end font-mono text-xs">
+                                        <span className="text-muted-foreground">{isAr ? "الوزن:" : "Weight:"} </span>
+                                        <strong className="text-foreground">{weightPct}%</strong>
+                                        <span className="ms-2 text-muted-foreground">{isAr ? "الهدف:" : "Target:"} </span>
+                                        <strong className="text-emerald-600">{targetPct}%</strong>
+                                      </div>
+
+                                      <div className="flex items-center gap-1">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => handleOpenEditCriterion(crit)}
+                                          className="h-7 w-7 p-0 rounded-lg text-muted-foreground hover:text-brand cursor-pointer"
+                                          title={isAr ? "تعديل" : "Edit"}
+                                        >
+                                          <Pencil className="h-3.5 w-3.5" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => handleArchiveCriterion(crit.id)}
+                                          className="h-7 w-7 p-0 rounded-lg text-muted-foreground hover:text-rose-600 cursor-pointer"
+                                          title={isAr ? "أرشفة" : "Archive"}
+                                        >
+                                          <Trash2 className="h-3.5 w-3.5" />
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                ) : (
+                  /* Flat List View */
+                  <div className="divide-y divide-border rounded-2xl border border-border overflow-hidden bg-card">
+                    {kpiCriteria
+                      .filter((crit: any) => {
+                        const matchLayer = criteriaLayerFilter === "all" || crit.layer === criteriaLayerFilter;
+                        const critCat = crit.category_en || crit.category || "operational";
+                        const matchCat =
+                          criteriaCategoryFilter === "all" ||
+                          critCat === criteriaCategoryFilter ||
+                          crit.category === criteriaCategoryFilter;
+                        return matchLayer && matchCat;
+                      })
+                      .map((crit: any) => {
+                        const weightPct = crit.default_weight ? (crit.default_weight * 100).toFixed(1) : "—";
+                        const targetPct =
+                          crit.default_target !== undefined && crit.default_target !== null
+                            ? (crit.default_target <= 1
+                              ? (crit.default_target * 100).toFixed(0)
+                              : crit.default_target)
+                            : crit.max_value !== undefined && crit.max_value !== null
+                              ? crit.max_value
+                              : "—";
+
+                        return (
+                          <div
+                            key={crit.id}
+                            className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-muted/30 transition-colors"
+                          >
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0">
+                                  {crit.code}
+                                </Badge>
+                                <span className="font-bold text-xs text-foreground">
+                                  {isAr ? crit.name_ar : crit.name_en}
+                                </span>
+                                <Badge
+                                  className={`text-[10px] px-2 py-0 ${crit.layer === "common"
+                                    ? "bg-blue-600 text-white"
+                                    : crit.layer === "role"
+                                      ? "bg-emerald-600 text-white"
+                                      : "bg-purple-600 text-white"
+                                    }`}
+                                >
+                                  {crit.layer === "common"
+                                    ? isAr ? "معيار عام" : "Common"
+                                    : crit.layer === "role"
+                                      ? isAr ? "معيار تخصصي" : "Role"
+                                      : isAr ? "مخصص" : "Custom"}
+                                </Badge>
+
+                                {crit.scoring_direction && (
+                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono text-muted-foreground">
+                                    {crit.scoring_direction === "higher_is_better"
+                                      ? isAr ? "الأعلى أفضل ↑" : "Higher ↑"
+                                      : crit.scoring_direction === "lower_is_better"
+                                        ? isAr ? "الأقل أفضل ↓" : "Lower ↓"
+                                        : crit.scoring_direction === "rating_5"
+                                          ? isAr ? "مقياس 1-5 ★" : "Scale 1-5"
+                                          : crit.scoring_direction}
+                                  </Badge>
+                                )}
+                                {crit.unit && (
+                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono text-muted-foreground">
+                                    {crit.unit}
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-muted-foreground">
+                                {isAr ? crit.category_ar : crit.category_en}
+                                {crit.how_measured_en && crit.how_measured_en !== crit.category_en && (
+                                  <span className="ms-2 text-muted-foreground/80">
+                                    • {isAr ? crit.how_measured_ar : crit.how_measured_en}
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-3 shrink-0">
+                              <div className="text-end font-mono text-xs">
+                                <span className="text-muted-foreground">{isAr ? "الوزن:" : "Weight:"} </span>
+                                <strong className="text-foreground">{weightPct}%</strong>
+                                <span className="ms-2 text-muted-foreground">{isAr ? "الهدف:" : "Target:"} </span>
+                                <strong className="text-emerald-600">{targetPct}%</strong>
+                              </div>
+
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleOpenEditCriterion(crit)}
+                                  className="h-7 w-7 p-0 rounded-lg text-muted-foreground hover:text-brand cursor-pointer"
+                                  title={isAr ? "تعديل" : "Edit"}
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleArchiveCriterion(crit.id)}
+                                  className="h-7 w-7 p-0 rounded-lg text-muted-foreground hover:text-rose-600 cursor-pointer"
+                                  title={isAr ? "أرشفة" : "Archive"}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
+            )}
+          </TabsContent>
         )}
       </Tabs>
 
@@ -4476,7 +4458,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
             <div className="flex items-center gap-2 text-brand">
               <Layers className="h-5 w-5" />
               <DialogTitle className="font-display text-lg font-bold">
-                {isAr ? `سجل تقييمات الأداء السنوية — عام ${selectedYear}` : `Annual KPI Evaluations Directory — Year ${selectedYear}`}
+                {isAr ? `سجل تقييمات الأداء السنوية — عام ${selectedYear}` : `KPI Evaluations Directory — Year ${selectedYear}`}
               </DialogTitle>
             </div>
           </DialogHeader>
@@ -4500,9 +4482,8 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                   return (
                     <div
                       key={ev.id}
-                      className={`flex items-center justify-between p-3.5 transition-colors ${
-                        isSelected ? "bg-brand/5 font-medium" : "hover:bg-muted/40"
-                      }`}
+                      className={`flex items-center justify-between p-3.5 transition-colors ${isSelected ? "bg-brand/5 font-medium" : "hover:bg-muted/40"
+                        }`}
                     >
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-2">
@@ -4621,8 +4602,8 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                   ? "تعديل التخصص الهندسي ومجال الكفاءة"
                   : "إضافة تخصص هندسي / مجال كفاءة جديد"
                 : editingDiscipline
-                ? "Edit Engineering Discipline"
-                : "Add New Engineering Discipline"}
+                  ? "Edit Engineering Discipline"
+                  : "Add New Engineering Discipline"}
             </DialogTitle>
           </DialogHeader>
 
@@ -4937,8 +4918,8 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                     ? `تعديل قالب التقييم (الإصدار v${editingTemplate.version || 1})`
                     : `Edit KPI Template (v${editingTemplate.version || 1})`
                   : isAr
-                  ? "إنشاء قالب تقييم جديد للوظيفة"
-                  : "Create New Job Evaluation Template"}
+                    ? "إنشاء قالب تقييم جديد للوظيفة"
+                    : "Create New Job Evaluation Template"}
               </DialogTitle>
             </div>
           </DialogHeader>
@@ -4955,11 +4936,11 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                   <p className="text-[11px] leading-relaxed">
                     {isAr
                       ? "هذا القالب معتمد حالياً. في حال تم استخدامه في تقييمات موظفين، سيؤدي حفظ التعديلات إلى إنشاء إصدار جديد (v" +
-                        ((editingTemplate.version || 1) + 1) +
-                        ") كمسودة، لحماية التقييمات السابقة من التغيير."
+                      ((editingTemplate.version || 1) + 1) +
+                      ") كمسودة، لحماية التقييمات السابقة من التغيير."
                       : "This template is currently published. If evaluations already exist, saving will branch to a new version draft (v" +
-                        ((editingTemplate.version || 1) + 1) +
-                        ") ensuring historical evaluations remain intact."}
+                      ((editingTemplate.version || 1) + 1) +
+                      ") ensuring historical evaluations remain intact."}
                   </p>
                 </div>
               </div>
@@ -5131,19 +5112,18 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                               key={l}
                               type="button"
                               onClick={() => setTemplateCriterionLayerFilter(l)}
-                              className={`px-2.5 py-0.5 rounded-lg text-[10px] font-medium transition-colors cursor-pointer shrink-0 ${
-                                templateCriterionLayerFilter === l
-                                  ? "bg-brand text-brand-foreground font-semibold shadow-xs"
-                                  : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
-                              }`}
+                              className={`px-2.5 py-0.5 rounded-lg text-[10px] font-medium transition-colors cursor-pointer shrink-0 ${templateCriterionLayerFilter === l
+                                ? "bg-brand text-brand-foreground font-semibold shadow-xs"
+                                : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                }`}
                             >
                               {l === "all"
                                 ? isAr ? "الكل" : "All"
                                 : l === "common"
-                                ? isAr ? "عام (40%)" : "Common (40%)"
-                                : l === "role"
-                                ? isAr ? "تخصصي (60%)" : "Role Specific (60%)"
-                                : isAr ? "مخصص" : "Custom"}
+                                  ? isAr ? "عام (40%)" : "Common (40%)"
+                                  : l === "role"
+                                    ? isAr ? "تخصصي (60%)" : "Role Specific (60%)"
+                                    : isAr ? "مخصص" : "Custom"}
                             </button>
                           ))}
                           <span className="ms-auto text-[10px] text-muted-foreground shrink-0 ps-1 font-mono">
@@ -5180,19 +5160,18 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                                     {isAr ? c.name_ar || c.name_en : c.name_en || c.name_ar}
                                   </span>
                                   <Badge
-                                    className={`text-[9px] px-1.5 py-0 shrink-0 ${
-                                      c.layer === "common"
-                                        ? "bg-blue-600/90 text-white"
-                                        : c.layer === "role"
+                                    className={`text-[9px] px-1.5 py-0 shrink-0 ${c.layer === "common"
+                                      ? "bg-blue-600/90 text-white"
+                                      : c.layer === "role"
                                         ? "bg-emerald-600/90 text-white"
                                         : "bg-purple-600/90 text-white"
-                                    }`}
+                                      }`}
                                   >
                                     {c.layer === "common"
                                       ? (isAr ? "عام" : "Common")
                                       : c.layer === "role"
-                                      ? (isAr ? "تخصصي" : "Role")
-                                      : (isAr ? "مخصص" : "Custom")}
+                                        ? (isAr ? "تخصصي" : "Role")
+                                        : (isAr ? "مخصص" : "Custom")}
                                   </Badge>
                                 </div>
                                 <div className="flex items-center gap-2 text-[10px] text-muted-foreground flex-wrap">
@@ -5381,13 +5360,12 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
 
                 return (
                   <div
-                    className={`p-3.5 rounded-2xl border transition-all space-y-2 ${
-                      isExact100
-                        ? "border-emerald-300 bg-emerald-500/10 text-emerald-900 dark:text-emerald-200"
-                        : isUnder
+                    className={`p-3.5 rounded-2xl border transition-all space-y-2 ${isExact100
+                      ? "border-emerald-300 bg-emerald-500/10 text-emerald-900 dark:text-emerald-200"
+                      : isUnder
                         ? "border-amber-300 bg-amber-500/10 text-amber-900 dark:text-amber-200"
                         : "border-rose-300 bg-rose-500/10 text-rose-900 dark:text-rose-200"
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center justify-between text-xs font-bold">
                       <span className="flex items-center gap-1.5">
@@ -5405,9 +5383,8 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
 
                     <div className="h-2 w-full rounded-full bg-muted/60 overflow-hidden">
                       <div
-                        className={`h-full transition-all duration-300 ${
-                          isExact100 ? "bg-emerald-600" : isUnder ? "bg-amber-500" : "bg-rose-600"
-                        }`}
+                        className={`h-full transition-all duration-300 ${isExact100 ? "bg-emerald-600" : isUnder ? "bg-amber-500" : "bg-rose-600"
+                          }`}
                         style={{ width: `${Math.min(100, Math.max(0, currentSum))}%` }}
                       />
                     </div>
@@ -5418,12 +5395,12 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                           ? "✓ الأوزان متطابقة بنسبة 100% تماماً. القالب مؤهل للنشر والاعتماد الرسمي."
                           : "✓ Target weight achieved (100.0%). Template is fully eligible for publishing."
                         : isUnder
-                        ? isAr
-                          ? `• إجمالي الأوزان أقل من 100% بـ (${(100 - currentSum).toFixed(1)}%). يمكنك الحفظ كمسودة، لكن يلزم 100% بالضبط لنشر القالب.`
-                          : `• Total weight is under 100% by ${(100 - currentSum).toFixed(1)}%. You may save as a Draft, but must reach exactly 100% to publish.`
-                        : isAr
-                        ? `• إجمالي الأوزان يتجاوز 100% بـ (${(currentSum - 100).toFixed(1)}%). يرجى خفض أوزان المعايير.`
-                        : `• Total weight exceeds 100% by ${(currentSum - 100).toFixed(1)}%. Please reduce criteria weights.`}
+                          ? isAr
+                            ? `• إجمالي الأوزان أقل من 100% بـ (${(100 - currentSum).toFixed(1)}%). يمكنك الحفظ كمسودة، لكن يلزم 100% بالضبط لنشر القالب.`
+                            : `• Total weight is under 100% by ${(100 - currentSum).toFixed(1)}%. You may save as a Draft, but must reach exactly 100% to publish.`
+                          : isAr
+                            ? `• إجمالي الأوزان يتجاوز 100% بـ (${(currentSum - 100).toFixed(1)}%). يرجى خفض أوزان المعايير.`
+                            : `• Total weight exceeds 100% by ${(currentSum - 100).toFixed(1)}%. Please reduce criteria weights.`}
                     </p>
                   </div>
                 );

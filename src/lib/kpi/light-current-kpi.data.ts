@@ -1,6 +1,6 @@
 /**
  * KPI Definitions & Calculations for
- * Junior ELV / Light Current Site Engineer Annual KPI Evaluation
+ * Junior ELV / Light Current Site Engineer KPI Evaluation
  * Source: Light Current Engineer Annul KPI Evaluation.xlsx (Integrated Technics)
  * Fully localized with English and Arabic.
  */
