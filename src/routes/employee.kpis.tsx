@@ -1085,41 +1085,44 @@ export function EmployeeKpiPage() {
             {/* Sub-view 2: Scorecard & Detailed Criteria Records (Matching Admin / Manager Layout) */}
             {kpiSubTab === "scorecard" && (
               <div className="rounded-3xl border border-border bg-card p-4 sm:p-5 shadow-2xs space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-border/50">
-                  <div>
-                    <h3 className="font-bold text-sm sm:text-base text-foreground flex items-center gap-2">
-                      <FileCheck className="h-4 w-4 text-brand" />
-                      <span>{isAr ? "سجل بطاقة الأداء والمعايير المعتمدة" : "Detailed Criteria Scorecard"}</span>
-                    </h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/50">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <h3 className="font-bold text-sm sm:text-base text-foreground flex items-center gap-2">
+                        <FileCheck className="h-4 w-4 text-brand" />
+                        <span>{isAr ? "سجل بطاقة الأداء والمعايير المعتمدة" : "Detailed Criteria Scorecard"}</span>
+                      </h3>
+                      <Badge variant="outline" className="font-mono text-xs px-2 py-0.5 rounded-full border-border bg-muted/40 font-medium text-muted-foreground">
+                        {activeScorecardItems.length} {isAr ? "معايير معتمدة" : "Metrics"}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
                       {isAr
                         ? "جميع معايير التقييم وأوزانها والأهداف ودرجة الإنجاز الفعلية والمحققة"
                         : "All assigned evaluation metrics, weights, targets, and quarterly actuals"}
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[11px] text-muted-foreground font-semibold flex items-center gap-1">
-                      <Filter className="h-3.5 w-3.5" />
-                      {isAr ? "الأرباع:" : "Quarters:"}
-                    </span>
-                    {(["all", "q1", "q2", "q3", "q4"] as const).map((qKey) => (
-                      <button
-                        key={qKey}
-                        type="button"
-                        onClick={() => setActiveQuarterFilter(qKey)}
-                        className={`rounded-xl px-2.5 py-1 text-xs font-semibold cursor-pointer transition-colors ${
-                          activeQuarterFilter === qKey
-                            ? "bg-orange-600 text-white font-bold shadow-xs"
-                            : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
-                        }`}
-                      >
-                        {qKey === "all" ? (isAr ? "الكل" : "All") : qKey.toUpperCase()}
-                      </button>
-                    ))}
-                    <Badge variant="outline" className="font-mono text-xs">
-                      {activeScorecardItems.length} {isAr ? "معيار" : "Metrics"}
-                    </Badge>
+                  <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+                    <div className="inline-flex items-center p-1 rounded-2xl bg-muted/60 border border-border/60 gap-0.5 shrink-0 shadow-2xs">
+                      {(["all", "q1", "q2", "q3", "q4"] as const).map((qKey) => {
+                        const isActive = activeQuarterFilter === qKey;
+                        return (
+                          <button
+                            key={qKey}
+                            type="button"
+                            onClick={() => setActiveQuarterFilter(qKey)}
+                            className={`rounded-xl px-3 py-1 text-xs font-semibold cursor-pointer transition-all ${
+                              isActive
+                                ? "bg-orange-600 hover:bg-orange-700 text-white font-bold shadow-xs"
+                                : "text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                            }`}
+                          >
+                            {qKey === "all" ? (isAr ? "الكل" : "All") : qKey.toUpperCase()}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
 
