@@ -116,6 +116,8 @@ import { KpisDefinitionTab } from "@/components/kpi/KpisDefinitionTab";
 
 export interface ScorecardItem {
   id: string;
+  templateItemId?: string;
+  criterionId?: string;
   numericIndex: number;
   code: string;
   name: string;
@@ -524,6 +526,8 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
 
         return {
           id: keyId,
+          templateItemId: it.id,
+          criterionId: it.criterion_id || crit.id,
           numericIndex: idx + 1,
           code: crit.code || `KPI-${idx + 1}`,
           name: crit.name_en || `Metric ${idx + 1}`,
