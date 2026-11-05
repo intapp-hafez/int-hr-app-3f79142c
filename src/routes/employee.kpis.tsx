@@ -99,7 +99,7 @@ export function EmployeeKpiPage() {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [mainTab, setMainTab] = useState<"job_description" | "kpis_records" | "kpis_definition">("job_description");
-  const [kpiSubTab, setKpiSubTab] = useState<"quarters" | "scorecard" | "feedback" | "history">("quarters");
+  const [kpiSubTab, setKpiSubTab] = useState<"quarters" | "scorecard" | "feedback">("quarters");
   const [collapsedPillars, setCollapsedPillars] = useState<Record<string, boolean>>({});
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingKpiDefPdf, setIsExportingKpiDefPdf] = useState(false);
@@ -820,9 +820,9 @@ export function EmployeeKpiPage() {
                 <button
                   type="button"
                   onClick={() => setKpiSubTab("quarters")}
-                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${kpiSubTab === "quarters"
-                    ? "bg-background text-foreground shadow-2xs font-bold"
-                    : "text-muted-foreground hover:text-foreground"
+                  className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${kpiSubTab === "quarters"
+                    ? "bg-orange-600 hover:bg-orange-700 text-white shadow-xs font-bold"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
                     }`}
                 >
                   <Calendar className="h-3.5 w-3.5" />
@@ -832,9 +832,9 @@ export function EmployeeKpiPage() {
                 <button
                   type="button"
                   onClick={() => setKpiSubTab("scorecard")}
-                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${kpiSubTab === "scorecard"
-                    ? "bg-background text-foreground shadow-2xs font-bold"
-                    : "text-muted-foreground hover:text-foreground"
+                  className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${kpiSubTab === "scorecard"
+                    ? "bg-orange-600 hover:bg-orange-700 text-white shadow-xs font-bold"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
                     }`}
                 >
                   <FileCheck className="h-3.5 w-3.5" />
@@ -844,25 +844,13 @@ export function EmployeeKpiPage() {
                 <button
                   type="button"
                   onClick={() => setKpiSubTab("feedback")}
-                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${kpiSubTab === "feedback"
-                    ? "bg-background text-foreground shadow-2xs font-bold"
-                    : "text-muted-foreground hover:text-foreground"
+                  className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${kpiSubTab === "feedback"
+                    ? "bg-orange-600 hover:bg-orange-700 text-white shadow-xs font-bold"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
                     }`}
                 >
                   <CheckCircle2 className="h-3.5 w-3.5" />
                   <span>{isAr ? "ملاحظات المدير" : "Feedback"}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setKpiSubTab("history")}
-                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${kpiSubTab === "history"
-                    ? "bg-background text-foreground shadow-2xs font-bold"
-                    : "text-muted-foreground hover:text-foreground"
-                    }`}
-                >
-                  <Layers className="h-3.5 w-3.5" />
-                  <span>{isAr ? "السجل" : "History"}</span>
                 </button>
               </div>
             </div>
@@ -1101,72 +1089,6 @@ export function EmployeeKpiPage() {
                       {evaluation?.notes?.recommendations || (isAr ? "لم يتم تحديد دورات إضافية بعد." : "No recommended training recorded yet.")}
                     </p>
                   </div>
-                </div>
-              </div>
-            )}
-
-            {/* Sub-view 4: Evaluation History */}
-            {kpiSubTab === "history" && (
-              <div className="rounded-3xl border border-border bg-card p-4 sm:p-5 shadow-2xs space-y-3">
-                <div>
-                  <h3 className="font-bold text-sm text-foreground">
-                    {isAr ? "سجل تقييمات الأداء عبر السنوات" : "Performance Evaluations History"}
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    {isAr
-                      ? "جميع بطاقات تقييم مؤشرات الأداء المعتمدة الخاصة بك."
-                      : "All official performance reviews and historical archives."}
-                  </p>
-                </div>
-
-                <div className="divide-y divide-border rounded-2xl border border-border overflow-hidden">
-                  {allEvaluations.length === 0 ? (
-                    <div className="p-6 text-center text-xs text-muted-foreground">
-                      {isAr ? "لا توجد تقييمات سابقة محفوظة في سجلك." : "No past evaluations found in your archive."}
-                    </div>
-                  ) : (
-                    allEvaluations.map((ev) => (
-                      <div
-                        key={ev.id}
-                        className={`flex items-center justify-between p-3.5 transition-colors ${ev.evaluation_year === selectedYear ? "bg-brand/5 font-semibold" : "hover:bg-muted/30"
-                          }`}
-                      >
-                        <div className="space-y-0.5">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-xs font-bold text-foreground">
-                              {isAr ? `تقييم عام ${ev.evaluation_year}` : `Year ${ev.evaluation_year}`}
-                            </span>
-                            {ev.evaluation_year === selectedYear && (
-                              <Badge className="bg-brand text-brand-foreground text-[9px] px-1.5 py-0">
-                                {isAr ? "الحالي" : "Current"}
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="text-[10px] text-muted-foreground">
-                            {ev.evaluator_name ? `${isAr ? "المُقيّم: " : "By: "}${ev.evaluator_name}` : "—"}
-                          </p>
-                        </div>
-
-                        <div className="flex items-center gap-2.5">
-                          <div className="text-end">
-                            <span className="font-mono text-xs font-bold text-foreground">
-                              {ev.summary?.totalScore ? `${ev.summary.totalScore}%` : "—"}
-                            </span>
-                            <p className="text-[9px] text-muted-foreground">{ev.summary?.rating || "—"}</p>
-                          </div>
-
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setSelectedYear(ev.evaluation_year)}
-                            className="rounded-xl text-xs h-7 px-2 cursor-pointer"
-                          >
-                            {isAr ? "فتح" : "View"}
-                          </Button>
-                        </div>
-                      </div>
-                    ))
-                  )}
                 </div>
               </div>
             )}
