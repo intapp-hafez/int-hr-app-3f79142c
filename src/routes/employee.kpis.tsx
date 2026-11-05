@@ -731,19 +731,16 @@ export function EmployeeKpiPage() {
         <TabsList className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full bg-transparent p-0 h-auto border-0 shadow-none">
           <TabsTrigger
             value="job_description"
-            className="relative flex items-center justify-start gap-3.5 w-full rounded-3xl border border-border bg-card p-4 sm:p-4.5 text-start cursor-pointer transition-all whitespace-normal hover:border-orange-500/40 hover:shadow-2xs data-[state=active]:border-orange-600 data-[state=active]:bg-orange-500/5 data-[state=active]:ring-2 data-[state=active]:ring-orange-600/20 data-[state=active]:shadow-xs group"
+            className="relative flex flex-col items-center justify-center gap-2.5 w-full rounded-3xl border border-border bg-card p-4 sm:p-5 text-center cursor-pointer transition-all whitespace-normal hover:border-orange-500/40 hover:shadow-2xs data-[state=active]:border-orange-600 data-[state=active]:bg-orange-500/5 data-[state=active]:ring-2 data-[state=active]:ring-orange-600/20 data-[state=active]:shadow-xs group"
           >
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-muted/80 text-muted-foreground transition-all group-data-[state=active]:bg-orange-600 group-data-[state=active]:text-white shadow-2xs">
-              <Briefcase className="h-5 w-5" />
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-muted/80 text-muted-foreground transition-all group-data-[state=active]:bg-orange-600 group-data-[state=active]:text-white shadow-2xs">
+              <Briefcase className="h-6 w-6" />
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between gap-1">
-                <span className="font-bold text-sm text-foreground group-data-[state=active]:text-orange-600 dark:group-data-[state=active]:text-orange-400">
-                  {isAr ? "الوصف الوظيفي" : "Job Description"}
-                </span>
-                <span className="h-2 w-2 rounded-full bg-transparent group-data-[state=active]:bg-orange-600 transition-colors shrink-0" />
-              </div>
-              <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
+            <div className="space-y-0.5">
+              <span className="block font-bold text-sm sm:text-base text-foreground group-data-[state=active]:text-orange-600 dark:group-data-[state=active]:text-orange-400">
+                {isAr ? "الوصف الوظيفي" : "Job Description"}
+              </span>
+              <p className="text-[11px] sm:text-xs text-muted-foreground">
                 {isAr ? "المسؤوليات والواجبات والمؤهلات" : "Roles, responsibilities & competencies"}
               </p>
             </div>
@@ -751,19 +748,16 @@ export function EmployeeKpiPage() {
 
           <TabsTrigger
             value="kpis_definition"
-            className="relative flex items-center justify-start gap-3.5 w-full rounded-3xl border border-border bg-card p-4 sm:p-4.5 text-start cursor-pointer transition-all whitespace-normal hover:border-orange-500/40 hover:shadow-2xs data-[state=active]:border-orange-600 data-[state=active]:bg-orange-500/5 data-[state=active]:ring-2 data-[state=active]:ring-orange-600/20 data-[state=active]:shadow-xs group"
+            className="relative flex flex-col items-center justify-center gap-2.5 w-full rounded-3xl border border-border bg-card p-4 sm:p-5 text-center cursor-pointer transition-all whitespace-normal hover:border-orange-500/40 hover:shadow-2xs data-[state=active]:border-orange-600 data-[state=active]:bg-orange-500/5 data-[state=active]:ring-2 data-[state=active]:ring-orange-600/20 data-[state=active]:shadow-xs group"
           >
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-muted/80 text-muted-foreground transition-all group-data-[state=active]:bg-orange-600 group-data-[state=active]:text-white shadow-2xs">
-              <Target className="h-5 w-5" />
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-muted/80 text-muted-foreground transition-all group-data-[state=active]:bg-orange-600 group-data-[state=active]:text-white shadow-2xs">
+              <Target className="h-6 w-6" />
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between gap-1">
-                <span className="font-bold text-sm text-foreground group-data-[state=active]:text-orange-600 dark:group-data-[state=active]:text-orange-400">
-                  {isAr ? "تعريف المؤشرات" : "KPIs Definition"}
-                </span>
-                <span className="h-2 w-2 rounded-full bg-transparent group-data-[state=active]:bg-orange-600 transition-colors shrink-0" />
-              </div>
-              <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
+            <div className="space-y-0.5">
+              <span className="block font-bold text-sm sm:text-base text-foreground group-data-[state=active]:text-orange-600 dark:group-data-[state=active]:text-orange-400">
+                {isAr ? "تعريف المؤشرات" : "KPIs Definition"}
+              </span>
+              <p className="text-[11px] sm:text-xs text-muted-foreground">
                 {isAr ? "أوزان ومستهدفات ومعايير القياس" : "Weights, targets & metric formulas"}
               </p>
             </div>
@@ -771,19 +765,16 @@ export function EmployeeKpiPage() {
 
           <TabsTrigger
             value="kpis_records"
-            className="relative flex items-center justify-start gap-3.5 w-full rounded-3xl border border-border bg-card p-4 sm:p-4.5 text-start cursor-pointer transition-all whitespace-normal hover:border-orange-500/40 hover:shadow-2xs data-[state=active]:border-orange-600 data-[state=active]:bg-orange-500/5 data-[state=active]:ring-2 data-[state=active]:ring-orange-600/20 data-[state=active]:shadow-xs group"
+            className="relative flex flex-col items-center justify-center gap-2.5 w-full rounded-3xl border border-border bg-card p-4 sm:p-5 text-center cursor-pointer transition-all whitespace-normal hover:border-orange-500/40 hover:shadow-2xs data-[state=active]:border-orange-600 data-[state=active]:bg-orange-500/5 data-[state=active]:ring-2 data-[state=active]:ring-orange-600/20 data-[state=active]:shadow-xs group"
           >
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-muted/80 text-muted-foreground transition-all group-data-[state=active]:bg-orange-600 group-data-[state=active]:text-white shadow-2xs">
-              <Award className="h-5 w-5" />
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-muted/80 text-muted-foreground transition-all group-data-[state=active]:bg-orange-600 group-data-[state=active]:text-white shadow-2xs">
+              <Award className="h-6 w-6" />
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between gap-1">
-                <span className="font-bold text-sm text-foreground group-data-[state=active]:text-orange-600 dark:group-data-[state=active]:text-orange-400">
-                  {isAr ? "سجل مؤشرات الأداء" : "KPIs Records"}
-                </span>
-                <span className="h-2 w-2 rounded-full bg-transparent group-data-[state=active]:bg-orange-600 transition-colors shrink-0" />
-              </div>
-              <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
+            <div className="space-y-0.5">
+              <span className="block font-bold text-sm sm:text-base text-foreground group-data-[state=active]:text-orange-600 dark:group-data-[state=active]:text-orange-400">
+                {isAr ? "سجل مؤشرات الأداء" : "KPIs Records"}
+              </span>
+              <p className="text-[11px] sm:text-xs text-muted-foreground">
                 {isAr ? "النتائج الفصلية وسجل بطاقة الأداء" : "Quarterly actuals & performance scorecard"}
               </p>
             </div>
