@@ -745,8 +745,8 @@ export function KpisDefinitionTab({
                 <th className="py-3 px-4 text-start min-w-[200px]">{isAr ? "اسم المؤشر / المعيار" : "KPI / Metric Name"}</th>
                 <th className="py-3 px-4 text-start min-w-[260px]">{isAr ? "التعريف (ماذا يقيس)" : "Definition (What it measures)"}</th>
                 <th className="py-3 px-4 text-start min-w-[200px]">{isAr ? "طريقة القياس" : "How it's measured"}</th>
-                <th className="py-3 px-3 text-center w-28">{isAr ? "الوزن (%)" : "Weight (%)"}</th>
-                <th className="py-3 px-3 text-center w-28">{isAr ? "المستهدف" : "Target"}</th>
+                <th className="py-3 px-3 text-center min-w-[110px] w-32">{isAr ? "الوزن (%)" : "Weight (%)"}</th>
+                <th className="py-3 px-3 text-center min-w-[110px] w-32">{isAr ? "المستهدف" : "Target"}</th>
                 {isEditing && <th className="py-3 px-2 text-center w-12">{isAr ? "إجراء" : "Action"}</th>}
               </tr>
             </thead>
@@ -829,33 +829,40 @@ export function KpisDefinitionTab({
                       </td>
 
                       {/* Weight (%) Input */}
-                      <td className="py-2.5 px-3 align-top">
-                        <div className="relative">
+                      <td className="py-2.5 px-3 align-top text-center">
+                        <div className="relative inline-flex items-center justify-center w-24">
                           <Input
                             type="number"
                             min={1}
                             max={100}
                             step={1}
-                            value={row.weightPct}
-                            onChange={(e) =>
-                              handleUpdateRowField(row.id, "weightPct", Number(e.target.value) || 0)
-                            }
-                            className="h-9 text-center font-mono font-bold text-xs rounded-xl pe-6 bg-background text-brand"
+                            value={row.weightPct === 0 ? "" : row.weightPct}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              handleUpdateRowField(
+                                row.id,
+                                "weightPct",
+                                val === "" ? 0 : Math.min(100, Math.max(0, Number(val)))
+                              );
+                            }}
+                            className="h-9 w-full text-center font-mono font-bold text-sm rounded-xl pe-7 ps-3 bg-background text-brand [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus-visible:ring-1 focus-visible:ring-brand shadow-none"
                           />
-                          <span className="absolute end-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">
+                          <span className="pointer-events-none absolute end-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground select-none">
                             %
                           </span>
                         </div>
                       </td>
 
                       {/* Target Input */}
-                      <td className="py-2.5 px-3 align-top">
-                        <Input
-                          value={row.target}
-                          onChange={(e) => handleUpdateRowField(row.id, "target", e.target.value)}
-                          placeholder="100%"
-                          className="h-9 text-center font-mono font-bold text-xs rounded-xl bg-background"
-                        />
+                      <td className="py-2.5 px-3 align-top text-center">
+                        <div className="inline-flex items-center justify-center w-24">
+                          <Input
+                            value={row.target}
+                            onChange={(e) => handleUpdateRowField(row.id, "target", e.target.value)}
+                            placeholder="100%"
+                            className="h-9 w-full text-center font-mono font-bold text-xs rounded-xl bg-background focus-visible:ring-1 focus-visible:ring-brand shadow-none"
+                          />
+                        </div>
                       </td>
 
                       {/* Delete action */}
