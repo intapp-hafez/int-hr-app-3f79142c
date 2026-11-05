@@ -35,6 +35,15 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { useI18n } from "@/lib/i18n";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -106,6 +115,23 @@ export function KpisDefinitionTab({
   const [isSaving, setIsSaving] = useState(false);
   const [editableRows, setEditableRows] = useState<EditableMetricRow[]>([]);
   const [deletedItemIds, setDeletedItemIds] = useState<string[]>([]);
+
+  // Add New KPI Definition Modal state
+  const [addModalOpen, setAddModalOpen] = useState(false);
+  const [isAddingNew, setIsAddingNew] = useState(false);
+  const [newDefForm, setNewDefForm] = useState({
+    name_en: "",
+    name_ar: "",
+    category: "behavioral",
+    definition_en: "",
+    definition_ar: "",
+    how_measured_en: "Measured in %",
+    how_measured_ar: "يقاس بالنسبة المئوية %",
+    weightPct: 10,
+    target: "100%",
+    unit: "%",
+    templateId: "",
+  });
 
   // Current employee
   const currentEmployee = useMemo(() => {
@@ -267,6 +293,122 @@ export function KpisDefinitionTab({
     setEditableRows(initial);
     setDeletedItemIds([]);
     setIsEditing(false);
+  };
+
+  // ── OPEN ADD NEW KPI DEFINITION MODAL ──
+  const handleOpenAddModal = () => {
+    const defaultTemplateId =
+      matchedTemplateData?.template?.id ||
+      (kpiTemplates && kpiTemplates.length > 0 ? kpiTemplates[0].id : "");
+
+    const currentSum = Math.round(
+      activeScorecardItems.reduce((acc, it) => acc + (Number(it.weight) || 0), 0) * 100
+    );
+    const suggestedWeight = Math.max(5, Math.min(100 - currentSum, 20)) || 10;
+
+    setNewDefForm({
+      name_en: "",
+      name_ar: "",
+      category: "behavioral",
+      definition_en: "",
+      definition_ar: "",
+      how_measured_en: "Measured in %",
+      how_measured_ar: "يقاس بالنسبة المئوية %",
+      weightPct: suggestedWeight,
+      target: "100%",
+      unit: "%",
+      templateId: defaultTemplateId,
+    });
+    setAddModalOpen(true);
+  };
+
+  // ── SUBMIT NEW KPI DEFINITION ──
+  const handleCreateNewDefinition = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDefForm.name_en.trim() && !newDefForm.name_ar.trim()) {
+      toast.error(isAr ? "يرجى إدخال اسم المؤشر" : "Please enter KPI Metric Name");
+      return;
+    }
+    if (!newDefForm.definition_en.trim() && !newDefForm.definition_ar.trim()) {
+      toast.error(isAr ? "يرجى إدخال تعريف المؤشر (ماذا يقيس)" : "Please enter KPI Definition");
+      return;
+    }
+
+    const weightVal = Number(newDefForm.weightPct);
+    if (isNaN(weightVal) || weightVal <= 0 || weightVal > 100) {
+      toast.error(isAr ? "الوزن يجب أن يكون بين 1% و 100%" : "Weight must be between 1% and 100%");
+      return;
+    }
+
+    setIsAddingNew(true);
+    try {
+      const nameEn = newDefForm.name_en.trim() || newDefForm.name_ar.trim();
+      const nameAr = newDefForm.name_ar.trim() || nameEn;
+      const defEn = newDefForm.definition_en.trim() || newDefForm.definition_ar.trim();
+      const defAr = newDefForm.definition_ar.trim() || defEn;
+      const howEn =
+        newDefForm.how_measured_en.trim() ||
+        (newDefForm.unit ? `Measured in ${newDefForm.unit}` : "Measured in %");
+      const howAr = newDefForm.how_measured_ar.trim() || howEn;
+      const weightDecimal = weightVal / 100;
+      const targetNumeric = Number(newDefForm.target.replace(/[^0-9.]/g, "")) || 100;
+
+      // 1. Insert into kpi_criteria
+      const { data: newCrit, error: critErr } = await supabase
+        .from("kpi_criteria")
+        .insert({
+          name_en: nameEn,
+          name_ar: nameAr,
+          description_en: defEn,
+          description_ar: defAr,
+          category: newDefForm.category,
+          how_measured_en: howEn,
+          how_measured_ar: howAr,
+          unit: newDefForm.unit || "%",
+          default_weight: weightDecimal,
+          scoring_direction: "higher_is_better",
+          is_active: true,
+          is_required: true,
+        })
+        .select("id")
+        .single();
+
+      if (critErr) throw critErr;
+
+      // 2. Attach to target template
+      const targetTmplId = newDefForm.templateId || matchedTemplateData?.template?.id;
+      if (targetTmplId && newCrit?.id) {
+        const nextOrder = (activeScorecardItems?.length || 0) + 1;
+        const { error: itemErr } = await supabase
+          .from("kpi_template_items")
+          .insert({
+            template_id: targetTmplId,
+            criterion_id: newCrit.id,
+            weight: weightDecimal,
+            target_benchmark: targetNumeric,
+            display_order: nextOrder,
+          });
+        if (itemErr) throw itemErr;
+      }
+
+      // 3. Invalidate React Query caches
+      await queryClient.invalidateQueries({ queryKey: ["kpi-matched-template"] });
+      await queryClient.invalidateQueries({ queryKey: ["kpi-criteria"] });
+      await queryClient.invalidateQueries({ queryKey: ["kpi-templates"] });
+      await queryClient.invalidateQueries({ queryKey: ["kpi-evaluations-list"] });
+
+      toast.success(
+        isAr
+          ? "تمت إضافة تعريف المؤشر الجديد وحفظه بنجاح!"
+          : "New KPI Definition created and attached successfully!"
+      );
+      setAddModalOpen(false);
+    } catch (err: any) {
+      console.error("Failed to add KPI definition:", err);
+      toast.error(err.message || "Failed to create KPI definition");
+    } finally {
+      setIsAddingNew(false);
+    }
   };
 
   // ── SAVE CHANGES TO DATABASE ──
@@ -555,6 +697,16 @@ export function KpisDefinitionTab({
               </PopoverContent>
             </Popover>
 
+            {/* ── ADD NEW KPI DEFINITION BUTTON (PROMINENT OPTION) ── */}
+            <Button
+              onClick={handleOpenAddModal}
+              size="sm"
+              className="rounded-2xl gap-1.5 bg-brand text-brand-foreground hover:bg-brand/90 cursor-pointer h-9 text-xs font-bold shadow-xs"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>{isAr ? "إضافة تعريف مؤشر جديد" : "Add KPI Definition"}</span>
+            </Button>
+
             {/* ── EDIT MODE TOGGLE BUTTONS ── */}
             {!isEditing ? (
               <Button
@@ -757,6 +909,15 @@ export function KpisDefinitionTab({
                     <div className="flex flex-col items-center justify-center gap-2">
                       <AlertCircle className="h-6 w-6 text-muted-foreground/60" />
                       <span>{isAr ? "لا توجد مؤشرات معروضة" : "No KPI metrics to display"}</span>
+                      <Button
+                        type="button"
+                        onClick={handleOpenAddModal}
+                        size="sm"
+                        className="mt-2 rounded-2xl gap-1.5 bg-brand text-brand-foreground hover:bg-brand/90 font-bold text-xs"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span>{isAr ? "إضافة تعريف مؤشر أداء جديد" : "Add KPI Definition"}</span>
+                      </Button>
                     </div>
                   </td>
                 </tr>
@@ -978,6 +1139,232 @@ export function KpisDefinitionTab({
           </table>
         </div>
       </div>
+
+      {/* ── ADD NEW KPI DEFINITION DIALOG ── */}
+      <Dialog open={addModalOpen} onOpenChange={setAddModalOpen}>
+        <DialogContent className="sm:max-w-xl rounded-3xl p-6 max-h-[90vh] overflow-y-auto">
+          <form onSubmit={handleCreateNewDefinition} className="space-y-4">
+            <DialogHeader>
+              <div className="flex items-center gap-2 text-brand">
+                <Target className="h-5 w-5" />
+                <DialogTitle className="text-base font-bold font-display">
+                  {isAr ? "إضافة تعريف مؤشر أداء جديد" : "Add New KPI Definition"}
+                </DialogTitle>
+              </div>
+              <DialogDescription className="text-xs text-muted-foreground">
+                {isAr
+                  ? "قم بتعريف المؤشر وتحديد طريقة قياسه ووزنه النسبي ومستهدفه ليتم ربطه بنموذج تقييم الأداء."
+                  : "Define a new performance metric with its measurement formula, description, target benchmark, and percentage weight."}
+              </DialogDescription>
+            </DialogHeader>
+
+            {/* Target Template / Position Banner */}
+            <div className="p-3.5 rounded-2xl bg-muted/40 border border-border space-y-1.5">
+              <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+                {isAr ? "النموذج والوظيفة المستهدفة:" : "Target Template & Role:"}
+              </span>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs">
+                <span className="font-bold text-foreground">{templateName}</span>
+                <span className="text-muted-foreground font-medium">
+                  {currentEmployee.position} • {currentEmployee.department}
+                </span>
+              </div>
+            </div>
+
+            {/* Template Selector if multiple templates available */}
+            {kpiTemplates && kpiTemplates.length > 1 && (
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-muted-foreground">
+                  {isAr ? "ربط بقالب وظيفي محدد" : "Assign to Job Role Template"}
+                </Label>
+                <select
+                  value={newDefForm.templateId}
+                  onChange={(e) => setNewDefForm((p) => ({ ...p, templateId: e.target.value }))}
+                  className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold"
+                >
+                  {kpiTemplates.map((t: any) => (
+                    <option key={t.id} value={t.id}>
+                      {isAr ? t.name_ar || t.name_en : t.name_en || t.name_ar}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Category Selector */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">
+                {isAr ? "فئة المعيار / المؤشر" : "KPI Category"} <span className="text-rose-500">*</span>
+              </Label>
+              <Select
+                value={newDefForm.category}
+                onValueChange={(val) => setNewDefForm((p) => ({ ...p, category: val }))}
+              >
+                <SelectTrigger className="rounded-xl text-xs h-9 bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  {STANDARD_CATEGORIES.map((c) => (
+                    <SelectItem key={c.value} value={c.value} className="text-xs">
+                      {isAr ? c.labelAr : c.labelEn}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* KPI Metric Names (English & Arabic) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">
+                  {isAr ? "اسم المؤشر (بالإنجليزية)" : "KPI Name (English)"} <span className="text-rose-500">*</span>
+                </Label>
+                <Input
+                  value={newDefForm.name_en}
+                  onChange={(e) => setNewDefForm((p) => ({ ...p, name_en: e.target.value }))}
+                  placeholder="e.g. Code Review & Team Collaboration"
+                  className="rounded-xl text-xs h-9 bg-background"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">
+                  {isAr ? "اسم المؤشر (بالعربية)" : "KPI Name (Arabic)"}
+                </Label>
+                <Input
+                  value={newDefForm.name_ar}
+                  onChange={(e) => setNewDefForm((p) => ({ ...p, name_ar: e.target.value }))}
+                  placeholder="مثال: مراجعة الأكواد والتعاون الجماعي"
+                  dir="rtl"
+                  className="rounded-xl text-xs h-9 text-right bg-background"
+                />
+              </div>
+            </div>
+
+            {/* Definition (What it measures) */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">
+                {isAr ? "التعريف التفصيلي (ماذا يقيس)" : "Definition (What it measures)"} <span className="text-rose-500">*</span>
+              </Label>
+              <Textarea
+                value={newDefForm.definition_en}
+                onChange={(e) => setNewDefForm((p) => ({ ...p, definition_en: e.target.value }))}
+                placeholder={
+                  isAr
+                    ? "اشرح بالتفصيل ما الذي يقيسه هذا المؤشر ومخرجات الأداء المتوقعة..."
+                    : "Describe what this KPI measures, expected quality standards, and scope..."
+                }
+                rows={2}
+                className="rounded-xl text-xs resize-y bg-background"
+                required
+              />
+            </div>
+
+            {/* How it's measured (Measurement Methodology / Formula) */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">
+                {isAr ? "طريقة القياس والاحتساب" : "How it's measured (Formula & Methodology)"} <span className="text-rose-500">*</span>
+              </Label>
+              <Input
+                value={newDefForm.how_measured_en}
+                onChange={(e) => setNewDefForm((p) => ({ ...p, how_measured_en: e.target.value }))}
+                placeholder="e.g. Measured in % compliance or quarterly review score"
+                className="rounded-xl text-xs h-9 bg-background"
+                required
+              />
+            </div>
+
+            {/* Weight, Target & Unit */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">
+                  {isAr ? "الوزن النسبي (%)" : "Weight (%)"} <span className="text-rose-500">*</span>
+                </Label>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={newDefForm.weightPct === 0 ? "" : newDefForm.weightPct}
+                    onChange={(e) =>
+                      setNewDefForm((p) => ({
+                        ...p,
+                        weightPct: e.target.value === "" ? 0 : Number(e.target.value),
+                      }))
+                    }
+                    className="rounded-xl text-xs h-9 text-center font-mono font-bold pe-7 ps-3 bg-background [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    required
+                  />
+                  <span className="pointer-events-none absolute end-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground select-none">
+                    %
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">
+                  {isAr ? "المستهدف" : "Target Benchmark"} <span className="text-rose-500">*</span>
+                </Label>
+                <Input
+                  value={newDefForm.target}
+                  onChange={(e) => setNewDefForm((p) => ({ ...p, target: e.target.value }))}
+                  placeholder="100%"
+                  className="rounded-xl text-xs h-9 text-center font-mono font-bold bg-background"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">
+                  {isAr ? "وحدة القياس" : "Unit"}
+                </Label>
+                <Select
+                  value={newDefForm.unit}
+                  onValueChange={(val) => setNewDefForm((p) => ({ ...p, unit: val }))}
+                >
+                  <SelectTrigger className="rounded-xl text-xs h-9 bg-background">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="%" className="text-xs">% (Percentage)</SelectItem>
+                    <SelectItem value="scale" className="text-xs">Scale (1 to 5)</SelectItem>
+                    <SelectItem value="numeric" className="text-xs">Numeric</SelectItem>
+                    <SelectItem value="count" className="text-xs">Count / Days</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Dialog Footer Actions */}
+            <DialogFooter className="gap-2 pt-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setAddModalOpen(false)}
+                disabled={isAddingNew}
+                className="rounded-2xl text-xs h-9"
+              >
+                {isAr ? "إلغاء" : "Cancel"}
+              </Button>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={isAddingNew}
+                className="rounded-2xl text-xs h-9 bg-brand text-brand-foreground hover:bg-brand/90 font-bold gap-1.5 shadow-xs"
+              >
+                {isAddingNew ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Plus className="h-3.5 w-3.5" />
+                )}
+                <span>{isAr ? "حفظ وإضافة المؤشر" : "Save & Add Definition"}</span>
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
