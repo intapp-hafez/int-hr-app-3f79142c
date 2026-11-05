@@ -736,14 +736,9 @@ export function EmployeeKpiPage() {
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-muted/80 text-muted-foreground transition-all group-data-[state=active]:bg-orange-600 group-data-[state=active]:text-white shadow-2xs">
               <Briefcase className="h-6 w-6" />
             </div>
-            <div className="space-y-0.5">
-              <span className="block font-bold text-sm sm:text-base text-foreground group-data-[state=active]:text-orange-600 dark:group-data-[state=active]:text-orange-400">
-                {isAr ? "الوصف الوظيفي" : "Job Description"}
-              </span>
-              <p className="text-[11px] sm:text-xs text-muted-foreground">
-                {isAr ? "المسؤوليات والواجبات والمؤهلات" : "Roles, responsibilities & competencies"}
-              </p>
-            </div>
+            <span className="font-bold text-sm sm:text-base text-foreground group-data-[state=active]:text-orange-600 dark:group-data-[state=active]:text-orange-400">
+              {isAr ? "الوصف الوظيفي" : "Job Description"}
+            </span>
           </TabsTrigger>
 
           <TabsTrigger
@@ -753,14 +748,9 @@ export function EmployeeKpiPage() {
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-muted/80 text-muted-foreground transition-all group-data-[state=active]:bg-orange-600 group-data-[state=active]:text-white shadow-2xs">
               <Target className="h-6 w-6" />
             </div>
-            <div className="space-y-0.5">
-              <span className="block font-bold text-sm sm:text-base text-foreground group-data-[state=active]:text-orange-600 dark:group-data-[state=active]:text-orange-400">
-                {isAr ? "تعريف المؤشرات" : "KPIs Definition"}
-              </span>
-              <p className="text-[11px] sm:text-xs text-muted-foreground">
-                {isAr ? "أوزان ومستهدفات ومعايير القياس" : "Weights, targets & metric formulas"}
-              </p>
-            </div>
+            <span className="font-bold text-sm sm:text-base text-foreground group-data-[state=active]:text-orange-600 dark:group-data-[state=active]:text-orange-400">
+              {isAr ? "تعريف المؤشرات" : "KPIs Definition"}
+            </span>
           </TabsTrigger>
 
           <TabsTrigger
@@ -770,14 +760,9 @@ export function EmployeeKpiPage() {
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-muted/80 text-muted-foreground transition-all group-data-[state=active]:bg-orange-600 group-data-[state=active]:text-white shadow-2xs">
               <Award className="h-6 w-6" />
             </div>
-            <div className="space-y-0.5">
-              <span className="block font-bold text-sm sm:text-base text-foreground group-data-[state=active]:text-orange-600 dark:group-data-[state=active]:text-orange-400">
-                {isAr ? "سجل مؤشرات الأداء" : "KPIs Records"}
-              </span>
-              <p className="text-[11px] sm:text-xs text-muted-foreground">
-                {isAr ? "النتائج الفصلية وسجل بطاقة الأداء" : "Quarterly actuals & performance scorecard"}
-              </p>
-            </div>
+            <span className="font-bold text-sm sm:text-base text-foreground group-data-[state=active]:text-orange-600 dark:group-data-[state=active]:text-orange-400">
+              {isAr ? "سجل مؤشرات الأداء" : "KPIs Records"}
+            </span>
           </TabsTrigger>
         </TabsList>
 
