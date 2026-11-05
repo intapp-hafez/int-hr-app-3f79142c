@@ -3635,12 +3635,9 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
             {templateSubTab === "job-descriptions" && <JobDescriptionsTab />}
             {templateSubTab === "kpis-definition" && (
               <KpisDefinitionTab
-                employeesList={employeesList}
-                selectedEmpId={selectedEmpId}
-                onSelectEmployee={setSelectedEmpId}
-                activeScorecardItems={activeScorecardItems}
-                matchedTemplateData={matchedTemplateData}
                 kpiTemplates={kpiTemplates}
+                departmentsData={departmentsData}
+                positionsData={positionsData}
                 selectedYear={selectedYear}
               />
             )}

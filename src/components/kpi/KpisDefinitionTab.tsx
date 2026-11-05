@@ -3,9 +3,7 @@ import {
   Target,
   FileDown,
   FileSpreadsheet,
-  Printer,
   Search,
-  User,
   Building2,
   Briefcase,
   CheckCircle2,
@@ -18,6 +16,7 @@ import {
   Plus,
   Trash2,
   RotateCcw,
+  Layers,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -52,19 +51,10 @@ import { exportKpiDefinitionPdf, KpiDefPdfRow } from "@/lib/kpi/kpi-definition-p
 import { ScorecardItem, formatCategoryName } from "./KpiEvaluationView";
 
 export interface KpisDefinitionTabProps {
-  employeesList: Array<{
-    id: string;
-    name: string;
-    code: string;
-    position: string;
-    department: string;
-  }>;
-  selectedEmpId: string;
-  onSelectEmployee: (empId: string) => void;
-  activeScorecardItems: ScorecardItem[];
-  matchedTemplateData?: any;
   kpiTemplates: any[];
-  selectedYear: number;
+  departmentsData?: any[];
+  positionsData?: any[];
+  selectedYear?: number;
 }
 
 interface EditableMetricRow {
@@ -93,19 +83,91 @@ const STANDARD_CATEGORIES = [
 ];
 
 export function KpisDefinitionTab({
-  employeesList,
-  selectedEmpId,
-  onSelectEmployee,
-  activeScorecardItems,
-  matchedTemplateData,
-  kpiTemplates,
-  selectedYear,
+  kpiTemplates = [],
+  departmentsData = [],
+  positionsData = [],
+  selectedYear = 2026,
 }: KpisDefinitionTabProps) {
-  const { t, isAr } = useI18n();
+  const { isAr } = useI18n();
   const queryClient = useQueryClient();
 
-  const [empSearch, setEmpSearch] = useState("");
-  const [empPopoverOpen, setEmpPopoverOpen] = useState(false);
+  // Template selection state
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>(() => {
+    return kpiTemplates[0]?.id || "";
+  });
+  const [templateSearch, setTemplateSearch] = useState("");
+  const [templatePopoverOpen, setTemplatePopoverOpen] = useState(false);
+
+  // Auto-select first template if none selected or when templates list loads
+  useEffect(() => {
+    if (!selectedTemplateId && kpiTemplates.length > 0) {
+      setSelectedTemplateId(kpiTemplates[0].id);
+    }
+  }, [kpiTemplates, selectedTemplateId]);
+
+  const currentTemplate = useMemo(() => {
+    return kpiTemplates.find((t) => t.id === selectedTemplateId) || kpiTemplates[0] || null;
+  }, [kpiTemplates, selectedTemplateId]);
+
+  const templateName = isAr
+    ? currentTemplate?.name_ar || currentTemplate?.name_en || "قالب غير محدد"
+    : currentTemplate?.name_en || currentTemplate?.name_ar || "Unspecified Template";
+
+  const jobTitle = isAr
+    ? currentTemplate?.position?.name_ar || currentTemplate?.position?.name_en || currentTemplate?.name_ar || currentTemplate?.name_en || "عام"
+    : currentTemplate?.position?.name_en || currentTemplate?.name_en || "General";
+
+  const departmentName = isAr
+    ? currentTemplate?.department?.name_ar || currentTemplate?.department?.name_en || "كافة الإدارات"
+    : currentTemplate?.department?.name_en || "Company-wide";
+
+  // Derive scorecard items from currentTemplate.items
+  const activeScorecardItems: ScorecardItem[] = useMemo(() => {
+    if (!currentTemplate?.items || currentTemplate.items.length === 0) return [];
+    const sorted = [...currentTemplate.items].sort(
+      (a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0)
+    );
+    return sorted.map((it: any, idx: number) => {
+      const crit = it.criterion || {};
+      const weight =
+        Number(it.weight) > 1 ? Number(it.weight) / 100 : Number(it.weight || 0);
+      const target = Number(it.target_benchmark ?? crit.default_target ?? 100);
+      const direction = (it.scoring_direction ||
+        crit.scoring_direction ||
+        "higher_is_better") as "higher_is_better" | "lower_is_better" | "rating_5";
+      const unit = it.unit || crit.unit || "%";
+      const inputType =
+        direction === "rating_5" || unit === "scale"
+          ? "rating_5"
+          : unit === "%"
+            ? "percentage"
+            : "numeric";
+      const keyId = String(it.criterion_id || it.id || idx + 1);
+
+      return {
+        id: keyId,
+        templateItemId: it.id,
+        criterionId: it.criterion_id || crit.id,
+        numericIndex: idx + 1,
+        code: crit.code || `KPI-${idx + 1}`,
+        name: crit.name_en || `Metric ${idx + 1}`,
+        name_ar: crit.name_ar || `مؤشر ${idx + 1}`,
+        category: crit.category || "operational",
+        category_ar: crit.category_ar,
+        definition: crit.description_en || crit.how_measured_en || "",
+        definition_ar: crit.description_ar || crit.how_measured_ar || "",
+        weight,
+        target,
+        unit,
+        direction,
+        inputType,
+        howMeasured: crit.how_measured_en || "",
+        howMeasured_ar: crit.how_measured_ar || "",
+      };
+    });
+  }, [currentTemplate]);
+
+  // Export & Filter states
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -133,20 +195,6 @@ export function KpisDefinitionTab({
     templateId: "",
   });
 
-  // Current employee
-  const currentEmployee = useMemo(() => {
-    return (
-      employeesList.find((e) => e.id === selectedEmpId) ||
-      employeesList[0] || {
-        id: "",
-        name: isAr ? "غير محدد" : "Unspecified",
-        code: "",
-        position: isAr ? "غير محدد" : "Unspecified",
-        department: isAr ? "غير محدد" : "Unspecified",
-      }
-    );
-  }, [employeesList, selectedEmpId, isAr]);
-
   // Synchronize editableRows whenever activeScorecardItems change (and not actively editing)
   useEffect(() => {
     if (!isEditing) {
@@ -171,39 +219,29 @@ export function KpisDefinitionTab({
     }
   }, [activeScorecardItems, isEditing, isAr]);
 
-  // Filtered selector employees
-  const filteredEmployees = useMemo(() => {
-    if (!empSearch.trim()) return employeesList;
-    const q = empSearch.toLowerCase().trim();
-    return employeesList.filter(
-      (e) =>
-        e.name.toLowerCase().includes(q) ||
-        e.code.toLowerCase().includes(q) ||
-        e.position.toLowerCase().includes(q) ||
-        e.department.toLowerCase().includes(q)
+  // Filtered templates list for the role template selector
+  const filteredTemplates = useMemo(() => {
+    if (!templateSearch.trim()) return kpiTemplates;
+    const q = templateSearch.toLowerCase().trim();
+    return kpiTemplates.filter(
+      (t) =>
+        t.name_en?.toLowerCase().includes(q) ||
+        t.name_ar?.toLowerCase().includes(q) ||
+        t.position?.name_en?.toLowerCase().includes(q) ||
+        t.department?.name_en?.toLowerCase().includes(q)
     );
-  }, [employeesList, empSearch]);
+  }, [kpiTemplates, templateSearch]);
 
-  // Template name
-  const templateName = useMemo(() => {
-    if (matchedTemplateData?.template) {
-      return isAr
-        ? matchedTemplateData.template.name_ar || matchedTemplateData.template.name_en
-        : matchedTemplateData.template.name_en;
-    }
-    return isAr ? "نموذج تقييم الوظيفة" : "Role Evaluation Template";
-  }, [matchedTemplateData, isAr]);
-
-  // Categories in items
+  // Unique categories for filtering
   const categories = useMemo(() => {
     const set = new Set<string>();
-    (isEditing ? editableRows : activeScorecardItems).forEach((it) => {
+    activeScorecardItems.forEach((it) => {
       if (it.category) set.add(it.category);
     });
     return Array.from(set);
-  }, [activeScorecardItems, editableRows, isEditing]);
+  }, [activeScorecardItems]);
 
-  // Sum of weights in edit mode
+  // Sum of weights in edit mode vs read-only
   const currentTotalWeight = useMemo(() => {
     if (isEditing) {
       return editableRows.reduce((acc, it) => acc + (Number(it.weightPct) || 0), 0);
@@ -215,23 +253,27 @@ export function KpisDefinitionTab({
 
   // Filtered rows for display
   const displayedRows = useMemo(() => {
-    const source = isEditing ? editableRows : activeScorecardItems;
-    return source.filter((item: any) => {
-      if (categoryFilter !== "all" && item.category !== categoryFilter) {
-        return false;
-      }
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const matchName = (item.name || "").toLowerCase().includes(q);
-        const matchDef = (item.definition || "").toLowerCase().includes(q);
-        const matchCat = (item.category || "").toLowerCase().includes(q);
-        if (!matchName && !matchDef && !matchCat) return false;
-      }
-      return true;
-    });
-  }, [isEditing, editableRows, activeScorecardItems, categoryFilter, searchQuery]);
+    let list = activeScorecardItems;
+    if (categoryFilter !== "all") {
+      list = list.filter((it) => it.category === categoryFilter);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      list = list.filter(
+        (it) =>
+          it.name?.toLowerCase().includes(q) ||
+          it.name_ar?.toLowerCase().includes(q) ||
+          it.definition?.toLowerCase().includes(q) ||
+          it.definition_ar?.toLowerCase().includes(q) ||
+          it.howMeasured?.toLowerCase().includes(q) ||
+          it.howMeasured_ar?.toLowerCase().includes(q) ||
+          it.category?.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [activeScorecardItems, categoryFilter, searchQuery]);
 
-  // ── ROW EDITING HANDLERS ──
+  // ── INLINE EDIT HANDLERS ──
   const handleUpdateRowField = (rowId: string, field: keyof EditableMetricRow, value: any) => {
     setEditableRows((prev) =>
       prev.map((r) => {
@@ -273,7 +315,6 @@ export function KpisDefinitionTab({
   };
 
   const handleCancelEdit = () => {
-    // Revert to activeScorecardItems
     const initial: EditableMetricRow[] = activeScorecardItems.map((it, idx) => ({
       id: it.id,
       templateItemId: it.templateItemId,
@@ -297,10 +338,6 @@ export function KpisDefinitionTab({
 
   // ── OPEN ADD NEW KPI DEFINITION MODAL ──
   const handleOpenAddModal = () => {
-    const defaultTemplateId =
-      matchedTemplateData?.template?.id ||
-      (kpiTemplates && kpiTemplates.length > 0 ? kpiTemplates[0].id : "");
-
     const currentSum = Math.round(
       activeScorecardItems.reduce((acc, it) => acc + (Number(it.weight) || 0), 0) * 100
     );
@@ -317,7 +354,7 @@ export function KpisDefinitionTab({
       weightPct: suggestedWeight,
       target: "100%",
       unit: "%",
-      templateId: defaultTemplateId,
+      templateId: currentTemplate?.id || "",
     });
     setAddModalOpen(true);
   };
@@ -376,7 +413,7 @@ export function KpisDefinitionTab({
       if (critErr) throw critErr;
 
       // 2. Attach to target template
-      const targetTmplId = newDefForm.templateId || matchedTemplateData?.template?.id;
+      const targetTmplId = newDefForm.templateId || currentTemplate?.id;
       if (targetTmplId && newCrit?.id) {
         const nextOrder = (activeScorecardItems?.length || 0) + 1;
         const { error: itemErr } = await supabase
@@ -392,15 +429,14 @@ export function KpisDefinitionTab({
       }
 
       // 3. Invalidate React Query caches
-      await queryClient.invalidateQueries({ queryKey: ["kpi-matched-template"] });
-      await queryClient.invalidateQueries({ queryKey: ["kpi-criteria"] });
       await queryClient.invalidateQueries({ queryKey: ["kpi-templates"] });
-      await queryClient.invalidateQueries({ queryKey: ["kpi-evaluations-list"] });
+      await queryClient.invalidateQueries({ queryKey: ["kpi-criteria"] });
+      await queryClient.invalidateQueries({ queryKey: ["kpi-matched-template"] });
 
       toast.success(
         isAr
-          ? "تمت إضافة تعريف المؤشر الجديد وحفظه بنجاح!"
-          : "New KPI Definition created and attached successfully!"
+          ? "تمت إضافة تعريف المؤشر الجديد وحفظه في القالب بنجاح!"
+          : "New KPI Definition created and attached to template successfully!"
       );
       setAddModalOpen(false);
     } catch (err: any) {
@@ -416,27 +452,32 @@ export function KpisDefinitionTab({
     if (currentTotalWeight !== 100) {
       toast.error(
         isAr
-          ? `مجموع الأوزان يجب أن يساوي 100%. الإجمالي الحالي: ${currentTotalWeight}%`
-          : `Sum of criteria weights must equal exactly 100%. Current total: ${currentTotalWeight}%`
+          ? `مجموع الأوزان الحالية هو ${currentTotalWeight}%. يجب أن يكون المجموع 100% تماماً للحفظ.`
+          : `Current total weight is ${currentTotalWeight}%. Total weight must equal exactly 100% to save.`
       );
       return;
     }
 
-    const templateId = matchedTemplateData?.template?.id;
-    setIsSaving(true);
+    const templateId = currentTemplate?.id;
+    if (!templateId) {
+      toast.error(isAr ? "لم يتم تحديد قالب لحفظ المؤشرات" : "No template selected to save metrics");
+      return;
+    }
 
+    setIsSaving(true);
     try {
-      // 1. Process deletions
+      // 1. Delete rows marked for removal
       if (deletedItemIds.length > 0) {
-        await supabase
+        const { error: delErr } = await supabase
           .from("kpi_template_items")
           .delete()
           .in("id", deletedItemIds);
+        if (delErr) throw delErr;
       }
 
       // 2. Process updates and new rows
       for (const row of editableRows) {
-        const targetBenchmark = Number(row.target) || 100;
+        const targetBenchmark = Number(row.target.replace(/[^0-9.]/g, "")) || 100;
         const weightDecimal = Number(row.weightPct) / 100;
 
         if (row.isNew) {
@@ -462,8 +503,8 @@ export function KpisDefinitionTab({
 
           if (critErr) throw critErr;
 
-          // B) If we have a matched template, attach new criterion to kpi_template_items
-          if (templateId && newCrit?.id) {
+          // B) Attach to current template
+          if (newCrit?.id) {
             const { error: itemErr } = await supabase
               .from("kpi_template_items")
               .insert({
@@ -472,7 +513,6 @@ export function KpisDefinitionTab({
                 weight: weightDecimal,
                 target_benchmark: targetBenchmark,
                 display_order: row.numericIndex,
-                unit: row.unit || "%",
               });
             if (itemErr) throw itemErr;
           }
@@ -513,72 +553,73 @@ export function KpisDefinitionTab({
         }
       }
 
-      // Invalidate relevant React Query caches to refresh data across all views
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["kpi-matched-template"] }),
-        queryClient.invalidateQueries({ queryKey: ["kpi-criteria"] }),
-        queryClient.invalidateQueries({ queryKey: ["kpi-templates"] }),
-        queryClient.invalidateQueries({ queryKey: ["kpi-evaluations-list"] }),
-      ]);
+      // Invalidate queries to refresh view
+      await queryClient.invalidateQueries({ queryKey: ["kpi-templates"] });
+      await queryClient.invalidateQueries({ queryKey: ["kpi-criteria"] });
+      await queryClient.invalidateQueries({ queryKey: ["kpi-matched-template"] });
 
       toast.success(
-        isAr ? "تم حفظ وتحديث تعريفات المؤشرات بنجاح" : "KPI definitions saved successfully"
+        isAr
+          ? "تم حفظ تعديلات بطاقة تعريف المؤشرات بنجاح!"
+          : "KPIs Definition matrix saved successfully!"
       );
       setIsEditing(false);
-      setDeletedItemIds([]);
     } catch (err: any) {
-      console.error("Save error:", err);
-      toast.error(err.message || (isAr ? "حدث خطأ أثناء الحفظ" : "Failed to save changes"));
+      console.error("Failed to save KPI definitions:", err);
+      toast.error(err.message || "Failed to save changes to database");
     } finally {
       setIsSaving(false);
     }
   };
 
-  // PDF Export
+  // ── EXPORT PDF ──
   const handleExportPdf = async () => {
     if (activeScorecardItems.length === 0) {
-      toast.error(isAr ? "لا توجد مؤشرات للتصدير" : "No KPI metrics to export");
+      toast.error(isAr ? "لا توجد مؤشرات للتصدير" : "No KPIs to export");
       return;
     }
+
     setIsExportingPdf(true);
     try {
       const pdfRows: KpiDefPdfRow[] = activeScorecardItems.map((it, idx) => ({
-        id: idx + 1,
+        id: it.numericIndex || idx + 1,
         category: formatCategoryName(it.category, isAr),
         name: isAr ? it.name_ar || it.name : it.name,
         definition: isAr ? it.definition_ar || it.definition : it.definition,
         howMeasured: isAr
           ? it.howMeasured_ar || it.howMeasured || "—"
           : it.howMeasured || (it.unit ? `Measured in ${it.unit}` : "—"),
-        weight: it.weight,
-        target: it.target > 1 ? it.target / 100 : it.target,
-        unit: it.unit,
+        weight: Number(it.weight || 0),
+        target: Number(it.target || 100) > 1 ? Number(it.target) / 100 : Number(it.target || 1),
+        unit: it.unit || "%",
       }));
 
       await exportKpiDefinitionPdf(
         pdfRows,
         {
-          fullName: currentEmployee.name,
-          position: currentEmployee.position,
-          department: currentEmployee.department,
+          fullName: templateName,
+          position: jobTitle,
+          department: departmentName,
         },
         selectedYear
       );
-      toast.success(isAr ? "تم تحميل ملف مؤشرات الأداء (PDF)" : "KPIs Definition PDF downloaded");
+
+      toast.success(isAr ? "تم تصدير ملف PDF بنجاح" : "PDF exported successfully");
     } catch (err: any) {
-      console.error("PDF export error:", err);
-      toast.error(err.message || (isAr ? "فشل تصدير ملف PDF" : "Failed to export PDF"));
+      console.error("Failed to export PDF:", err);
+      toast.error(err.message || "Failed to export PDF");
     } finally {
       setIsExportingPdf(false);
     }
   };
 
-  // Excel Export
+  // ── EXPORT EXCEL ──
   const handleExportExcel = async () => {
     try {
       const { utils, writeFile } = await import("xlsx");
-      const exportData = (isEditing ? editableRows : activeScorecardItems).map((it: any, idx: number) => ({
-        "#": idx + 1,
+      const sourceList = isEditing ? editableRows : activeScorecardItems;
+      const dataToExport = sourceList.map((it: any, idx: number) => ({
+        "#": it.numericIndex || idx + 1,
         Category: formatCategoryName(it.category, false),
         "KPI / Metric Name": it.name,
         "Definition (What it measures)": it.definition,
@@ -587,10 +628,10 @@ export function KpisDefinitionTab({
         Target: `${it.target}${it.unit === "%" ? "%" : it.unit ? " " + it.unit : ""}`,
       }));
 
+      const ws = utils.json_to_sheet(dataToExport);
       const wb = utils.book_new();
-      const ws = utils.json_to_sheet(exportData);
       utils.book_append_sheet(wb, ws, "KPIs Definition");
-      const filename = `KPIs_Definition_${(currentEmployee.name || "Employee").replace(/\s+/g, "_")}_${selectedYear}.xlsx`;
+      const filename = `KPIs_Definition_${templateName.replace(/\s+/g, "_")}_${selectedYear}.xlsx`;
       writeFile(wb, filename);
       toast.success(isAr ? "تم تصدير ملف الإكسل" : "Excel file exported");
     } catch (err: any) {
@@ -634,61 +675,70 @@ export function KpisDefinitionTab({
             </h2>
             <p className="text-xs text-muted-foreground">
               {isAr
-                ? "يمكنك تعديل أسماء المعايير، وطريقة القياس، والتعريف التفصيلي، والنسب المئوية للأوزان والمستهدفات."
-                : "Edit metric names, definitions, formulas, targets, and percentage weights directly in the table."}
+                ? "دليل تعريفي لمعايير الأداء الوظيفية، صيغ الاحتساب، والمستهدفات والأوزان النسبية لكل منصب."
+                : "Definitive matrix for role KPIs, measurement formulas, targets, and percentage weights by job position."}
             </p>
           </div>
 
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-2 shrink-0">
-            {/* Target Employee Dropdown */}
-            <Popover open={empPopoverOpen} onOpenChange={setEmpPopoverOpen}>
+            {/* Job Role Template Selector Dropdown */}
+            <Popover open={templatePopoverOpen} onOpenChange={setTemplatePopoverOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
                   size="sm"
                   disabled={isEditing}
-                  className="rounded-2xl gap-2 text-xs font-medium cursor-pointer border-border h-9"
+                  className="rounded-2xl gap-2 text-xs font-semibold cursor-pointer border-border h-9"
                 >
-                  <User className="h-3.5 w-3.5 text-brand" />
-                  <span className="max-w-[140px] truncate">{currentEmployee.name}</span>
+                  <Briefcase className="h-3.5 w-3.5 text-brand" />
+                  <span className="max-w-[180px] truncate">{templateName}</span>
                   <ChevronDown className="h-3.5 w-3.5 opacity-60" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-80 p-3 rounded-2xl shadow-xl" align="end">
+              <PopoverContent className="w-88 p-3 rounded-2xl shadow-xl" align="end">
                 <div className="space-y-2.5">
-                  <div className="text-xs font-bold text-foreground">
-                    {isAr ? "اختر الموظف لعرض بطاقة مؤشراته" : "Select Target Employee"}
+                  <div className="text-xs font-bold text-foreground flex items-center justify-between">
+                    <span>{isAr ? "اختر القالب الوظيفي" : "Select Job Role Template"}</span>
+                    <Badge variant="outline" className="text-[10px] font-mono">
+                      {kpiTemplates.length} {isAr ? "قالب" : "Templates"}
+                    </Badge>
                   </div>
                   <div className="relative">
                     <Search className="absolute start-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                     <Input
-                      value={empSearch}
-                      onChange={(e) => setEmpSearch(e.target.value)}
-                      placeholder={isAr ? "بحث بالاسم أو الكود..." : "Search name or code..."}
+                      value={templateSearch}
+                      onChange={(e) => setTemplateSearch(e.target.value)}
+                      placeholder={isAr ? "بحث بالقالب أو الوظيفة..." : "Search template or position..."}
                       className="ps-8 h-8 text-xs rounded-xl"
                     />
                   </div>
-                  <div className="max-h-60 overflow-y-auto divide-y divide-border/40 text-xs">
-                    {filteredEmployees.map((emp) => (
+                  <div className="max-h-64 overflow-y-auto divide-y divide-border/40 text-xs">
+                    {filteredTemplates.map((t) => (
                       <button
-                        key={emp.id}
+                        key={t.id}
                         type="button"
                         onClick={() => {
-                          onSelectEmployee(emp.id);
-                          setEmpPopoverOpen(false);
-                          setEmpSearch("");
+                          setSelectedTemplateId(t.id);
+                          setTemplatePopoverOpen(false);
+                          setTemplateSearch("");
                         }}
-                        className={`w-full text-start p-2 rounded-xl transition cursor-pointer flex flex-col gap-0.5 hover:bg-muted/60 ${
-                          emp.id === currentEmployee.id ? "bg-brand/10 font-bold text-brand" : ""
+                        className={`w-full text-start p-2.5 rounded-xl transition cursor-pointer flex flex-col gap-1 hover:bg-muted/60 ${
+                          t.id === currentTemplate?.id ? "bg-brand/10 font-bold text-brand" : ""
                         }`}
                       >
                         <div className="flex items-center justify-between">
-                          <span className="truncate">{emp.name}</span>
-                          {emp.code && <span className="text-[10px] font-mono text-muted-foreground">{emp.code}</span>}
+                          <span className="truncate font-bold">
+                            {isAr ? t.name_ar || t.name_en : t.name_en || t.name_ar}
+                          </span>
+                          <span className="text-[10px] font-mono text-muted-foreground">
+                            {t.items?.length || 0} {isAr ? "معايير" : "KPIs"}
+                          </span>
                         </div>
-                        <div className="text-[10px] text-muted-foreground truncate">
-                          {emp.position || "—"} • {emp.department || "—"}
+                        <div className="text-[10px] text-muted-foreground truncate flex items-center gap-1.5">
+                          <span>{t.position?.name_en || isAr ? "كافة المناصب" : "All Roles"}</span>
+                          <span>•</span>
+                          <span>{t.department?.name_en || isAr ? "عام" : "General"}</span>
                         </div>
                       </button>
                     ))}
@@ -697,7 +747,7 @@ export function KpisDefinitionTab({
               </PopoverContent>
             </Popover>
 
-            {/* ── ADD NEW KPI DEFINITION BUTTON (PROMINENT OPTION) ── */}
+            {/* ── ADD NEW KPI DEFINITION BUTTON (ALWAYS VISIBLE) ── */}
             <Button
               onClick={handleOpenAddModal}
               size="sm"
@@ -789,16 +839,16 @@ export function KpisDefinitionTab({
           </div>
         </div>
 
-        {/* ── HEADER SUBTITLE BANNER (Name | Job Title: | Department:) ── */}
+        {/* ── HEADER SUBTITLE BANNER (Job Role Definition — NOT tied to employee) ── */}
         <div className="relative overflow-hidden rounded-2xl bg-neutral-900 text-white p-4 sm:p-5 shadow-sm border border-neutral-800">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
               <div className="flex items-center gap-2">
-                <span className="text-neutral-400 font-semibold">{isAr ? "الاسم:" : "Name:"}</span>
-                <span className="font-bold text-sm text-white tracking-tight">{currentEmployee.name}</span>
-                {currentEmployee.code && (
-                  <Badge variant="outline" className="text-[10px] font-mono border-neutral-700 text-neutral-300">
-                    {currentEmployee.code}
+                <span className="text-neutral-400 font-semibold">{isAr ? "النموذج:" : "Template:"}</span>
+                <span className="font-bold text-sm text-white tracking-tight">{templateName}</span>
+                {currentTemplate?.status && (
+                  <Badge variant="outline" className="text-[10px] font-mono border-neutral-700 text-orange-400">
+                    {currentTemplate.status.toUpperCase()}
                   </Badge>
                 )}
               </div>
@@ -807,20 +857,20 @@ export function KpisDefinitionTab({
 
               <div className="flex items-center gap-2">
                 <span className="text-neutral-400 font-semibold">{isAr ? "المسمى الوظيفي:" : "Job Title:"}</span>
-                <span className="font-semibold text-orange-400">{currentEmployee.position || "—"}</span>
+                <span className="font-semibold text-orange-400">{jobTitle}</span>
               </div>
 
               <span className="hidden md:inline text-neutral-600">|</span>
 
               <div className="flex items-center gap-2">
                 <span className="text-neutral-400 font-semibold">{isAr ? "الإدارة / القسم:" : "Department:"}</span>
-                <span className="text-neutral-200">{currentEmployee.department || "—"}</span>
+                <span className="text-neutral-200">{departmentName}</span>
               </div>
             </div>
 
             <div className="flex items-center gap-2 text-[11px] text-neutral-400">
-              <span>{isAr ? "النموذج:" : "Template:"}</span>
-              <span className="font-mono text-neutral-300">{templateName}</span>
+              <span>{isAr ? "الإصدار:" : "Version:"}</span>
+              <span className="font-mono text-neutral-300">v{currentTemplate?.version || 1}</span>
             </div>
           </div>
         </div>
@@ -843,7 +893,7 @@ export function KpisDefinitionTab({
                 <button
                   type="button"
                   onClick={() => setCategoryFilter("all")}
-                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold cursor-pointer transition ${
+                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold cursor-pointer whitespace-nowrap transition ${
                     categoryFilter === "all"
                       ? "bg-brand text-brand-foreground shadow-xs"
                       : "bg-muted text-muted-foreground hover:bg-muted/80"
@@ -908,7 +958,7 @@ export function KpisDefinitionTab({
                   <td colSpan={isEditing ? 8 : 7} className="py-12 text-center text-muted-foreground">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <AlertCircle className="h-6 w-6 text-muted-foreground/60" />
-                      <span>{isAr ? "لا توجد مؤشرات معروضة" : "No KPI metrics to display"}</span>
+                      <span>{isAr ? "لا توجد مؤشرات معروضة لهذا القالب" : "No KPI metrics defined for this template"}</span>
                       <Button
                         type="button"
                         onClick={handleOpenAddModal}
@@ -961,20 +1011,15 @@ export function KpisDefinitionTab({
                           placeholder={isAr ? "اسم المؤشر..." : "Metric name..."}
                           className="h-9 text-xs font-semibold rounded-xl bg-background"
                         />
-                        {row.code && (
-                          <div className="font-mono text-[10px] text-muted-foreground mt-1 ps-1">
-                            {row.code}
-                          </div>
-                        )}
                       </td>
 
-                      {/* Definition (What it measures) Textarea */}
+                      {/* Definition Input */}
                       <td className="py-2.5 px-3 align-top">
                         <Textarea
                           value={row.definition}
                           onChange={(e) => handleUpdateRowField(row.id, "definition", e.target.value)}
-                          placeholder={isAr ? "اكتب تعريف المؤشر وماذا يقيس بالتفصيل..." : "Describe what this metric measures..."}
-                          className="min-h-[64px] text-xs rounded-xl bg-background resize-y leading-relaxed"
+                          placeholder={isAr ? "ماذا يقيس هذا المؤشر..." : "What this metric measures..."}
+                          className="min-h-[56px] text-xs resize-y rounded-xl bg-background"
                           rows={2}
                         />
                       </td>
@@ -1166,7 +1211,7 @@ export function KpisDefinitionTab({
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs">
                 <span className="font-bold text-foreground">{templateName}</span>
                 <span className="text-muted-foreground font-medium">
-                  {currentEmployee.position} • {currentEmployee.department}
+                  {jobTitle} • {departmentName}
                 </span>
               </div>
             </div>
@@ -1185,6 +1230,7 @@ export function KpisDefinitionTab({
                   {kpiTemplates.map((t: any) => (
                     <option key={t.id} value={t.id}>
                       {isAr ? t.name_ar || t.name_en : t.name_en || t.name_ar}
+                      {t.position?.name_en ? ` (${t.position.name_en})` : ""}
                     </option>
                   ))}
                 </select>
