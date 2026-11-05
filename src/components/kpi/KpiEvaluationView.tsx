@@ -236,6 +236,12 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
   const [isEvaluationsListOpen, setIsEvaluationsListOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
+  // Per-metric return / notes dialog (Admin)
+  const [metricReturnModalOpen, setMetricReturnModalOpen] = useState(false);
+  const [selectedReturnKpi, setSelectedReturnKpi] = useState<any | null>(null);
+  const [metricReturnNote, setMetricReturnNote] = useState("");
+  const [metricIsReturned, setMetricIsReturned] = useState(false);
+
   // ── DYNAMIC ENGINEERING DISCIPLINES WITH LOCALSTORAGE PERSISTENCE ──
   const [disciplines, setDisciplines] = useState<KpiDiscipline[]>(() => {
     try {
@@ -850,6 +856,60 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
     }
   };
 
+  const handleOpenMetricReturnModal = (kpi: any) => {
+    setSelectedReturnKpi(kpi);
+    const row = kpiState[kpi.id] as any;
+    setMetricReturnNote(row?.adminNotes || row?.notes || "");
+    setMetricIsReturned(row?.isReturned ?? true);
+    setMetricReturnModalOpen(true);
+  };
+
+  const handleSaveMetricReturnNote = async (returnEvaluation = false) => {
+    if (!selectedReturnKpi) return;
+    const kpiId = String(selectedReturnKpi.id);
+    const updatedState = {
+      ...kpiState,
+      [kpiId]: {
+        ...kpiState[kpiId],
+        adminNotes: metricReturnNote.trim(),
+        notes: metricReturnNote.trim(),
+        isReturned: metricIsReturned,
+      },
+    };
+    setKpiState(updatedState as any);
+    setHasUnsavedChanges(true);
+
+    if (returnEvaluation) {
+      if (serverRecord?.id) {
+        try {
+          await updateStatusMutation.mutateAsync("draft");
+          toast.warning(
+            isAr
+              ? `تمت إعادة التقييم للمراجعة مع حفظ ملاحظة: ${selectedReturnKpi.name}`
+              : `Evaluation returned to Draft with notes on: ${selectedReturnKpi.name}`
+          );
+        } catch (err: any) {
+          toast.error(err.message || "Failed to return evaluation");
+        }
+      } else {
+        setStatus("Draft" as any);
+      }
+    } else {
+      toast.success(
+        isAr ? "تم حفظ ملاحظة المؤشر بنجاح" : "Metric note saved successfully"
+      );
+    }
+
+    if (selectedEmpId && selectedYear) {
+      saveMutation.mutate({
+        targetStatus: returnEvaluation ? "draft" : (status.toLowerCase() as any),
+      });
+    }
+
+    setMetricReturnModalOpen(false);
+    setSelectedReturnKpi(null);
+  };
+
   // ── CRITERIA CATALOG HANDLERS ──
   const handleOpenAddCriterion = () => {
     setEditingCriterion(null);
@@ -1420,6 +1480,9 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
           q3: val.q3 ?? { actual: null, achievement: null, score: null },
           q4: val.q4 ?? { actual: null, achievement: null, score: null },
           annualScore: val.annualScore ?? null,
+          adminNotes: val.adminNotes ?? "",
+          notes: val.notes ?? "",
+          isReturned: val.isReturned ?? false,
         };
       });
       setKpiState(incomingState);
@@ -1547,7 +1610,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
       targetStatus: "draft" | "submitted" | "reviewed" | "approved";
     }) => {
       const serializedScores: Record<string, any> = {};
-      Object.entries(kpiState).forEach(([key, val]) => {
+      Object.entries(kpiState).forEach(([key, val]: [string, any]) => {
         serializedScores[String(key)] = {
           targetAnnual: val.targetAnnual,
           q1: val.q1,
@@ -1555,6 +1618,9 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
           q3: val.q3,
           q4: val.q4,
           annualScore: val.annualScore,
+          adminNotes: val.adminNotes || "",
+          notes: val.notes || "",
+          isReturned: val.isReturned || false,
         };
       });
 
@@ -2930,7 +2996,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                     <th className="px-3 py-3 text-center bg-muted/80 font-bold w-20">
                       {isAr ? "المتوسط السنوي" : "Annual Avg"}
                     </th>
-                    <th className="px-2 py-3 text-center w-8 print:hidden"></th>
+                    <th className="px-2 py-3 text-center w-14 print:hidden"></th>
                   </tr>
                 </thead>
 
@@ -3123,18 +3189,40 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                                 {fmtRawScore(row.annualScore)}
                               </td>
 
-                              {/* Info Dialog Trigger */}
+                              {/* Actions: Return / Add Notes (for admin) & Info Dialog */}
                               <td className="px-2 py-2 text-center print:hidden">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => setInfoModalKpi(kpi as any)}
-                                  className="h-6 w-6 rounded-lg text-muted-foreground hover:text-foreground cursor-pointer"
-                                  title={isAr ? "معلومات وطريقة قياس المؤشر" : "Metric Measurement & Definition"}
-                                >
-                                  <Info className="h-3.5 w-3.5" />
-                                </Button>
+                                <div className="flex items-center justify-center gap-1">
+                                  {(role === "admin" || role === "hr") && (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleOpenMetricReturnModal(kpi)}
+                                      className={`h-6 w-6 rounded-lg cursor-pointer transition-colors ${
+                                        row.adminNotes || row.isReturned
+                                          ? "text-amber-600 bg-amber-500/15 hover:bg-amber-500/25 ring-1 ring-amber-500/40"
+                                          : "text-muted-foreground hover:text-amber-600 hover:bg-amber-500/10"
+                                      }`}
+                                      title={
+                                        row.adminNotes
+                                          ? (isAr ? `ملاحظة الإعادة: ${row.adminNotes}` : `Return note: ${row.adminNotes}`)
+                                          : (isAr ? "إعادة المؤشر وإضافة ملاحظات" : "Return metric & add notes")
+                                      }
+                                    >
+                                      <RotateCcw className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => setInfoModalKpi(kpi as any)}
+                                    className="h-6 w-6 rounded-lg text-muted-foreground hover:text-foreground cursor-pointer"
+                                    title={isAr ? "معلومات وطريقة قياس المؤشر" : "Metric Measurement & Definition"}
+                                  >
+                                    <Info className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
                               </td>
                             </tr>
                           );
@@ -4297,6 +4385,94 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
               <p className="text-muted-foreground leading-relaxed">
                 {isAr ? infoModalKpi?.howMeasured_ar : infoModalKpi?.howMeasured}
               </p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Metric Return & Notes Dialog (Admin) */}
+      <Dialog open={metricReturnModalOpen} onOpenChange={setMetricReturnModalOpen}>
+        <DialogContent className="sm:max-w-md rounded-3xl" dir={dir}>
+          <DialogHeader>
+            <div className="flex items-center gap-2 text-amber-600">
+              <RotateCcw className="h-5 w-5" />
+              <DialogTitle className="text-base font-bold font-display">
+                {isAr ? "إعادة المؤشر وإضافة ملاحظات" : "Return Metric & Add Revision Notes"}
+              </DialogTitle>
+            </div>
+            <DialogDescription className="text-xs text-muted-foreground">
+              #{selectedReturnKpi?.numericIndex}. {isAr ? (selectedReturnKpi?.name_ar || selectedReturnKpi?.name) : selectedReturnKpi?.name}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 text-xs pt-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge variant="outline" className="font-mono text-[10px]">
+                {isAr ? `الوزن: ${fmtPercent(selectedReturnKpi?.weight, 1)}` : `Weight: ${fmtPercent(selectedReturnKpi?.weight, 1)}`}
+              </Badge>
+              <Badge variant="secondary" className="font-mono text-[10px]">
+                {isAr
+                  ? `المستهدف: ${selectedReturnKpi?.target ? (selectedReturnKpi.unit === "%" ? `${(selectedReturnKpi.target > 1 ? selectedReturnKpi.target : selectedReturnKpi.target * 100).toFixed(0)}%` : selectedReturnKpi.target) : "—"}`
+                  : `Target: ${selectedReturnKpi?.target ? (selectedReturnKpi.unit === "%" ? `${(selectedReturnKpi.target > 1 ? selectedReturnKpi.target : selectedReturnKpi.target * 100).toFixed(0)}%` : selectedReturnKpi.target) : "—"}`}
+              </Badge>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-foreground block">
+                {isAr ? "ملاحظات وتوجيهات التعديل (سبب الإعادة):" : "Revision Notes & Return Reason:"}
+              </label>
+              <textarea
+                rows={4}
+                value={metricReturnNote}
+                onChange={(e) => setMetricReturnNote(e.target.value)}
+                placeholder={
+                  isAr
+                    ? "اكتب هنا سبب الإعادة، أو المستندات الناقصة، أو التوجيهات للمُقيّم..."
+                    : "Specify what requires revision, missing evidence, or instructions for the evaluator..."
+                }
+                className="w-full text-xs rounded-2xl border border-input bg-background p-3 focus:outline-none focus:ring-1 focus:ring-brand resize-none"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 pt-1 border-t border-border/50">
+              <input
+                type="checkbox"
+                id="markMetricReturned"
+                checked={metricIsReturned}
+                onChange={(e) => setMetricIsReturned(e.target.checked)}
+                className="h-4 w-4 rounded text-amber-600 cursor-pointer"
+              />
+              <label htmlFor="markMetricReturned" className="text-xs text-foreground cursor-pointer select-none">
+                {isAr ? "تحديد هذا المؤشر كمُعاد للمراجعة" : "Mark this metric as returned for revision"}
+              </label>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2 pt-2 border-t border-border">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setMetricReturnModalOpen(false)}
+                className="rounded-xl cursor-pointer"
+              >
+                {isAr ? "إلغاء" : "Cancel"}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleSaveMetricReturnNote(false)}
+                className="rounded-xl gap-1.5 cursor-pointer text-foreground"
+              >
+                <Save className="h-3.5 w-3.5" />
+                <span>{isAr ? "حفظ الملاحظة فقط" : "Save Notes"}</span>
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => handleSaveMetricReturnNote(true)}
+                className="rounded-xl gap-1.5 bg-amber-600 hover:bg-amber-700 text-white cursor-pointer shadow-xs"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                <span>{isAr ? "إعادة التقييم للمراجعة" : "Return Evaluation"}</span>
+              </Button>
             </div>
           </div>
         </DialogContent>

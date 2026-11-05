@@ -36,6 +36,9 @@ export interface KpiRowState {
   q3: KpiQuarterValues;
   q4: KpiQuarterValues;
   annualScore: number | null; // Average of quarterly scores
+  adminNotes?: string;
+  notes?: string;
+  isReturned?: boolean;
 }
 
 export interface KpiCategorySummary {

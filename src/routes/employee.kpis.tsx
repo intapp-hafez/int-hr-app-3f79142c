@@ -748,8 +748,8 @@ export function EmployeeKpiPage() {
                 <Badge
                   variant={summaryTotals.hasData ? "default" : "outline"}
                   className={`text-xs px-2.5 py-0.5 font-semibold flex items-center gap-1.5 ${summaryTotals.hasData
-                      ? ratingTier.badgeClass
-                      : "bg-muted text-muted-foreground border-border"
+                    ? ratingTier.badgeClass
+                    : "bg-muted text-muted-foreground border-border"
                     }`}
                 >
                   {summaryTotals.hasData ? (
@@ -821,20 +821,20 @@ export function EmployeeKpiPage() {
                   type="button"
                   onClick={() => setKpiSubTab("quarters")}
                   className={`rounded-xl px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${kpiSubTab === "quarters"
-                      ? "bg-background text-foreground shadow-2xs font-bold"
-                      : "text-muted-foreground hover:text-foreground"
+                    ? "bg-background text-foreground shadow-2xs font-bold"
+                    : "text-muted-foreground hover:text-foreground"
                     }`}
                 >
                   <Calendar className="h-3.5 w-3.5" />
-                  <span>{isAr ? "النتائج الفصلية" : "Quarterly Results"}</span>
+                  <span>{isAr ? "النتائج الفصلية" : "Q-Results"}</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setKpiSubTab("scorecard")}
                   className={`rounded-xl px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${kpiSubTab === "scorecard"
-                      ? "bg-background text-foreground shadow-2xs font-bold"
-                      : "text-muted-foreground hover:text-foreground"
+                    ? "bg-background text-foreground shadow-2xs font-bold"
+                    : "text-muted-foreground hover:text-foreground"
                     }`}
                 >
                   <FileCheck className="h-3.5 w-3.5" />
@@ -845,8 +845,8 @@ export function EmployeeKpiPage() {
                   type="button"
                   onClick={() => setKpiSubTab("feedback")}
                   className={`rounded-xl px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${kpiSubTab === "feedback"
-                      ? "bg-background text-foreground shadow-2xs font-bold"
-                      : "text-muted-foreground hover:text-foreground"
+                    ? "bg-background text-foreground shadow-2xs font-bold"
+                    : "text-muted-foreground hover:text-foreground"
                     }`}
                 >
                   <CheckCircle2 className="h-3.5 w-3.5" />
@@ -857,8 +857,8 @@ export function EmployeeKpiPage() {
                   type="button"
                   onClick={() => setKpiSubTab("history")}
                   className={`rounded-xl px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${kpiSubTab === "history"
-                      ? "bg-background text-foreground shadow-2xs font-bold"
-                      : "text-muted-foreground hover:text-foreground"
+                    ? "bg-background text-foreground shadow-2xs font-bold"
+                    : "text-muted-foreground hover:text-foreground"
                     }`}
                 >
                   <Layers className="h-3.5 w-3.5" />
@@ -953,14 +953,14 @@ export function EmployeeKpiPage() {
                         <div className="h-2 w-full rounded-full bg-muted/80 overflow-hidden">
                           <div
                             className={`h-full rounded-full transition-all duration-500 ${progress >= 90
-                                ? "bg-emerald-500"
-                                : progress >= 75
-                                  ? "bg-blue-500"
-                                  : progress >= 60
-                                    ? "bg-amber-500"
-                                    : progress > 0
-                                      ? "bg-rose-500"
-                                      : "bg-transparent"
+                              ? "bg-emerald-500"
+                              : progress >= 75
+                                ? "bg-blue-500"
+                                : progress >= 60
+                                  ? "bg-amber-500"
+                                  : progress > 0
+                                    ? "bg-rose-500"
+                                    : "bg-transparent"
                               }`}
                             style={{ width: `${progress}%` }}
                           />
