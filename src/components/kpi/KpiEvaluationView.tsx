@@ -2154,16 +2154,6 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
             )}
           </Button>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={loadSampleData}
-            disabled={isLocked}
-            className="rounded-xl gap-1.5 cursor-pointer"
-          >
-            <Sparkles className="h-4 w-4 text-brand" /> {isAr ? "بيانات تجريبية" : "Sample Data"}
-          </Button>
-
           {/* Save Draft Button */}
           <Button
             variant="outline"
