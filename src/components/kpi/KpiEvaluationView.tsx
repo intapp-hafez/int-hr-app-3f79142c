@@ -3642,12 +3642,14 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                   </div>
 
                   <div className="flex items-center gap-2">
+                    {/* Hidden as requested - code preserved */}
                     <Button
                       onClick={handleSeedDefaultTemplates}
                       variant="outline"
                       size="sm"
                       disabled={isSeedingTemplates}
-                      className="rounded-2xl gap-1.5 cursor-pointer text-xs border-brand/30 hover:bg-brand/5"
+                      className="hidden rounded-2xl gap-1.5 cursor-pointer text-xs border-brand/30 hover:bg-brand/5"
+                      style={{ display: "none" }}
                       title={isAr ? "إدراج قوالب الوظائف الافتراضية (هندسة، برمجيات، موارد بشرية، محاسبة، مبيعات)" : "Seed standard templates for Engineering, IT, HR, Finance, Sales"}
                     >
                       {isSeedingTemplates ? <Loader2 className="h-4 w-4 animate-spin text-brand" /> : <Sparkles className="h-4 w-4 text-brand" />}
@@ -3716,11 +3718,13 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                       {isAr ? "لا توجد قوالب تطابق البحث" : "No templates found matching your criteria"}
                     </p>
                     <div className="flex items-center justify-center gap-2 pt-1">
+                      {/* Hidden as requested - code preserved */}
                       <Button
                         size="sm"
                         onClick={handleSeedDefaultTemplates}
                         disabled={isSeedingTemplates}
-                        className="rounded-xl text-xs gap-1.5 cursor-pointer bg-brand text-brand-foreground hover:bg-brand/90"
+                        className="hidden rounded-xl text-xs gap-1.5 cursor-pointer bg-brand text-brand-foreground hover:bg-brand/90"
+                        style={{ display: "none" }}
                       >
                         {isSeedingTemplates ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                         <span>{isAr ? "إدراج القوالب الافتراضية الجاهزة" : "Seed Default Templates"}</span>
