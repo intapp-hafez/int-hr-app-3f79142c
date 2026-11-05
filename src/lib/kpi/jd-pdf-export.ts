@@ -55,7 +55,7 @@ export async function exportJobDescriptionPdf(
   const darkNavy: [number, number, number] = [15, 23, 42];     // #0f172a
   const slateMuted: [number, number, number] = [100, 116, 139];// #64748b
   const lightBg: [number, number, number] = [248, 250, 252];   // #f8fafc
-  const borderGray = [226, 232, 240];// #e2e8f0
+  const borderGray: [number, number, number] = [226, 232, 240];// #e2e8f0
 
   let currentY = margin - 6;
 
