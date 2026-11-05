@@ -67,6 +67,28 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 
+type EmpKpiQuarter = { actual: number | null; achievement: number | null; score: number | null };
+
+type EmpKpiRow = {
+  kpi: {
+    id: number;
+    category: string;
+    category_ar: string;
+    name: string;
+    name_ar: string;
+    definition: string;
+    definition_ar: string;
+    weight: number;
+    target: number;
+    unit: string;
+  };
+  q1: EmpKpiQuarter;
+  q2: EmpKpiQuarter;
+  q3: EmpKpiQuarter;
+  q4: EmpKpiQuarter;
+  annualScore: number | null;
+};
+
 export const Route = createFileRoute("/employee/kpis")({
   component: EmployeeKpiPage,
 });
