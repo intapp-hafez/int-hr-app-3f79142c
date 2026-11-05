@@ -47,6 +47,7 @@ import {
   getMyKpiEvaluation,
   listMyKpiEvaluations,
   matchKpiTemplate,
+  getQuarterlyEvaluation,
 } from "@/backend/functions/kpi-evaluations.functions";
 import { getMyProfileDetails } from "@/backend/functions/auth.functions";
 import { buildDynamicJobDescription } from "@/lib/kpi/dynamic-job-description";
@@ -109,12 +110,36 @@ export function EmployeeKpiPage() {
   const listMyKpisFn = useServerFn(listMyKpiEvaluations);
   const getProfileFn = useServerFn(getMyProfileDetails);
   const matchTemplateFn = useServerFn(matchKpiTemplate);
+  const getQuarterlyFn = useServerFn(getQuarterlyEvaluation);
 
   // Fetch current year evaluation
   const { data: evaluation } = useQuery({
     queryKey: ["my-kpi-evaluation", selectedYear],
     queryFn: () => getMyKpiFn({ data: { year: selectedYear } }),
     enabled: !!session,
+  });
+
+  // Fetch real quarterly evaluations (approved) from kpi_quarterly_evaluations
+  const empId = session?.employeeId;
+  const { data: q1Eval } = useQuery({
+    queryKey: ["my-quarterly-eval", empId, selectedYear, "q1"],
+    queryFn: () => getQuarterlyFn({ data: { employeeId: empId!, year: selectedYear, quarter: "q1" } }),
+    enabled: !!empId,
+  });
+  const { data: q2Eval } = useQuery({
+    queryKey: ["my-quarterly-eval", empId, selectedYear, "q2"],
+    queryFn: () => getQuarterlyFn({ data: { employeeId: empId!, year: selectedYear, quarter: "q2" } }),
+    enabled: !!empId,
+  });
+  const { data: q3Eval } = useQuery({
+    queryKey: ["my-quarterly-eval", empId, selectedYear, "q3"],
+    queryFn: () => getQuarterlyFn({ data: { employeeId: empId!, year: selectedYear, quarter: "q3" } }),
+    enabled: !!empId,
+  });
+  const { data: q4Eval } = useQuery({
+    queryKey: ["my-quarterly-eval", empId, selectedYear, "q4"],
+    queryFn: () => getQuarterlyFn({ data: { employeeId: empId!, year: selectedYear, quarter: "q4" } }),
+    enabled: !!empId,
   });
 
   // Fetch history list of evaluations
@@ -353,11 +378,36 @@ export function EmployeeKpiPage() {
 
   const rawStatus = (evaluation?.status || "draft").toLowerCase();
 
+  // Real quarterly scores from kpi_quarterly_evaluations (approved = show score, else null)
   const quartersList = [
-    { q: "q1", label: "Q1", label_ar: "الربع الأول", date: isAr ? "يناير – مارس" : "Jan – Mar", score: summaryTotals.q1Score, target: 0.25 },
-    { q: "q2", label: "Q2", label_ar: "الربع الثاني", date: isAr ? "أبريل – يونيو" : "Apr – Jun", score: summaryTotals.q2Score, target: 0.25 },
-    { q: "q3", label: "Q3", label_ar: "الربع الثالث", date: isAr ? "يوليو – سبتمبر" : "Jul – Sep", score: summaryTotals.q3Score, target: 0.25 },
-    { q: "q4", label: "Q4", label_ar: "الربع الرابع", date: isAr ? "أكتوبر – ديسمبر" : "Oct – Dec", score: summaryTotals.q4Score, target: 0.25 },
+    {
+      q: "q1", label: "Q1", label_ar: "الربع الأول",
+      date: isAr ? "يناير – مارس" : "Jan – Mar",
+      score: q1Eval?.status === "approved" ? (q1Eval.score ?? null) : null,
+      status: q1Eval?.status ?? null,
+      target: 25,
+    },
+    {
+      q: "q2", label: "Q2", label_ar: "الربع الثاني",
+      date: isAr ? "أبريل – يونيو" : "Apr – Jun",
+      score: q2Eval?.status === "approved" ? (q2Eval.score ?? null) : null,
+      status: q2Eval?.status ?? null,
+      target: 25,
+    },
+    {
+      q: "q3", label: "Q3", label_ar: "الربع الثالث",
+      date: isAr ? "يوليو – سبتمبر" : "Jul – Sep",
+      score: q3Eval?.status === "approved" ? (q3Eval.score ?? null) : null,
+      status: q3Eval?.status ?? null,
+      target: 25,
+    },
+    {
+      q: "q4", label: "Q4", label_ar: "الربع الرابع",
+      date: isAr ? "أكتوبر – ديسمبر" : "Oct – Dec",
+      score: q4Eval?.status === "approved" ? (q4Eval.score ?? null) : null,
+      status: q4Eval?.status ?? null,
+      target: 25,
+    },
   ] as const;
 
   return (
@@ -726,8 +776,29 @@ export function EmployeeKpiPage() {
             {kpiSubTab === "quarters" && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 {quartersList.map((item) => {
-                  const isCompleted = item.score !== null;
-                  const progress = item.score !== null ? Math.min(100, Math.round((item.score / item.target) * 100)) : 0;
+                  // score is 0-100 (direct from kpi_quarterly_evaluations.score)
+                  const isApproved  = item.status === "approved";
+                  const isSubmitted = item.status === "submitted";
+                  const isReturned  = item.status === "returned";
+                  const hasScore    = item.score !== null;
+                  // progress: score / target * 100 (both are 0-100)
+                  const progress = hasScore ? Math.min(100, Math.round((item.score! / item.target) * 100)) : 0;
+
+                  const badgeClass = isApproved
+                    ? "bg-emerald-600 text-white"
+                    : isSubmitted
+                    ? "bg-blue-600 text-white"
+                    : isReturned
+                    ? "bg-amber-500 text-white"
+                    : "text-muted-foreground border-border";
+
+                  const badgeLabel = isApproved
+                    ? (isAr ? "معتمد" : "Approved")
+                    : isSubmitted
+                    ? (isAr ? "بانتظار المراجعة" : "Pending Review")
+                    : isReturned
+                    ? (isAr ? "مُعاد" : "Returned")
+                    : (isAr ? "قيد التقييم" : "Not Started");
 
                   return (
                     <div
@@ -747,14 +818,10 @@ export function EmployeeKpiPage() {
                           </div>
                         </div>
                         <Badge
-                          variant={isCompleted ? "default" : "outline"}
-                          className={`text-[10px] px-2 py-0.5 font-semibold ${
-                            isCompleted
-                              ? "bg-emerald-600 text-white"
-                              : "text-muted-foreground border-border"
-                          }`}
+                          variant={isApproved ? "default" : "outline"}
+                          className={`text-[10px] px-2 py-0.5 font-semibold ${badgeClass}`}
                         >
-                          {isCompleted ? (isAr ? "معتمد" : "Approved") : (isAr ? "قيد التقييم" : "Pending Review")}
+                          {badgeLabel}
                         </Badge>
                       </div>
 
@@ -763,14 +830,14 @@ export function EmployeeKpiPage() {
                           <span className="text-[10px] text-muted-foreground uppercase font-bold block">
                             {isAr ? "الهدف" : "Target"}
                           </span>
-                          <span className="font-mono text-xs font-bold text-foreground">25.0%</span>
+                          <span className="font-mono text-xs font-bold text-foreground">{item.target}.0%</span>
                         </div>
                         <div>
                           <span className="text-[10px] text-muted-foreground uppercase font-bold block">
                             {isAr ? "الدرجة المحققة" : "Score"}
                           </span>
                           <span className="font-mono text-xs font-bold text-brand">
-                            {item.score !== null ? fmtPercent(item.score, 1) : "—"}
+                            {hasScore ? `${item.score!.toFixed(1)}%` : "—"}
                           </span>
                         </div>
                         <div>
@@ -778,7 +845,7 @@ export function EmployeeKpiPage() {
                             {isAr ? "نسبة الاستيفاء" : "Attainment"}
                           </span>
                           <span className="font-mono text-xs font-bold text-foreground">
-                            {item.score !== null ? `${progress}%` : "—"}
+                            {hasScore ? `${progress}%` : "—"}
                           </span>
                         </div>
                       </div>
