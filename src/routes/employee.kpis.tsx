@@ -324,13 +324,26 @@ export function EmployeeKpiPage() {
 
   // Hydrate recorded scorecard state directly from evaluation.scores
   const kpiState = useMemo<Record<string, KpiRowState>>(() => {
-    const scores = (evaluation?.scores as Record<string, any>) || {};
+    let scores: Record<string, any> = {};
+    if (evaluation?.scores) {
+      if (typeof evaluation.scores === "string") {
+        try {
+          scores = JSON.parse(evaluation.scores);
+        } catch {
+          scores = {};
+        }
+      } else {
+        scores = evaluation.scores as Record<string, any>;
+      }
+    }
     const state: Record<string, KpiRowState> = {};
 
     activeScorecardItems.forEach((it, idx) => {
       // Lookup scores by criterion UUID, display index, or item id
       const saved =
         scores[it.id] ||
+        scores[String(it.numericIndex)] ||
+        scores[it.numericIndex] ||
         scores[String(idx + 1)] ||
         scores[idx + 1] ||
         {};
@@ -442,7 +455,15 @@ export function EmployeeKpiPage() {
       if (row.annualScore !== null) { annualSum += row.annualScore; hasData = true; }
     });
 
-    const savedTotalScore = evaluation?.summary?.totalScore != null ? Number(evaluation.summary.totalScore) : null;
+    let summaryObj: any = evaluation?.summary;
+    if (typeof summaryObj === "string") {
+      try {
+        summaryObj = JSON.parse(summaryObj);
+      } catch {
+        summaryObj = null;
+      }
+    }
+    const savedTotalScore = summaryObj?.totalScore != null ? Number(summaryObj.totalScore) : null;
     if (savedTotalScore !== null && savedTotalScore > 0) {
       hasData = true;
     }
@@ -1432,7 +1453,7 @@ export function EmployeeKpiPage() {
                     </span>
                     {summaryTotals.hasData && (
                       <Badge className={`${ratingTier.badgeClass} text-[10px] px-2 py-0.5`}>
-                        {isAr ? ratingTier.name_ar : ratingTier.name}
+                        {isAr ? ratingTier.tier_ar : ratingTier.tier}
                       </Badge>
                     )}
                   </div>
