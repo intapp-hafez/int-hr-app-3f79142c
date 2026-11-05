@@ -511,102 +511,26 @@ export function EmployeeKpiPage() {
           </div>
         </TabsContent>
 
-        {/* ══════════════════════════════════════════════════════════════════ */}
-        {/* ── TAB 1: JOB DESCRIPTION (الوصف الوظيفي التنفيذي والرسمي) ── */}
-        {/* ══════════════════════════════════════════════════════════════════ */}
-        <TabsContent value="job_description" className="space-y-5">
-          {/* 1. Employee & Position Identity Hero Card */}
-          <div className="relative overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-card via-card to-brand/5 p-4 sm:p-6 shadow-xs space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-start gap-3 min-w-0">
-                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-brand/10 text-brand shadow-2xs">
-                  <Briefcase className="h-6 w-6" />
-                </span>
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h1 className="font-display text-base sm:text-xl font-bold tracking-tight text-foreground">
-                      {isAr ? jobDescData.positionTitleAr : jobDescData.positionTitleEn}
-                    </h1>
-                    <Badge variant="outline" className="text-[11px] font-semibold text-brand border-brand/30 bg-brand/5">
-                      {jobDescData.jobGrade}
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                    {isAr ? jobDescData.positionTitleEn : jobDescData.positionTitleAr}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-                <Badge className="bg-emerald-600 text-white text-[10px] gap-1 px-2.5 py-1 font-semibold shadow-2xs">
-                  <ShieldCheck className="h-3 w-3" />
-                  {isAr ? "وظيفة معتمدة رسمياً" : "Active Official Role"}
-                </Badge>
-              </div>
-            </div>
-
-            {/* Role Attributes Grid (Clean 3 Cards matching employee identity) */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-border/60">
-              {/* Department */}
-              <div className="rounded-2xl border border-border/60 bg-muted/20 p-3 flex flex-col justify-between">
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Building2 className="h-4 w-4 text-brand shrink-0" />
-                  <span className="font-medium">{isAr ? "الإدارة / القسم" : "Department"}</span>
-                </div>
-                <p className="text-sm font-bold text-foreground mt-1.5 break-words">
-                  {isAr ? jobDescData.departmentNameAr : jobDescData.departmentNameEn}
-                </p>
-              </div>
-
-              {/* Direct Manager */}
-              <div className="rounded-2xl border border-border/60 bg-muted/20 p-3 flex flex-col justify-between">
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <UserCog className="h-4 w-4 text-brand shrink-0" />
-                  <span className="font-medium">{isAr ? "المدير المباشر" : "Direct Manager"}</span>
-                </div>
-                <p className="text-sm font-bold text-foreground mt-1.5 break-words" title={jobDescData.managerName}>
-                  {jobDescData.managerName}
-                </p>
-              </div>
-
-              {/* Contract Type */}
-              <div className="rounded-2xl border border-border/60 bg-muted/20 p-3 flex flex-col justify-between">
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <FileText className="h-4 w-4 text-brand shrink-0" />
-                  <span className="font-medium">{isAr ? "نوع التعاقد" : "Contract Type"}</span>
-                </div>
-                <p className="text-sm font-bold text-foreground mt-1.5 break-words">
-                  {jobDescData.contractType}
-                </p>
-              </div>
-            </div>
-
-            {/* Action Bar: Download Official JD (PDF) */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-              <Button
-                onClick={handleDownloadMyJdPdf}
-                disabled={isExportingPdf}
-                className="h-9 gap-2 rounded-xl bg-brand text-brand-foreground font-semibold shadow-xs hover:brightness-105"
-              >
-                {isExportingPdf ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <FileDown className="h-4 w-4" />
-                )}
-                {isAr ? "تحميل بطاقة الوصف الوظيفي (PDF)" : "Download Official JD (PDF)"}
-              </Button>
-
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="font-mono font-bold text-foreground">
-                  {jobDescData.jobCode || "JD-001"}
-                </span>
-                <span>·</span>
-                <span>{jobDescData.docVersion || "v1.0"}</span>
-              </div>
-            </div>
-          </div>
-
-
+        {/* ── TAB 1: JOB DESCRIPTION ── */}
+        <TabsContent value="job_description" className="flex flex-col items-center justify-center py-12 gap-4">
+          <Button
+            onClick={handleDownloadMyJdPdf}
+            disabled={isExportingPdf}
+            size="lg"
+            className="h-12 gap-2 rounded-2xl bg-brand text-brand-foreground font-semibold shadow hover:brightness-105 px-8 text-base"
+          >
+            {isExportingPdf ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <FileDown className="h-5 w-5" />
+            )}
+            {isAr ? "تحميل بطاقة الوصف الوظيفي (PDF)" : "Download Official JD (PDF)"}
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            {jobDescData.jobCode && <span className="font-mono font-bold text-foreground">{jobDescData.jobCode}</span>}
+            {jobDescData.jobCode && " · "}
+            {jobDescData.docVersion || "v1.0"}
+          </p>
         </TabsContent>
 
         {/* ══════════════════════════════════════════════════════════════════ */}
