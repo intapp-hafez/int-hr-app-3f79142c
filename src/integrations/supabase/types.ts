@@ -3928,6 +3928,89 @@ export type Database = {
         }
         Relationships: []
       }
+      position_job_descriptions: {
+        Row: {
+          approved_by: string
+          authority: string[]
+          behavioral_competencies: string[]
+          career_path: string[]
+          created_at: string
+          doc_version: string
+          external_relations: string
+          id: string
+          internal_relations: string
+          job_category: string
+          job_code: string
+          job_grade: string
+          job_summary: string
+          location_type: string
+          position_id: string
+          position_type: string
+          qualifications: string
+          responsibilities: string[]
+          reviewed_by: string
+          tags: string[]
+          technical_competencies: string[]
+          updated_at: string
+        }
+        Insert: {
+          approved_by?: string
+          authority?: string[]
+          behavioral_competencies?: string[]
+          career_path?: string[]
+          created_at?: string
+          doc_version?: string
+          external_relations?: string
+          id?: string
+          internal_relations?: string
+          job_category?: string
+          job_code?: string
+          job_grade?: string
+          job_summary?: string
+          location_type?: string
+          position_id: string
+          position_type?: string
+          qualifications?: string
+          responsibilities?: string[]
+          reviewed_by?: string
+          tags?: string[]
+          technical_competencies?: string[]
+          updated_at?: string
+        }
+        Update: {
+          approved_by?: string
+          authority?: string[]
+          behavioral_competencies?: string[]
+          career_path?: string[]
+          created_at?: string
+          doc_version?: string
+          external_relations?: string
+          id?: string
+          internal_relations?: string
+          job_category?: string
+          job_code?: string
+          job_grade?: string
+          job_summary?: string
+          location_type?: string
+          position_id?: string
+          position_type?: string
+          qualifications?: string
+          responsibilities?: string[]
+          reviewed_by?: string
+          tags?: string[]
+          technical_competencies?: string[]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "position_job_descriptions_position_id_fkey"
+            columns: ["position_id"]
+            isOneToOne: true
+            referencedRelation: "positions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       positions: {
         Row: {
           active: boolean

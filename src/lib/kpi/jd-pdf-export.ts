@@ -52,10 +52,10 @@ export async function exportJobDescriptionPdf(
 
   // Primary brand palette (Integrated Technics Corporate Identity)
   const brandOrange = [234, 88, 12]; // #ea580c
-  const darkNavy = [15, 23, 42];     // #0f172a
-  const slateMuted = [100, 116, 139];// #64748b
-  const lightBg = [248, 250, 252];   // #f8fafc
-  const borderGray = [226, 232, 240];// #e2e8f0
+  const darkNavy: [number, number, number] = [15, 23, 42];     // #0f172a
+  const slateMuted: [number, number, number] = [100, 116, 139];// #64748b
+  const lightBg: [number, number, number] = [248, 250, 252];   // #f8fafc
+  const borderGray: [number, number, number] = [226, 232, 240];// #e2e8f0
 
   let currentY = margin - 6;
 
@@ -216,7 +216,7 @@ export async function exportJobDescriptionPdf(
       [
         {
           content: jd.jobSummary || "Core professional responsibilities and deliverables for this operational position.",
-          styles: { fontSize: 8.5, lineHeight: 1.25, cellPadding: 8, textColor: [51, 65, 85] },
+          styles: { fontSize: 8.5, cellPadding: 8, textColor: [51, 65, 85] },
         },
       ],
     ],
