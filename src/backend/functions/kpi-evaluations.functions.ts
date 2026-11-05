@@ -1313,8 +1313,9 @@ export const getQuarterlyEvaluation = createServerFn({ method: "POST" })
 
     if (error) throw new Error(`Failed to fetch quarterly evaluation: ${error.message}`);
 
-    // Employee Privacy Boundary: Employees see only approved evaluations, never unapproved drafts or pending submissions
-    if (!isAdmin && input.employeeId === userId && evalRecord && evalRecord.status !== "approved") {
+    // Employee Privacy Boundary: Employees may view their own evaluations once submitted or approved.
+    // Draft evaluations are hidden until the manager has formally submitted them.
+    if (!isAdmin && input.employeeId === userId && evalRecord && evalRecord.status === "draft") {
       return null;
     }
 

@@ -198,15 +198,47 @@ export function EmployeeKpiPage() {
     );
   }, [profileDetails, matchedTemplate, savedJobDescription, isAr]);
 
-  // Compute scorecard values dynamically from matched template criteria or default KPI set
+  // Compute scorecard values dynamically from matched template criteria or default KPI set.
+  // Also merges per-criterion scores from quarterly evaluation items when kpi_evaluations.scores is empty.
   const kpiRows = useMemo<EmpKpiRow[]>(() => {
     const scores = (evaluation?.scores as Record<string, any>) || {};
+
+    // Build a lookup of criterion scores from quarterly items (q1..q4)
+    // keyed by criterion_id or display_order index (1-based)
+    const qItemsMap: Record<string, { q1: EmpKpiQuarter; q2: EmpKpiQuarter; q3: EmpKpiQuarter; q4: EmpKpiQuarter }> = {};
+    const mergeItems = (qEval: typeof q1Eval | typeof q2Eval | typeof q3Eval | typeof q4Eval, qKey: "q1" | "q2" | "q3" | "q4") => {
+      if (!qEval || qEval.status === "draft") return;
+      const items = (qEval as any).items as any[] | undefined;
+      if (!items) return;
+      items.forEach((item: any, idx: number) => {
+        const key = item.criterion_id || String(idx + 1);
+        if (!qItemsMap[key]) {
+          qItemsMap[key] = {
+            q1: { actual: null, achievement: null, score: null },
+            q2: { actual: null, achievement: null, score: null },
+            q3: { actual: null, achievement: null, score: null },
+            q4: { actual: null, achievement: null, score: null },
+          };
+        }
+        qItemsMap[key][qKey] = {
+          actual: item.actual_value ?? null,
+          achievement: item.achievement_rate ?? null,
+          score: item.weighted_score ?? null,
+        };
+      });
+    };
+    mergeItems(q1Eval, "q1");
+    mergeItems(q2Eval, "q2");
+    mergeItems(q3Eval, "q3");
+    mergeItems(q4Eval, "q4");
 
     if (matchedTemplate?.items && matchedTemplate.items.length > 0) {
       return matchedTemplate.items.map((it: any, index: number) => {
         const crit = it.criterion;
         const cid = crit?.id || it.criterion_id || String(index + 1);
         const saved = scores[String(cid)] || scores[cid] || scores[String(index + 1)] || {};
+        // Also try quarterly items fallback
+        const qFallback = qItemsMap[cid] || qItemsMap[String(index + 1)] || {};
 
         return {
           kpi: {
@@ -230,10 +262,10 @@ export function EmployeeKpiPage() {
             target: Number(it.target_benchmark ? it.target_benchmark / 100 : 1.0),
             unit: it.unit || crit?.unit || "%",
           },
-          q1: saved?.q1 || { actual: null, achievement: null, score: null },
-          q2: saved?.q2 || { actual: null, achievement: null, score: null },
-          q3: saved?.q3 || { actual: null, achievement: null, score: null },
-          q4: saved?.q4 || { actual: null, achievement: null, score: null },
+          q1: saved?.q1 || qFallback?.q1 || { actual: null, achievement: null, score: null },
+          q2: saved?.q2 || qFallback?.q2 || { actual: null, achievement: null, score: null },
+          q3: saved?.q3 || qFallback?.q3 || { actual: null, achievement: null, score: null },
+          q4: saved?.q4 || qFallback?.q4 || { actual: null, achievement: null, score: null },
           annualScore: saved?.annualScore ?? null,
         };
       });
@@ -241,16 +273,17 @@ export function EmployeeKpiPage() {
 
     return LIGHT_CURRENT_ENGINEER_KPIS.map((kpi) => {
       const saved = scores[String(kpi.id)] || scores[kpi.id];
+      const qFallback = qItemsMap[String(kpi.id)] || {};
       return {
         kpi,
-        q1: saved?.q1 || { actual: null, achievement: null, score: null },
-        q2: saved?.q2 || { actual: null, achievement: null, score: null },
-        q3: saved?.q3 || { actual: null, achievement: null, score: null },
-        q4: saved?.q4 || { actual: null, achievement: null, score: null },
+        q1: saved?.q1 || qFallback?.q1 || { actual: null, achievement: null, score: null },
+        q2: saved?.q2 || qFallback?.q2 || { actual: null, achievement: null, score: null },
+        q3: saved?.q3 || qFallback?.q3 || { actual: null, achievement: null, score: null },
+        q4: saved?.q4 || qFallback?.q4 || { actual: null, achievement: null, score: null },
         annualScore: saved?.annualScore ?? null,
       };
     });
-  }, [evaluation, matchedTemplate]);
+  }, [evaluation, matchedTemplate, q1Eval, q2Eval, q3Eval, q4Eval]);
 
   // Quarterly summary totals
   const summaryTotals = useMemo(() => {
@@ -432,33 +465,33 @@ export function EmployeeKpiPage() {
 
   const rawStatus = (evaluation?.status || "draft").toLowerCase();
 
-  // Real quarterly scores from kpi_quarterly_evaluations (approved = show score, else null)
+  // Real quarterly scores from kpi_quarterly_evaluations (submitted/approved = show score, draft = null)
   const quartersList = [
     {
       q: "q1", label: "Q1", label_ar: "الربع الأول",
       date: isAr ? "يناير – مارس" : "Jan – Mar",
-      score: q1Eval?.status === "approved" ? (q1Eval.score ?? null) : null,
+      score: (q1Eval && q1Eval.status !== "draft") ? (q1Eval.score ?? null) : null,
       status: q1Eval?.status ?? null,
       target: 25,
     },
     {
       q: "q2", label: "Q2", label_ar: "الربع الثاني",
       date: isAr ? "أبريل – يونيو" : "Apr – Jun",
-      score: q2Eval?.status === "approved" ? (q2Eval.score ?? null) : null,
+      score: (q2Eval && q2Eval.status !== "draft") ? (q2Eval.score ?? null) : null,
       status: q2Eval?.status ?? null,
       target: 25,
     },
     {
       q: "q3", label: "Q3", label_ar: "الربع الثالث",
       date: isAr ? "يوليو – سبتمبر" : "Jul – Sep",
-      score: q3Eval?.status === "approved" ? (q3Eval.score ?? null) : null,
+      score: (q3Eval && q3Eval.status !== "draft") ? (q3Eval.score ?? null) : null,
       status: q3Eval?.status ?? null,
       target: 25,
     },
     {
       q: "q4", label: "Q4", label_ar: "الربع الرابع",
       date: isAr ? "أكتوبر – ديسمبر" : "Oct – Dec",
-      score: q4Eval?.status === "approved" ? (q4Eval.score ?? null) : null,
+      score: (q4Eval && q4Eval.status !== "draft") ? (q4Eval.score ?? null) : null,
       status: q4Eval?.status ?? null,
       target: 25,
     },
