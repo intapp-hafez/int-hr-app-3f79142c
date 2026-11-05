@@ -16,7 +16,6 @@ import {
   Building2,
   Sparkles,
   CheckCheck,
-  Compass,
   Check,
   FileCheck,
   ChevronDown,
@@ -607,26 +606,7 @@ export function EmployeeKpiPage() {
             </div>
           </div>
 
-          {/* Job Purpose & Summary */}
-          <div className="rounded-3xl border border-border bg-card p-4 sm:p-5 shadow-2xs space-y-3">
-            <div className="flex items-center gap-2">
-              <span className="grid h-8 w-8 place-items-center rounded-xl bg-brand/10 text-brand">
-                <Compass className="h-4 w-4" />
-              </span>
-              <div>
-                <h3 className="font-bold text-sm text-foreground">
-                  {isAr ? "الهدف العام ونطاق الدور الوظيفي" : "Job Purpose & Operational Scope"}
-                </h3>
-                <p className="text-[11px] text-muted-foreground">
-                  {isAr ? "المهام المحورية والمسؤولية التشغيلية في المنظمة" : "Primary mission, reporting framework, and core objectives"}
-                </p>
-              </div>
-            </div>
 
-            <div className="rounded-2xl border border-border/70 bg-muted/20 p-3.5 sm:p-4 text-xs sm:text-sm leading-relaxed text-foreground">
-              <p>{isAr ? jobDescData.purposeAr : jobDescData.purposeEn}</p>
-            </div>
-          </div>
         </TabsContent>
 
         {/* ══════════════════════════════════════════════════════════════════ */}
