@@ -77,7 +77,7 @@ export function EmployeeKpiPage() {
 
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
-  const [mainTab, setMainTab] = useState<"job_description" | "kpis_records">("job_description");
+  const [mainTab, setMainTab] = useState<"job_description" | "kpis_records" | "kpis_definition">("job_description");
   const [kpiSubTab, setKpiSubTab] = useState<"quarters" | "scorecard" | "feedback" | "history">("quarters");
   const [collapsedPillars, setCollapsedPillars] = useState<Record<string, boolean>>({});
   const [isExportingPdf, setIsExportingPdf] = useState(false);
