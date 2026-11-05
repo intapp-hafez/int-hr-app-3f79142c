@@ -1899,17 +1899,23 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
       let hasQ1 = false, hasQ2 = false, hasQ3 = false, hasQ4 = false;
 
       if (ev?.scores) {
-        let q1 = 0, q2 = 0, q3 = 0, q4 = 0;
-        Object.values(ev.scores).forEach((item: any) => {
-          if (item?.q1?.score != null) { q1 += item.q1.score; hasQ1 = true; }
-          if (item?.q2?.score != null) { q2 += item.q2.score; hasQ2 = true; }
-          if (item?.q3?.score != null) { q3 += item.q3.score; hasQ3 = true; }
-          if (item?.q4?.score != null) { q4 += item.q4.score; hasQ4 = true; }
-        });
-        if (hasQ1) q1Sum = q1;
-        if (hasQ2) q2Sum = q2;
-        if (hasQ3) q3Sum = q3;
-        if (hasQ4) q4Sum = q4;
+        let scoresObj: any = ev.scores;
+        if (typeof scoresObj === "string") {
+          try { scoresObj = JSON.parse(scoresObj); } catch {}
+        }
+        if (scoresObj && typeof scoresObj === "object") {
+          let q1 = 0, q2 = 0, q3 = 0, q4 = 0;
+          Object.values(scoresObj).forEach((item: any) => {
+            if (item?.q1?.score != null) { q1 += Number(item.q1.score); hasQ1 = true; }
+            if (item?.q2?.score != null) { q2 += Number(item.q2.score); hasQ2 = true; }
+            if (item?.q3?.score != null) { q3 += Number(item.q3.score); hasQ3 = true; }
+            if (item?.q4?.score != null) { q4 += Number(item.q4.score); hasQ4 = true; }
+          });
+          if (hasQ1) q1Sum = q1;
+          if (hasQ2) q2Sum = q2;
+          if (hasQ3) q3Sum = q3;
+          if (hasQ4) q4Sum = q4;
+        }
       }
 
       const totalScore = ev?.summary?.totalScore != null

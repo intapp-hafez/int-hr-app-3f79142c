@@ -1976,6 +1976,7 @@ export const listKpiEvaluations = createServerFn({ method: "POST" })
         evaluator_id,
         evaluator_name,
         status,
+        scores,
         summary,
         notes,
         submitted_at,
@@ -2016,7 +2017,21 @@ export const listKpiEvaluations = createServerFn({ method: "POST" })
     const { data, error } = await query.limit(500);
     if (error) throw new Error(`Failed to list KPI evaluations: ${error.message}`);
 
-    let rows = (data || []) as KpiEvaluationRecord[];
+    let rows = (data || []).map((r: any) => {
+      let scores = r.scores;
+      if (typeof scores === "string") {
+        try { scores = JSON.parse(scores); } catch {}
+      }
+      let summary = r.summary;
+      if (typeof summary === "string") {
+        try { summary = JSON.parse(summary); } catch {}
+      }
+      let notes = r.notes;
+      if (typeof notes === "string") {
+        try { notes = JSON.parse(notes); } catch {}
+      }
+      return { ...r, scores, summary, notes };
+    }) as KpiEvaluationRecord[];
     if (input.search && input.search.trim()) {
       const s = input.search.trim().toLowerCase();
       rows = rows.filter((r) => {
@@ -2240,6 +2255,7 @@ export const listMyKpiEvaluations = createServerFn({ method: "POST" })
         evaluator_id,
         evaluator_name,
         status,
+        scores,
         summary,
         notes,
         submitted_at,
