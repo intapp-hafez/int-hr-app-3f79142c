@@ -432,7 +432,7 @@ export const LIGHT_CURRENT_ENGINEER_KPIS: KpiMetricDefinition[] = [
 ];
 
 export interface PerformanceRating {
-  tier: "Outstanding" | "Exceeds Expectations" | "Meets Expectations" | "Needs Improvement" | "Unsatisfactory";
+  tier: "Outstanding" | "Exceeds Expectations" | "Meets Expectations" | "Needs Improvement" | "Unsatisfactory" | "Pending Evaluation";
   tier_ar: string;
   minScore: number;
   color: string;

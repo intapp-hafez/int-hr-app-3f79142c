@@ -142,7 +142,7 @@ export function EmployeeKpiPage() {
   });
 
   // Fetch official saved job description from position_job_descriptions if available
-  const effectivePositionId = profileDetails?.position_id || matchedTemplate?.position_id || (matchedTemplate as any)?.position?.id;
+  const effectivePositionId = profileDetails?.position_id || (matchedTemplate as any)?.position_id || (matchedTemplate as any)?.position?.id;
 
   const { data: savedJobDescription } = useQuery({
     queryKey: ["position-job-description", effectivePositionId],
