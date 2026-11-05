@@ -104,7 +104,7 @@ export function EmployeeKpiPage() {
 
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
-  const [mainTab, setMainTab] = useState<"job_description" | "kpis_records" | "kpis_definition">("job_description");
+  const [mainTab, setMainTab] = useState<"job_description" | "kpis_records" | "kpis_definition">("kpis_records");
   const [kpiSubTab, setKpiSubTab] = useState<"quarters" | "scorecard" | "feedback">("quarters");
   const [activeQuarterFilter, setActiveQuarterFilter] = useState<"all" | "q1" | "q2" | "q3" | "q4">("all");
   const [infoModalKpi, setInfoModalKpi] = useState<ScorecardItem | null>(null);
