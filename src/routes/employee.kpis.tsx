@@ -395,27 +395,158 @@ export function EmployeeKpiPage() {
       {/* ── 2 MAIN TABS: JOB DESCRIPTION & KPIS RECORDS ── */}
       <Tabs
         value={mainTab}
-        onValueChange={(val) => setMainTab(val as "job_description" | "kpis_records")}
+        onValueChange={(val) => setMainTab(val as "job_description" | "kpis_records" | "kpis_definition")}
         className="space-y-4"
       >
-        <div className="border-b border-border pb-2 px-1">
-          <TabsList className="grid w-full grid-cols-2 rounded-2xl p-1 bg-muted/60 border border-border/50 shadow-2xs h-auto">
-            <TabsTrigger
-              value="job_description"
-              className="rounded-xl py-2.5 text-xs sm:text-sm font-bold gap-2 cursor-pointer data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm transition-all"
-            >
-              <Briefcase className="h-4 w-4 text-brand" />
-              <span>{isAr ? "الوصف الوظيفي" : "Job Description"}</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="kpis_records"
-              className="rounded-xl py-2.5 text-xs sm:text-sm font-bold gap-2 cursor-pointer data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm transition-all"
-            >
-              <Award className="h-4 w-4 text-brand" />
-              <span>{isAr ? "سجلات مؤشرات الأداء" : "KPIs Records"}</span>
-            </TabsTrigger>
-          </TabsList>
-        </div>
+        <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 gap-3 h-auto bg-transparent p-0">
+          <TabsTrigger
+            value="job_description"
+            className="group rounded-2xl border border-border bg-card p-4 text-start shadow-2xs cursor-pointer transition-all hover:border-brand/40 hover:shadow-xs data-[state=active]:border-brand data-[state=active]:bg-brand/5 data-[state=active]:shadow-sm"
+          >
+            <div className="flex items-start gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand/10 text-brand transition-colors group-data-[state=active]:bg-brand group-data-[state=active]:text-brand-foreground">
+                <Briefcase className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-foreground">
+                  {isAr ? "الوصف الوظيفي" : "Job Description"}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+                  {isAr ? "مهامك ومسؤولياتك الرسمية" : "Your official role & responsibilities"}
+                </p>
+              </div>
+            </div>
+          </TabsTrigger>
+          <TabsTrigger
+            value="kpis_definition"
+            className="group rounded-2xl border border-border bg-card p-4 text-start shadow-2xs cursor-pointer transition-all hover:border-brand/40 hover:shadow-xs data-[state=active]:border-brand data-[state=active]:bg-brand/5 data-[state=active]:shadow-sm"
+          >
+            <div className="flex items-start gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand/10 text-brand transition-colors group-data-[state=active]:bg-brand group-data-[state=active]:text-brand-foreground">
+                <Target className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-foreground">
+                  {isAr ? "تعريف مؤشرات الأداء" : "KPIs Definition"}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+                  {isAr ? "المعايير والأوزان والمستهدفات" : "Criteria, weights & targets"}
+                </p>
+              </div>
+            </div>
+          </TabsTrigger>
+          <TabsTrigger
+            value="kpis_records"
+            className="group rounded-2xl border border-border bg-card p-4 text-start shadow-2xs cursor-pointer transition-all hover:border-brand/40 hover:shadow-xs data-[state=active]:border-brand data-[state=active]:bg-brand/5 data-[state=active]:shadow-sm"
+          >
+            <div className="flex items-start gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand/10 text-brand transition-colors group-data-[state=active]:bg-brand group-data-[state=active]:text-brand-foreground">
+                <Award className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-foreground">
+                  {isAr ? "سجلات مؤشرات الأداء" : "KPIs Records"}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+                  {isAr ? "نتائجك الفصلية والسنوية" : "Your quarterly & annual results"}
+                </p>
+              </div>
+            </div>
+          </TabsTrigger>
+        </TabsList>
+
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {/* ── TAB: KPIS DEFINITION (تعريف المؤشرات والأوزان) ── */}
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        <TabsContent value="kpis_definition" className="space-y-4">
+          <div className="rounded-3xl border border-border bg-card p-4 sm:p-6 shadow-xs space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand/10 text-brand">
+                  <Target className="h-5 w-5" />
+                </span>
+                <div>
+                  <h2 className="text-sm sm:text-base font-bold text-foreground">
+                    {isAr ? "تعريف مؤشرات الأداء" : "KPIs Definition"}
+                  </h2>
+                  <p className="text-[11px] text-muted-foreground">
+                    {isAr
+                      ? "المعايير التي يتم تقييمك عليها، مع الوزن والمستهدف لكل مؤشر"
+                      : "The criteria you are evaluated on, with the weight and target of each KPI"}
+                  </p>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-[11px] font-semibold">
+                {isAr ? `${kpiRows.length} مؤشر` : `${kpiRows.length} KPIs`}
+              </Badge>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {kpiRows.map((row) => (
+                <div
+                  key={row.kpi.id}
+                  className="rounded-2xl border border-border/60 bg-muted/20 p-3.5 space-y-2.5"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-foreground leading-snug">
+                        {isAr ? row.kpi.name_ar : row.kpi.name}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        {isAr ? row.kpi.name : row.kpi.name_ar}
+                      </p>
+                    </div>
+                    <Badge variant="outline" className="shrink-0 text-[10px] font-semibold text-brand border-brand/30 bg-brand/5">
+                      {isAr ? row.kpi.category_ar : row.kpi.category}
+                    </Badge>
+                  </div>
+
+                  {(row.kpi.definition || row.kpi.definition_ar) && (
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      {isAr ? row.kpi.definition_ar || row.kpi.definition : row.kpi.definition || row.kpi.definition_ar}
+                    </p>
+                  )}
+
+                  <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border/50">
+                    <div className="text-center">
+                      <p className="text-[10px] text-muted-foreground font-medium">
+                        {isAr ? "الوزن" : "Weight"}
+                      </p>
+                      <p className="text-sm font-bold text-foreground">
+                        {fmtPercent(row.kpi.weight, 0)}
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-[10px] text-muted-foreground font-medium">
+                        {isAr ? "المستهدف" : "Target"}
+                      </p>
+                      <p className="text-sm font-bold text-foreground">
+                        {fmtPercent(row.kpi.target, 0)}
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-[10px] text-muted-foreground font-medium">
+                        {isAr ? "وحدة القياس" : "Unit"}
+                      </p>
+                      <p className="text-sm font-bold text-foreground">
+                        {row.kpi.unit || "—"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {kpiRows.length === 0 && (
+              <div className="rounded-2xl border border-dashed border-border p-8 text-center">
+                <Target className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
+                <p className="text-sm font-semibold text-muted-foreground">
+                  {isAr ? "لا توجد مؤشرات معرفة بعد" : "No KPIs defined yet"}
+                </p>
+              </div>
+            )}
+          </div>
+        </TabsContent>
 
         {/* ══════════════════════════════════════════════════════════════════ */}
         {/* ── TAB 1: JOB DESCRIPTION (الوصف الوظيفي التنفيذي والرسمي) ── */}
