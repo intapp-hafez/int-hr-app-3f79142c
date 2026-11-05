@@ -216,7 +216,7 @@ export async function exportJobDescriptionPdf(
       [
         {
           content: jd.jobSummary || "Core professional responsibilities and deliverables for this operational position.",
-          styles: { fontSize: 8.5, lineHeight: 1.25, cellPadding: 8, textColor: [51, 65, 85] },
+          styles: { fontSize: 8.5, cellPadding: 8, textColor: [51, 65, 85] },
         },
       ],
     ],
