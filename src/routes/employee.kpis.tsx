@@ -420,60 +420,27 @@ export function EmployeeKpiPage() {
         onValueChange={(val) => setMainTab(val as "job_description" | "kpis_records" | "kpis_definition")}
         className="space-y-4"
       >
-        <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 gap-3 h-auto bg-transparent p-0">
+        <TabsList className="flex w-full rounded-2xl p-1 h-auto bg-muted/50 border border-border/50 shadow-2xs gap-1">
           <TabsTrigger
             value="job_description"
-            className="group rounded-2xl border border-border bg-card p-4 text-start shadow-2xs cursor-pointer transition-all hover:border-brand/40 hover:shadow-xs data-[state=active]:border-brand data-[state=active]:bg-brand/5 data-[state=active]:shadow-sm"
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 px-3 text-xs sm:text-sm font-bold cursor-pointer transition-all data-[state=active]:bg-background data-[state=active]:text-brand data-[state=active]:shadow-sm"
           >
-            <div className="flex items-start gap-3">
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand/10 text-brand transition-colors group-data-[state=active]:bg-brand group-data-[state=active]:text-brand-foreground">
-                <Briefcase className="h-5 w-5" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-sm font-bold text-foreground">
-                  {isAr ? "الوصف الوظيفي" : "Job Description"}
-                </p>
-                <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
-                  {isAr ? "مهامك ومسؤولياتك الرسمية" : "Your official role & responsibilities"}
-                </p>
-              </div>
-            </div>
+            <Briefcase className="h-4 w-4 shrink-0" />
+            <span className="truncate">{isAr ? "الوصف الوظيفي" : "Job Description"}</span>
           </TabsTrigger>
           <TabsTrigger
             value="kpis_definition"
-            className="group rounded-2xl border border-border bg-card p-4 text-start shadow-2xs cursor-pointer transition-all hover:border-brand/40 hover:shadow-xs data-[state=active]:border-brand data-[state=active]:bg-brand/5 data-[state=active]:shadow-sm"
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 px-3 text-xs sm:text-sm font-bold cursor-pointer transition-all data-[state=active]:bg-background data-[state=active]:text-brand data-[state=active]:shadow-sm"
           >
-            <div className="flex items-start gap-3">
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand/10 text-brand transition-colors group-data-[state=active]:bg-brand group-data-[state=active]:text-brand-foreground">
-                <Target className="h-5 w-5" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-sm font-bold text-foreground">
-                  {isAr ? "تعريف مؤشرات الأداء" : "KPIs Definition"}
-                </p>
-                <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
-                  {isAr ? "المعايير والأوزان والمستهدفات" : "Criteria, weights & targets"}
-                </p>
-              </div>
-            </div>
+            <Target className="h-4 w-4 shrink-0" />
+            <span className="truncate">{isAr ? "تعريف المؤشرات" : "KPIs Definition"}</span>
           </TabsTrigger>
           <TabsTrigger
             value="kpis_records"
-            className="group rounded-2xl border border-border bg-card p-4 text-start shadow-2xs cursor-pointer transition-all hover:border-brand/40 hover:shadow-xs data-[state=active]:border-brand data-[state=active]:bg-brand/5 data-[state=active]:shadow-sm"
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 px-3 text-xs sm:text-sm font-bold cursor-pointer transition-all data-[state=active]:bg-background data-[state=active]:text-brand data-[state=active]:shadow-sm"
           >
-            <div className="flex items-start gap-3">
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand/10 text-brand transition-colors group-data-[state=active]:bg-brand group-data-[state=active]:text-brand-foreground">
-                <Award className="h-5 w-5" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-sm font-bold text-foreground">
-                  {isAr ? "سجلات مؤشرات الأداء" : "KPIs Records"}
-                </p>
-                <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
-                  {isAr ? "نتائجك الفصلية والسنوية" : "Your quarterly & annual results"}
-                </p>
-              </div>
-            </div>
+            <Award className="h-4 w-4 shrink-0" />
+            <span className="truncate">{isAr ? "سجلات الأداء" : "KPIs Records"}</span>
           </TabsTrigger>
         </TabsList>
 
