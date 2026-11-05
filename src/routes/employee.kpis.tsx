@@ -43,6 +43,7 @@ import {
 } from "@/lib/kpi/light-current-kpi.data";
 import { exportKpiEvaluationToExcel } from "@/lib/kpi/kpi-excel-export";
 import { exportJobDescriptionPdf } from "@/lib/kpi/jd-pdf-export";
+import { exportKpiDefinitionPdf } from "@/lib/kpi/kpi-definition-pdf-export";
 import {
   getMyKpiEvaluation,
   listMyKpiEvaluations,
@@ -101,6 +102,7 @@ export function EmployeeKpiPage() {
   const [kpiSubTab, setKpiSubTab] = useState<"quarters" | "scorecard" | "feedback" | "history">("quarters");
   const [collapsedPillars, setCollapsedPillars] = useState<Record<string, boolean>>({});
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isExportingKpiDefPdf, setIsExportingKpiDefPdf] = useState(false);
 
   const togglePillar = (num: string) => {
     setCollapsedPillars((prev) => ({ ...prev, [num]: !prev[num] }));
@@ -376,6 +378,58 @@ export function EmployeeKpiPage() {
     }
   };
 
+  const handleDownloadKpiDefPdf = async () => {
+    setIsExportingKpiDefPdf(true);
+    try {
+      const rows = kpiRows.map((row, i) => {
+        // Try to get howMeasured from the matchedTemplate criterion
+        let howMeasured = "";
+        if (matchedTemplate?.items?.length) {
+          const item = (matchedTemplate.items as any[])[i];
+          howMeasured =
+            item?.criterion?.how_measured_en ||
+            item?.criterion?.description_en ||
+            "";
+        } else {
+          // Fallback: use definition field (LIGHT_CURRENT_ENGINEER_KPIS already has howMeasured in definition)
+          howMeasured = row.kpi.definition;
+        }
+        return {
+          id: row.kpi.id,
+          category: row.kpi.category,
+          name: row.kpi.name,
+          definition: row.kpi.definition,
+          howMeasured,
+          weight: row.kpi.weight,
+          target: row.kpi.target,
+          unit: row.kpi.unit,
+        };
+      });
+
+      await exportKpiDefinitionPdf(
+        rows,
+        {
+          fullName: profileDetails?.full_name || session?.name || "",
+          position:
+            profileDetails?.position ||
+            (matchedTemplate as any)?.position?.name_en ||
+            "",
+          department:
+            profileDetails?.department ||
+            (matchedTemplate as any)?.department?.name_en ||
+            "",
+        },
+        selectedYear
+      );
+      toast.success(isAr ? "تم تحميل ملف مؤشرات الأداء (PDF)" : "KPI Definition PDF downloaded");
+    } catch (err) {
+      console.error("KPI PDF export error:", err);
+      toast.error(isAr ? "تعذر إنشاء ملف PDF" : "Failed to generate PDF");
+    } finally {
+      setIsExportingKpiDefPdf(false);
+    }
+  };
+
   const rawStatus = (evaluation?.status || "draft").toLowerCase();
 
   // Real quarterly scores from kpi_quarterly_evaluations (approved = show score, else null)
@@ -469,96 +523,32 @@ export function EmployeeKpiPage() {
         </TabsList>
 
         {/* ══════════════════════════════════════════════════════════════════ */}
-        {/* ── TAB: KPIS DEFINITION (تعريف المؤشرات والأوزان) ── */}
+        {/* ── TAB: KPIS DEFINITION ── */}
         {/* ══════════════════════════════════════════════════════════════════ */}
-        <TabsContent value="kpis_definition" className="space-y-4">
-          <div className="rounded-3xl border border-border bg-card p-4 sm:p-6 shadow-xs space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2.5">
-                <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand/10 text-brand">
-                  <Target className="h-5 w-5" />
-                </span>
-                <div>
-                  <h2 className="text-sm sm:text-base font-bold text-foreground">
-                    {isAr ? "تعريف مؤشرات الأداء" : "KPIs Definition"}
-                  </h2>
-                  <p className="text-[11px] text-muted-foreground">
-                    {isAr
-                      ? "المعايير التي يتم تقييمك عليها، مع الوزن والمستهدف لكل مؤشر"
-                      : "The criteria you are evaluated on, with the weight and target of each KPI"}
-                  </p>
-                </div>
-              </div>
-              <Badge variant="outline" className="text-[11px] font-semibold">
-                {isAr ? `${kpiRows.length} مؤشر` : `${kpiRows.length} KPIs`}
-              </Badge>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {kpiRows.map((row) => (
-                <div
-                  key={row.kpi.id}
-                  className="rounded-2xl border border-border/60 bg-muted/20 p-3.5 space-y-2.5"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold text-foreground leading-snug">
-                        {isAr ? row.kpi.name_ar : row.kpi.name}
-                      </p>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">
-                        {isAr ? row.kpi.name : row.kpi.name_ar}
-                      </p>
-                    </div>
-                    <Badge variant="outline" className="shrink-0 text-[10px] font-semibold text-brand border-brand/30 bg-brand/5">
-                      {isAr ? row.kpi.category_ar : row.kpi.category}
-                    </Badge>
-                  </div>
-
-                  {(row.kpi.definition || row.kpi.definition_ar) && (
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      {isAr ? row.kpi.definition_ar || row.kpi.definition : row.kpi.definition || row.kpi.definition_ar}
-                    </p>
-                  )}
-
-                  <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border/50">
-                    <div className="text-center">
-                      <p className="text-[10px] text-muted-foreground font-medium">
-                        {isAr ? "الوزن" : "Weight"}
-                      </p>
-                      <p className="text-sm font-bold text-foreground">
-                        {fmtPercent(row.kpi.weight, 0)}
-                      </p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-[10px] text-muted-foreground font-medium">
-                        {isAr ? "المستهدف" : "Target"}
-                      </p>
-                      <p className="text-sm font-bold text-foreground">
-                        {fmtPercent(row.kpi.target, 0)}
-                      </p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-[10px] text-muted-foreground font-medium">
-                        {isAr ? "وحدة القياس" : "Unit"}
-                      </p>
-                      <p className="text-sm font-bold text-foreground">
-                        {row.kpi.unit || "—"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {kpiRows.length === 0 && (
-              <div className="rounded-2xl border border-dashed border-border p-8 text-center">
-                <Target className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
-                <p className="text-sm font-semibold text-muted-foreground">
-                  {isAr ? "لا توجد مؤشرات معرفة بعد" : "No KPIs defined yet"}
-                </p>
-              </div>
+        <TabsContent value="kpis_definition" className="flex flex-col items-center justify-center py-12 gap-4">
+          <Button
+            onClick={handleDownloadKpiDefPdf}
+            disabled={isExportingKpiDefPdf || kpiRows.length === 0}
+            size="lg"
+            className="h-12 gap-2 rounded-2xl bg-brand text-brand-foreground font-semibold shadow hover:brightness-105 px-8 text-base"
+          >
+            {isExportingKpiDefPdf ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <FileDown className="h-5 w-5" />
             )}
-          </div>
+            {isAr ? "تحميل مؤشرات الأداء (PDF)" : "Download KPIs Definition (PDF)"}
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            {kpiRows.length > 0 ? (
+              <>
+                <span className="font-mono font-bold text-foreground">{kpiRows.length}</span>
+                {" "}{isAr ? "مؤشر أداء — صفحة A4 أفقية" : "KPI indicators — Landscape A4"}
+              </>
+            ) : (
+              isAr ? "لا توجد مؤشرات أداء معرّفة بعد" : "No KPIs defined for your position yet"
+            )}
+          </p>
         </TabsContent>
 
         {/* ── TAB 1: JOB DESCRIPTION ── */}

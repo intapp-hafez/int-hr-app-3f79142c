@@ -6,8 +6,8 @@ export interface KpiDefPdfRow {
   name: string;
   definition: string;
   howMeasured: string;
-  weight: number;   // decimal, e.g. 0.15 for 15 %
-  target: number;   // decimal, e.g. 0.90 for 90 %
+  weight: number;   // decimal 0–1  e.g. 0.15 = 15 %
+  target: number;   // decimal 0–1  e.g. 0.90 = 90 %
   unit?: string;
 }
 
@@ -15,7 +15,6 @@ export interface KpiDefPdfEmployee {
   fullName?: string | null;
   position?: string | null;
   department?: string | null;
-  jobGrade?: string | null;
 }
 
 export async function exportKpiDefinitionPdf(
@@ -31,154 +30,59 @@ export async function exportKpiDefinitionPdf(
   const doc = new jsPDF({ unit: "pt", format: "a4", orientation: "landscape" });
   const pageWidth  = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 40;
+  const margin = 36;
 
-  // ── Brand palette ────────────────────────────────────────────────────────
-  const brandOrange: [number, number, number] = [234, 88, 12];   // #ea580c
-  const darkNavy:   [number, number, number] = [15, 23, 42];     // #0f172a
-  const slateMuted: [number, number, number] = [100, 116, 139];  // #64748b
-  const lightBg:    [number, number, number] = [248, 250, 252];  // #f8fafc
-  const borderGray: [number, number, number] = [226, 232, 240];  // #e2e8f0
-  const headerBg:   [number, number, number] = [15, 23, 42];     // dark header
+  // ── Brand palette ─────────────────────────────────────────────────────────
+  const brandOrange: [number, number, number] = [234, 88, 12];    // #ea580c
+  const headerBg:   [number, number, number] = [45, 50, 60];      // charcoal header bar
+  const tableHead:  [number, number, number] = [45, 50, 60];      // same dark for table header
+  const catBg:      [number, number, number] = [255, 245, 238];   // very light orange tint for category
+  const borderGray: [number, number, number] = [220, 220, 220];
+  const white:      [number, number, number] = [255, 255, 255];
 
-  let currentY = margin - 6;
+  // ── 1. Full-width dark header bar ─────────────────────────────────────────
+  const headerH = 60;
+  doc.setFillColor(...headerBg);
+  doc.rect(0, 0, pageWidth, headerH, "F");
 
-  // ── 1. Header: Logo + Company name ───────────────────────────────────────
-  const logoWidth  = 118;
-  const logoHeight = 40;
+  // Logo inside header on the left
+  const logoSize = 48;
   try {
-    doc.addImage(COMPANY_LOGO_BASE64, "PNG", margin, currentY, logoWidth, logoHeight);
+    doc.addImage(COMPANY_LOGO_BASE64, "PNG", margin - 4, 6, logoSize, logoSize);
   } catch {
-    // fallback: text only
+    // fallback: skip logo
   }
 
+  // Company name inside header
+  const textX = margin + logoSize + 12;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(15);
-  doc.setTextColor(...darkNavy);
-  doc.text("INTEGRATED TECHNICS", pageWidth - margin, currentY + 14, { align: "right" });
+  doc.setFontSize(20);
+  doc.setTextColor(...white);
+  doc.text("INTEGRATED TECHNICS", textX, 30);
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
+  // Orange subtitle line: doc type | job title | department
+  const parts: string[] = ["Quarterly KPI Evaluation"];
+  if (employee?.position) parts.push(`Job Title:  ${employee.position}`);
+  if (employee?.department) parts.push(`Department: ${employee.department}`);
+  const subtitle = parts.join("   |   ");
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
   doc.setTextColor(...brandOrange);
-  doc.text("KPI Performance Framework", pageWidth - margin, currentY + 28, { align: "right" });
+  doc.text(subtitle, textX, 48);
 
-  currentY += logoHeight + 10;
+  let currentY = headerH + 10;
 
-  // ── 2. Orange divider line ────────────────────────────────────────────────
-  doc.setDrawColor(...brandOrange);
-  doc.setLineWidth(2);
-  doc.line(margin, currentY, pageWidth - margin, currentY);
-  currentY += 10;
-
-  // ── 3. Document title ─────────────────────────────────────────────────────
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
-  doc.setTextColor(...darkNavy);
-  const titleYear = year ? ` – ${year}` : "";
-  doc.text(`KPIs Definition & Measurement Framework${titleYear}`, margin, currentY + 12);
-  currentY += 28;
-
-  // ── 4. Employee identity block ────────────────────────────────────────────
-  if (employee?.fullName || employee?.position) {
-    doc.setFillColor(...lightBg);
-    doc.setDrawColor(...borderGray);
-    doc.setLineWidth(0.5);
-    const infoBoxH = 36;
-    doc.roundedRect(margin, currentY, pageWidth - margin * 2, infoBoxH, 4, 4, "FD");
-
-    const col1 = margin + 12;
-    const col2 = pageWidth * 0.42;
-    const col3 = pageWidth * 0.68;
-    const textY = currentY + 13;
-
-    // Label+value helper
-    const cell = (label: string, value: string, x: number, maxW: number) => {
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(7.5);
-      doc.setTextColor(...slateMuted);
-      doc.text(label.toUpperCase(), x, textY - 2);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(9);
-      doc.setTextColor(...darkNavy);
-      const trimmed = doc.splitTextToSize(value || "—", maxW)[0];
-      doc.text(trimmed, x, textY + 9);
-    };
-
-    cell("Employee", employee.fullName || "", col1, col2 - col1 - 8);
-    cell("Position", employee.position || "", col2, col3 - col2 - 8);
-    cell("Department", employee.department || "", col3, pageWidth - margin - col3 - 8);
-
-    currentY += infoBoxH + 10;
-  }
-
-  // ── 5. KPI table ──────────────────────────────────────────────────────────
+  // ── 2. KPI table ──────────────────────────────────────────────────────────
   const pct = (v: number) => `${Math.round(v * 100)}%`;
 
-  // Group rows by category to build body with merged category cells
-  type BodyRow = (string | { content: string; rowSpan?: number; styles?: object })[];
-  const body: BodyRow[] = [];
-
-  // Track category spans for rowSpan grouping
-  let categoryGroups: { category: string; count: number; startIdx: number }[] = [];
-  rows.forEach((r) => {
-    const last = categoryGroups[categoryGroups.length - 1];
-    if (last && last.category === r.category) {
-      last.count++;
-    } else {
-      categoryGroups.push({ category: r.category, count: 1, startIdx: body.length });
-    }
-  });
-
-  let cgIdx = 0;
-  let cgRemaining = 0;
-
-  rows.forEach((r, i) => {
-    if (cgRemaining === 0) {
-      cgRemaining = categoryGroups[cgIdx]?.count || 1;
-      cgIdx++;
-    }
-    cgRemaining--;
-
-    const categoryCell =
-      cgRemaining === categoryGroups[cgIdx - 1]?.count - 1
-        ? {
-            content: r.category,
-            rowSpan: categoryGroups[cgIdx - 1]?.count,
-            styles: { valign: "middle", fontStyle: "bold", fillColor: lightBg },
-          }
-        : i === 0 || rows[i - 1]?.category !== r.category
-        ? {
-            content: r.category,
-            rowSpan: (categoryGroups.find((g) => g.category === r.category)?.count) || 1,
-            styles: { valign: "middle", fontStyle: "bold", fillColor: lightBg },
-          }
-        : null;
-
-    const rowArr: BodyRow = [
-      String(i + 1),
-      categoryCell as any,
-      r.name,
-      r.definition || "—",
-      r.howMeasured || "—",
-      pct(r.weight),
-      pct(r.target),
-    ].filter((c) => c !== null) as BodyRow;
-
-    // If category cell was null (continuation rows), insert placeholder at index 1
-    if (categoryCell === null) {
-      rowArr.splice(1, 0, "" as any);
-    }
-
-    body.push(rowArr);
-  });
-
-  // Simpler flat build (jspdf-autotable rowSpan is tricky; use flat rows with repeated category)
-  const flatBody: string[][] = rows.map((r, i) => [
+  // Build flat body rows; track category spans to merge visually
+  const body: string[][] = rows.map((r, i) => [
     String(i + 1),
     r.category,
     r.name,
     r.definition || "—",
-    r.howMeasured || "—",
+    r.howMeasured || (r.unit ? `Measured in ${r.unit}` : "—"),
     pct(r.weight),
     pct(r.target),
   ]);
@@ -191,61 +95,66 @@ export async function exportKpiDefinitionPdf(
       "KPI / Metric Name",
       "Definition (What it measures)",
       "How it's measured",
-      "Weight (%)",
+      "Weight\n(%)",
       "Target",
     ]],
-    body: flatBody,
+    body,
     margin: { left: margin, right: margin },
     tableWidth: pageWidth - margin * 2,
     styles: {
       fontSize: 8,
-      cellPadding: 5,
+      cellPadding: { top: 5, bottom: 5, left: 5, right: 5 },
       lineColor: borderGray,
       lineWidth: 0.4,
       valign: "middle",
       overflow: "linebreak",
+      textColor: [30, 30, 30],
     },
     headStyles: {
-      fillColor: headerBg,
-      textColor: [255, 255, 255],
+      fillColor: tableHead,
+      textColor: white,
       fontStyle: "bold",
       fontSize: 8,
       halign: "center",
       valign: "middle",
-      cellPadding: 6,
+      cellPadding: { top: 6, bottom: 6, left: 5, right: 5 },
     },
     columnStyles: {
-      0: { halign: "center", cellWidth: 22, fontStyle: "bold" },
-      1: { cellWidth: 90, fontStyle: "bold", fillColor: lightBg },
-      2: { cellWidth: 110, fontStyle: "bold" },
+      0: { halign: "center", cellWidth: 20, fontStyle: "bold" },
+      1: { cellWidth: 95, fontStyle: "bold", fillColor: catBg },
+      2: { cellWidth: 110 },
       3: { cellWidth: "auto" },
-      4: { cellWidth: 120 },
-      5: { halign: "center", cellWidth: 50, fontStyle: "bold", textColor: brandOrange },
-      6: { halign: "center", cellWidth: 50, fontStyle: "bold" },
+      4: { cellWidth: 110 },
+      5: { halign: "center", cellWidth: 42, fontStyle: "bold" },
+      6: { halign: "center", cellWidth: 42, fontStyle: "bold" },
     },
     alternateRowStyles: { fillColor: [255, 255, 255] },
     rowPageBreak: "auto",
     didParseCell(data) {
-      // Category column: bold + light bg for all rows
+      // Category col: always light orange bg + dark bold text
       if (data.column.index === 1 && data.section === "body") {
-        data.cell.styles.fillColor = lightBg;
+        data.cell.styles.fillColor = catBg;
         data.cell.styles.fontStyle = "bold";
-        data.cell.styles.textColor = darkNavy;
+        data.cell.styles.textColor = [80, 30, 0];
+      }
+      // Weight col: orange text
+      if (data.column.index === 5 && data.section === "body") {
+        data.cell.styles.textColor = brandOrange;
       }
     },
     didDrawPage(data) {
-      // ── Footer on each page ───────────────────────────────────────────────
-      const footY = pageHeight - 22;
+      // Footer on every page
+      const footY = pageHeight - 16;
       doc.setDrawColor(...borderGray);
-      doc.setLineWidth(0.5);
-      doc.line(margin, footY - 6, pageWidth - margin, footY - 6);
-
+      doc.setLineWidth(0.4);
+      doc.line(margin, footY - 5, pageWidth - margin, footY - 5);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(7);
-      doc.setTextColor(...slateMuted);
-      doc.text("INTEGRATED TECHNICS — Confidential Internal Document", margin, footY + 2);
+      doc.setTextColor(140, 140, 140);
+      doc.text("INTEGRATED TECHNICS — Confidential Internal HR Document", margin, footY + 2);
+      const yearStr = year ? ` ${year}` : "";
       doc.text(
-        `Page ${data.pageNumber}`,
+        `KPI Performance Framework${yearStr}   |   Page ${data.pageNumber}`,
         pageWidth - margin,
         footY + 2,
         { align: "right" }
@@ -253,26 +162,26 @@ export async function exportKpiDefinitionPdf(
     },
   });
 
-  // ── 6. Totals row (weight sum) ────────────────────────────────────────────
-  const finalY = (doc as any).lastAutoTable?.finalY ?? currentY;
+  // ── 3. Totals footer row ───────────────────────────────────────────────────
+  const finalY: number = (doc as any).lastAutoTable?.finalY ?? currentY;
   const totalWeight = rows.reduce((s, r) => s + r.weight, 0);
 
-  doc.setFillColor(...darkNavy);
+  doc.setFillColor(...tableHead);
   doc.rect(margin, finalY, pageWidth - margin * 2, 20, "F");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8.5);
-  doc.setTextColor(255, 255, 255);
+  doc.setTextColor(...white);
   doc.text(
-    `TOTAL WEIGHT: ${pct(totalWeight)}    |    ${rows.length} KPI Indicators`,
+    `TOTAL WEIGHT: ${pct(totalWeight)}   |   ${rows.length} KPI Indicators`,
     pageWidth / 2,
     finalY + 13,
     { align: "center" }
   );
 
-  // ── 7. Save ───────────────────────────────────────────────────────────────
-  const empSlug = employee?.fullName
-    ? `_${employee.fullName.replace(/\s+/g, "-")}`
+  // ── 4. Save ────────────────────────────────────────────────────────────────
+  const posSlug = employee?.position
+    ? `_${employee.position.replace(/[^a-zA-Z0-9]/g, "-").slice(0, 30)}`
     : "";
-  doc.save(`KPI-Definition${empSlug}${titleYear ? `_${year}` : ""}.pdf`);
+  const yearStr = year ? `_${year}` : "";
+  doc.save(`KPI-Definition${posSlug}${yearStr}.pdf`);
 }
-
