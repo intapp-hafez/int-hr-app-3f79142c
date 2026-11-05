@@ -153,7 +153,7 @@ export function EmployeeKpiPage() {
   }, [profileDetails, matchedTemplate, savedJobDescription, isAr]);
 
   // Compute scorecard values dynamically from matched template criteria or default KPI set
-  const kpiRows = useMemo(() => {
+  const kpiRows = useMemo<EmpKpiRow[]>(() => {
     const scores = (evaluation?.scores as Record<string, any>) || {};
 
     if (matchedTemplate?.items && matchedTemplate.items.length > 0) {
