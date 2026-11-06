@@ -1303,55 +1303,63 @@ export function ProjectDetailView({
 
       {/* ── MODAL: EDIT PROJECT ── */}
       <Dialog open={isEditProjectOpen} onOpenChange={setIsEditProjectOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Edit className="h-5 w-5 text-orange-500" />
-              {isAr ? "تعديل بيانات المشروع" : "Edit Project Details"}
+        <DialogContent className="sm:max-w-3xl md:max-w-4xl max-h-[92vh] overflow-y-auto">
+          <DialogHeader className="border-b border-border/60 pb-3">
+            <DialogTitle className="flex items-center gap-2.5 text-base sm:text-lg font-bold">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400">
+                <Edit className="h-5 w-5" />
+              </div>
+              <span>{isAr ? "تعديل بيانات المشروع" : "Edit Project Details"}</span>
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-3.5 py-2 text-xs">
-            <div className="space-y-1">
-              <Label>{isAr ? "اسم المشروع" : "Project Name"}</Label>
-              <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label>{isAr ? "الموقع" : "Location"}</Label>
-                <Input value={editLocation} onChange={(e) => setEditLocation(e.target.value)} />
+          <div className="space-y-4 py-3 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div className="space-y-1.5">
+                <Label className="font-semibold text-foreground/90">{isAr ? "اسم المشروع" : "Project Name"}</Label>
+                <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="h-10 rounded-xl" />
               </div>
-              <div className="space-y-1">
-                <Label>{isAr ? "الحالة" : "Status"}</Label>
+              <div className="space-y-1.5">
+                <Label className="font-semibold text-foreground/90">{isAr ? "الموقع" : "Location"}</Label>
+                <Input value={editLocation} onChange={(e) => setEditLocation(e.target.value)} className="h-10 rounded-xl" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+              <div className="space-y-1.5">
+                <Label className="font-semibold text-foreground/90">{isAr ? "تاريخ البدء" : "Start Date"}</Label>
+                <Input value={editStartDate} onChange={(e) => setEditStartDate(e.target.value)} className="h-10 rounded-xl" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="font-semibold text-foreground/90">{isAr ? "تاريخ الانتهاء" : "End Date"}</Label>
+                <Input value={editEndDate} onChange={(e) => setEditEndDate(e.target.value)} className="h-10 rounded-xl" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="font-semibold text-foreground/90">{isAr ? "الحالة" : "Status"}</Label>
                 <select
                   value={editStatus}
                   onChange={(e: any) => setEditStatus(e.target.value)}
-                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs"
+                  className="w-full h-10 rounded-xl border border-input bg-background px-3 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand shadow-2xs"
                 >
-                  <option value="ongoing">Ongoing</option>
-                  <option value="upcoming">Upcoming</option>
-                  <option value="completed">Completed</option>
-                  <option value="on_hold">On Hold</option>
+                  <option value="ongoing">{isAr ? "قيد التنفيذ (Ongoing)" : "Ongoing"}</option>
+                  <option value="upcoming">{isAr ? "قادم (Upcoming)" : "Upcoming"}</option>
+                  <option value="completed">{isAr ? "مكتمل (Completed)" : "Completed"}</option>
+                  <option value="on_hold">{isAr ? "معلق (On Hold)" : "On Hold"}</option>
                 </select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label>{isAr ? "تاريخ البدء" : "Start Date"}</Label>
-                <Input value={editStartDate} onChange={(e) => setEditStartDate(e.target.value)} />
-              </div>
-              <div className="space-y-1">
-                <Label>{isAr ? "تاريخ الانتهاء" : "End Date"}</Label>
-                <Input value={editEndDate} onChange={(e) => setEditEndDate(e.target.value)} />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label>{isAr ? "الملاحظات والوصف" : "Notes & Description"}</Label>
-              <Textarea rows={3} value={editNotes} onChange={(e) => setEditNotes(e.target.value)} />
+
+            <div className="space-y-1.5">
+              <Label className="font-semibold text-foreground/90">{isAr ? "الملاحظات والوصف" : "Notes & Description"}</Label>
+              <Textarea rows={3} value={editNotes} onChange={(e) => setEditNotes(e.target.value)} className="rounded-xl resize-none text-xs" />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditProjectOpen(false)}>{isAr ? "إلغاء" : "Cancel"}</Button>
-            <Button onClick={handleSaveEditProject} className="bg-brand text-brand-foreground">{isAr ? "حفظ التعديلات" : "Save Changes"}</Button>
+          <DialogFooter className="border-t border-border/60 pt-3 gap-2">
+            <Button variant="outline" onClick={() => setIsEditProjectOpen(false)} className="rounded-xl h-10 px-5 text-xs font-semibold">
+              {isAr ? "إلغاء" : "Cancel"}
+            </Button>
+            <Button onClick={handleSaveEditProject} className="bg-orange-600 hover:bg-orange-700 text-white rounded-xl h-10 px-6 text-xs font-semibold shadow-sm shadow-orange-600/20">
+              {isAr ? "حفظ التعديلات" : "Save Changes"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

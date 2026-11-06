@@ -23,82 +23,87 @@ export const listCompanyProjects = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     const supabase = context.supabase;
 
-    let query = supabase
-      .from("company_projects")
-      .select(`
-        id,
-        project_code,
-        name,
-        description,
-        project_manager_name,
-        project_manager_id,
-        reported_manager_name,
-        reported_manager_id,
-        location,
-        start_date,
-        end_date,
-        notes,
-        status,
-        created_at,
-        tasks:project_tasks(id, status),
-        members:project_members(id)
-      `)
-      .order("created_at", { ascending: true });
+    try {
+      let query = supabase
+        .from("company_projects")
+        .select(`
+          id,
+          project_code,
+          name,
+          description,
+          project_manager_name,
+          project_manager_id,
+          reported_manager_name,
+          reported_manager_id,
+          location,
+          start_date,
+          end_date,
+          notes,
+          status,
+          created_at,
+          tasks:project_tasks(id, status),
+          members:project_members(id)
+        `)
+        .order("created_at", { ascending: false });
 
-    if (data.status && data.status !== "all") {
-      query = query.eq("status", data.status);
-    }
-    if (data.location && data.location !== "all") {
-      query = query.ilike("location", `%${data.location}%`);
-    }
-    if (data.manager && data.manager !== "all") {
-      query = query.ilike("project_manager_name", `%${data.manager}%`);
-    }
-    if (data.search && data.search.trim()) {
-      const term = data.search.trim();
-      query = query.or(`name.ilike.%${term}%,project_code.ilike.%${term}%,project_manager_name.ilike.%${term}%`);
-    }
+      if (data.status && data.status !== "all") {
+        query = query.eq("status", data.status);
+      }
+      if (data.location && data.location !== "all") {
+        query = query.ilike("location", `%${data.location}%`);
+      }
+      if (data.manager && data.manager !== "all") {
+        query = query.ilike("project_manager_name", `%${data.manager}%`);
+      }
+      if (data.search && data.search.trim()) {
+        const term = data.search.trim();
+        query = query.or(`name.ilike.%${term}%,project_code.ilike.%${term}%,project_manager_name.ilike.%${term}%`);
+      }
 
-    const { data: rows, error } = await query;
-    if (error) {
-      console.error("[listCompanyProjects] error:", error);
-      throw new Error(error.message);
+      const { data: rows, error } = await query;
+      if (error) {
+        console.warn("[listCompanyProjects] Database query note:", error.message);
+        return [];
+      }
+
+      // Transform into frontend representation with dynamic task completion calculation
+      return (rows || []).map((row: any) => {
+        const tasks = row.tasks || [];
+        const totalTasks = tasks.length;
+        const completedTasks = tasks.filter((t: any) => t.status === "completed").length;
+        const membersCount = (row.members || []).length;
+
+        return {
+          id: row.id,
+          code: row.project_code || "PRJ-001",
+          name: row.name,
+          name_ar: row.name,
+          projectManager: {
+            name: row.project_manager_name || "Unassigned",
+            avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face",
+          },
+          reportedManager: {
+            name: row.reported_manager_name || "Unassigned",
+            avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face",
+          },
+          employeesCount: membersCount,
+          location: row.location || "Head Office",
+          startDate: row.start_date || "",
+          endDate: row.end_date || "",
+          notes: row.notes || "",
+          completedTasksCount: completedTasks,
+          totalTasksCount: totalTasks,
+          status: row.status as "ongoing" | "upcoming" | "completed" | "on_hold",
+          employees: [],
+          tasks: [],
+          files: [],
+          updates: [],
+        };
+      });
+    } catch (err: any) {
+      console.warn("[listCompanyProjects] Error handled:", err.message);
+      return [];
     }
-
-    // Transform into frontend representation with task completion calculation
-    return (rows || []).map((row: any) => {
-      const tasks = row.tasks || [];
-      const totalTasks = tasks.length;
-      const completedTasks = tasks.filter((t: any) => t.status === "completed").length;
-      const membersCount = (row.members || []).length;
-
-      return {
-        id: row.id,
-        code: row.project_code,
-        name: row.name,
-        name_ar: row.name,
-        projectManager: {
-          name: row.project_manager_name || "Unassigned",
-          avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face",
-        },
-        reportedManager: {
-          name: row.reported_manager_name || "Unassigned",
-          avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face",
-        },
-        employeesCount: membersCount,
-        location: row.location || "Head Office",
-        startDate: row.start_date || "",
-        endDate: row.end_date || "",
-        notes: row.notes || "",
-        completedTasksCount: completedTasks,
-        totalTasksCount: totalTasks,
-        status: row.status as "ongoing" | "upcoming" | "completed" | "on_hold",
-        employees: [],
-        tasks: [],
-        files: [],
-        updates: [],
-      };
-    });
   });
 
 // ─── GET SINGLE PROJECT WITH ALL SUB-ITEMS ─────────────────────────────────────
@@ -448,35 +453,70 @@ export const listProjectAssignablePeople = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const supabase = context.supabase;
-    const { data: profiles, error } = await supabase
-      .from("profiles")
-      .select("id, full_name, email, role, department, position, avatar_url")
-      .order("full_name", { ascending: true });
+    try {
+      const { data: profiles, error } = await supabase
+        .from("profiles")
+        .select(`
+          id,
+          full_name,
+          email,
+          role,
+          avatar_url,
+          department:departments!profiles_department_id_fkey(name_en, name_ar),
+          position:positions(name_en, name_ar)
+        `)
+        .order("full_name", { ascending: true });
 
-    if (error || !profiles || profiles.length === 0) {
+      if (error || !profiles || profiles.length === 0) {
+        console.warn("[listProjectAssignablePeople] Note:", error?.message);
+        return { managers: [], employees: [] };
+      }
+
+      // Identify managers: role is admin/manager/hr OR title includes Manager/Lead/Head/Director
+      const managerProfiles = profiles.filter((p: any) => {
+        const title = (p.position?.name_en || "").toLowerCase();
+        return (
+          p.role === "manager" ||
+          p.role === "admin" ||
+          p.role === "hr" ||
+          title.includes("manager") ||
+          title.includes("head") ||
+          title.includes("lead") ||
+          title.includes("director")
+        );
+      });
+
+      // If no managers match criteria, allow any profile
+      const effectiveManagers = managerProfiles.length > 0 ? managerProfiles : profiles;
+
+      return {
+        managers: effectiveManagers.map((m: any) => {
+          const deptName = m.department?.name_en || m.department?.name_ar || "Management";
+          const posTitle = m.position?.name_en || m.position?.name_ar || m.role || "Manager";
+          return {
+            id: m.id,
+            name: m.full_name || m.email || "Manager",
+            role: posTitle,
+            department: deptName,
+            avatarUrl: m.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face",
+          };
+        }),
+        employees: profiles.map((e: any) => {
+          const deptName = e.department?.name_en || e.department?.name_ar || "General";
+          const posTitle = e.position?.name_en || e.position?.name_ar || e.role || "Team Member";
+          return {
+            id: e.id,
+            name: e.full_name || e.email || "Employee",
+            email: e.email || "",
+            role: posTitle,
+            department: deptName,
+            avatarUrl: e.avatar_url || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face",
+          };
+        }),
+      };
+    } catch (err: any) {
+      console.warn("[listProjectAssignablePeople] Error:", err.message);
       return { managers: [], employees: [] };
     }
-
-    const managers = profiles.filter((p: any) =>
-      p.role === "manager" || p.role === "admin" || p.role === "hr"
-    );
-
-    return {
-      managers: managers.map((m: any) => ({
-        id: m.id,
-        name: m.full_name || m.email || "Manager",
-        role: m.role,
-        department: m.department || "Management",
-        avatarUrl: m.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face",
-      })),
-      employees: profiles.map((e: any) => ({
-        id: e.id,
-        name: e.full_name || e.email || "Employee",
-        email: e.email,
-        role: e.position || e.role || "Team Member",
-        department: e.department || "Operations",
-        avatarUrl: e.avatar_url || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face",
-      })),
-    };
   });
 

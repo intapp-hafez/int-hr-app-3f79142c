@@ -24,7 +24,7 @@ import {
   UserCheck,
   UserPlus,
 } from "lucide-react";
-import { Project, ProjectEmployee, INITIAL_PROJECTS, loadProjectsFromStorage, saveProjectsToStorage } from "@/lib/projects/projects.data";
+import { Project, ProjectEmployee } from "@/lib/projects/projects.data";
 import { ProjectDetailView } from "./ProjectDetailView";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -54,37 +54,14 @@ import {
   listProjectAssignablePeople,
 } from "@/backend/functions/projects.functions";
 
-const DEFAULT_MANAGERS = [
-  { id: "m1", name: "John Reyes", role: "Project Manager", department: "Operations" },
-  { id: "m2", name: "Maria Santos", role: "Reported Manager / VP", department: "Operations" },
-  { id: "m3", name: "Carlos Medina", role: "General Manager", department: "Executive" },
-  { id: "m4", name: "Liza Cortez", role: "Project Lead", department: "Operations" },
-  { id: "m5", name: "Mark Villanueva", role: "IT Systems Director", department: "IT & Tech" },
-  { id: "m6", name: "Anna Dela Cruz", role: "Logistics Manager", department: "Logistics" },
-  { id: "m7", name: "Ramon Bautista", role: "Regional Branch Manager", department: "Regional Ops" },
-];
-
-const DEFAULT_EMPLOYEES: ProjectEmployee[] = [
-  { id: "e1", name: "Michael Chang", role: "Senior IT Infrastructure Lead", department: "IT & Tech", email: "m.chang@integ.com" },
-  { id: "e2", name: "Fatima Al-Zahra", role: "HR & Talent Partner", department: "Human Resources", email: "f.alzahra@integ.com" },
-  { id: "e3", name: "Rami Youssef", role: "Security & Compliance Specialist", department: "Operations", email: "r.youssef@integ.com" },
-  { id: "e4", name: "Khaled Nabil", role: "Facilities Coordinator", department: "General Admin", email: "k.nabil@integ.com" },
-  { id: "e5", name: "Sarah Jenkins", role: "Procurement Specialist", department: "Finance", email: "s.jenkins@integ.com" },
-  { id: "e6", name: "David Tan", role: "Electrical Site Engineer", department: "Engineering", email: "d.tan@integ.com" },
-  { id: "e7", name: "Elena Rostova", role: "QA & Safety Inspector", department: "Quality Assurance", email: "e.rostova@integ.com" },
-  { id: "e8", name: "Ahmed Mansour", role: "Site Supervisor", department: "Field Operations", email: "a.mansour@integ.com" },
-  { id: "e9", name: "Grace Lee", role: "Network Architect", department: "IT & Tech", email: "g.lee@integ.com" },
-  { id: "e10", name: "Robert Chen", role: "HVAC Systems Lead", department: "Maintenance", email: "r.chen@integ.com" },
-];
-
 interface ProjectsViewProps {
   role?: "admin" | "manager";
 }
 
 export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
   const { isAr } = useI18n();
-  const [projects, setProjects] = useState<Project[]>(() => loadProjectsFromStorage());
-  const [selectedProjectId, setSelectedProjectId] = useState<string>("PRJ-002");
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [detailProject, setDetailProject] = useState<Project | null>(null);
   const [detailInitialTab, setDetailInitialTab] = useState<"details" | "employees" | "tasks" | "files" | "updates">("details");
 
@@ -100,11 +77,11 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
   const [newProjId, setNewProjId] = useState("");
   const [newProjName, setNewProjName] = useState("");
   const [newProjNameAr, setNewProjNameAr] = useState("");
-  const [newProjManager, setNewProjManager] = useState("John Reyes");
-  const [newProjReportedManager, setNewProjReportedManager] = useState("Maria Santos");
+  const [newProjManager, setNewProjManager] = useState("");
+  const [newProjReportedManager, setNewProjReportedManager] = useState("");
   const [newProjLocation, setNewProjLocation] = useState("Head Office");
-  const [newProjStartDate, setNewProjStartDate] = useState("May 01, 2025");
-  const [newProjEndDate, setNewProjEndDate] = useState("Aug 31, 2025");
+  const [newProjStartDate, setNewProjStartDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [newProjEndDate, setNewProjEndDate] = useState("");
   const [newProjStatus, setNewProjStatus] = useState<Project["status"]>("ongoing");
   const [newProjNotes, setNewProjNotes] = useState("");
   const [newProjNotesAr, setNewProjNotesAr] = useState("");
@@ -113,7 +90,7 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
   const [editingProject, setEditingProject] = useState<Project | null>(null);
 
   // Multi-employee selection state for Create Project modal
-  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>(["e1", "e2", "e3"]);
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
   const [isEmployeeDropdownOpen, setIsEmployeeDropdownOpen] = useState(false);
   const [employeeSearchQuery, setEmployeeSearchQuery] = useState("");
 
@@ -126,50 +103,40 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
   const listAssignablePeopleFn = useServerFn(listProjectAssignablePeople);
   const queryClient = useQueryClient();
 
-  const { data: assignablePeople } = useQuery({
+  const { data: assignablePeople, isLoading: isPeopleLoading } = useQuery({
     queryKey: ["project-assignable-people"],
     queryFn: async () => {
       try {
         return await listAssignablePeopleFn();
-      } catch {
-        return null;
+      } catch (err) {
+        console.warn("[listProjectAssignablePeople] query error:", err);
+        return { managers: [], employees: [] };
       }
     },
     staleTime: 60000,
   });
 
-  // Combined Managers list
+  // Database-driven Managers list
   const availableManagers = useMemo(() => {
-    const list = [...DEFAULT_MANAGERS];
-    if (assignablePeople?.managers && assignablePeople.managers.length > 0) {
-      for (const m of assignablePeople.managers) {
-        if (!list.some((x) => x.name.toLowerCase() === m.name.toLowerCase())) {
-          list.push(m);
-        }
-      }
-    }
-    return list;
+    return assignablePeople?.managers || [];
   }, [assignablePeople]);
 
-  // Combined Employees list
+  // Database-driven Employees list
   const availableEmployees = useMemo<ProjectEmployee[]>(() => {
-    const list = [...DEFAULT_EMPLOYEES];
-    if (assignablePeople?.employees && assignablePeople.employees.length > 0) {
-      for (const e of assignablePeople.employees) {
-        if (!list.some((x) => x.id === e.id || x.name.toLowerCase() === e.name.toLowerCase())) {
-          list.push({
-            id: e.id,
-            name: e.name,
-            role: e.role,
-            department: e.department,
-            email: e.email || `${e.name.toLowerCase().replace(/\s+/g, ".")}@integ.com`,
-            avatarUrl: e.avatarUrl,
-          });
-        }
+    return assignablePeople?.employees || [];
+  }, [assignablePeople]);
+
+  // Set default managers when list loads from DB
+  React.useEffect(() => {
+    if (availableManagers.length > 0) {
+      if (!newProjManager) {
+        setNewProjManager(availableManagers[0].name);
+      }
+      if (!newProjReportedManager) {
+        setNewProjReportedManager(availableManagers[1]?.name || availableManagers[0].name);
       }
     }
-    return list;
-  }, [assignablePeople]);
+  }, [availableManagers, newProjManager, newProjReportedManager]);
 
   // Filtered employees for dropdown search
   const filteredSelectableEmployees = useMemo(() => {
@@ -183,8 +150,12 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
     );
   }, [availableEmployees, employeeSearchQuery]);
 
-  // Fetch from database with fallback to localStorage
-  const { data: dbProjects } = useQuery({
+  // Fetch projects strictly from database
+  const {
+    data: dbProjects,
+    isLoading: isProjectsLoading,
+    refetch: refetchProjects,
+  } = useQuery({
     queryKey: ["company-projects", statusFilter, locationFilter, managerFilter, searchQuery],
     queryFn: async () => {
       try {
@@ -196,27 +167,28 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
             search: searchQuery,
           },
         });
-        return res;
+        return (res as Project[]) || [];
       } catch (err) {
-        return null;
+        console.warn("[company-projects query]", err);
+        return [];
       }
     },
-    staleTime: 30000,
+    staleTime: 5000,
   });
 
   // Sync state when DB projects load
   React.useEffect(() => {
-    if (dbProjects && Array.isArray(dbProjects) && dbProjects.length > 0) {
-      setProjects((prev) => {
-        // Merge or replace
-        const dbMap = new Map((dbProjects as any[]).map((p) => [p.code || p.id, p]));
-        return prev.map((p) => {
-          const fromDb = dbMap.get(p.id) || dbMap.get((p as any).code);
-          return fromDb ? { ...p, ...fromDb, employees: p.employees, tasks: p.tasks, files: p.files, updates: p.updates } : p;
-        });
-      });
+    if (dbProjects) {
+      setProjects(dbProjects);
+      if (dbProjects.length > 0) {
+        if (!selectedProjectId || !dbProjects.some((p) => p.id === selectedProjectId)) {
+          setSelectedProjectId(dbProjects[0].id);
+        }
+      } else {
+        setSelectedProjectId("");
+      }
     }
-  }, [dbProjects]);
+  }, [dbProjects, selectedProjectId]);
 
   // Open detail view with real-time DB enrichment
   const handleOpenDetail = async (
@@ -230,142 +202,104 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
       if (full && full.id) {
         setDetailProject(full as any);
       }
-    } catch {
-      // Fallback: continue showing local mock project
+    } catch (err) {
+      console.warn("[handleOpenDetail] error:", err);
     }
   };
 
-  // Sync and persist projects
-  const updateProject = (updated: Project) => {
-    const next = projects.map((p) => (p.id === updated.id ? updated : p));
-    setProjects(next);
-    saveProjectsToStorage(next);
-    if (detailProject && detailProject.id === updated.id) {
-      setDetailProject(updated);
-    }
-
-    // Background DB sync if id is UUID
-    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(updated.id)) {
-      updateProjectFn({
-        data: {
-          id: updated.id,
-          name: updated.name,
-          location: updated.location,
-          notes: updated.notes,
-          status: updated.status,
-        },
-      })
-        .then(() => queryClient.invalidateQueries({ queryKey: ["company-projects"] }))
-        .catch(() => {});
+  // Sync project updates directly to DB
+  const updateProject = async (updated: Project) => {
+    try {
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(updated.id)) {
+        await updateProjectFn({
+          data: {
+            id: updated.id,
+            name: updated.name,
+            location: updated.location,
+            notes: updated.notes,
+            status: updated.status,
+            start_date: updated.startDate || undefined,
+            end_date: updated.endDate || undefined,
+          },
+        });
+      }
+      await queryClient.invalidateQueries({ queryKey: ["company-projects"] });
+      await refetchProjects();
+      if (detailProject && detailProject.id === updated.id) {
+        setDetailProject(updated);
+      }
+      toast.success(isAr ? "تم تحديث المشروع في قاعدة البيانات" : "Project updated in database");
+    } catch (err: any) {
+      console.error("[updateProject] error:", err);
+      toast.error(err.message || (isAr ? "فشل تحديث المشروع" : "Failed to update project"));
     }
   };
 
-  const handleCreateProject = () => {
+  const handleCreateProject = async () => {
     if (!newProjName.trim()) {
       toast.error(isAr ? "يرجى إدخال اسم المشروع" : "Project name is required");
       return;
     }
-    const generatedId = newProjId.trim() || `PRJ-${String(projects.length + 1).padStart(3, "0")}`;
+    const generatedCode = newProjId.trim() || `PRJ-${String(projects.length + 1).padStart(3, "0")}`;
 
     const assignedEmployeesList = availableEmployees.filter((e) =>
       selectedEmployeeIds.includes(e.id)
     );
 
-    const newProject: Project = {
-      id: generatedId,
-      name: newProjName.trim(),
-      name_ar: newProjNameAr.trim() || undefined,
-      projectManager: {
-        name: newProjManager,
-        avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face",
-      },
-      reportedManager: {
-        name: newProjReportedManager,
-        avatarUrl: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=100&h=100&fit=crop&crop=face",
-      },
-      location: newProjLocation,
-      startDate: newProjStartDate,
-      endDate: newProjEndDate,
-      status: newProjStatus,
-      notes: newProjNotes.trim() || "Project initialized.",
-      notes_ar: newProjNotesAr.trim() || undefined,
-      employeesCount: assignedEmployeesList.length,
-      completedTasksCount: 0,
-      totalTasksCount: 4,
-      employees: assignedEmployeesList,
-      tasks: [
-        { id: `t-${Date.now()}-1`, title: "Kickoff Meeting & Resource Allocation", status: "in_progress", priority: "high", assignee: { name: newProjManager }, dueDate: "Jun 15, 2025" },
-        { id: `t-${Date.now()}-2`, title: "Procurement & Site Preparation", status: "pending", priority: "medium", assignee: { name: newProjManager }, dueDate: "Jul 01, 2025" },
-      ],
-      files: [],
-      updates: [
-        { id: `u-${Date.now()}-1`, author: { name: newProjManager, role: "Project Manager" }, content: "Project created and team assigned.", timestamp: "Just now" },
-      ],
-    };
-
-    const next = [newProject, ...projects];
-    setProjects(next);
-    saveProjectsToStorage(next);
-    setSelectedProjectId(newProject.id);
-    setIsNewProjectOpen(false);
-
-    // Background DB insert
-    createProjectFn({
-      data: {
-        project_code: newProject.id,
-        name: newProject.name,
-        project_manager_name: newProject.projectManager.name,
-        reported_manager_name: newProject.reportedManager.name,
-        location: newProject.location,
-        start_date: "2025-05-01",
-        end_date: "2025-08-31",
-        notes: newProject.notes,
-        status: newProject.status,
-        initial_members: assignedEmployeesList.map((e) => ({
-          name: e.name,
-          role: e.role,
-          department: e.department,
-          email: e.email,
-        })),
-      },
-    })
-      .then((created: any) => {
-        queryClient.invalidateQueries({ queryKey: ["company-projects"] });
-        if (created?.id) {
-          setProjects((prev) =>
-            prev.map((p) => (p.id === newProject.id ? { ...p, id: created.id, code: newProject.id } : p))
-          );
-        }
-      })
-      .catch((err) => {
-        console.warn("DB insert fallback to local storage:", err);
+    try {
+      const created = await createProjectFn({
+        data: {
+          project_code: generatedCode,
+          name: newProjName.trim(),
+          project_manager_name: newProjManager || (availableManagers[0]?.name ?? "Unassigned"),
+          reported_manager_name: newProjReportedManager || (availableManagers[1]?.name ?? availableManagers[0]?.name ?? "Unassigned"),
+          location: newProjLocation || "Head Office",
+          start_date: newProjStartDate || undefined,
+          end_date: newProjEndDate || undefined,
+          notes: newProjNotes.trim() || undefined,
+          status: newProjStatus,
+          initial_members: assignedEmployeesList.map((e) => ({
+            employee_id: e.id,
+            name: e.name,
+            role: e.role,
+            department: e.department,
+            email: e.email,
+          })),
+        },
       });
 
-    // Reset inputs
-    setNewProjId("");
-    setNewProjName("");
-    setNewProjNameAr("");
-    setNewProjNotes("");
-    setNewProjNotesAr("");
-    toast.success(isAr ? "تم إنشاء المشروع بنجاح" : "Project created successfully");
+      await queryClient.invalidateQueries({ queryKey: ["company-projects"] });
+      await refetchProjects();
+      if (created?.id) {
+        setSelectedProjectId(created.id);
+      }
+      setIsNewProjectOpen(false);
+      setNewProjId("");
+      setNewProjName("");
+      setNewProjNameAr("");
+      setNewProjNotes("");
+      setNewProjNotesAr("");
+      setSelectedEmployeeIds([]);
+      toast.success(isAr ? "تم إنشاء المشروع بنجاح وحفظه في قاعدة البيانات" : "Project created successfully");
+    } catch (err: any) {
+      console.error("[handleCreateProject] error:", err);
+      toast.error(err.message || (isAr ? "فشل إنشاء المشروع" : "Failed to create project"));
+    }
   };
 
-  const handleDeleteProject = (projId: string) => {
-    if (confirm(isAr ? "هل أنت متأكد من حذف هذا المشروع؟" : "Are you sure you want to delete this project?")) {
-      const next = projects.filter((p) => p.id !== projId);
-      setProjects(next);
-      saveProjectsToStorage(next);
-      if (selectedProjectId === projId && next.length > 0) {
-        setSelectedProjectId(next[0].id);
+  const handleDeleteProject = async (projId: string) => {
+    if (confirm(isAr ? "هل أنت متأكد من حذف هذا المشروع نهائياً؟" : "Are you sure you want to permanently delete this project?")) {
+      try {
+        if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projId)) {
+          await deleteProjectFn({ data: { id: projId } });
+        }
+        await queryClient.invalidateQueries({ queryKey: ["company-projects"] });
+        await refetchProjects();
+        toast.success(isAr ? "تم حذف المشروع" : "Project deleted");
+      } catch (err: any) {
+        console.error("[handleDeleteProject] error:", err);
+        toast.error(err.message || (isAr ? "فشل حذف المشروع" : "Failed to delete project"));
       }
-
-      // Background DB delete if UUID
-      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projId)) {
-        deleteProjectFn({ data: { id: projId } })
-          .then(() => queryClient.invalidateQueries({ queryKey: ["company-projects"] }))
-          .catch(() => {});
-      }
-      toast.success(isAr ? "تم حذف المشروع" : "Project deleted");
     }
   };
 
@@ -627,7 +561,18 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60">
-              {filteredProjects.length > 0 ? (
+              {isProjectsLoading ? (
+                <tr>
+                  <td colSpan={12} className="py-16 text-center text-muted-foreground text-xs">
+                    <div className="flex flex-col items-center justify-center gap-3">
+                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-orange-500 border-t-transparent" />
+                      <p className="font-medium text-muted-foreground">
+                        {isAr ? "جاري تحميل المشاريع من قاعدة البيانات..." : "Loading projects from database..."}
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredProjects.length > 0 ? (
                 filteredProjects.map((proj) => {
                   const isSelected = selectedProjectId === proj.id;
                   const completedT = proj.tasks.filter((t) => t.status === "completed").length;
@@ -789,10 +734,38 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
                     </tr>
                   );
                 })
+              ) : projects.length === 0 ? (
+                <tr>
+                  <td colSpan={12} className="py-16 text-center text-muted-foreground text-xs">
+                    <div className="flex flex-col items-center justify-center gap-3 max-w-sm mx-auto">
+                      <div className="h-12 w-12 rounded-2xl bg-orange-500/10 text-orange-600 dark:text-orange-400 flex items-center justify-center">
+                        <Folder className="h-6 w-6" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="font-bold text-sm text-foreground">
+                          {isAr ? "لا توجد مشاريع في قاعدة البيانات" : "No projects found in database"}
+                        </p>
+                        <p className="text-muted-foreground text-xs">
+                          {isAr
+                            ? "انقر فوق زر \"مشروع جديد\" لإنشاء أول مشروع للشركة مع تعيين المديرين وفريق العمل."
+                            : "Click '+ New Project' above to create your first company project with real team assignments."}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => setIsNewProjectOpen(true)}
+                        className="mt-1 h-8 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-semibold text-xs gap-1.5"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        {isAr ? "مشروع جديد" : "+ New Project"}
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
               ) : (
                 <tr>
                   <td colSpan={12} className="py-12 text-center text-muted-foreground text-xs">
-                    {isAr ? "لا توجد مشاريع مطابقة للبحث" : "No projects match your filter criteria"}
+                    {isAr ? "لا توجد مشاريع مطابقة للبحث أو التصفية" : "No projects match your filter criteria"}
                   </td>
                 </tr>
               )}
@@ -948,66 +921,91 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
 
       {/* ── MODAL: CREATE NEW PROJECT ── */}
       <Dialog open={isNewProjectOpen} onOpenChange={setIsNewProjectOpen}>
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Folder className="h-5 w-5 text-orange-500" />
-              {isAr ? "إنشاء مشروع جديد" : "Create New Project"}
+        <DialogContent className="sm:max-w-3xl md:max-w-4xl max-h-[92vh] overflow-y-auto">
+          <DialogHeader className="border-b border-border/60 pb-3">
+            <DialogTitle className="flex items-center gap-2.5 text-base sm:text-lg font-bold">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400">
+                <Folder className="h-5 w-5" />
+              </div>
+              <span>{isAr ? "إنشاء مشروع جديد" : "Create New Project"}</span>
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-2 text-xs">
-            <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1">
-                <Label>{isAr ? "رمز المشروع" : "Project ID"}</Label>
+          <div className="space-y-4 py-3 text-xs">
+            {/* Row 1: Code & Name (EN) */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+              <div className="space-y-1.5">
+                <Label className="font-semibold text-foreground/90">{isAr ? "رمز المشروع" : "Project ID"}</Label>
                 <Input
                   placeholder={`PRJ-${String(projects.length + 1).padStart(3, "0")}`}
                   value={newProjId}
                   onChange={(e) => setNewProjId(e.target.value)}
+                  className="h-10 rounded-xl"
                 />
               </div>
-              <div className="col-span-2 space-y-1">
-                <Label>{isAr ? "اسم المشروع (EN) *" : "Project Name (EN) *"}</Label>
+              <div className="sm:col-span-2 space-y-1.5">
+                <Label className="font-semibold text-foreground/90">{isAr ? "اسم المشروع (EN) *" : "Project Name (EN) *"}</Label>
                 <Input
                   placeholder="e.g. Data Center Modernization"
                   value={newProjName}
                   onChange={(e) => setNewProjName(e.target.value)}
+                  className="h-10 rounded-xl"
                 />
               </div>
             </div>
 
-            <div className="space-y-1">
-              <Label>{isAr ? "اسم المشروع (عربي)" : "Project Name (AR)"}</Label>
-              <Input
-                placeholder="تحديث مركز البيانات الرئيسي"
-                value={newProjNameAr}
-                onChange={(e) => setNewProjNameAr(e.target.value)}
-              />
+            {/* Row 2: Name (AR) & Location */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div className="space-y-1.5">
+                <Label className="font-semibold text-foreground/90">{isAr ? "اسم المشروع (عربي)" : "Project Name (AR)"}</Label>
+                <Input
+                  placeholder="تحديث مركز البيانات الرئيسي"
+                  value={newProjNameAr}
+                  onChange={(e) => setNewProjNameAr(e.target.value)}
+                  className="h-10 rounded-xl"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="font-semibold text-foreground/90">{isAr ? "الموقع" : "Location"}</Label>
+                <Input
+                  value={newProjLocation}
+                  onChange={(e) => setNewProjLocation(e.target.value)}
+                  placeholder="e.g. Head Office / Riyadh / Cairo"
+                  className="h-10 rounded-xl"
+                />
+              </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label>{isAr ? "مدير المشروع" : "Project Manager"}</Label>
+            {/* Row 3: Managers */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div className="space-y-1.5">
+                <Label className="font-semibold text-foreground/90">{isAr ? "مدير المشروع" : "Project Manager"}</Label>
                 <select
                   value={newProjManager}
                   onChange={(e) => setNewProjManager(e.target.value)}
-                  className="w-full h-9 rounded-xl border border-input bg-background px-3 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand"
+                  className="w-full h-10 rounded-xl border border-input bg-background px-3 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand shadow-2xs"
                 >
+                  {availableManagers.length === 0 && (
+                    <option value="">{isPeopleLoading ? (isAr ? "جاري تحميل المديرين من قاعدة البيانات..." : "Loading managers from DB...") : (isAr ? "لا يوجد مديرين" : "No managers found")}</option>
+                  )}
                   {availableManagers.map((m) => (
-                    <option key={m.name} value={m.name}>
+                    <option key={m.id || m.name} value={m.name}>
                       {m.name} ({m.department})
                     </option>
                   ))}
                 </select>
               </div>
-              <div className="space-y-1">
-                <Label>{isAr ? "المدير المباشر" : "Reported Manager"}</Label>
+              <div className="space-y-1.5">
+                <Label className="font-semibold text-foreground/90">{isAr ? "المدير المباشر" : "Reported Manager"}</Label>
                 <select
                   value={newProjReportedManager}
                   onChange={(e) => setNewProjReportedManager(e.target.value)}
-                  className="w-full h-9 rounded-xl border border-input bg-background px-3 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand"
+                  className="w-full h-10 rounded-xl border border-input bg-background px-3 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand shadow-2xs"
                 >
+                  {availableManagers.length === 0 && (
+                    <option value="">{isPeopleLoading ? (isAr ? "جاري تحميل المديرين من قاعدة البيانات..." : "Loading managers from DB...") : (isAr ? "لا يوجد مديرين" : "No managers found")}</option>
+                  )}
                   {availableManagers.map((m) => (
-                    <option key={m.name} value={m.name}>
+                    <option key={m.id || m.name} value={m.name}>
                       {m.name} ({m.department})
                     </option>
                   ))}
@@ -1015,12 +1013,12 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
               </div>
             </div>
 
-            {/* Multi-Select Assigned Employees Dropdown */}
+            {/* Row 4: Multi-Select Assigned Employees Dropdown */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <Label className="flex items-center gap-1.5 font-semibold">
+                <Label className="flex items-center gap-1.5 font-semibold text-foreground/90">
                   <Users className="h-3.5 w-3.5 text-orange-500" />
-                  {isAr ? "تعيين أعضاء الفريق (تحديد متعدد من القائمة)" : "Assign Team Employees (Multi-Select)"}
+                  {isAr ? "تعيين أعضاء الفريق (تحديد متعدد من قاعدة البيانات)" : "Assign Team Employees (Multi-Select)"}
                 </Label>
                 <span className="text-[11px] text-muted-foreground font-medium">
                   {selectedEmployeeIds.length} {isAr ? "موظف محدد" : "employees selected"}
@@ -1032,11 +1030,11 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
                   <div
                     role="button"
                     tabIndex={0}
-                    className="min-h-[42px] w-full rounded-xl border border-input bg-background p-1.5 text-xs cursor-pointer flex flex-wrap items-center gap-1.5 hover:border-orange-500/50 transition-colors focus:ring-1 focus:ring-brand"
+                    className="min-h-[46px] w-full rounded-xl border border-input bg-background p-2 text-xs cursor-pointer flex flex-wrap items-center gap-1.5 hover:border-orange-500/50 transition-colors focus:ring-1 focus:ring-brand shadow-2xs"
                   >
                     {selectedEmployeeIds.length === 0 ? (
                       <span className="text-muted-foreground px-2 py-1 select-none">
-                        {isAr ? "اختر موظفين لتعيينهم في المشروع..." : "Click to select employees from dropdown..."}
+                        {isAr ? "اختر موظفين لتعيينهم في المشروع..." : "Click to select employees from database..."}
                       </span>
                     ) : (
                       selectedEmployeeIds.map((empId) => {
@@ -1045,7 +1043,7 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
                         return (
                           <span
                             key={emp.id}
-                            className="inline-flex items-center gap-1 rounded-lg bg-orange-500/10 text-orange-700 dark:text-orange-300 border border-orange-500/20 px-2 py-0.5 text-[11px] font-medium"
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-orange-500/10 text-orange-700 dark:text-orange-300 border border-orange-500/20 px-2.5 py-1 text-[11px] font-medium"
                           >
                             <span>{emp.name}</span>
                             <button
@@ -1068,19 +1066,19 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
                   </div>
                 </PopoverTrigger>
 
-                <PopoverContent className="w-[440px] p-0 rounded-2xl shadow-xl border border-border" align="start">
-                  <div className="p-2.5 border-b border-border/60 bg-muted/30 space-y-2">
+                <PopoverContent className="w-[680px] max-w-[90vw] p-0 rounded-2xl shadow-xl border border-border" align="start">
+                  <div className="p-3 border-b border-border/60 bg-muted/30 space-y-2.5">
                     <div className="relative">
                       <Search className="absolute start-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                       <Input
                         placeholder={isAr ? "بحث عن موظف بالاسم أو التخصص..." : "Search employee name, role, department..."}
                         value={employeeSearchQuery}
                         onChange={(e) => setEmployeeSearchQuery(e.target.value)}
-                        className="h-8 ps-8 text-xs rounded-xl bg-background"
+                        className="h-9 ps-8 text-xs rounded-xl bg-background"
                       />
                     </div>
                     <div className="flex items-center justify-between text-[11px] text-muted-foreground px-1">
-                      <span>{filteredSelectableEmployees.length} {isAr ? "موظف متاح" : "employees available"}</span>
+                      <span>{filteredSelectableEmployees.length} {isAr ? "موظف متاح بقاعدة البيانات" : "employees available in DB"}</span>
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
@@ -1101,7 +1099,7 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
                     </div>
                   </div>
 
-                  <div className="max-h-60 overflow-y-auto divide-y divide-border/40 p-1">
+                  <div className="max-h-64 overflow-y-auto divide-y divide-border/40 p-1">
                     {filteredSelectableEmployees.map((emp) => {
                       const isSelected = selectedEmployeeIds.includes(emp.id);
                       return (
@@ -1112,12 +1110,12 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
                               isSelected ? prev.filter((id) => id !== emp.id) : [...prev, emp.id]
                             );
                           }}
-                          className={`flex items-center gap-2.5 p-2 rounded-xl cursor-pointer transition-colors ${
+                          className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition-colors ${
                             isSelected ? "bg-orange-500/10" : "hover:bg-muted/50"
                           }`}
                         >
                           <Checkbox checked={isSelected} className="data-[state=checked]:bg-orange-600 data-[state=checked]:border-orange-600" />
-                          <div className="h-7 w-7 rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center font-bold text-brand text-[10px] shrink-0">
+                          <div className="h-8 w-8 rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center font-bold text-brand text-[11px] shrink-0">
                             {emp.avatarUrl ? (
                               <img src={emp.avatarUrl} alt="" className="h-full w-full rounded-full object-cover" />
                             ) : (
@@ -1137,52 +1135,58 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
               </Popover>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label>{isAr ? "الموقع" : "Location"}</Label>
-                <Input value={newProjLocation} onChange={(e) => setNewProjLocation(e.target.value)} />
+            {/* Row 5: Dates & Status */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+              <div className="space-y-1.5">
+                <Label className="font-semibold text-foreground/90">{isAr ? "تاريخ البدء" : "Start Date"}</Label>
+                <Input
+                  type="date"
+                  value={newProjStartDate}
+                  onChange={(e) => setNewProjStartDate(e.target.value)}
+                  className="h-10 rounded-xl"
+                />
               </div>
-              <div className="space-y-1">
-                <Label>{isAr ? "الحالة الأولية" : "Initial Status"}</Label>
+              <div className="space-y-1.5">
+                <Label className="font-semibold text-foreground/90">{isAr ? "تاريخ الانتهاء" : "End Date"}</Label>
+                <Input
+                  type="date"
+                  value={newProjEndDate}
+                  onChange={(e) => setNewProjEndDate(e.target.value)}
+                  className="h-10 rounded-xl"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="font-semibold text-foreground/90">{isAr ? "الحالة الأولية" : "Initial Status"}</Label>
                 <select
                   value={newProjStatus}
                   onChange={(e: any) => setNewProjStatus(e.target.value)}
-                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs"
+                  className="w-full h-10 rounded-xl border border-input bg-background px-3 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand shadow-2xs"
                 >
-                  <option value="ongoing">Ongoing</option>
-                  <option value="upcoming">Upcoming</option>
-                  <option value="completed">Completed</option>
-                  <option value="on_hold">On Hold</option>
+                  <option value="ongoing">{isAr ? "قيد التنفيذ (Ongoing)" : "Ongoing"}</option>
+                  <option value="upcoming">{isAr ? "قادم (Upcoming)" : "Upcoming"}</option>
+                  <option value="completed">{isAr ? "مكتمل (Completed)" : "Completed"}</option>
+                  <option value="on_hold">{isAr ? "معلق (On Hold)" : "On Hold"}</option>
                 </select>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label>{isAr ? "تاريخ البدء" : "Start Date"}</Label>
-                <Input value={newProjStartDate} onChange={(e) => setNewProjStartDate(e.target.value)} />
-              </div>
-              <div className="space-y-1">
-                <Label>{isAr ? "تاريخ الانتهاء" : "End Date"}</Label>
-                <Input value={newProjEndDate} onChange={(e) => setNewProjEndDate(e.target.value)} />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <Label>{isAr ? "الوصف والملاحظات" : "Notes & Description"}</Label>
+            {/* Row 6: Description */}
+            <div className="space-y-1.5">
+              <Label className="font-semibold text-foreground/90">{isAr ? "الوصف والملاحظات" : "Notes & Description"}</Label>
               <Textarea
                 rows={3}
                 placeholder="Brief summary of goals, scope, and deliverables..."
                 value={newProjNotes}
                 onChange={(e) => setNewProjNotes(e.target.value)}
+                className="rounded-xl resize-none text-xs"
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsNewProjectOpen(false)}>
+          <DialogFooter className="border-t border-border/60 pt-3 gap-2">
+            <Button variant="outline" onClick={() => setIsNewProjectOpen(false)} className="rounded-xl h-10 px-5 text-xs font-semibold">
               {isAr ? "إلغاء" : "Cancel"}
             </Button>
-            <Button onClick={handleCreateProject} className="bg-orange-600 hover:bg-orange-700 text-white">
+            <Button onClick={handleCreateProject} className="bg-orange-600 hover:bg-orange-700 text-white rounded-xl h-10 px-6 text-xs font-semibold shadow-sm shadow-orange-600/20">
               {isAr ? "إنشاء المشروع" : "Create Project"}
             </Button>
           </DialogFooter>
@@ -1192,25 +1196,38 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
       {/* ── MODAL: EDIT PROJECT ── */}
       {editingProject && (
         <Dialog open={!!editingProject} onOpenChange={(open) => !open && setEditingProject(null)}>
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Edit className="h-5 w-5 text-orange-500" />
-                {isAr ? "تعديل بيانات المشروع" : "Edit Project Details"}
+          <DialogContent className="sm:max-w-3xl md:max-w-4xl max-h-[92vh] overflow-y-auto">
+            <DialogHeader className="border-b border-border/60 pb-3">
+              <DialogTitle className="flex items-center gap-2.5 text-base sm:text-lg font-bold">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400">
+                  <Edit className="h-5 w-5" />
+                </div>
+                <span>{isAr ? "تعديل بيانات المشروع" : "Edit Project Details"}</span>
               </DialogTitle>
             </DialogHeader>
-            <div className="space-y-3.5 py-2 text-xs">
-              <div className="space-y-1">
-                <Label>{isAr ? "اسم المشروع" : "Project Name"}</Label>
-                <Input
-                  value={editingProject.name}
-                  onChange={(e) => setEditingProject({ ...editingProject, name: e.target.value })}
-                />
+            <div className="space-y-4 py-3 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="space-y-1.5">
+                  <Label className="font-semibold text-foreground/90">{isAr ? "اسم المشروع" : "Project Name"}</Label>
+                  <Input
+                    value={editingProject.name}
+                    onChange={(e) => setEditingProject({ ...editingProject, name: e.target.value })}
+                    className="h-10 rounded-xl"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="font-semibold text-foreground/90">{isAr ? "الموقع" : "Location"}</Label>
+                  <Input
+                    value={editingProject.location}
+                    onChange={(e) => setEditingProject({ ...editingProject, location: e.target.value })}
+                    className="h-10 rounded-xl"
+                  />
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label>{isAr ? "مدير المشروع" : "Project Manager"}</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="space-y-1.5">
+                  <Label className="font-semibold text-foreground/90">{isAr ? "مدير المشروع" : "Project Manager"}</Label>
                   <select
                     value={editingProject.projectManager.name}
                     onChange={(e) =>
@@ -1219,17 +1236,17 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
                         projectManager: { ...editingProject.projectManager, name: e.target.value },
                       })
                     }
-                    className="w-full h-9 rounded-xl border border-input bg-background px-3 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand"
+                    className="w-full h-10 rounded-xl border border-input bg-background px-3 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand shadow-2xs"
                   >
                     {availableManagers.map((m) => (
-                      <option key={m.name} value={m.name}>
+                      <option key={m.id || m.name} value={m.name}>
                         {m.name} ({m.department})
                       </option>
                     ))}
                   </select>
                 </div>
-                <div className="space-y-1">
-                  <Label>{isAr ? "المدير المباشر" : "Reported Manager"}</Label>
+                <div className="space-y-1.5">
+                  <Label className="font-semibold text-foreground/90">{isAr ? "المدير المباشر" : "Reported Manager"}</Label>
                   <select
                     value={editingProject.reportedManager.name}
                     onChange={(e) =>
@@ -1238,74 +1255,69 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
                         reportedManager: { ...editingProject.reportedManager, name: e.target.value },
                       })
                     }
-                    className="w-full h-9 rounded-xl border border-input bg-background px-3 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand"
+                    className="w-full h-10 rounded-xl border border-input bg-background px-3 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand shadow-2xs"
                   >
                     {availableManagers.map((m) => (
-                      <option key={m.name} value={m.name}>
+                      <option key={m.id || m.name} value={m.name}>
                         {m.name} ({m.department})
                       </option>
                     ))}
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label>{isAr ? "الموقع" : "Location"}</Label>
-                  <Input
-                    value={editingProject.location}
-                    onChange={(e) => setEditingProject({ ...editingProject, location: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>{isAr ? "الحالة" : "Status"}</Label>
-                  <select
-                    value={editingProject.status}
-                    onChange={(e: any) => setEditingProject({ ...editingProject, status: e.target.value })}
-                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs"
-                  >
-                    <option value="ongoing">Ongoing</option>
-                    <option value="upcoming">Upcoming</option>
-                    <option value="completed">Completed</option>
-                    <option value="on_hold">On Hold</option>
-                  </select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label>{isAr ? "تاريخ البدء" : "Start Date"}</Label>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                <div className="space-y-1.5">
+                  <Label className="font-semibold text-foreground/90">{isAr ? "تاريخ البدء" : "Start Date"}</Label>
                   <Input
                     value={editingProject.startDate}
                     onChange={(e) => setEditingProject({ ...editingProject, startDate: e.target.value })}
+                    className="h-10 rounded-xl"
                   />
                 </div>
-                <div className="space-y-1">
-                  <Label>{isAr ? "تاريخ الانتهاء" : "End Date"}</Label>
+                <div className="space-y-1.5">
+                  <Label className="font-semibold text-foreground/90">{isAr ? "تاريخ الانتهاء" : "End Date"}</Label>
                   <Input
                     value={editingProject.endDate}
                     onChange={(e) => setEditingProject({ ...editingProject, endDate: e.target.value })}
+                    className="h-10 rounded-xl"
                   />
                 </div>
+                <div className="space-y-1.5">
+                  <Label className="font-semibold text-foreground/90">{isAr ? "الحالة" : "Status"}</Label>
+                  <select
+                    value={editingProject.status}
+                    onChange={(e: any) => setEditingProject({ ...editingProject, status: e.target.value })}
+                    className="w-full h-10 rounded-xl border border-input bg-background px-3 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand shadow-2xs"
+                  >
+                    <option value="ongoing">{isAr ? "قيد التنفيذ (Ongoing)" : "Ongoing"}</option>
+                    <option value="upcoming">{isAr ? "قادم (Upcoming)" : "Upcoming"}</option>
+                    <option value="completed">{isAr ? "مكتمل (Completed)" : "Completed"}</option>
+                    <option value="on_hold">{isAr ? "معلق (On Hold)" : "On Hold"}</option>
+                  </select>
+                </div>
               </div>
-              <div className="space-y-1">
-                <Label>{isAr ? "الوصف والملاحظات" : "Notes & Description"}</Label>
+
+              <div className="space-y-1.5">
+                <Label className="font-semibold text-foreground/90">{isAr ? "الوصف والملاحظات" : "Notes & Description"}</Label>
                 <Textarea
                   rows={3}
                   value={editingProject.notes}
                   onChange={(e) => setEditingProject({ ...editingProject, notes: e.target.value })}
+                  className="rounded-xl resize-none text-xs"
                 />
               </div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setEditingProject(null)}>
+            <DialogFooter className="border-t border-border/60 pt-3 gap-2">
+              <Button variant="outline" onClick={() => setEditingProject(null)} className="rounded-xl h-10 px-5 text-xs font-semibold">
                 {isAr ? "إلغاء" : "Cancel"}
               </Button>
               <Button
                 onClick={() => {
                   updateProject(editingProject);
                   setEditingProject(null);
-                  toast.success(isAr ? "تم حفظ التعديلات" : "Project updated");
                 }}
-                className="bg-brand text-brand-foreground"
+                className="bg-orange-600 hover:bg-orange-700 text-white rounded-xl h-10 px-6 text-xs font-semibold shadow-sm shadow-orange-600/20"
               >
                 {isAr ? "حفظ التعديلات" : "Save Changes"}
               </Button>
