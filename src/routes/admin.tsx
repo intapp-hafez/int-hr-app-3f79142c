@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, Link, useRouterState, Navigate, useNavigate } from "@tanstack/react-router";
 import { useState, useRef, useEffect, useMemo } from "react";
-import { Award, LayoutDashboard, Users, MapPin, Clock, CalendarDays, FileBarChart2, ScrollText, Menu, X, Bell, Search, Wallet, Settings, FileSignature, Shield, Building2, KeyRound, Calculator, UserCog, Network, StickyNote, Banknote, Plane, BarChart3, MessageSquare , Smartphone, Printer, ShieldAlert, ArrowLeft, Navigation, PanelLeftClose, PanelLeftOpen, ChevronDown, Sliders } from "lucide-react";
+import { Award, LayoutDashboard, Users, MapPin, Clock, CalendarDays, FileBarChart2, ScrollText, Menu, X, Bell, Search, Wallet, Settings, FileSignature, Shield, Building2, KeyRound, Calculator, UserCog, Network, StickyNote, Banknote, Plane, BarChart3, MessageSquare , Smartphone, Printer, ShieldAlert, ArrowLeft, Navigation, PanelLeftClose, PanelLeftOpen, ChevronDown, Sliders, Folder } from "lucide-react";
 import { NotificationsBell } from "@/components/admin/NotificationsBell";
 import { AppLogo } from "@/components/AppLogo";
 import { UserMenu } from "@/components/UserMenu";
@@ -117,6 +117,10 @@ function AdminLayout() {
     {
       type: "item",
       item: { to: "/admin", icon: LayoutDashboard, label: t("dashboard"), exact: true, page: null },
+    },
+    {
+      type: "item",
+      item: { to: "/admin/projects", icon: Folder, label: t("projects") || "Projects", page: null },
     },
     {
       type: "item",

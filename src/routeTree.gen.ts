@@ -47,6 +47,7 @@ import { Route as AdminNotificationPreferencesRouteImport } from './routes/admin
 import { Route as AdminOrgChartRouteImport } from './routes/admin.org-chart'
 import { Route as AdminPayrollRouteImport } from './routes/admin.payroll'
 import { Route as AdminPayrollSettingsRouteImport } from './routes/admin.payroll-settings'
+import { Route as AdminProjectsRouteImport } from './routes/admin.projects'
 import { Route as AdminReassignManagersRouteImport } from './routes/admin.reassign-managers'
 import { Route as AdminReportsRouteImport } from './routes/admin.reports'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
@@ -83,6 +84,7 @@ import { Route as ManagerKpiEvaluationsRouteImport } from './routes/manager.kpi-
 import { Route as ManagerLeavesRouteImport } from './routes/manager.leaves'
 import { Route as ManagerNotificationsRouteImport } from './routes/manager.notifications'
 import { Route as ManagerProfileRouteImport } from './routes/manager.profile'
+import { Route as ManagerProjectsRouteImport } from './routes/manager.projects'
 import { Route as ManagerTasksRouteImport } from './routes/manager.tasks'
 import { Route as ManagerTeamRouteImport } from './routes/manager.team'
 import { Route as ManagerTripAllowancesRouteImport } from './routes/manager.trip-allowances'
@@ -298,6 +300,11 @@ const AdminPayrollSettingsRoute = AdminPayrollSettingsRouteImport.update({
   path: '/payroll-settings',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminProjectsRoute = AdminProjectsRouteImport.update({
+  id: '/projects',
+  path: '/projects',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminReassignManagersRoute = AdminReassignManagersRouteImport.update({
   id: '/reassign-managers',
   path: '/reassign-managers',
@@ -478,6 +485,11 @@ const ManagerProfileRoute = ManagerProfileRouteImport.update({
   path: '/profile',
   getParentRoute: () => ManagerRoute,
 } as any)
+const ManagerProjectsRoute = ManagerProjectsRouteImport.update({
+  id: '/projects',
+  path: '/projects',
+  getParentRoute: () => ManagerRoute,
+} as any)
 const ManagerTasksRoute = ManagerTasksRouteImport.update({
   id: '/tasks',
   path: '/tasks',
@@ -625,6 +637,7 @@ export interface FileRoutesByFullPath {
   '/admin/org-chart': typeof AdminOrgChartRoute
   '/admin/payroll': typeof AdminPayrollRoute
   '/admin/payroll-settings': typeof AdminPayrollSettingsRoute
+  '/admin/projects': typeof AdminProjectsRoute
   '/admin/reassign-managers': typeof AdminReassignManagersRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/settings': typeof AdminSettingsRoute
@@ -658,6 +671,7 @@ export interface FileRoutesByFullPath {
   '/manager/leaves': typeof ManagerLeavesRoute
   '/manager/notifications': typeof ManagerNotificationsRoute
   '/manager/profile': typeof ManagerProfileRoute
+  '/manager/projects': typeof ManagerProjectsRoute
   '/manager/tasks': typeof ManagerTasksRoute
   '/manager/team': typeof ManagerTeamRoute
   '/manager/trip-allowances': typeof ManagerTripAllowancesRoute
@@ -715,6 +729,7 @@ export interface FileRoutesByTo {
   '/admin/org-chart': typeof AdminOrgChartRoute
   '/admin/payroll': typeof AdminPayrollRoute
   '/admin/payroll-settings': typeof AdminPayrollSettingsRoute
+  '/admin/projects': typeof AdminProjectsRoute
   '/admin/reassign-managers': typeof AdminReassignManagersRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/settings': typeof AdminSettingsRoute
@@ -748,6 +763,7 @@ export interface FileRoutesByTo {
   '/manager/leaves': typeof ManagerLeavesRoute
   '/manager/notifications': typeof ManagerNotificationsRoute
   '/manager/profile': typeof ManagerProfileRoute
+  '/manager/projects': typeof ManagerProjectsRoute
   '/manager/tasks': typeof ManagerTasksRoute
   '/manager/team': typeof ManagerTeamRoute
   '/manager/trip-allowances': typeof ManagerTripAllowancesRoute
@@ -813,6 +829,7 @@ export interface FileRoutesById {
   '/admin/org-chart': typeof AdminOrgChartRoute
   '/admin/payroll': typeof AdminPayrollRoute
   '/admin/payroll-settings': typeof AdminPayrollSettingsRoute
+  '/admin/projects': typeof AdminProjectsRoute
   '/admin/reassign-managers': typeof AdminReassignManagersRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/settings': typeof AdminSettingsRoute
@@ -846,6 +863,7 @@ export interface FileRoutesById {
   '/manager/leaves': typeof ManagerLeavesRoute
   '/manager/notifications': typeof ManagerNotificationsRoute
   '/manager/profile': typeof ManagerProfileRoute
+  '/manager/projects': typeof ManagerProjectsRoute
   '/manager/tasks': typeof ManagerTasksRoute
   '/manager/team': typeof ManagerTeamRoute
   '/manager/trip-allowances': typeof ManagerTripAllowancesRoute
@@ -912,6 +930,7 @@ export interface FileRouteTypes {
     | '/admin/org-chart'
     | '/admin/payroll'
     | '/admin/payroll-settings'
+    | '/admin/projects'
     | '/admin/reassign-managers'
     | '/admin/reports'
     | '/admin/settings'
@@ -945,6 +964,7 @@ export interface FileRouteTypes {
     | '/manager/leaves'
     | '/manager/notifications'
     | '/manager/profile'
+    | '/manager/projects'
     | '/manager/tasks'
     | '/manager/team'
     | '/manager/trip-allowances'
@@ -1002,6 +1022,7 @@ export interface FileRouteTypes {
     | '/admin/org-chart'
     | '/admin/payroll'
     | '/admin/payroll-settings'
+    | '/admin/projects'
     | '/admin/reassign-managers'
     | '/admin/reports'
     | '/admin/settings'
@@ -1035,6 +1056,7 @@ export interface FileRouteTypes {
     | '/manager/leaves'
     | '/manager/notifications'
     | '/manager/profile'
+    | '/manager/projects'
     | '/manager/tasks'
     | '/manager/team'
     | '/manager/trip-allowances'
@@ -1099,6 +1121,7 @@ export interface FileRouteTypes {
     | '/admin/org-chart'
     | '/admin/payroll'
     | '/admin/payroll-settings'
+    | '/admin/projects'
     | '/admin/reassign-managers'
     | '/admin/reports'
     | '/admin/settings'
@@ -1132,6 +1155,7 @@ export interface FileRouteTypes {
     | '/manager/leaves'
     | '/manager/notifications'
     | '/manager/profile'
+    | '/manager/projects'
     | '/manager/tasks'
     | '/manager/team'
     | '/manager/trip-allowances'
@@ -1439,6 +1463,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminPayrollSettingsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/projects': {
+      id: '/admin/projects'
+      path: '/projects'
+      fullPath: '/admin/projects'
+      preLoaderRoute: typeof AdminProjectsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/reassign-managers': {
       id: '/admin/reassign-managers'
       path: '/reassign-managers'
@@ -1691,6 +1722,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ManagerProfileRouteImport
       parentRoute: typeof ManagerRoute
     }
+    '/manager/projects': {
+      id: '/manager/projects'
+      path: '/projects'
+      fullPath: '/manager/projects'
+      preLoaderRoute: typeof ManagerProjectsRouteImport
+      parentRoute: typeof ManagerRoute
+    }
     '/manager/tasks': {
       id: '/manager/tasks'
       path: '/tasks'
@@ -1911,6 +1949,7 @@ interface AdminRouteChildren {
   AdminOrgChartRoute: typeof AdminOrgChartRoute
   AdminPayrollRoute: typeof AdminPayrollRoute
   AdminPayrollSettingsRoute: typeof AdminPayrollSettingsRoute
+  AdminProjectsRoute: typeof AdminProjectsRoute
   AdminReassignManagersRoute: typeof AdminReassignManagersRoute
   AdminReportsRoute: typeof AdminReportsRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
@@ -1955,6 +1994,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminOrgChartRoute: AdminOrgChartRoute,
   AdminPayrollRoute: AdminPayrollRoute,
   AdminPayrollSettingsRoute: AdminPayrollSettingsRoute,
+  AdminProjectsRoute: AdminProjectsRoute,
   AdminReassignManagersRoute: AdminReassignManagersRoute,
   AdminReportsRoute: AdminReportsRoute,
   AdminSettingsRoute: AdminSettingsRoute,
@@ -2037,6 +2077,7 @@ interface ManagerRouteChildren {
   ManagerLeavesRoute: typeof ManagerLeavesRoute
   ManagerNotificationsRoute: typeof ManagerNotificationsRoute
   ManagerProfileRoute: typeof ManagerProfileRoute
+  ManagerProjectsRoute: typeof ManagerProjectsRoute
   ManagerTasksRoute: typeof ManagerTasksRoute
   ManagerTeamRoute: typeof ManagerTeamRoute
   ManagerTripAllowancesRoute: typeof ManagerTripAllowancesRoute
@@ -2053,6 +2094,7 @@ const ManagerRouteChildren: ManagerRouteChildren = {
   ManagerLeavesRoute: ManagerLeavesRoute,
   ManagerNotificationsRoute: ManagerNotificationsRoute,
   ManagerProfileRoute: ManagerProfileRoute,
+  ManagerProjectsRoute: ManagerProjectsRoute,
   ManagerTasksRoute: ManagerTasksRoute,
   ManagerTeamRoute: ManagerTeamRoute,
   ManagerTripAllowancesRoute: ManagerTripAllowancesRoute,

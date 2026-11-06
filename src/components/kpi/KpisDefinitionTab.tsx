@@ -1051,20 +1051,16 @@ export function KpisDefinitionTab({
                       <td className="py-2.5 px-3 align-top text-center">
                         <div className="relative inline-flex items-center justify-center w-24">
                           <Input
-                            type="number"
-                            min={1}
-                            max={100}
-                            step={1}
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
                             value={row.weightPct === 0 ? "" : row.weightPct}
                             onChange={(e) => {
-                              const val = e.target.value;
-                              handleUpdateRowField(
-                                row.id,
-                                "weightPct",
-                                val === "" ? 0 : Math.min(100, Math.max(0, Number(val)))
-                              );
+                              const raw = e.target.value.replace(/[^0-9]/g, "");
+                              const num = raw === "" ? 0 : Math.min(100, Math.max(0, parseInt(raw, 10)));
+                              handleUpdateRowField(row.id, "weightPct", num);
                             }}
-                            className="h-9 w-full text-center font-mono font-bold text-sm rounded-xl pe-7 ps-3 bg-background text-brand [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus-visible:ring-1 focus-visible:ring-brand shadow-none"
+                            className="h-9 w-full text-center font-mono font-bold text-sm rounded-xl pe-7 ps-3 bg-background text-brand focus-visible:ring-1 focus-visible:ring-brand shadow-none"
                           />
                           <span className="pointer-events-none absolute end-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground select-none">
                             %
@@ -1402,17 +1398,16 @@ export function KpisDefinitionTab({
                 </Label>
                 <div className="relative">
                   <Input
-                    type="number"
-                    min={1}
-                    max={100}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={newDefForm.weightPct === 0 ? "" : newDefForm.weightPct}
-                    onChange={(e) =>
-                      setNewDefForm((p) => ({
-                        ...p,
-                        weightPct: e.target.value === "" ? 0 : Number(e.target.value),
-                      }))
-                    }
-                    className="rounded-xl text-xs h-9 text-center font-mono font-bold pe-7 ps-3 bg-background [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/[^0-9]/g, "");
+                      const num = raw === "" ? 0 : Math.min(100, Math.max(0, parseInt(raw, 10)));
+                      setNewDefForm((p) => ({ ...p, weightPct: num }));
+                    }}
+                    className="rounded-xl text-xs h-9 text-center font-mono font-bold pe-7 ps-3 bg-background"
                     required
                   />
                   <span className="pointer-events-none absolute end-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground select-none">

@@ -27,6 +27,7 @@ export const ui = {
   // Nav - employee
   welcome: "Welcome",
   dashboard: "Dashboard",
+  projects: "Projects",
   attendance: "Attendance",
   attendanceRules: "Attendance Rules",
   leaves: "Leaves",

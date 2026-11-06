@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, Link, useRouterState, Navigate } from "@tanstack/react-router";
 import { useMemo } from "react";
-import { Award, Home, Users, ListChecks, Route as RouteIcon, LogOut, LogIn, UserCircle, Banknote, MessageSquare, CalendarCheck, History } from "lucide-react";
+import { Award, Home, Users, ListChecks, Route as RouteIcon, LogOut, LogIn, UserCircle, Banknote, MessageSquare, CalendarCheck, History, Folder } from "lucide-react";
 import { AppLogo } from "@/components/AppLogo";
 import { LanguageToggle, useI18n } from "@/lib/i18n";
 import { ThemeToggle } from "@/lib/theme";
@@ -68,6 +68,7 @@ function ManagerLayout() {
 
   const sidebarItems = [
     { to: "/manager", icon: Home, label: t("dashboard"), exact: true },
+    { to: "/manager/projects", icon: Folder, label: t("projects") || "Projects" },
     { to: "/manager/chat", icon: MessageSquare, label: t("messagesChat") },
     { to: "/manager/check", icon: LogIn, label: t("checkInOut") },
     { to: "/manager/team", icon: Users, label: t("myTeam") },
@@ -83,6 +84,7 @@ function ManagerLayout() {
 
   const mobileItems = [
     { to: "/manager", icon: Home, label: t("dashboard"), exact: true },
+    { to: "/manager/projects", icon: Folder, label: t("projects") || "Projects" },
     { to: "/manager/chat", icon: MessageSquare, label: t("messagesChat") },
     { to: "/manager/check", icon: LogIn, label: t("checkInOut") },
     { to: "/manager/team", icon: Users, label: t("myTeam") },

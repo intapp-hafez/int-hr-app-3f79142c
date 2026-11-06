@@ -27,6 +27,7 @@ export const ui: Record<UiKey, string> = {
   // Nav - employee
   welcome: "مرحباً",
   dashboard: "الرئيسية",
+  projects: "المشاريع",
   attendance: "الحضور",
   attendanceRules: "قواعد الحضور",
   leaves: "الإجازات",
