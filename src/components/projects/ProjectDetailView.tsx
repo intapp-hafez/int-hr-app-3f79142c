@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Folder,
   ArrowLeft,
@@ -30,6 +30,10 @@ import {
   Shield,
   FileDown,
   Download,
+  Search,
+  Check,
+  ChevronDown,
+  UserCheck,
 } from "lucide-react";
 import { Project, ProjectTask, ProjectEmployee, ProjectFile, ProjectUpdate, formatProjectCode } from "@/lib/projects/projects.data";
 import { EmployeeAvatar } from "@/components/EmployeeAvatar";
@@ -39,6 +43,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useQuery } from "@tanstack/react-query";
 import { useI18n } from "@/lib/i18n";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
@@ -51,6 +58,7 @@ import {
   addProjectFile,
   deleteProjectFile,
   addProjectUpdate,
+  listProjectAssignablePeople,
 } from "@/backend/functions/projects.functions";
 
 interface ProjectDetailViewProps {
@@ -95,12 +103,21 @@ export function ProjectDetailView({
 
   const [newUpdateText, setNewUpdateText] = useState("");
 
-  // Edit Project form
+  // Edit Project form state
+  const [editCode, setEditCode] = useState(formatProjectCode(project.code || project.id));
   const [editName, setEditName] = useState(project.name);
+  const [editNameAr, setEditNameAr] = useState(project.name_ar || project.name);
   const [editLocation, setEditLocation] = useState(project.location);
+  const [editProjectManager, setEditProjectManager] = useState(project.projectManager.name);
+  const [editReportedManager, setEditReportedManager] = useState(project.reportedManager.name);
+  const [editSelectedEmployeeIds, setEditSelectedEmployeeIds] = useState<string[]>(
+    project.employees.map((e) => e.id)
+  );
+  const [editEmployeeSearchQuery, setEditEmployeeSearchQuery] = useState("");
+  const [editIsEmployeePopoverOpen, setEditIsEmployeePopoverOpen] = useState(false);
   const [editStartDate, setEditStartDate] = useState(project.startDate);
   const [editEndDate, setEditEndDate] = useState(project.endDate);
-  const [editStatus, setEditStatus] = useState(project.status);
+  const [editStatus, setEditStatus] = useState<Project["status"]>(project.status);
   const [editNotes, setEditNotes] = useState(project.notes);
 
   // TanStack Start Server Functions
@@ -112,6 +129,50 @@ export function ProjectDetailView({
   const addFileFn = useServerFn(addProjectFile);
   const deleteFileFn = useServerFn(deleteProjectFile);
   const addUpdateFn = useServerFn(addProjectUpdate);
+  const listAssignablePeopleFn = useServerFn(listProjectAssignablePeople);
+
+  const { data: assignablePeople } = useQuery({
+    queryKey: ["project-assignable-people"],
+    queryFn: async () => {
+      try {
+        return await listAssignablePeopleFn();
+      } catch (err) {
+        return { managers: [], employees: [] };
+      }
+    },
+    staleTime: 60000,
+  });
+
+  const availableManagers = useMemo(() => assignablePeople?.managers || [], [assignablePeople]);
+  const availableEmployees = useMemo<ProjectEmployee[]>(() => assignablePeople?.employees || [], [assignablePeople]);
+
+  // Sync edit form fields whenever modal opens or project updates
+  useEffect(() => {
+    if (isEditProjectOpen) {
+      setEditCode(formatProjectCode(project.code || project.id));
+      setEditName(project.name);
+      setEditNameAr(project.name_ar || project.name);
+      setEditLocation(project.location);
+      setEditProjectManager(project.projectManager.name);
+      setEditReportedManager(project.reportedManager.name);
+      setEditSelectedEmployeeIds(project.employees.map((e) => e.id));
+      setEditStartDate(project.startDate);
+      setEditEndDate(project.endDate);
+      setEditStatus(project.status);
+      setEditNotes(project.notes);
+    }
+  }, [isEditProjectOpen, project]);
+
+  const filteredSelectableEmployees = useMemo(() => {
+    if (!editEmployeeSearchQuery.trim()) return availableEmployees;
+    const q = editEmployeeSearchQuery.toLowerCase().trim();
+    return availableEmployees.filter(
+      (e) =>
+        e.name.toLowerCase().includes(q) ||
+        e.role.toLowerCase().includes(q) ||
+        e.department.toLowerCase().includes(q)
+    );
+  }, [availableEmployees, editEmployeeSearchQuery]);
 
   const isProjectUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(project.id);
 
@@ -272,10 +333,30 @@ export function ProjectDetailView({
   };
 
   const handleSaveEditProject = () => {
+    const selectedEmps = availableEmployees.filter((e) => editSelectedEmployeeIds.includes(e.id));
+    const finalEmployees = selectedEmps.length > 0 ? selectedEmps : project.employees;
+
+    const pm = availableManagers.find((m) => m.name === editProjectManager);
+    const rm = availableManagers.find((m) => m.name === editReportedManager);
+
     const updated: Project = {
       ...project,
+      code: editCode.trim() || project.code,
       name: editName.trim() || project.name,
+      name_ar: editNameAr.trim() || project.name_ar,
       location: editLocation.trim() || project.location,
+      projectManager: {
+        id: pm?.id || project.projectManager.id,
+        name: editProjectManager || project.projectManager.name,
+        avatarUrl: pm?.avatarUrl || project.projectManager.avatarUrl,
+      },
+      reportedManager: {
+        id: rm?.id || project.reportedManager.id,
+        name: editReportedManager || project.reportedManager.name,
+        avatarUrl: rm?.avatarUrl || project.reportedManager.avatarUrl,
+      },
+      employees: finalEmployees,
+      employeesCount: finalEmployees.length,
       startDate: editStartDate || project.startDate,
       endDate: editEndDate || project.endDate,
       status: editStatus,
@@ -1314,17 +1395,196 @@ export function ProjectDetailView({
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-3 text-xs">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            {/* Row 1: Code & Name (EN) */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
               <div className="space-y-1.5">
-                <Label className="font-semibold text-foreground/90">{isAr ? "اسم المشروع" : "Project Name"}</Label>
-                <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="h-10 rounded-xl" />
+                <Label className="font-semibold text-foreground/90">{isAr ? "رمز المشروع" : "Project ID / Code"}</Label>
+                <Input
+                  value={editCode}
+                  onChange={(e) => setEditCode(e.target.value)}
+                  placeholder="PROJ-001"
+                  className="h-10 rounded-xl font-mono"
+                />
               </div>
-              <div className="space-y-1.5">
-                <Label className="font-semibold text-foreground/90">{isAr ? "الموقع" : "Location"}</Label>
-                <Input value={editLocation} onChange={(e) => setEditLocation(e.target.value)} className="h-10 rounded-xl" />
+              <div className="sm:col-span-2 space-y-1.5">
+                <Label className="font-semibold text-foreground/90">{isAr ? "اسم المشروع (EN) *" : "Project Name (EN) *"}</Label>
+                <Input
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="e.g. Data Center Modernization"
+                  className="h-10 rounded-xl"
+                />
               </div>
             </div>
 
+            {/* Row 2: Name (AR) & Location */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div className="space-y-1.5">
+                <Label className="font-semibold text-foreground/90">{isAr ? "اسم المشروع (عربي)" : "Project Name (AR)"}</Label>
+                <Input
+                  value={editNameAr}
+                  onChange={(e) => setEditNameAr(e.target.value)}
+                  placeholder="تحديث مركز البيانات الرئيسي"
+                  className="h-10 rounded-xl"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="font-semibold text-foreground/90">{isAr ? "الموقع" : "Location"}</Label>
+                <Input
+                  value={editLocation}
+                  onChange={(e) => setEditLocation(e.target.value)}
+                  placeholder="e.g. Head Office / Cairo"
+                  className="h-10 rounded-xl"
+                />
+              </div>
+            </div>
+
+            {/* Row 3: Managers */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div className="space-y-1.5">
+                <Label className="font-semibold text-foreground/90">{isAr ? "مدير المشروع" : "Project Manager"}</Label>
+                <select
+                  value={editProjectManager}
+                  onChange={(e) => setEditProjectManager(e.target.value)}
+                  className="w-full h-10 rounded-xl border border-input bg-background px-3 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand shadow-2xs"
+                >
+                  {availableManagers.map((m) => (
+                    <option key={m.id || m.name} value={m.name}>
+                      {m.name} ({m.department})
+                    </option>
+                  ))}
+                  {availableManagers.length === 0 && (
+                    <option value={project.projectManager.name}>{project.projectManager.name}</option>
+                  )}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="font-semibold text-foreground/90">{isAr ? "المدير المباشر" : "Reported Manager"}</Label>
+                <select
+                  value={editReportedManager}
+                  onChange={(e) => setEditReportedManager(e.target.value)}
+                  className="w-full h-10 rounded-xl border border-input bg-background px-3 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand shadow-2xs"
+                >
+                  {availableManagers.map((m) => (
+                    <option key={m.id || m.name} value={m.name}>
+                      {m.name} ({m.department})
+                    </option>
+                  ))}
+                  {availableManagers.length === 0 && (
+                    <option value={project.reportedManager.name}>{project.reportedManager.name}</option>
+                  )}
+                </select>
+              </div>
+            </div>
+
+            {/* Row 4: Assigned Team Members Popover */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label className="font-semibold text-foreground/90">
+                  {isAr ? "أعضاء فريق المشروع المكلفون" : "Assigned Team Members / Employees"}
+                </Label>
+                <span className="text-[11px] text-muted-foreground font-mono">
+                  {editSelectedEmployeeIds.length} {isAr ? "موظف محدد" : "employees selected"}
+                </span>
+              </div>
+
+              <Popover open={editIsEmployeePopoverOpen} onOpenChange={setEditIsEmployeePopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full h-auto min-h-[42px] justify-between text-left font-normal rounded-xl border-input bg-background hover:bg-muted/30 px-3 py-2"
+                  >
+                    <div className="flex flex-wrap items-center gap-1.5 max-w-[85%]">
+                      {editSelectedEmployeeIds.length === 0 ? (
+                        <span className="text-muted-foreground flex items-center gap-1.5">
+                          <Users className="h-4 w-4" />
+                          {isAr ? "اختر موظفي المشروع..." : "Select team members from database..."}
+                        </span>
+                      ) : (
+                        availableEmployees
+                          .filter((e) => editSelectedEmployeeIds.includes(e.id))
+                          .slice(0, 4)
+                          .map((emp) => (
+                            <Badge
+                              key={emp.id}
+                              variant="secondary"
+                              className="gap-1 bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20 text-[11px] px-2 py-0.5 rounded-lg"
+                            >
+                              <UserCheck className="h-3 w-3" />
+                              <span className="truncate max-w-[120px]">{emp.name.split(" ")[0]}</span>
+                            </Badge>
+                          ))
+                      )}
+                      {editSelectedEmployeeIds.length > 4 && (
+                        <Badge variant="outline" className="text-[11px] px-1.5 py-0.5 rounded-lg">
+                          +{editSelectedEmployeeIds.length - 4} {isAr ? "آخرين" : "more"}
+                        </Badge>
+                      )}
+                    </div>
+                    <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0 opacity-70" />
+                  </Button>
+                </PopoverTrigger>
+
+                <PopoverContent align="start" className="w-[420px] sm:w-[600px] md:w-[680px] p-2 rounded-2xl shadow-xl">
+                  <div className="p-2 border-b border-border/50 flex items-center gap-2">
+                    <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <Input
+                      placeholder={isAr ? "بحث بالاسم، الدور، أو الإدارة..." : "Search by name, role, or department..."}
+                      value={editEmployeeSearchQuery}
+                      onChange={(e) => setEditEmployeeSearchQuery(e.target.value)}
+                      className="h-8 border-none bg-transparent shadow-none focus-visible:ring-0 text-xs"
+                    />
+                    {editSelectedEmployeeIds.length > 0 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setEditSelectedEmployeeIds([])}
+                        className="h-7 text-[11px] text-muted-foreground hover:text-foreground shrink-0"
+                      >
+                        {isAr ? "إلغاء التحديد" : "Clear all"}
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="max-h-64 overflow-y-auto divide-y divide-border/40 p-1">
+                    {filteredSelectableEmployees.map((emp) => {
+                      const isSelected = editSelectedEmployeeIds.includes(emp.id);
+                      return (
+                        <div
+                          key={emp.id}
+                          onClick={() => {
+                            setEditSelectedEmployeeIds((prev) =>
+                              isSelected ? prev.filter((id) => id !== emp.id) : [...prev, emp.id]
+                            );
+                          }}
+                          className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition-colors ${
+                            isSelected ? "bg-orange-500/10" : "hover:bg-muted/50"
+                          }`}
+                        >
+                          <Checkbox checked={isSelected} className="data-[state=checked]:bg-orange-600 data-[state=checked]:border-orange-600" />
+                          <EmployeeAvatar
+                            id={emp.id}
+                            name={emp.name}
+                            url={emp.avatarUrl}
+                            className="h-8 w-8 rounded-full shrink-0"
+                            fallbackClassName="text-[10px]"
+                          />
+                          <div className="min-w-0 flex-1 text-xs">
+                            <p className="font-semibold text-foreground truncate">{emp.name}</p>
+                            <p className="text-[10px] text-muted-foreground truncate">{emp.role} • {emp.department}</p>
+                          </div>
+                          {isSelected && <Check className="h-4 w-4 text-orange-600 shrink-0" />}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* Row 5: Dates & Status */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
               <div className="space-y-1.5">
                 <Label className="font-semibold text-foreground/90">{isAr ? "تاريخ البدء" : "Start Date"}</Label>
@@ -1349,6 +1609,7 @@ export function ProjectDetailView({
               </div>
             </div>
 
+            {/* Row 6: Notes */}
             <div className="space-y-1.5">
               <Label className="font-semibold text-foreground/90">{isAr ? "الملاحظات والوصف" : "Notes & Description"}</Label>
               <Textarea rows={3} value={editNotes} onChange={(e) => setEditNotes(e.target.value)} className="rounded-xl resize-none text-xs" />

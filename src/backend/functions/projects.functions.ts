@@ -280,11 +280,25 @@ export const updateCompanyProject = createServerFn({ method: "POST" })
   .validator((d: unknown) => UpdateProjectSchema.parse(d))
   .handler(async ({ data, context }) => {
     const supabase = context.supabase;
-    const { id, ...updates } = data;
+    const { id, initial_members, assigned_employee_ids, ...rawUpdates } = data;
+
+    const allowedFields: Record<string, any> = {};
+    if (rawUpdates.project_code !== undefined) allowedFields.project_code = rawUpdates.project_code;
+    if (rawUpdates.name !== undefined) allowedFields.name = rawUpdates.name;
+    if (rawUpdates.description !== undefined) allowedFields.description = rawUpdates.description;
+    if (rawUpdates.project_manager_name !== undefined) allowedFields.project_manager_name = rawUpdates.project_manager_name;
+    if (rawUpdates.project_manager_id !== undefined) allowedFields.project_manager_id = rawUpdates.project_manager_id;
+    if (rawUpdates.reported_manager_name !== undefined) allowedFields.reported_manager_name = rawUpdates.reported_manager_name;
+    if (rawUpdates.reported_manager_id !== undefined) allowedFields.reported_manager_id = rawUpdates.reported_manager_id;
+    if (rawUpdates.location !== undefined) allowedFields.location = rawUpdates.location;
+    if (rawUpdates.start_date !== undefined) allowedFields.start_date = rawUpdates.start_date;
+    if (rawUpdates.end_date !== undefined) allowedFields.end_date = rawUpdates.end_date;
+    if (rawUpdates.notes !== undefined) allowedFields.notes = rawUpdates.notes;
+    if (rawUpdates.status !== undefined) allowedFields.status = rawUpdates.status;
 
     const { data: updated, error } = await supabase
       .from("company_projects")
-      .update(updates)
+      .update(allowedFields)
       .eq("id", id)
       .select()
       .single();
@@ -292,6 +306,26 @@ export const updateCompanyProject = createServerFn({ method: "POST" })
     if (error) {
       console.error("[updateCompanyProject] error:", error);
       throw new Error(error.message);
+    }
+
+    // Synchronize project members if provided
+    if (initial_members && Array.isArray(initial_members)) {
+      try {
+        await supabase.from("project_members").delete().eq("project_id", id);
+        if (initial_members.length > 0) {
+          const memberRows = initial_members.map((m) => ({
+            project_id: id,
+            name: m.name,
+            email: m.email || null,
+            role: m.role || "Team Member",
+            department: m.department || null,
+            employee_id: m.employee_id || null,
+          }));
+          await supabase.from("project_members").insert(memberRows);
+        }
+      } catch (memErr) {
+        console.warn("[updateCompanyProject] Member sync warning:", memErr);
+      }
     }
 
     return updated;
