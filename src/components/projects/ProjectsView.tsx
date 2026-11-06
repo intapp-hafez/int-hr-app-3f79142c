@@ -581,16 +581,17 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
                   return (
                     <tr
                       key={proj.id}
-                      onClick={() => setSelectedProjectId(proj.id)}
-                      className={`cursor-pointer transition-colors ${
+                      onClick={() => handleOpenDetail(proj, "details")}
+                      className={`cursor-pointer transition-colors group ${
                         isSelected
-                          ? "bg-orange-500/5 dark:bg-orange-500/10 hover:bg-orange-500/8"
-                          : "hover:bg-muted/40"
+                          ? "bg-orange-500/5 dark:bg-orange-500/10 hover:bg-orange-500/10"
+                          : "hover:bg-orange-500/5 dark:hover:bg-orange-500/10"
                       }`}
                     >
                       {/* Proj-ID */}
                       <td className="py-3.5 px-3.5 font-mono font-bold text-orange-600 dark:text-orange-400 whitespace-nowrap">
                         <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleOpenDetail(proj, "details");
@@ -603,7 +604,16 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
 
                       {/* Name */}
                       <td className="py-3.5 px-3.5 font-semibold text-foreground max-w-[200px] truncate">
-                        {isAr ? proj.name_ar || proj.name : proj.name}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenDetail(proj, "details");
+                          }}
+                          className="hover:underline hover:text-orange-600 dark:hover:text-orange-400 text-left font-semibold text-foreground truncate max-w-full inline-block transition-colors"
+                        >
+                          {isAr ? proj.name_ar || proj.name : proj.name}
+                        </button>
                       </td>
 
                       {/* Project Manager */}
@@ -640,10 +650,17 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
 
                       {/* Employees count */}
                       <td className="py-3.5 px-3 text-center">
-                        <span className="inline-flex items-center gap-1 text-muted-foreground font-mono font-medium">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenDetail(proj, "employees");
+                          }}
+                          className="inline-flex items-center gap-1 text-muted-foreground hover:text-orange-600 dark:hover:text-orange-400 font-mono font-medium hover:underline"
+                        >
                           <Users className="h-3.5 w-3.5" />
-                          {proj.employees.length || proj.employeesCount}
-                        </span>
+                          <span>{proj.employees.length || proj.employeesCount}</span>
+                        </button>
                       </td>
 
                       {/* Location */}
@@ -679,8 +696,17 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
                       </td>
 
                       {/* Tasks ratio */}
-                      <td className="py-3.5 px-3 text-center font-mono font-bold text-blue-600 dark:text-blue-400">
-                        {completedT} / {totalT}
+                      <td className="py-3.5 px-3 text-center font-mono font-bold">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenDetail(proj, "tasks");
+                          }}
+                          className="text-blue-600 dark:text-blue-400 hover:text-orange-600 dark:hover:text-orange-400 hover:underline"
+                        >
+                          {completedT} / {totalT}
+                        </button>
                       </td>
 
                       {/* Status */}
@@ -782,13 +808,26 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-500/10 text-orange-600 dark:text-orange-400">
                 <Folder className="h-4 w-4 fill-orange-500/20" />
               </div>
-              <h3 className="font-bold text-base text-foreground">
+              <h3
+                onClick={() => handleOpenDetail(selectedProject, "details")}
+                className="font-bold text-base text-foreground cursor-pointer hover:text-orange-600 dark:hover:text-orange-400 hover:underline flex items-center gap-1.5 transition-colors"
+                title={isAr ? "انقر لفتح تفاصيل المشروع" : "Click to view project details"}
+              >
                 {formatProjectCode(selectedProject.code || selectedProject.id, projects.indexOf(selectedProject))} – {isAr ? selectedProject.name_ar || selectedProject.name : selectedProject.name}
               </h3>
               {getStatusBadge(selectedProject.status)}
             </div>
 
             <div className="flex items-center gap-2">
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => handleOpenDetail(selectedProject, "details")}
+                className="h-8 gap-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold shadow-sm"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                {isAr ? "عرض التفاصيل" : "View Details"}
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
