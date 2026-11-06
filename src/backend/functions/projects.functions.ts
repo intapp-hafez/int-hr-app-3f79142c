@@ -70,31 +70,33 @@ export const listCompanyProjects = createServerFn({ method: "GET" })
       const tasks = row.tasks || [];
       const totalTasks = tasks.length;
       const completedTasks = tasks.filter((t: any) => t.status === "completed").length;
-      const progressPercent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
       const membersCount = (row.members || []).length;
 
       return {
         id: row.id,
         code: row.project_code,
         name: row.name,
-        description: row.description || "",
+        name_ar: row.name,
         projectManager: {
           name: row.project_manager_name || "Unassigned",
-          avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+          avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face",
         },
         reportedManager: {
           name: row.reported_manager_name || "Unassigned",
-          avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
+          avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face",
         },
         employeesCount: membersCount,
         location: row.location || "Head Office",
         startDate: row.start_date || "",
         endDate: row.end_date || "",
         notes: row.notes || "",
-        tasksCompleted: completedTasks,
-        tasksTotal: totalTasks,
-        progressPercent,
+        completedTasksCount: completedTasks,
+        totalTasksCount: totalTasks,
         status: row.status as "ongoing" | "upcoming" | "completed" | "on_hold",
+        employees: [],
+        tasks: [],
+        files: [],
+        updates: [],
       };
     });
   });
@@ -128,14 +130,16 @@ export const getCompanyProject = createServerFn({ method: "GET" })
       supabase.from("project_updates").select("*").eq("project_id", project.id).order("created_at", { ascending: false }),
     ]);
 
-    const tasks = (tasksRes.data || []).map((t: any, idx: number) => ({
+    const tasks = (tasksRes.data || []).map((t: any) => ({
       id: t.id,
-      numericIndex: idx + 1,
       title: t.title,
-      assignee: t.assignee_name || "Unassigned",
-      priority: (t.priority || "MEDIUM").toUpperCase() as "HIGH" | "MEDIUM" | "LOW",
+      assignee: {
+        name: t.assignee_name || "Unassigned",
+        avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face",
+      },
+      priority: (t.priority || "medium") as "low" | "medium" | "high",
       dueDate: t.due_date || "",
-      status: t.status === "in_progress" ? "In Progress" : t.status === "completed" ? "Completed" : "Pending",
+      status: (t.status || "pending") as "completed" | "in_progress" | "pending",
     }));
 
     const members = (membersRes.data || []).map((m: any) => ({
@@ -145,69 +149,53 @@ export const getCompanyProject = createServerFn({ method: "GET" })
       department: m.department || "Operations",
       email: m.email || "",
       phone: m.phone || "",
-      avatar: m.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+      avatarUrl: m.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face",
     }));
 
     const files = (filesRes.data || []).map((f: any) => ({
       id: f.id,
       name: f.name,
       size: f.size || "0 KB",
-      type: f.type || "DOCUMENT",
+      type: (f.type ? f.type.toLowerCase() : "pdf") as "pdf" | "doc" | "image" | "sheet" | "archive",
       uploadedBy: f.uploaded_by_name || "Administrator",
-      uploadedDate: f.uploaded_at ? new Date(f.uploaded_at).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }) : "",
-      url: f.url || "#",
+      uploadedAt: f.uploaded_at ? new Date(f.uploaded_at).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }) : "",
     }));
 
     const updates = (updatesRes.data || []).map((u: any) => ({
       id: u.id,
-      author: u.author_name,
-      role: u.author_role,
-      date: u.date || (u.created_at ? new Date(u.created_at).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }) : ""),
-      title: u.title,
+      author: {
+        name: u.author_name,
+        role: u.author_role || "Project Lead",
+        avatarUrl: u.author_avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face",
+      },
       content: u.content,
-      avatar: u.author_avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+      timestamp: u.date || (u.created_at ? new Date(u.created_at).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }) : ""),
     }));
 
     const totalTasks = tasks.length;
-    const completedTasks = tasks.filter((t) => t.status === "Completed").length;
-    const inProgressTasks = tasks.filter((t) => t.status === "In Progress").length;
-    const pendingTasks = tasks.filter((t) => t.status === "Pending").length;
-    const progressPercent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+    const completedTasks = tasks.filter((t) => t.status === "completed").length;
 
     return {
       id: project.id,
       code: project.project_code,
       name: project.name,
-      description: project.description || "",
+      name_ar: project.name,
       projectManager: {
         name: project.project_manager_name,
-        avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+        avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face",
       },
       reportedManager: {
         name: project.reported_manager_name,
-        avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
+        avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face",
       },
       employeesCount: members.length,
       location: project.location,
       startDate: project.start_date || "",
       endDate: project.end_date || "",
       notes: project.notes || "",
-      tasksCompleted: completedTasks,
-      tasksTotal: totalTasks,
-      progressPercent,
+      completedTasksCount: completedTasks,
+      totalTasksCount: totalTasks,
       status: project.status as "ongoing" | "upcoming" | "completed" | "on_hold",
-      situation: {
-        completedTasks,
-        inProgressTasks,
-        pendingTasks,
-        projectEmployees: members.length,
-        overallProgress: progressPercent,
-      },
-      keyDates: {
-        startDate: project.start_date || "",
-        expectedEndDate: project.end_date || "",
-        remainingTime: "60 Days",
-      },
       tasks,
       employees: members,
       files,
@@ -441,3 +429,4 @@ export const addProjectUpdate = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return update;
   });
+

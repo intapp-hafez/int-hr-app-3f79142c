@@ -41,6 +41,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   listCompanyProjects,
+  getCompanyProject,
   createCompanyProject,
   updateCompanyProject,
   deleteCompanyProject,
@@ -83,6 +84,7 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
 
   // TanStack Start Server Functions
   const listProjectsFn = useServerFn(listCompanyProjects);
+  const getProjectFn = useServerFn(getCompanyProject);
   const createProjectFn = useServerFn(createCompanyProject);
   const updateProjectFn = useServerFn(updateCompanyProject);
   const deleteProjectFn = useServerFn(deleteCompanyProject);
@@ -108,6 +110,37 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
     },
     staleTime: 30000,
   });
+
+  // Sync state when DB projects load
+  React.useEffect(() => {
+    if (dbProjects && Array.isArray(dbProjects) && dbProjects.length > 0) {
+      setProjects((prev) => {
+        // Merge or replace
+        const dbMap = new Map((dbProjects as any[]).map((p) => [p.code || p.id, p]));
+        return prev.map((p) => {
+          const fromDb = dbMap.get(p.id) || dbMap.get((p as any).code);
+          return fromDb ? { ...p, ...fromDb, employees: p.employees, tasks: p.tasks, files: p.files, updates: p.updates } : p;
+        });
+      });
+    }
+  }, [dbProjects]);
+
+  // Open detail view with real-time DB enrichment
+  const handleOpenDetail = async (
+    proj: Project,
+    tab: "details" | "employees" | "tasks" | "files" | "updates" = "details"
+  ) => {
+    setDetailInitialTab(tab);
+    setDetailProject(proj);
+    try {
+      const full = await getProjectFn({ data: { id: proj.id } });
+      if (full && full.id) {
+        setDetailProject(full as any);
+      }
+    } catch {
+      // Fallback: continue showing local mock project
+    }
+  };
 
   // Sync and persist projects
   const updateProject = (updated: Project) => {
@@ -514,8 +547,7 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            setDetailProject(proj);
-                            setDetailInitialTab("details");
+                            handleOpenDetail(proj, "details");
                           }}
                           className="hover:underline text-left"
                         >
@@ -620,20 +652,14 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-44">
                             <DropdownMenuItem
-                              onClick={() => {
-                                setDetailProject(proj);
-                                setDetailInitialTab("details");
-                              }}
+                              onClick={() => handleOpenDetail(proj, "details")}
                               className="gap-2 text-xs"
                             >
                               <ExternalLink className="h-3.5 w-3.5" />
                               {isAr ? "عرض التفاصيل" : "View Details"}
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onClick={() => {
-                                setDetailProject(proj);
-                                setDetailInitialTab("tasks");
-                              }}
+                              onClick={() => handleOpenDetail(proj, "tasks")}
                               className="gap-2 text-xs"
                             >
                               <ListTodo className="h-3.5 w-3.5" />
@@ -701,10 +727,7 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  setDetailProject(selectedProject);
-                  setDetailInitialTab("tasks");
-                }}
+                onClick={() => handleOpenDetail(selectedProject, "tasks")}
                 className="h-8 gap-1.5 rounded-xl border-border hover:bg-muted text-xs font-medium"
               >
                 <CheckSquare className="h-3.5 w-3.5 text-muted-foreground" />
@@ -713,10 +736,7 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => {
-                  setDetailProject(selectedProject);
-                  setDetailInitialTab("details");
-                }}
+                onClick={() => handleOpenDetail(selectedProject, "details")}
                 className="h-8 w-8 text-muted-foreground hover:text-foreground"
               >
                 <MoreVertical className="h-4 w-4" />
@@ -815,10 +835,7 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                setDetailProject(selectedProject);
-                setDetailInitialTab("tasks");
-              }}
+              onClick={() => handleOpenDetail(selectedProject, "tasks")}
               className="gap-1.5 rounded-xl border-orange-500/40 text-orange-600 dark:text-orange-400 hover:bg-orange-500/5 hover:border-orange-500 text-xs font-semibold shrink-0"
             >
               <span>{isAr ? "عرض جميع المهام" : "View All Tasks"}</span>

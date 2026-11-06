@@ -285,6 +285,74 @@ export function ProjectDetailView({
     toast.success(isAr ? "تم تحديث بيانات المشروع" : "Project details updated");
   };
 
+  const handleToggleTaskStatus = (task: ProjectTask) => {
+    const nextStatus: ProjectTask["status"] =
+      task.status === "pending" ? "in_progress" : task.status === "in_progress" ? "completed" : "pending";
+    const updatedTasks = project.tasks.map((t) => (t.id === task.id ? { ...t, status: nextStatus } : t));
+    const completedCount = updatedTasks.filter((t) => t.status === "completed").length;
+    const updated: Project = {
+      ...project,
+      tasks: updatedTasks,
+      completedTasksCount: completedCount,
+    };
+    onUpdateProject(updated);
+
+    if (isProjectUuid && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(task.id)) {
+      updateTaskFn({
+        data: {
+          id: task.id,
+          status: nextStatus,
+        },
+      }).catch(() => {});
+    }
+  };
+
+  const handleDeleteTask = (taskId: string) => {
+    const updatedTasks = project.tasks.filter((t) => t.id !== taskId);
+    const completedCount = updatedTasks.filter((t) => t.status === "completed").length;
+    const updated: Project = {
+      ...project,
+      tasks: updatedTasks,
+      totalTasksCount: updatedTasks.length,
+      completedTasksCount: completedCount,
+    };
+    onUpdateProject(updated);
+
+    if (isProjectUuid && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(taskId)) {
+      deleteTaskFn({ data: { id: taskId } }).catch(() => {});
+    }
+    toast.success(isAr ? "تم حذف المهمة" : "Task removed");
+  };
+
+  const handleRemoveEmployee = (empId: string) => {
+    const updatedEmployees = project.employees.filter((e) => e.id !== empId);
+    const updated: Project = {
+      ...project,
+      employees: updatedEmployees,
+      employeesCount: updatedEmployees.length,
+    };
+    onUpdateProject(updated);
+
+    if (isProjectUuid && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(empId)) {
+      removeMemberFn({ data: { id: empId } }).catch(() => {});
+    }
+    toast.success(isAr ? "تم إزالة الموظف من المشروع" : "Member removed from project");
+  };
+
+  const handleDeleteFile = (fileId: string) => {
+    const updatedFiles = project.files.filter((f) => f.id !== fileId);
+    const updated: Project = {
+      ...project,
+      files: updatedFiles,
+    };
+    onUpdateProject(updated);
+
+    if (isProjectUuid && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(fileId)) {
+      deleteFileFn({ data: { id: fileId } }).catch(() => {});
+    }
+    toast.success(isAr ? "تم حذف الملف" : "File removed");
+  };
+
   const getStatusBadge = (status: Project["status"]) => {
     switch (status) {
       case "ongoing":
@@ -859,6 +927,14 @@ export function ProjectDetailView({
                     <p className="text-xs text-orange-600 dark:text-orange-400 font-medium truncate">{emp.role}</p>
                     <p className="text-[11px] text-muted-foreground truncate">{emp.department}</p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveEmployee(emp.id)}
+                    className="text-muted-foreground/60 hover:text-rose-500 transition-colors p-1 rounded-lg"
+                    title={isAr ? "إزالة الموظف من المشروع" : "Remove member"}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
                 <div className="border-t border-border/50 pt-2 text-[11px] text-muted-foreground font-mono truncate">
                   {emp.email}
@@ -897,11 +973,12 @@ export function ProjectDetailView({
                   <th className="py-3 px-4">{isAr ? "الأولوية" : "Priority"}</th>
                   <th className="py-3 px-4">{isAr ? "تاريخ الاستحقاق" : "Due Date"}</th>
                   <th className="py-3 px-4 text-center">{isAr ? "الحالة" : "Status"}</th>
+                  <th className="py-3 px-3 text-center w-12">{isAr ? "حذف" : "Action"}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
                 {project.tasks.map((task, idx) => (
-                  <tr key={task.id} className="hover:bg-muted/30 transition-colors">
+                  <tr key={task.id} className="hover:bg-muted/30 transition-colors group">
                     <td className="py-3 px-4 text-center font-mono text-muted-foreground font-medium">{idx + 1}</td>
                     <td className="py-3 px-4 font-semibold text-foreground">{task.title}</td>
                     <td className="py-3 px-4 text-foreground/90">{task.assignee.name}</td>
@@ -918,15 +995,30 @@ export function ProjectDetailView({
                     </td>
                     <td className="py-3 px-4 font-mono text-muted-foreground">{task.dueDate}</td>
                     <td className="py-3 px-4 text-center">
-                      <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold ${
-                        task.status === "completed"
-                          ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                          : task.status === "in_progress"
-                          ? "bg-sky-500/15 text-sky-600 dark:text-sky-400"
-                          : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
-                      }`}>
-                        {task.status === "completed" ? "Completed" : task.status === "in_progress" ? "In Progress" : "Pending"}
-                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleTaskStatus(task)}
+                        title={isAr ? "انقر لتغيير حالة المهمة" : "Click to cycle status: Pending ➔ In Progress ➔ Completed"}
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-semibold cursor-pointer transition-transform hover:scale-105 active:scale-95 ${
+                          task.status === "completed"
+                            ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25"
+                            : task.status === "in_progress"
+                            ? "bg-sky-500/15 text-sky-600 dark:text-sky-400 hover:bg-sky-500/25"
+                            : "bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25"
+                        }`}
+                      >
+                        {task.status === "completed" ? "Completed ✓" : task.status === "in_progress" ? "In Progress ↻" : "Pending ⏳"}
+                      </button>
+                    </td>
+                    <td className="py-3 px-3 text-center">
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteTask(task.id)}
+                        className="text-muted-foreground/60 hover:text-rose-500 transition-colors p-1 rounded-lg"
+                        title={isAr ? "حذف المهمة" : "Delete task"}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -967,9 +1059,19 @@ export function ProjectDetailView({
                       <p className="text-[11px] text-muted-foreground">{file.size} • {file.uploadedAt}</p>
                     </div>
                   </div>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
-                    <Download className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                      <Download className="h-4 w-4" />
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteFile(file.id)}
+                      className="text-muted-foreground/60 hover:text-rose-500 transition-colors p-1.5 rounded-lg"
+                      title={isAr ? "حذف الملف" : "Delete file"}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

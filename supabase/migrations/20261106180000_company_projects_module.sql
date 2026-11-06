@@ -325,3 +325,4 @@ BEGIN
       (v_p2_id, 'Liza Cortez', 'Project Manager', 'Office Furniture Fit-Out 100% Completed', 'Desks, ergonomic chairs, and conference room media stations are assembled and inspected.', 'Mar 29, 2025');
   END IF;
 END $$;
+
