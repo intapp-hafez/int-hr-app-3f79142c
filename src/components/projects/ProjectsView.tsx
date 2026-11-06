@@ -19,8 +19,12 @@ import {
   Clock,
   RefreshCw,
   User,
+  X,
+  Check,
+  UserCheck,
+  UserPlus,
 } from "lucide-react";
-import { Project, INITIAL_PROJECTS, loadProjectsFromStorage, saveProjectsToStorage } from "@/lib/projects/projects.data";
+import { Project, ProjectEmployee, INITIAL_PROJECTS, loadProjectsFromStorage, saveProjectsToStorage } from "@/lib/projects/projects.data";
 import { ProjectDetailView } from "./ProjectDetailView";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +32,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,7 +51,31 @@ import {
   createCompanyProject,
   updateCompanyProject,
   deleteCompanyProject,
+  listProjectAssignablePeople,
 } from "@/backend/functions/projects.functions";
+
+const DEFAULT_MANAGERS = [
+  { id: "m1", name: "John Reyes", role: "Project Manager", department: "Operations" },
+  { id: "m2", name: "Maria Santos", role: "Reported Manager / VP", department: "Operations" },
+  { id: "m3", name: "Carlos Medina", role: "General Manager", department: "Executive" },
+  { id: "m4", name: "Liza Cortez", role: "Project Lead", department: "Operations" },
+  { id: "m5", name: "Mark Villanueva", role: "IT Systems Director", department: "IT & Tech" },
+  { id: "m6", name: "Anna Dela Cruz", role: "Logistics Manager", department: "Logistics" },
+  { id: "m7", name: "Ramon Bautista", role: "Regional Branch Manager", department: "Regional Ops" },
+];
+
+const DEFAULT_EMPLOYEES: ProjectEmployee[] = [
+  { id: "e1", name: "Michael Chang", role: "Senior IT Infrastructure Lead", department: "IT & Tech", email: "m.chang@integ.com" },
+  { id: "e2", name: "Fatima Al-Zahra", role: "HR & Talent Partner", department: "Human Resources", email: "f.alzahra@integ.com" },
+  { id: "e3", name: "Rami Youssef", role: "Security & Compliance Specialist", department: "Operations", email: "r.youssef@integ.com" },
+  { id: "e4", name: "Khaled Nabil", role: "Facilities Coordinator", department: "General Admin", email: "k.nabil@integ.com" },
+  { id: "e5", name: "Sarah Jenkins", role: "Procurement Specialist", department: "Finance", email: "s.jenkins@integ.com" },
+  { id: "e6", name: "David Tan", role: "Electrical Site Engineer", department: "Engineering", email: "d.tan@integ.com" },
+  { id: "e7", name: "Elena Rostova", role: "QA & Safety Inspector", department: "Quality Assurance", email: "e.rostova@integ.com" },
+  { id: "e8", name: "Ahmed Mansour", role: "Site Supervisor", department: "Field Operations", email: "a.mansour@integ.com" },
+  { id: "e9", name: "Grace Lee", role: "Network Architect", department: "IT & Tech", email: "g.lee@integ.com" },
+  { id: "e10", name: "Robert Chen", role: "HVAC Systems Lead", department: "Maintenance", email: "r.chen@integ.com" },
+];
 
 interface ProjectsViewProps {
   role?: "admin" | "manager";
@@ -82,13 +112,76 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
   // Edit Project Dialog state
   const [editingProject, setEditingProject] = useState<Project | null>(null);
 
+  // Multi-employee selection state for Create Project modal
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>(["e1", "e2", "e3"]);
+  const [isEmployeeDropdownOpen, setIsEmployeeDropdownOpen] = useState(false);
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState("");
+
   // TanStack Start Server Functions
   const listProjectsFn = useServerFn(listCompanyProjects);
   const getProjectFn = useServerFn(getCompanyProject);
   const createProjectFn = useServerFn(createCompanyProject);
   const updateProjectFn = useServerFn(updateCompanyProject);
   const deleteProjectFn = useServerFn(deleteCompanyProject);
+  const listAssignablePeopleFn = useServerFn(listProjectAssignablePeople);
   const queryClient = useQueryClient();
+
+  const { data: assignablePeople } = useQuery({
+    queryKey: ["project-assignable-people"],
+    queryFn: async () => {
+      try {
+        return await listAssignablePeopleFn();
+      } catch {
+        return null;
+      }
+    },
+    staleTime: 60000,
+  });
+
+  // Combined Managers list
+  const availableManagers = useMemo(() => {
+    const list = [...DEFAULT_MANAGERS];
+    if (assignablePeople?.managers && assignablePeople.managers.length > 0) {
+      for (const m of assignablePeople.managers) {
+        if (!list.some((x) => x.name.toLowerCase() === m.name.toLowerCase())) {
+          list.push(m);
+        }
+      }
+    }
+    return list;
+  }, [assignablePeople]);
+
+  // Combined Employees list
+  const availableEmployees = useMemo<ProjectEmployee[]>(() => {
+    const list = [...DEFAULT_EMPLOYEES];
+    if (assignablePeople?.employees && assignablePeople.employees.length > 0) {
+      for (const e of assignablePeople.employees) {
+        if (!list.some((x) => x.id === e.id || x.name.toLowerCase() === e.name.toLowerCase())) {
+          list.push({
+            id: e.id,
+            name: e.name,
+            role: e.role,
+            department: e.department,
+            email: e.email || `${e.name.toLowerCase().replace(/\s+/g, ".")}@integ.com`,
+            avatarUrl: e.avatarUrl,
+          });
+        }
+      }
+    }
+    return list;
+  }, [assignablePeople]);
+
+  // Filtered employees for dropdown search
+  const filteredSelectableEmployees = useMemo(() => {
+    if (!employeeSearchQuery.trim()) return availableEmployees;
+    const q = employeeSearchQuery.toLowerCase().trim();
+    return availableEmployees.filter(
+      (e) =>
+        e.name.toLowerCase().includes(q) ||
+        e.role.toLowerCase().includes(q) ||
+        e.department.toLowerCase().includes(q)
+    );
+  }, [availableEmployees, employeeSearchQuery]);
 
   // Fetch from database with fallback to localStorage
   const { data: dbProjects } = useQuery({
@@ -174,6 +267,10 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
     }
     const generatedId = newProjId.trim() || `PRJ-${String(projects.length + 1).padStart(3, "0")}`;
 
+    const assignedEmployeesList = availableEmployees.filter((e) =>
+      selectedEmployeeIds.includes(e.id)
+    );
+
     const newProject: Project = {
       id: generatedId,
       name: newProjName.trim(),
@@ -192,12 +289,10 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
       status: newProjStatus,
       notes: newProjNotes.trim() || "Project initialized.",
       notes_ar: newProjNotesAr.trim() || undefined,
-      employeesCount: 5,
+      employeesCount: assignedEmployeesList.length,
       completedTasksCount: 0,
       totalTasksCount: 4,
-      employees: [
-        { id: `e-${Date.now()}-1`, name: newProjManager, role: "Project Manager", department: "Project Management", email: `${newProjManager.toLowerCase().replace(/\s+/g, ".")}@integ.com` },
-      ],
+      employees: assignedEmployeesList,
       tasks: [
         { id: `t-${Date.now()}-1`, title: "Kickoff Meeting & Resource Allocation", status: "in_progress", priority: "high", assignee: { name: newProjManager }, dueDate: "Jun 15, 2025" },
         { id: `t-${Date.now()}-2`, title: "Procurement & Site Preparation", status: "pending", priority: "medium", assignee: { name: newProjManager }, dueDate: "Jul 01, 2025" },
@@ -226,6 +321,12 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
         end_date: "2025-08-31",
         notes: newProject.notes,
         status: newProject.status,
+        initial_members: assignedEmployeesList.map((e) => ({
+          name: e.name,
+          role: e.role,
+          department: e.department,
+          email: e.email,
+        })),
       },
     })
       .then((created: any) => {
@@ -886,12 +987,154 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>{isAr ? "مدير المشروع" : "Project Manager"}</Label>
-                <Input value={newProjManager} onChange={(e) => setNewProjManager(e.target.value)} />
+                <select
+                  value={newProjManager}
+                  onChange={(e) => setNewProjManager(e.target.value)}
+                  className="w-full h-9 rounded-xl border border-input bg-background px-3 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand"
+                >
+                  {availableManagers.map((m) => (
+                    <option key={m.name} value={m.name}>
+                      {m.name} ({m.department})
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="space-y-1">
                 <Label>{isAr ? "المدير المباشر" : "Reported Manager"}</Label>
-                <Input value={newProjReportedManager} onChange={(e) => setNewProjReportedManager(e.target.value)} />
+                <select
+                  value={newProjReportedManager}
+                  onChange={(e) => setNewProjReportedManager(e.target.value)}
+                  className="w-full h-9 rounded-xl border border-input bg-background px-3 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand"
+                >
+                  {availableManagers.map((m) => (
+                    <option key={m.name} value={m.name}>
+                      {m.name} ({m.department})
+                    </option>
+                  ))}
+                </select>
               </div>
+            </div>
+
+            {/* Multi-Select Assigned Employees Dropdown */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label className="flex items-center gap-1.5 font-semibold">
+                  <Users className="h-3.5 w-3.5 text-orange-500" />
+                  {isAr ? "تعيين أعضاء الفريق (تحديد متعدد من القائمة)" : "Assign Team Employees (Multi-Select)"}
+                </Label>
+                <span className="text-[11px] text-muted-foreground font-medium">
+                  {selectedEmployeeIds.length} {isAr ? "موظف محدد" : "employees selected"}
+                </span>
+              </div>
+
+              <Popover open={isEmployeeDropdownOpen} onOpenChange={setIsEmployeeDropdownOpen}>
+                <PopoverTrigger asChild>
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    className="min-h-[42px] w-full rounded-xl border border-input bg-background p-1.5 text-xs cursor-pointer flex flex-wrap items-center gap-1.5 hover:border-orange-500/50 transition-colors focus:ring-1 focus:ring-brand"
+                  >
+                    {selectedEmployeeIds.length === 0 ? (
+                      <span className="text-muted-foreground px-2 py-1 select-none">
+                        {isAr ? "اختر موظفين لتعيينهم في المشروع..." : "Click to select employees from dropdown..."}
+                      </span>
+                    ) : (
+                      selectedEmployeeIds.map((empId) => {
+                        const emp = availableEmployees.find((e) => e.id === empId);
+                        if (!emp) return null;
+                        return (
+                          <span
+                            key={emp.id}
+                            className="inline-flex items-center gap-1 rounded-lg bg-orange-500/10 text-orange-700 dark:text-orange-300 border border-orange-500/20 px-2 py-0.5 text-[11px] font-medium"
+                          >
+                            <span>{emp.name}</span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedEmployeeIds((prev) => prev.filter((id) => id !== emp.id));
+                              }}
+                              className="hover:text-rose-600 rounded-sm"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        );
+                      })
+                    )}
+                    <div className="ms-auto pe-2 text-muted-foreground">
+                      <ChevronDown className="h-4 w-4" />
+                    </div>
+                  </div>
+                </PopoverTrigger>
+
+                <PopoverContent className="w-[440px] p-0 rounded-2xl shadow-xl border border-border" align="start">
+                  <div className="p-2.5 border-b border-border/60 bg-muted/30 space-y-2">
+                    <div className="relative">
+                      <Search className="absolute start-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                      <Input
+                        placeholder={isAr ? "بحث عن موظف بالاسم أو التخصص..." : "Search employee name, role, department..."}
+                        value={employeeSearchQuery}
+                        onChange={(e) => setEmployeeSearchQuery(e.target.value)}
+                        className="h-8 ps-8 text-xs rounded-xl bg-background"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] text-muted-foreground px-1">
+                      <span>{filteredSelectableEmployees.length} {isAr ? "موظف متاح" : "employees available"}</span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedEmployeeIds(availableEmployees.map((e) => e.id))}
+                          className="text-orange-600 dark:text-orange-400 hover:underline font-semibold"
+                        >
+                          {isAr ? "تحديد الكل" : "Select All"}
+                        </button>
+                        <span>•</span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedEmployeeIds([])}
+                          className="text-muted-foreground hover:text-foreground font-semibold"
+                        >
+                          {isAr ? "مسح" : "Clear"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="max-h-60 overflow-y-auto divide-y divide-border/40 p-1">
+                    {filteredSelectableEmployees.map((emp) => {
+                      const isSelected = selectedEmployeeIds.includes(emp.id);
+                      return (
+                        <div
+                          key={emp.id}
+                          onClick={() => {
+                            setSelectedEmployeeIds((prev) =>
+                              isSelected ? prev.filter((id) => id !== emp.id) : [...prev, emp.id]
+                            );
+                          }}
+                          className={`flex items-center gap-2.5 p-2 rounded-xl cursor-pointer transition-colors ${
+                            isSelected ? "bg-orange-500/10" : "hover:bg-muted/50"
+                          }`}
+                        >
+                          <Checkbox checked={isSelected} className="data-[state=checked]:bg-orange-600 data-[state=checked]:border-orange-600" />
+                          <div className="h-7 w-7 rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center font-bold text-brand text-[10px] shrink-0">
+                            {emp.avatarUrl ? (
+                              <img src={emp.avatarUrl} alt="" className="h-full w-full rounded-full object-cover" />
+                            ) : (
+                              emp.name.slice(0, 2).toUpperCase()
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1 text-xs">
+                            <p className="font-semibold text-foreground truncate">{emp.name}</p>
+                            <p className="text-[10px] text-muted-foreground truncate">{emp.role} • {emp.department}</p>
+                          </div>
+                          {isSelected && <Check className="h-4 w-4 text-orange-600 shrink-0" />}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -963,6 +1206,47 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
                   value={editingProject.name}
                   onChange={(e) => setEditingProject({ ...editingProject, name: e.target.value })}
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>{isAr ? "مدير المشروع" : "Project Manager"}</Label>
+                  <select
+                    value={editingProject.projectManager.name}
+                    onChange={(e) =>
+                      setEditingProject({
+                        ...editingProject,
+                        projectManager: { ...editingProject.projectManager, name: e.target.value },
+                      })
+                    }
+                    className="w-full h-9 rounded-xl border border-input bg-background px-3 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand"
+                  >
+                    {availableManagers.map((m) => (
+                      <option key={m.name} value={m.name}>
+                        {m.name} ({m.department})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <Label>{isAr ? "المدير المباشر" : "Reported Manager"}</Label>
+                  <select
+                    value={editingProject.reportedManager.name}
+                    onChange={(e) =>
+                      setEditingProject({
+                        ...editingProject,
+                        reportedManager: { ...editingProject.reportedManager, name: e.target.value },
+                      })
+                    }
+                    className="w-full h-9 rounded-xl border border-input bg-background px-3 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand"
+                  >
+                    {availableManagers.map((m) => (
+                      <option key={m.name} value={m.name}>
+                        {m.name} ({m.department})
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">

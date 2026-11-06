@@ -17,6 +17,18 @@ export const CreateProjectSchema = z.object({
   end_date: z.string().optional(),
   notes: z.string().optional(),
   status: ProjectStatusSchema.default("ongoing"),
+  assigned_employee_ids: z.array(z.string()).optional(),
+  initial_members: z
+    .array(
+      z.object({
+        name: z.string(),
+        role: z.string().optional(),
+        department: z.string().optional(),
+        email: z.string().optional(),
+        employee_id: z.string().uuid().optional().nullable(),
+      })
+    )
+    .optional(),
 });
 
 export const UpdateProjectSchema = CreateProjectSchema.partial().extend({

@@ -235,6 +235,19 @@ export const createCompanyProject = createServerFn({ method: "POST" })
       throw new Error(error.message);
     }
 
+    // Insert initial members if provided
+    if (inserted?.id && data.initial_members && data.initial_members.length > 0) {
+      const memberRows = data.initial_members.map((m) => ({
+        project_id: inserted.id,
+        name: m.name,
+        email: m.email || null,
+        role: m.role || "Team Member",
+        department: m.department || null,
+        employee_id: m.employee_id || null,
+      }));
+      await supabase.from("project_members").insert(memberRows).catch((e: any) => console.warn("Failed inserting members:", e));
+    }
+
     return inserted;
   });
 
@@ -428,5 +441,42 @@ export const addProjectUpdate = createServerFn({ method: "POST" })
 
     if (error) throw new Error(error.message);
     return update;
+  });
+
+// ─── ASSIGNABLE PEOPLE (MANAGERS & EMPLOYEES) ─────────────────────────────────
+export const listProjectAssignablePeople = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const supabase = context.supabase;
+    const { data: profiles, error } = await supabase
+      .from("profiles")
+      .select("id, full_name, email, role, department, position, avatar_url")
+      .order("full_name", { ascending: true });
+
+    if (error || !profiles || profiles.length === 0) {
+      return { managers: [], employees: [] };
+    }
+
+    const managers = profiles.filter((p: any) =>
+      p.role === "manager" || p.role === "admin" || p.role === "hr"
+    );
+
+    return {
+      managers: managers.map((m: any) => ({
+        id: m.id,
+        name: m.full_name || m.email || "Manager",
+        role: m.role,
+        department: m.department || "Management",
+        avatarUrl: m.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face",
+      })),
+      employees: profiles.map((e: any) => ({
+        id: e.id,
+        name: e.full_name || e.email || "Employee",
+        email: e.email,
+        role: e.position || e.role || "Team Member",
+        department: e.department || "Operations",
+        avatarUrl: e.avatar_url || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face",
+      })),
+    };
   });
 
