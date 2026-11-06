@@ -309,3 +309,4 @@ export function saveProjectsToStorage(projects: Project[]): void {
     console.error("Failed to save projects to localStorage:", err);
   }
 }
+

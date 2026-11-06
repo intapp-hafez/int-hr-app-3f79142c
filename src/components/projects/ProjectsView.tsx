@@ -37,6 +37,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useI18n } from "@/lib/i18n";
 import { toast } from "sonner";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  listCompanyProjects,
+  createCompanyProject,
+  updateCompanyProject,
+  deleteCompanyProject,
+} from "@/backend/functions/projects.functions";
 
 interface ProjectsViewProps {
   role?: "admin" | "manager";
@@ -73,6 +81,34 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
   // Edit Project Dialog state
   const [editingProject, setEditingProject] = useState<Project | null>(null);
 
+  // TanStack Start Server Functions
+  const listProjectsFn = useServerFn(listCompanyProjects);
+  const createProjectFn = useServerFn(createCompanyProject);
+  const updateProjectFn = useServerFn(updateCompanyProject);
+  const deleteProjectFn = useServerFn(deleteCompanyProject);
+  const queryClient = useQueryClient();
+
+  // Fetch from database with fallback to localStorage
+  const { data: dbProjects } = useQuery({
+    queryKey: ["company-projects", statusFilter, locationFilter, managerFilter, searchQuery],
+    queryFn: async () => {
+      try {
+        const res = await listProjectsFn({
+          data: {
+            status: statusFilter,
+            location: locationFilter,
+            manager: managerFilter,
+            search: searchQuery,
+          },
+        });
+        return res;
+      } catch (err) {
+        return null;
+      }
+    },
+    staleTime: 30000,
+  });
+
   // Sync and persist projects
   const updateProject = (updated: Project) => {
     const next = projects.map((p) => (p.id === updated.id ? updated : p));
@@ -80,6 +116,21 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
     saveProjectsToStorage(next);
     if (detailProject && detailProject.id === updated.id) {
       setDetailProject(updated);
+    }
+
+    // Background DB sync if id is UUID
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(updated.id)) {
+      updateProjectFn({
+        data: {
+          id: updated.id,
+          name: updated.name,
+          location: updated.location,
+          notes: updated.notes,
+          status: updated.status,
+        },
+      })
+        .then(() => queryClient.invalidateQueries({ queryKey: ["company-projects"] }))
+        .catch(() => {});
     }
   };
 
@@ -130,6 +181,32 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
     setSelectedProjectId(newProject.id);
     setIsNewProjectOpen(false);
 
+    // Background DB insert
+    createProjectFn({
+      data: {
+        project_code: newProject.id,
+        name: newProject.name,
+        project_manager_name: newProject.projectManager.name,
+        reported_manager_name: newProject.reportedManager.name,
+        location: newProject.location,
+        start_date: "2025-05-01",
+        end_date: "2025-08-31",
+        notes: newProject.notes,
+        status: newProject.status,
+      },
+    })
+      .then((created: any) => {
+        queryClient.invalidateQueries({ queryKey: ["company-projects"] });
+        if (created?.id) {
+          setProjects((prev) =>
+            prev.map((p) => (p.id === newProject.id ? { ...p, id: created.id, code: newProject.id } : p))
+          );
+        }
+      })
+      .catch((err) => {
+        console.warn("DB insert fallback to local storage:", err);
+      });
+
     // Reset inputs
     setNewProjId("");
     setNewProjName("");
@@ -146,6 +223,13 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
       saveProjectsToStorage(next);
       if (selectedProjectId === projId && next.length > 0) {
         setSelectedProjectId(next[0].id);
+      }
+
+      // Background DB delete if UUID
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projId)) {
+        deleteProjectFn({ data: { id: projId } })
+          .then(() => queryClient.invalidateQueries({ queryKey: ["company-projects"] }))
+          .catch(() => {});
       }
       toast.success(isAr ? "تم حذف المشروع" : "Project deleted");
     }

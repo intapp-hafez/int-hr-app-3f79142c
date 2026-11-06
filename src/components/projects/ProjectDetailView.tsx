@@ -40,6 +40,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { useI18n } from "@/lib/i18n";
 import { toast } from "sonner";
+import { useServerFn } from "@tanstack/react-start";
+import {
+  createProjectTask,
+  updateProjectTask,
+  deleteProjectTask,
+  addProjectMember,
+  removeProjectMember,
+  addProjectFile,
+  deleteProjectFile,
+  addProjectUpdate,
+} from "@/backend/functions/projects.functions";
 
 interface ProjectDetailViewProps {
   project: Project;
@@ -91,6 +102,18 @@ export function ProjectDetailView({
   const [editStatus, setEditStatus] = useState(project.status);
   const [editNotes, setEditNotes] = useState(project.notes);
 
+  // TanStack Start Server Functions
+  const createTaskFn = useServerFn(createProjectTask);
+  const updateTaskFn = useServerFn(updateProjectTask);
+  const deleteTaskFn = useServerFn(deleteProjectTask);
+  const addMemberFn = useServerFn(addProjectMember);
+  const removeMemberFn = useServerFn(removeProjectMember);
+  const addFileFn = useServerFn(addProjectFile);
+  const deleteFileFn = useServerFn(deleteProjectFile);
+  const addUpdateFn = useServerFn(addProjectUpdate);
+
+  const isProjectUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(project.id);
+
   // Calculate task statistics
   const completedTasks = project.tasks.filter((t) => t.status === "completed").length;
   const inProgressTasks = project.tasks.filter((t) => t.status === "in_progress").length;
@@ -118,6 +141,20 @@ export function ProjectDetailView({
       totalTasksCount: project.tasks.length + 1,
     };
     onUpdateProject(updated);
+
+    if (isProjectUuid) {
+      createTaskFn({
+        data: {
+          project_id: project.id,
+          title: newTask.title,
+          assignee_name: newTask.assignee.name,
+          priority: newTask.priority,
+          status: "pending",
+          due_date: "2025-05-30",
+        },
+      }).catch(() => {});
+    }
+
     setNewTaskTitle("");
     setIsAddTaskOpen(false);
     toast.success(isAr ? "تمت إضافة المهمة بنجاح" : "Task added successfully");
@@ -141,6 +178,19 @@ export function ProjectDetailView({
       employeesCount: project.employees.length + 1,
     };
     onUpdateProject(updated);
+
+    if (isProjectUuid) {
+      addMemberFn({
+        data: {
+          project_id: project.id,
+          name: newEmp.name,
+          email: newEmp.email,
+          role: newEmp.role,
+          department: newEmp.department,
+        },
+      }).catch(() => {});
+    }
+
     setNewEmpName("");
     setNewEmpRole("");
     setIsAddEmployeeOpen(false);
@@ -165,6 +215,18 @@ export function ProjectDetailView({
       files: [newFile, ...project.files],
     };
     onUpdateProject(updated);
+
+    if (isProjectUuid) {
+      addFileFn({
+        data: {
+          project_id: project.id,
+          name: newFile.name,
+          size: newFile.size,
+          type: newFile.type.toUpperCase(),
+        },
+      }).catch(() => {});
+    }
+
     setNewFileName("");
     setIsUploadFileOpen(false);
     toast.success(isAr ? "تم رفع الملف بنجاح" : "File uploaded successfully");
@@ -190,6 +252,19 @@ export function ProjectDetailView({
       updates: [newUp, ...project.updates],
     };
     onUpdateProject(updated);
+
+    if (isProjectUuid) {
+      addUpdateFn({
+        data: {
+          project_id: project.id,
+          title: "Milestone Progress Update",
+          content: newUp.content,
+          author_name: project.projectManager.name,
+          author_role: "Project Manager",
+        },
+      }).catch(() => {});
+    }
+
     setNewUpdateText("");
     setIsAddUpdateOpen(false);
     toast.success(isAr ? "تم نشر التحديث للمشروع" : "Project update posted");
@@ -1181,3 +1256,4 @@ export function ProjectDetailView({
     </div>
   );
 }
+
