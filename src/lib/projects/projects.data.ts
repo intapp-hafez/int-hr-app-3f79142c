@@ -71,3 +71,13 @@ export interface Project {
 }
 
 export const EMPTY_PROJECTS: Project[] = [];
+
+export function formatProjectCode(code?: string | null, index: number = 0): string {
+  if (!code || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(code)) {
+    return `PROJ-${String(index + 1).padStart(3, "0")}`;
+  }
+  if (/^prj-/i.test(code)) {
+    return code.replace(/^prj-/i, "PROJ-");
+  }
+  return code;
+}

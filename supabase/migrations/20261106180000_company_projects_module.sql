@@ -216,7 +216,12 @@ BEGIN
   SELECT id INTO v_pm2_id FROM public.profiles WHERE full_name ILIKE '%Khaled Habashe%' LIMIT 1;
   SELECT id INTO v_rm2_id FROM public.profiles WHERE full_name ILIKE '%Ahmed Moselhy%' LIMIT 1;
 
-  -- ─── 1. Insert Default Project PRJ-001 ───
+  -- Normalize existing project codes to PROJ- format
+  UPDATE public.company_projects SET project_code = 'PROJ-001' WHERE project_code IN ('PRJ-001');
+  UPDATE public.company_projects SET project_code = 'PROJ-002' WHERE project_code IN ('PRJ-002');
+  UPDATE public.company_projects SET project_code = REPLACE(project_code, 'PRJ-', 'PROJ-') WHERE project_code LIKE 'PRJ-%';
+
+  -- ─── 1. Insert Default Project PROJ-001 ───
   INSERT INTO public.company_projects (
     project_code,
     name,
@@ -231,7 +236,7 @@ BEGIN
     notes,
     status
   ) VALUES (
-    'PRJ-001',
+    'PROJ-001',
     'Cairo HQ Smart Infrastructure & Light Current Upgrade',
     'Comprehensive modernization of server room cabling, fiber optic backbone, access control, and network security across all Cairo headquarters floors.',
     v_pm1_id,
@@ -303,7 +308,7 @@ BEGIN
       (v_p1_id, 'Rahim Kamal Abdel Hamid Al-Shuwaimi', 'Network Engineer', 'VLAN Infrastructure Configured', 'Corporate, guest, and VoIP subnet routing established with automated DHCP relay.', 'Apr 20, 2025');
   END IF;
 
-  -- ─── 2. Insert Default Project PRJ-002 ───
+  -- ─── 2. Insert Default Project PROJ-002 ───
   INSERT INTO public.company_projects (
     project_code,
     name,
@@ -318,7 +323,7 @@ BEGIN
     notes,
     status
   ) VALUES (
-    'PRJ-002',
+    'PROJ-002',
     'Alexandria Regional Logistics & Warehouse Automation',
     'Implementation of automated barcode inventory flow, heavy racking structures, and logistics vehicle integration at Alexandria distribution center.',
     v_pm2_id,

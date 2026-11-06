@@ -31,7 +31,7 @@ import {
   FileDown,
   Download,
 } from "lucide-react";
-import { Project, ProjectTask, ProjectEmployee, ProjectFile, ProjectUpdate } from "@/lib/projects/projects.data";
+import { Project, ProjectTask, ProjectEmployee, ProjectFile, ProjectUpdate, formatProjectCode } from "@/lib/projects/projects.data";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -377,7 +377,7 @@ export function ProjectDetailView({
               <span>{isAr ? "المشاريع" : "Projects"}</span>
             </button>
             <ChevronRight className="h-3 w-3" />
-            <span className="text-foreground font-semibold font-mono">{project.id}</span>
+            <span className="text-foreground font-semibold font-mono">{formatProjectCode(project.code || project.id)}</span>
           </div>
           <div className="flex flex-wrap items-center gap-3 pt-1">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400">
@@ -386,7 +386,7 @@ export function ProjectDetailView({
             <div>
               <div className="flex items-center gap-2.5">
                 <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
-                  {project.id} — {isAr ? project.name_ar || project.name : project.name}
+                  {formatProjectCode(project.code || project.id)} — {isAr ? project.name_ar || project.name : project.name}
                 </h1>
                 {getStatusBadge(project.status)}
               </div>
@@ -529,7 +529,7 @@ export function ProjectDetailView({
                       {isAr ? "رمز المشروع:" : "Project ID"}
                     </span>
                     <span className="font-mono font-bold text-foreground text-xs bg-muted px-2 py-0.5 rounded">
-                      {project.id}
+                      {formatProjectCode(project.code || project.id)}
                     </span>
                   </div>
 

@@ -24,7 +24,7 @@ import {
   UserCheck,
   UserPlus,
 } from "lucide-react";
-import { Project, ProjectEmployee } from "@/lib/projects/projects.data";
+import { Project, ProjectEmployee, formatProjectCode } from "@/lib/projects/projects.data";
 import { ProjectDetailView } from "./ProjectDetailView";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -240,7 +240,7 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
       toast.error(isAr ? "يرجى إدخال اسم المشروع" : "Project name is required");
       return;
     }
-    const generatedCode = newProjId.trim() || `PRJ-${String(projects.length + 1).padStart(3, "0")}`;
+    const generatedCode = newProjId.trim() || `PROJ-${String(projects.length + 1).padStart(3, "0")}`;
 
     const assignedEmployeesList = availableEmployees.filter((e) =>
       selectedEmployeeIds.includes(e.id)
@@ -328,7 +328,7 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
       // 5. Search query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
-        const matchesId = p.id.toLowerCase().includes(q);
+        const matchesId = p.id.toLowerCase().includes(q) || (p.code && p.code.toLowerCase().includes(q));
         const matchesName = p.name.toLowerCase().includes(q) || (p.name_ar && p.name_ar.toLowerCase().includes(q));
         const matchesPm = p.projectManager.name.toLowerCase().includes(q);
         const matchesRm = p.reportedManager.name.toLowerCase().includes(q);
@@ -589,15 +589,15 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
                       }`}
                     >
                       {/* Proj-ID */}
-                      <td className="py-3.5 px-3.5 font-mono font-bold text-orange-600 dark:text-orange-400">
+                      <td className="py-3.5 px-3.5 font-mono font-bold text-orange-600 dark:text-orange-400 whitespace-nowrap">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             handleOpenDetail(proj, "details");
                           }}
-                          className="hover:underline text-left"
+                          className="hover:underline text-left inline-block"
                         >
-                          {proj.id}
+                          {formatProjectCode(proj.code || proj.id, filteredProjects.indexOf(proj))}
                         </button>
                       </td>
 
@@ -783,7 +783,7 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
                 <Folder className="h-4 w-4 fill-orange-500/20" />
               </div>
               <h3 className="font-bold text-base text-foreground">
-                {selectedProject.id} – {isAr ? selectedProject.name_ar || selectedProject.name : selectedProject.name}
+                {formatProjectCode(selectedProject.code || selectedProject.id, projects.indexOf(selectedProject))} – {isAr ? selectedProject.name_ar || selectedProject.name : selectedProject.name}
               </h3>
               {getStatusBadge(selectedProject.status)}
             </div>
@@ -936,7 +936,7 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
               <div className="space-y-1.5">
                 <Label className="font-semibold text-foreground/90">{isAr ? "رمز المشروع" : "Project ID"}</Label>
                 <Input
-                  placeholder={`PRJ-${String(projects.length + 1).padStart(3, "0")}`}
+                  placeholder={`PROJ-${String(projects.length + 1).padStart(3, "0")}`}
                   value={newProjId}
                   onChange={(e) => setNewProjId(e.target.value)}
                   className="h-10 rounded-xl"

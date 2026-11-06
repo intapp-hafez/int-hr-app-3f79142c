@@ -67,15 +67,23 @@ export const listCompanyProjects = createServerFn({ method: "GET" })
       }
 
       // Transform into frontend representation with dynamic task completion calculation
-      return (rows || []).map((row: any) => {
+      return (rows || []).map((row: any, index: number) => {
         const tasks = row.tasks || [];
         const totalTasks = tasks.length;
         const completedTasks = tasks.filter((t: any) => t.status === "completed").length;
         const membersCount = (row.members || []).length;
 
+        const isRawUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(row.project_code || "");
+        let formattedCode = (!row.project_code || isRawUuid)
+          ? `PROJ-${String(index + 1).padStart(3, "0")}`
+          : row.project_code;
+        if (/^prj-/i.test(formattedCode)) {
+          formattedCode = formattedCode.replace(/^prj-/i, "PROJ-");
+        }
+
         return {
           id: row.id,
-          code: row.project_code || "PRJ-001",
+          code: formattedCode,
           name: row.name,
           name_ar: row.name,
           projectManager: {
@@ -180,9 +188,15 @@ export const getCompanyProject = createServerFn({ method: "GET" })
     const totalTasks = tasks.length;
     const completedTasks = tasks.filter((t) => t.status === "completed").length;
 
+    const isCodeUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(project.project_code || "");
+    let formattedCode = (!project.project_code || isCodeUuid) ? "PROJ-001" : project.project_code;
+    if (/^prj-/i.test(formattedCode)) {
+      formattedCode = formattedCode.replace(/^prj-/i, "PROJ-");
+    }
+
     return {
       id: project.id,
-      code: project.project_code,
+      code: formattedCode,
       name: project.name,
       name_ar: project.name,
       projectManager: {
