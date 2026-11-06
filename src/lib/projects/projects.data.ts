@@ -48,10 +48,12 @@ export interface Project {
   name: string;
   name_ar?: string;
   projectManager: {
+    id?: string;
     name: string;
     avatarUrl?: string;
   };
   reportedManager: {
+    id?: string;
     name: string;
     avatarUrl?: string;
   };

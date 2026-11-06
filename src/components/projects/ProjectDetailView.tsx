@@ -32,6 +32,7 @@ import {
   Download,
 } from "lucide-react";
 import { Project, ProjectTask, ProjectEmployee, ProjectFile, ProjectUpdate, formatProjectCode } from "@/lib/projects/projects.data";
+import { EmployeeAvatar } from "@/components/EmployeeAvatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -549,15 +550,13 @@ export function ProjectDetailView({
                       {isAr ? "مدير المشروع:" : "Project Manager"}
                     </span>
                     <div className="flex items-center gap-2">
-                      <div className="h-6 w-6 rounded-full overflow-hidden bg-brand/10 border border-brand/20">
-                        {project.projectManager.avatarUrl ? (
-                          <img src={project.projectManager.avatarUrl} alt="" className="h-full w-full object-cover" />
-                        ) : (
-                          <div className="h-full w-full flex items-center justify-center text-[10px] font-bold text-brand">
-                            {project.projectManager.name.slice(0, 2)}
-                          </div>
-                        )}
-                      </div>
+                      <EmployeeAvatar
+                        id={project.projectManager.id || project.projectManager.name}
+                        name={project.projectManager.name}
+                        url={project.projectManager.avatarUrl}
+                        className="h-7 w-7 rounded-full shrink-0"
+                        fallbackClassName="text-[10px]"
+                      />
                       <span className="font-medium text-foreground">{project.projectManager.name}</span>
                     </div>
                   </div>
@@ -568,15 +567,13 @@ export function ProjectDetailView({
                       {isAr ? "المدير المباشر:" : "Reported Manager"}
                     </span>
                     <div className="flex items-center gap-2">
-                      <div className="h-6 w-6 rounded-full overflow-hidden bg-muted border border-border">
-                        {project.reportedManager.avatarUrl ? (
-                          <img src={project.reportedManager.avatarUrl} alt="" className="h-full w-full object-cover" />
-                        ) : (
-                          <div className="h-full w-full flex items-center justify-center text-[10px] font-bold text-muted-foreground">
-                            {project.reportedManager.name.slice(0, 2)}
-                          </div>
-                        )}
-                      </div>
+                      <EmployeeAvatar
+                        id={project.reportedManager.id || project.reportedManager.name}
+                        name={project.reportedManager.name}
+                        url={project.reportedManager.avatarUrl}
+                        className="h-7 w-7 rounded-full shrink-0"
+                        fallbackClassName="text-[10px]"
+                      />
                       <span className="font-medium text-foreground">{project.reportedManager.name}</span>
                     </div>
                   </div>
@@ -915,13 +912,13 @@ export function ProjectDetailView({
             {project.employees.map((emp) => (
               <div key={emp.id} className="rounded-2xl border bg-card p-4 shadow-2xs hover:shadow-sm transition-all space-y-3">
                 <div className="flex items-center gap-3">
-                  <div className="h-11 w-11 rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center font-bold text-brand">
-                    {emp.avatarUrl ? (
-                      <img src={emp.avatarUrl} alt="" className="h-full w-full rounded-full object-cover" />
-                    ) : (
-                      emp.name.slice(0, 2).toUpperCase()
-                    )}
-                  </div>
+                  <EmployeeAvatar
+                    id={emp.id}
+                    name={emp.name}
+                    url={emp.avatarUrl}
+                    className="h-11 w-11 rounded-full shrink-0"
+                    fallbackClassName="text-xs"
+                  />
                   <div className="min-w-0 flex-1">
                     <h4 className="font-semibold text-sm text-foreground truncate">{emp.name}</h4>
                     <p className="text-xs text-orange-600 dark:text-orange-400 font-medium truncate">{emp.role}</p>
@@ -1107,9 +1104,13 @@ export function ProjectDetailView({
               <div key={up.id} className="rounded-2xl border bg-card p-4 shadow-2xs space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="h-7 w-7 rounded-full bg-brand/10 text-brand font-bold text-xs flex items-center justify-center">
-                      {up.author.name.slice(0, 2).toUpperCase()}
-                    </div>
+                    <EmployeeAvatar
+                      id={up.id || up.author.name}
+                      name={up.author.name}
+                      url={up.author.avatarUrl}
+                      className="h-7 w-7 rounded-full shrink-0"
+                      fallbackClassName="text-[10px]"
+                    />
                     <span className="font-semibold text-xs text-foreground">{up.author.name}</span>
                     <span className="text-[11px] text-muted-foreground">• {up.author.role}</span>
                   </div>

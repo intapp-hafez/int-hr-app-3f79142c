@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { Project, ProjectEmployee, formatProjectCode } from "@/lib/projects/projects.data";
 import { ProjectDetailView } from "./ProjectDetailView";
+import { EmployeeAvatar } from "@/components/EmployeeAvatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -619,15 +620,13 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
                       {/* Project Manager */}
                       <td className="py-3.5 px-3.5">
                         <div className="flex items-center gap-2">
-                          <div className="h-6 w-6 rounded-full overflow-hidden bg-brand/10 border border-brand/20 shrink-0">
-                            {proj.projectManager.avatarUrl ? (
-                              <img src={proj.projectManager.avatarUrl} alt="" className="h-full w-full object-cover" />
-                            ) : (
-                              <div className="h-full w-full flex items-center justify-center text-[10px] font-bold text-brand">
-                                {proj.projectManager.name.slice(0, 2)}
-                              </div>
-                            )}
-                          </div>
+                          <EmployeeAvatar
+                            id={proj.projectManager.id || proj.projectManager.name}
+                            name={proj.projectManager.name}
+                            url={proj.projectManager.avatarUrl}
+                            className="h-7 w-7 rounded-full shrink-0"
+                            fallbackClassName="text-[10px]"
+                          />
                           <span className="font-medium text-foreground whitespace-nowrap">{proj.projectManager.name}</span>
                         </div>
                       </td>
@@ -635,15 +634,13 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
                       {/* Reported Manager */}
                       <td className="py-3.5 px-3.5">
                         <div className="flex items-center gap-2">
-                          <div className="h-6 w-6 rounded-full overflow-hidden bg-muted border border-border shrink-0">
-                            {proj.reportedManager.avatarUrl ? (
-                              <img src={proj.reportedManager.avatarUrl} alt="" className="h-full w-full object-cover" />
-                            ) : (
-                              <div className="h-full w-full flex items-center justify-center text-[10px] font-bold text-muted-foreground">
-                                {proj.reportedManager.name.slice(0, 2)}
-                              </div>
-                            )}
-                          </div>
+                          <EmployeeAvatar
+                            id={proj.reportedManager.id || proj.reportedManager.name}
+                            name={proj.reportedManager.name}
+                            url={proj.reportedManager.avatarUrl}
+                            className="h-7 w-7 rounded-full shrink-0"
+                            fallbackClassName="text-[10px]"
+                          />
                           <span className="font-medium text-foreground whitespace-nowrap">{proj.reportedManager.name}</span>
                         </div>
                       </td>
@@ -864,7 +861,16 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
                 <User className="h-3 w-3" />
                 {isAr ? "مدير المشروع" : "Project Manager"}
               </span>
-              <p className="font-semibold text-foreground">{selectedProject.projectManager.name}</p>
+              <div className="flex items-center gap-1.5 pt-0.5">
+                <EmployeeAvatar
+                  id={selectedProject.projectManager.id || selectedProject.projectManager.name}
+                  name={selectedProject.projectManager.name}
+                  url={selectedProject.projectManager.avatarUrl}
+                  className="h-5 w-5 rounded-full shrink-0"
+                  fallbackClassName="text-[8px]"
+                />
+                <p className="font-semibold text-foreground truncate">{selectedProject.projectManager.name}</p>
+              </div>
             </div>
 
             <div className="space-y-1">
@@ -872,7 +878,16 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
                 <Users className="h-3 w-3" />
                 {isAr ? "المدير المباشر" : "Reported Manager"}
               </span>
-              <p className="font-semibold text-foreground">{selectedProject.reportedManager.name}</p>
+              <div className="flex items-center gap-1.5 pt-0.5">
+                <EmployeeAvatar
+                  id={selectedProject.reportedManager.id || selectedProject.reportedManager.name}
+                  name={selectedProject.reportedManager.name}
+                  url={selectedProject.reportedManager.avatarUrl}
+                  className="h-5 w-5 rounded-full shrink-0"
+                  fallbackClassName="text-[8px]"
+                />
+                <p className="font-semibold text-foreground truncate">{selectedProject.reportedManager.name}</p>
+              </div>
             </div>
 
             <div className="space-y-1">
@@ -1154,13 +1169,13 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
                           }`}
                         >
                           <Checkbox checked={isSelected} className="data-[state=checked]:bg-orange-600 data-[state=checked]:border-orange-600" />
-                          <div className="h-8 w-8 rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center font-bold text-brand text-[11px] shrink-0">
-                            {emp.avatarUrl ? (
-                              <img src={emp.avatarUrl} alt="" className="h-full w-full rounded-full object-cover" />
-                            ) : (
-                              emp.name.slice(0, 2).toUpperCase()
-                            )}
-                          </div>
+                          <EmployeeAvatar
+                            id={emp.id}
+                            name={emp.name}
+                            url={emp.avatarUrl}
+                            className="h-8 w-8 rounded-full shrink-0"
+                            fallbackClassName="text-[10px]"
+                          />
                           <div className="min-w-0 flex-1 text-xs">
                             <p className="font-semibold text-foreground truncate">{emp.name}</p>
                             <p className="text-[10px] text-muted-foreground truncate">{emp.role} • {emp.department}</p>

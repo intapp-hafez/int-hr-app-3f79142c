@@ -87,12 +87,14 @@ export const listCompanyProjects = createServerFn({ method: "GET" })
           name: row.name,
           name_ar: row.name,
           projectManager: {
+            id: row.project_manager_id || undefined,
             name: row.project_manager_name || "Unassigned",
-            avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face",
+            avatarUrl: undefined,
           },
           reportedManager: {
+            id: row.reported_manager_id || undefined,
             name: row.reported_manager_name || "Unassigned",
-            avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face",
+            avatarUrl: undefined,
           },
           employeesCount: membersCount,
           location: row.location || "Head Office",
@@ -148,7 +150,7 @@ export const getCompanyProject = createServerFn({ method: "GET" })
       title: t.title,
       assignee: {
         name: t.assignee_name || "Unassigned",
-        avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face",
+        avatarUrl: undefined,
       },
       priority: (t.priority || "medium") as "low" | "medium" | "high",
       dueDate: t.due_date || "",
@@ -156,13 +158,13 @@ export const getCompanyProject = createServerFn({ method: "GET" })
     }));
 
     const members = (membersRes.data || []).map((m: any) => ({
-      id: m.id,
+      id: m.profile_id || m.id,
       name: m.name,
       role: m.role || "Team Member",
       department: m.department || "Operations",
       email: m.email || "",
       phone: m.phone || "",
-      avatarUrl: m.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face",
+      avatarUrl: m.avatar_url || undefined,
     }));
 
     const files = (filesRes.data || []).map((f: any) => ({
@@ -179,7 +181,7 @@ export const getCompanyProject = createServerFn({ method: "GET" })
       author: {
         name: u.author_name,
         role: u.author_role || "Project Lead",
-        avatarUrl: u.author_avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face",
+        avatarUrl: u.author_avatar || undefined,
       },
       content: u.content,
       timestamp: u.date || (u.created_at ? new Date(u.created_at).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }) : ""),
@@ -200,12 +202,14 @@ export const getCompanyProject = createServerFn({ method: "GET" })
       name: project.name,
       name_ar: project.name,
       projectManager: {
-        name: project.project_manager_name,
-        avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face",
+        id: project.project_manager_id || undefined,
+        name: project.project_manager_name || "Unassigned",
+        avatarUrl: undefined,
       },
       reportedManager: {
-        name: project.reported_manager_name,
-        avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face",
+        id: project.reported_manager_id || undefined,
+        name: project.reported_manager_name || "Unassigned",
+        avatarUrl: undefined,
       },
       employeesCount: members.length,
       location: project.location,
@@ -512,7 +516,7 @@ export const listProjectAssignablePeople = createServerFn({ method: "GET" })
             name: m.full_name || m.email || "Manager",
             role: posTitle,
             department: deptName,
-            avatarUrl: m.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face",
+            avatarUrl: m.avatar_url || undefined,
           };
         }),
         employees: profiles.map((e: any) => {
@@ -524,7 +528,7 @@ export const listProjectAssignablePeople = createServerFn({ method: "GET" })
             email: e.email || "",
             role: posTitle,
             department: deptName,
-            avatarUrl: e.avatar_url || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face",
+            avatarUrl: e.avatar_url || undefined,
           };
         }),
       };
