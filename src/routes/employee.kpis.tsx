@@ -45,7 +45,7 @@ import {
 } from "@/lib/kpi/light-current-kpi.data";
 import { exportKpiEvaluationToExcel } from "@/lib/kpi/kpi-excel-export";
 import { exportJobDescriptionPdf } from "@/lib/kpi/jd-pdf-export";
-import { exportKpiDefinitionPdf } from "@/lib/kpi/kpi-definition-pdf-export";
+import { exportKpiDefinitionPdf, KpiDefPdfRow } from "@/lib/kpi/kpi-definition-pdf-export";
 import {
   formatCategoryName,
   ScorecardItem,
@@ -220,8 +220,8 @@ export function EmployeeKpiPage() {
   // Active scorecard items matching Admin/Manager KpiEvaluationView logic
   const activeScorecardItems = useMemo<ScorecardItem[]>(() => {
     const rawItems =
-      evalTemplate?.items && evalTemplate.items.length > 0
-        ? evalTemplate.items
+      (evalTemplate as any)?.items && (evalTemplate as any).items.length > 0
+        ? (evalTemplate as any).items
         : (matchedTemplate as any)?.template?.items && (matchedTemplate as any).template.items.length > 0
         ? (matchedTemplate as any).template.items
         : (matchedTemplate as any)?.items && (matchedTemplate as any).items.length > 0
@@ -286,7 +286,7 @@ export function EmployeeKpiPage() {
       direction: (k.inputType === "rating_5"
         ? "rating_5"
         : "higher_is_better") as "higher_is_better" | "lower_is_better" | "rating_5",
-      inputType: k.inputType,
+      inputType: (k.inputType === "days" || k.inputType === "count" ? "numeric" : k.inputType) as "numeric" | "rating_5" | "percentage",
       howMeasured: k.definition,
       howMeasured_ar: k.definition_ar,
     }));
@@ -614,47 +614,51 @@ export function EmployeeKpiPage() {
   const handleDownloadKpiDefPdf = async () => {
     setIsExportingKpiDefPdf(true);
     try {
-      const rows = kpiRows.map((row, i) => {
-        // Try to get howMeasured from the matchedTemplate criterion
-        let howMeasured = "";
-        if (matchedTemplate?.items?.length) {
-          const item = (matchedTemplate.items as any[])[i];
-          howMeasured =
-            item?.criterion?.how_measured_en ||
-            item?.criterion?.description_en ||
-            "";
-        } else {
-          // Fallback: use definition field (LIGHT_CURRENT_ENGINEER_KPIS already has howMeasured in definition)
-          howMeasured = row.kpi.definition;
-        }
-        return {
-          id: row.kpi.id,
-          category: row.kpi.category,
-          name: row.kpi.name,
-          definition: row.kpi.definition,
-          howMeasured,
-          weight: row.kpi.weight,
-          target: row.kpi.target,
-          unit: row.kpi.unit,
-        };
-      });
+      const rows: KpiDefPdfRow[] = activeScorecardItems.map((it, idx) => ({
+        id: it.numericIndex || idx + 1,
+        category: formatCategoryName(it.category, isAr),
+        name: isAr ? it.name_ar || it.name : it.name,
+        definition: (isAr ? it.definition_ar || it.definition : it.definition) || "—",
+        howMeasured:
+          (isAr ? it.howMeasured_ar || it.howMeasured : it.howMeasured) ||
+          (it.unit ? `Measured in ${it.unit}` : "Standard measurement benchmark"),
+        weight: Number(it.weight || 0),
+        target: it.target,
+        unit: it.unit || "%",
+      }));
+
+      const posName =
+        profileDetails?.position ||
+        (effectiveTemplate as any)?.position?.name_en ||
+        (matchedTemplate as any)?.position_name ||
+        (matchedTemplate as any)?.template?.position?.name_en ||
+        "Position Benchmark";
+
+      const deptName =
+        profileDetails?.department ||
+        (effectiveTemplate as any)?.department?.name_en ||
+        (matchedTemplate as any)?.department_name ||
+        (matchedTemplate as any)?.template?.department?.name_en ||
+        "—";
+
+      const tmplName =
+        (effectiveTemplate as any)?.name_en ||
+        (matchedTemplate as any)?.template?.name_en ||
+        "Position KPI Framework";
 
       await exportKpiDefinitionPdf(
         rows,
         {
           fullName: profileDetails?.full_name || session?.name || "",
-          position:
-            profileDetails?.position ||
-            (matchedTemplate as any)?.position?.name_en ||
-            "",
-          department:
-            profileDetails?.department ||
-            (matchedTemplate as any)?.department?.name_en ||
-            "",
+          empCode: profileDetails?.emp_code || (session as any)?.emp_code || "",
+          position: posName,
+          department: deptName,
+          templateName: tmplName,
+          version: `v${(effectiveTemplate as any)?.version || (matchedTemplate as any)?.template?.version || "1.0"}`,
         },
         selectedYear
       );
-      toast.success(isAr ? "تم تحميل ملف مؤشرات الأداء (PDF)" : "KPI Definition PDF downloaded");
+      toast.success(isAr ? "تم تحميل ملف مؤشرات الأداء (PDF)" : "KPI Definition PDF downloaded successfully");
     } catch (err) {
       console.error("KPI PDF export error:", err);
       toast.error(isAr ? "تعذر إنشاء ملف PDF" : "Failed to generate PDF");
@@ -790,30 +794,159 @@ export function EmployeeKpiPage() {
         {/* ══════════════════════════════════════════════════════════════════ */}
         {/* ── TAB: KPIS DEFINITION ── */}
         {/* ══════════════════════════════════════════════════════════════════ */}
-        <TabsContent value="kpis_definition" className="flex flex-col items-center justify-center py-12 gap-4">
-          <Button
-            onClick={handleDownloadKpiDefPdf}
-            disabled={isExportingKpiDefPdf || kpiRows.length === 0}
-            size="lg"
-            className="h-12 gap-2 rounded-2xl bg-brand text-brand-foreground font-semibold shadow hover:brightness-105 px-8 text-base"
-          >
-            {isExportingKpiDefPdf ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              <FileDown className="h-5 w-5" />
-            )}
-            {isAr ? "تحميل مؤشرات الأداء (PDF)" : "Download KPIs Definition (PDF)"}
-          </Button>
-          <p className="text-xs text-muted-foreground">
-            {kpiRows.length > 0 ? (
-              <>
-                <span className="font-mono font-bold text-foreground">{kpiRows.length}</span>
-                {" "}{isAr ? "مؤشر أداء — صفحة A4 أفقية" : "KPI indicators — Landscape A4"}
-              </>
-            ) : (
-              isAr ? "لا توجد مؤشرات أداء معرّفة بعد" : "No KPIs defined for your position yet"
-            )}
-          </p>
+        <TabsContent value="kpis_definition" className="space-y-6 pt-2">
+          {/* Executive Top Banner Card */}
+          <div className="rounded-2xl border bg-card p-5 md:p-6 shadow-sm">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-brand/10 text-brand">
+                    <Target className="h-3.5 w-3.5" />
+                    {isAr ? "مصفوفة مؤشرات الأداء الوظيفية" : "Official Position KPIs Definition"}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                    <CheckCheck className="h-3.5 w-3.5" />
+                    {isAr ? "معتمد وموثق" : "Approved & Active"}
+                  </span>
+                  <span className="text-xs text-muted-foreground font-mono">
+                    {selectedYear} Framework
+                  </span>
+                </div>
+                <h3 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+                  <Briefcase className="h-5 w-5 text-brand" />
+                  {profileDetails?.position || (effectiveTemplate as any)?.position?.name_en || (matchedTemplate as any)?.position_name || (isAr ? "المسمى الوظيفي" : "Position Performance Framework")}
+                </h3>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <Building2 className="h-3.5 w-3.5" />
+                    <strong className="text-foreground">{isAr ? "الإدارة:" : "Department:"}</strong>{" "}
+                    {profileDetails?.department || (effectiveTemplate as any)?.department?.name_en || (matchedTemplate as any)?.department_name || "—"}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Layers className="h-3.5 w-3.5" />
+                    <strong className="text-foreground">{isAr ? "النموذج:" : "Template:"}</strong>{" "}
+                    {(effectiveTemplate as any)?.name_en || (matchedTemplate as any)?.template?.name_en || "Standard KPI Matrix"}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                    <strong className="text-foreground">{activeScorecardItems.length}</strong>{" "}
+                    {isAr ? "مؤشرات أداء" : "KPI Indicators"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Action Button */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <Button
+                  onClick={handleDownloadKpiDefPdf}
+                  disabled={isExportingKpiDefPdf || activeScorecardItems.length === 0}
+                  size="lg"
+                  className="h-12 gap-2 rounded-2xl bg-brand text-brand-foreground font-semibold shadow hover:brightness-105 px-6 text-sm"
+                >
+                  {isExportingKpiDefPdf ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <FileDown className="h-4 w-4" />
+                  )}
+                  {isAr ? "تحميل مؤشرات الأداء (PDF)" : "Download KPIs Definition (PDF)"}
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* KPI Definition Preview Table */}
+          {activeScorecardItems.length > 0 ? (
+            <div className="rounded-2xl border bg-card shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-[#202020] text-white">
+                      <th className="py-3 px-3 w-10 text-center font-bold">#</th>
+                      <th className="py-3 px-3 w-40 font-semibold">{isAr ? "التصنيف" : "CATEGORY"}</th>
+                      <th className="py-3 px-3 w-52 font-semibold">{isAr ? "اسم المؤشر" : "KPI / METRIC NAME"}</th>
+                      <th className="py-3 px-4 font-semibold">{isAr ? "التعريف (ماذا يقيس)" : "DEFINITION (WHAT IT MEASURES)"}</th>
+                      <th className="py-3 px-4 font-semibold">{isAr ? "طريقة القياس (المعادلة)" : "HOW IT'S MEASURED"}</th>
+                      <th className="py-3 px-3 w-20 text-center font-semibold">{isAr ? "الوزن" : "WEIGHT (%)"}</th>
+                      <th className="py-3 px-3 w-20 text-center font-semibold">{isAr ? "المستهدف" : "TARGET"}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/60">
+                    {activeScorecardItems.map((item, idx) => {
+                      const weightPct = Math.round((Number(item.weight) > 1 ? Number(item.weight) : Number(item.weight || 0) * 100));
+                      const targetStr = item.unit === "scale" || item.unit === "rating_5"
+                        ? `${item.target} scale`
+                        : item.unit === "%"
+                        ? `${Math.round(Number(item.target || 100))}%`
+                        : `${item.target} ${item.unit || ""}`.trim();
+
+                      return (
+                        <tr
+                          key={item.id}
+                          className="hover:bg-muted/40 transition-colors"
+                        >
+                          <td className="py-3 px-3 text-center font-mono font-medium text-muted-foreground">
+                            {idx + 1}
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className="inline-block px-2.5 py-1 rounded-md text-[11px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
+                              {formatCategoryName(item.category, isAr)}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3">
+                            <div className="font-semibold text-foreground text-[12px]">
+                              {isAr ? item.name_ar || item.name : item.name}
+                            </div>
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                              {item.code || `KPI-${idx + 1}`}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-muted-foreground leading-relaxed">
+                            {(isAr ? item.definition_ar || item.definition : item.definition) || "—"}
+                          </td>
+                          <td className="py-3 px-4 text-foreground/80 leading-relaxed font-sans">
+                            {(isAr ? item.howMeasured_ar || item.howMeasured : item.howMeasured) || (item.unit ? `Measured in ${item.unit}` : "Standard measurement")}
+                          </td>
+                          <td className="py-3 px-3 text-center font-mono font-bold text-brand text-sm">
+                            {weightPct}%
+                          </td>
+                          <td className="py-3 px-3 text-center font-mono font-bold text-foreground">
+                            <span className="inline-block px-2 py-0.5 rounded bg-muted text-[11px]">
+                              {targetStr}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-muted/50 border-t-2 border-border font-bold text-xs">
+                      <td colSpan={5} className="py-3 px-4 text-right">
+                        {isAr ? "إجمالي الأوزان النسبية والمستهدف الكلي:" : "TOTAL WEIGHT & TARGET BENCHMARK:"}
+                      </td>
+                      <td className="py-3 px-3 text-center font-mono text-brand text-sm">
+                        {Math.round(activeScorecardItems.reduce((acc, it) => acc + (Number(it.weight) > 1 ? Number(it.weight) : Number(it.weight || 0) * 100), 0))}%
+                      </td>
+                      <td className="py-3 px-3 text-center font-mono text-emerald-600 dark:text-emerald-400">
+                        100%
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed p-12 text-center bg-card">
+              <Info className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+              <h4 className="font-semibold text-foreground mb-1">
+                {isAr ? "لا توجد مؤشرات أداء معرّفة لهذا المسمى الوظيفي بعد" : "No KPIs defined for your position yet"}
+              </h4>
+              <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                {isAr
+                  ? "يرجى مراجعة إدارة الموارد البشرية لربط نموذج مؤشرات الأداء المعتمد بوظيفتك."
+                  : "Please contact HR to assign the approved KPI definition template for your job title."}
+              </p>
+            </div>
+          )}
         </TabsContent>
 
         {/* ── TAB 1: JOB DESCRIPTION ── */}

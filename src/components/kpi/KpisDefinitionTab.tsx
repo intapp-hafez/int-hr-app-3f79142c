@@ -396,6 +396,7 @@ export function KpisDefinitionTab({
         .insert({
           name_en: nameEn,
           name_ar: nameAr,
+          criterion_type: "common",
           description_en: defEn,
           description_ar: defAr,
           category: newDefForm.category,
@@ -487,6 +488,7 @@ export function KpisDefinitionTab({
             .insert({
               name_en: row.name,
               name_ar: row.name,
+              criterion_type: "common",
               description_en: row.definition,
               description_ar: row.definition,
               category: row.category,
@@ -597,9 +599,10 @@ export function KpisDefinitionTab({
       await exportKpiDefinitionPdf(
         pdfRows,
         {
-          fullName: templateName,
           position: jobTitle,
           department: departmentName,
+          templateName: templateName,
+          version: `v${currentTemplate?.version || 1}`,
         },
         selectedYear
       );
