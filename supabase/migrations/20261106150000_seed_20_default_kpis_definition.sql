@@ -31,325 +31,506 @@ BEGIN
     RETURNING id INTO v_template_id;
   END IF;
 
-  -- 2. Define and Link 20 Core KPIs
+  -- 2. Define and Link 20 Core KPIs (Idempotent: insert if missing, update if existing)
+
   -- 1) Attendance & Punctuality
-  INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
-  VALUES ('Attendance & Punctuality', 'الانضباط والالتزام بساعات العمل', 'common', 'behavioral',
-          'Adherence to official site and office working hours, timely check-ins, and shift schedule compliance without unapproved absenteeism.',
-          'الالتزام التام بساعات العمل الرسمية وتسجيل الحضور والانصراف في المواعيد المحددة وعدم الغياب دون إذن مسبق.',
-          'Measured in %: (Actual days attended on time / Scheduled work days) * 100 via biometric attendance records.',
-          'يقاس بالنسبة المئوية: (أيام الحضور في الموعد / إجمالي أيام العمل المجدولة) * 100 عبر سجلات البصمة.',
-          '%', 0.05, 'higher_is_better', true, true)
-  ON CONFLICT (id) DO NOTHING;
   SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'Attendance & Punctuality' LIMIT 1;
-  IF v_crit_id IS NOT NULL THEN
-    INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
-    VALUES (v_template_id, v_crit_id, 0.05, 100, 1, '%')
-    ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 100, display_order = 1;
+  IF v_crit_id IS NULL THEN
+    INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
+    VALUES ('Attendance & Punctuality', 'الانضباط والالتزام بساعات العمل', 'common', 'behavioral',
+            'Adherence to official site and office working hours, timely check-ins, and shift schedule compliance without unapproved absenteeism.',
+            'الالتزام التام بساعات العمل الرسمية وتسجيل الحضور والانصراف في المواعيد المحددة وعدم الغياب دون إذن مسبق.',
+            'Measured in %: (Actual days attended on time / Scheduled work days) * 100 via biometric attendance records.',
+            'يقاس بالنسبة المئوية: (أيام الحضور في الموعد / إجمالي أيام العمل المجدولة) * 100 عبر سجلات البصمة.',
+            '%', 0.05, 'higher_is_better', true, true)
+    RETURNING id INTO v_crit_id;
+  ELSE
+    UPDATE public.kpi_criteria
+    SET name_ar = 'الانضباط والالتزام بساعات العمل', criterion_type = 'common', category = 'behavioral',
+        description_en = 'Adherence to official site and office working hours, timely check-ins, and shift schedule compliance without unapproved absenteeism.',
+        description_ar = 'الالتزام التام بساعات العمل الرسمية وتسجيل الحضور والانصراف في المواعيد المحددة وعدم الغياب دون إذن مسبق.',
+        how_measured_en = 'Measured in %: (Actual days attended on time / Scheduled work days) * 100 via biometric attendance records.',
+        how_measured_ar = 'يقاس بالنسبة المئوية: (أيام الحضور في الموعد / إجمالي أيام العمل المجدولة) * 100 عبر سجلات البصمة.',
+        unit = '%', default_weight = 0.05, scoring_direction = 'higher_is_better', is_active = true, is_required = true
+    WHERE id = v_crit_id;
   END IF;
+  INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
+  VALUES (v_template_id, v_crit_id, 0.05, 100, 1, '%')
+  ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 100, display_order = 1;
 
   -- 2) Teamwork & Cross-functional Collaboration
-  INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
-  VALUES ('Teamwork & Cross-functional Collaboration', 'العمل الجماعي والتعاون المشترك', 'common', 'behavioral',
-          'Active support to peers, constructive cross-departmental cooperation, knowledge sharing, and maintaining a positive work atmosphere.',
-          'التعاون الفعال مع الزملاء ومشاركة المعرفة والعمل بروح الفريق الواحد لدعم إنجاز المهام المشتركة بين الإدارات.',
-          'Measured in %: Quarterly supervisor and peer rubric evaluation converted to percentage.',
-          'يقاس بالنسبة المئوية بناءً على التقييم الربعي للإشراف والتعاون الجماعي.',
-          '%', 0.05, 'higher_is_better', true, true)
-  ON CONFLICT (id) DO NOTHING;
   SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'Teamwork & Cross-functional Collaboration' LIMIT 1;
-  IF v_crit_id IS NOT NULL THEN
-    INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
-    VALUES (v_template_id, v_crit_id, 0.05, 100, 2, '%')
-    ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 100, display_order = 2;
+  IF v_crit_id IS NULL THEN
+    INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
+    VALUES ('Teamwork & Cross-functional Collaboration', 'العمل الجماعي والتعاون المشترك', 'common', 'behavioral',
+            'Active support to peers, constructive cross-departmental cooperation, knowledge sharing, and maintaining a positive work atmosphere.',
+            'التعاون الفعال مع الزملاء ومشاركة المعرفة والعمل بروح الفريق الواحد لدعم إنجاز المهام المشتركة بين الإدارات.',
+            'Measured in %: Quarterly supervisor and peer rubric evaluation converted to percentage.',
+            'يقاس بالنسبة المئوية بناءً على التقييم الربعي للإشراف والتعاون الجماعي.',
+            '%', 0.05, 'higher_is_better', true, true)
+    RETURNING id INTO v_crit_id;
+  ELSE
+    UPDATE public.kpi_criteria
+    SET name_ar = 'العمل الجماعي والتعاون المشترك', criterion_type = 'common', category = 'behavioral',
+        description_en = 'Active support to peers, constructive cross-departmental cooperation, knowledge sharing, and maintaining a positive work atmosphere.',
+        description_ar = 'التعاون الفعال مع الزملاء ومشاركة المعرفة والعمل بروح الفريق الواحد لدعم إنجاز المهام المشتركة بين الإدارات.',
+        how_measured_en = 'Measured in %: Quarterly supervisor and peer rubric evaluation converted to percentage.',
+        how_measured_ar = 'يقاس بالنسبة المئوية بناءً على التقييم الربعي للإشراف والتعاون الجماعي.',
+        unit = '%', default_weight = 0.05, scoring_direction = 'higher_is_better', is_active = true, is_required = true
+    WHERE id = v_crit_id;
   END IF;
+  INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
+  VALUES (v_template_id, v_crit_id, 0.05, 100, 2, '%')
+  ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 100, display_order = 2;
 
   -- 3) Professional Communication & Reporting
-  INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
-  VALUES ('Professional Communication & Reporting', 'التواصل المهني ودقة التقارير', 'common', 'behavioral',
-          'Delivering clear, timely, and structured verbal and written communication with clients, managers, and external partners.',
-          'التواصل المهني الواضح ورفع التقارير الدورية في مواعيدها ومتابعة التعليمات بدقة عالية.',
-          'Measured in %: Timeliness and accuracy rate of submitted periodic operational reports.',
-          'يقاس بنسبة الالتزام بمواعيد تسليم التقارير وجودة الصياغة وخلوها من الأخطاء.',
-          '%', 0.05, 'higher_is_better', true, true)
-  ON CONFLICT (id) DO NOTHING;
   SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'Professional Communication & Reporting' LIMIT 1;
-  IF v_crit_id IS NOT NULL THEN
-    INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
-    VALUES (v_template_id, v_crit_id, 0.05, 100, 3, '%')
-    ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 100, display_order = 3;
+  IF v_crit_id IS NULL THEN
+    INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
+    VALUES ('Professional Communication & Reporting', 'التواصل المهني ودقة التقارير', 'common', 'behavioral',
+            'Delivering clear, timely, and structured verbal and written communication with clients, managers, and external partners.',
+            'التواصل المهني الواضح ورفع التقارير الدورية في مواعيدها ومتابعة التعليمات بدقة عالية.',
+            'Measured in %: Timeliness and accuracy rate of submitted periodic operational reports.',
+            'يقاس بنسبة الالتزام بمواعيد تسليم التقارير وجودة الصياغة وخلوها من الأخطاء.',
+            '%', 0.05, 'higher_is_better', true, true)
+    RETURNING id INTO v_crit_id;
+  ELSE
+    UPDATE public.kpi_criteria
+    SET name_ar = 'التواصل المهني ودقة التقارير', criterion_type = 'common', category = 'behavioral',
+        description_en = 'Delivering clear, timely, and structured verbal and written communication with clients, managers, and external partners.',
+        description_ar = 'التواصل المهني الواضح ورفع التقارير الدورية في مواعيدها ومتابعة التعليمات بدقة عالية.',
+        how_measured_en = 'Measured in %: Timeliness and accuracy rate of submitted periodic operational reports.',
+        how_measured_ar = 'يقاس بنسبة الالتزام بمواعيد تسليم التقارير وجودة الصياغة وخلوها من الأخطاء.',
+        unit = '%', default_weight = 0.05, scoring_direction = 'higher_is_better', is_active = true, is_required = true
+    WHERE id = v_crit_id;
   END IF;
+  INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
+  VALUES (v_template_id, v_crit_id, 0.05, 100, 3, '%')
+  ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 100, display_order = 3;
 
   -- 4) On-Time Task & Project Delivery
-  INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
-  VALUES ('On-Time Task & Project Delivery', 'تسليم المهام والمشاريع في الموعد المحدد', 'common', 'technical',
-          'Completion of scheduled project milestones, sprint deliverables, and daily work orders within established timelines.',
-          'إنجاز المهام المسندة والمراحل التنفيذية للمشاريع في التواريخ المتفق عليها دون تأخير غير مبرر.',
-          'Measured in %: (Tasks completed on or before deadline / Total assigned tasks) * 100.',
-          'يقاس بالنسبة المئوية: (المهام المنجزة في الموعد / إجمالي المهام المسندة) * 100.',
-          '%', 0.10, 'higher_is_better', true, true)
-  ON CONFLICT (id) DO NOTHING;
   SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'On-Time Task & Project Delivery' LIMIT 1;
-  IF v_crit_id IS NOT NULL THEN
-    INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
-    VALUES (v_template_id, v_crit_id, 0.10, 95, 4, '%')
-    ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.10, target_benchmark = 95, display_order = 4;
+  IF v_crit_id IS NULL THEN
+    INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
+    VALUES ('On-Time Task & Project Delivery', 'تسليم المهام والمشاريع في الموعد المحدد', 'common', 'technical',
+            'Completion of scheduled project milestones, sprint deliverables, and daily work orders within established timelines.',
+            'إنجاز المهام المسندة والمراحل التنفيذية للمشاريع في التواريخ المتفق عليها دون تأخير غير مبرر.',
+            'Measured in %: (Tasks completed on or before deadline / Total assigned tasks) * 100.',
+            'يقاس بالنسبة المئوية: (المهام المنجزة في الموعد / إجمالي المهام المسندة) * 100.',
+            '%', 0.10, 'higher_is_better', true, true)
+    RETURNING id INTO v_crit_id;
+  ELSE
+    UPDATE public.kpi_criteria
+    SET name_ar = 'تسليم المهام والمشاريع في الموعد المحدد', criterion_type = 'common', category = 'technical',
+        description_en = 'Completion of scheduled project milestones, sprint deliverables, and daily work orders within established timelines.',
+        description_ar = 'إنجاز المهام المسندة والمراحل التنفيذية للمشاريع في التواريخ المتفق عليها دون تأخير غير مبرر.',
+        how_measured_en = 'Measured in %: (Tasks completed on or before deadline / Total assigned tasks) * 100.',
+        how_measured_ar = 'يقاس بالنسبة المئوية: (المهام المنجزة في الموعد / إجمالي المهام المسندة) * 100.',
+        unit = '%', default_weight = 0.10, scoring_direction = 'higher_is_better', is_active = true, is_required = true
+    WHERE id = v_crit_id;
   END IF;
+  INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
+  VALUES (v_template_id, v_crit_id, 0.10, 95, 4, '%')
+  ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.10, target_benchmark = 95, display_order = 4;
 
   -- 5) Work Quality & First-Time Accuracy
-  INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
-  VALUES ('Work Quality & First-Time Accuracy', 'جودة العمل والدقة من المرة الأولى', 'common', 'quality',
-          'Delivering error-free outputs compliant with specifications, minimizing rework, defects, and client rejections.',
-          'تقديم مخرجات دقيقة ومطابقة للمواصفات الفنية مع تقليل التعديلات والأخطاء وإعادة العمل لأدنى حد.',
-          'Measured in %: (Deliverables approved without rework / Total deliverables submitted) * 100.',
-          'يقاس بالنسبة المئوية: (المخرجات المعتمدة من أول مرة / إجمالي المخرجات المقدمة) * 100.',
-          '%', 0.10, 'higher_is_better', true, true)
-  ON CONFLICT (id) DO NOTHING;
   SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'Work Quality & First-Time Accuracy' LIMIT 1;
-  IF v_crit_id IS NOT NULL THEN
-    INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
-    VALUES (v_template_id, v_crit_id, 0.10, 95, 5, '%')
-    ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.10, target_benchmark = 95, display_order = 5;
+  IF v_crit_id IS NULL THEN
+    INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
+    VALUES ('Work Quality & First-Time Accuracy', 'جودة العمل والدقة من المرة الأولى', 'common', 'quality',
+            'Delivering error-free outputs, reports, or deliverables that meet technical specifications without rework or client rejection.',
+            'تقديم مخرجات وتقارير خالية من الأخطاء ومطابقة للمواصفات الفنية دون الحاجة لإعادة العمل أو تعديلات جوهرية.',
+            'Measured in %: 100 - ((Reworked tasks / Total completed tasks) * 100).',
+            'يقاس بالنسبة المئوية: 100 - ((المهام المعاد تنفيذها / إجمالي المهام المنجزة) * 100).',
+            '%', 0.10, 'higher_is_better', true, true)
+    RETURNING id INTO v_crit_id;
+  ELSE
+    UPDATE public.kpi_criteria
+    SET name_ar = 'جودة العمل والدقة من المرة الأولى', criterion_type = 'common', category = 'quality',
+        description_en = 'Delivering error-free outputs, reports, or deliverables that meet technical specifications without rework or client rejection.',
+        description_ar = 'تقديم مخرجات وتقارير خالية من الأخطاء ومطابقة للمواصفات الفنية دون الحاجة لإعادة العمل أو تعديلات جوهرية.',
+        how_measured_en = 'Measured in %: 100 - ((Reworked tasks / Total completed tasks) * 100).',
+        how_measured_ar = 'يقاس بالنسبة المئوية: 100 - ((المهام المعاد تنفيذها / إجمالي المهام المنجزة) * 100).',
+        unit = '%', default_weight = 0.10, scoring_direction = 'higher_is_better', is_active = true, is_required = true
+    WHERE id = v_crit_id;
   END IF;
+  INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
+  VALUES (v_template_id, v_crit_id, 0.10, 98, 5, '%')
+  ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.10, target_benchmark = 98, display_order = 5;
 
-  -- 6) Problem-Solving & Technical Troubleshooting
-  INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
-  VALUES ('Problem-Solving & Technical Troubleshooting', 'سرعة وكفاءة حل المشكلات والأعطال', 'common', 'technical',
-          'Swift identification of root causes and implementing robust, sustainable solutions for operational and technical issues.',
-          'القدرة على التشخيص السريع لجذور المشكلات وتقديم حلول جذرية وعملية تضمن استمرارية الأعمال.',
-          'Measured in %: (Issues resolved within SLA timeframe / Total issues logged) * 100.',
-          'يقاس بالنسبة المئوية: (المشكلات المحلولة ضمن وقت الاستجابة المعتمد / إجمالي البلاغات) * 100.',
-          '%', 0.05, 'higher_is_better', true, true)
-  ON CONFLICT (id) DO NOTHING;
-  SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'Problem-Solving & Technical Troubleshooting' LIMIT 1;
-  IF v_crit_id IS NOT NULL THEN
-    INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
-    VALUES (v_template_id, v_crit_id, 0.05, 90, 6, '%')
-    ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 90, display_order = 6;
+  -- 6) Problem Solving & Root Cause Resolution
+  SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'Problem Solving & Root Cause Resolution' LIMIT 1;
+  IF v_crit_id IS NULL THEN
+    INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
+    VALUES ('Problem Solving & Root Cause Resolution', 'حل المشكلات ومعالجة الأسباب الجذرية', 'common', 'technical',
+            'Identifying operational bottlenecks, diagnosing technical root causes, and applying lasting corrective and preventive solutions.',
+            'القدرة على تشخيص الأعطال وتحديد أسباب المشكلات الجذرية وابتكار حلول جذرية تمنع تكرارها.',
+            'Measured in %: (Incidents resolved within SLA / Total assigned incidents) * 100.',
+            'يقاس بالنسبة المئوية: (المشكلات المعالجة بنجاح / إجمالي البلاغات) * 100.',
+            '%', 0.05, 'higher_is_better', true, true)
+    RETURNING id INTO v_crit_id;
+  ELSE
+    UPDATE public.kpi_criteria
+    SET name_ar = 'حل المشكلات ومعالجة الأسباب الجذرية', criterion_type = 'common', category = 'technical',
+        description_en = 'Identifying operational bottlenecks, diagnosing technical root causes, and applying lasting corrective and preventive solutions.',
+        description_ar = 'القدرة على تشخيص الأعطال وتحديد أسباب المشكلات الجذرية وابتكار حلول جذرية تمنع تكرارها.',
+        how_measured_en = 'Measured in %: (Incidents resolved within SLA / Total assigned incidents) * 100.',
+        how_measured_ar = 'يقاس بالنسبة المئوية: (المشكلات المعالجة بنجاح / إجمالي البلاغات) * 100.',
+        unit = '%', default_weight = 0.05, scoring_direction = 'higher_is_better', is_active = true, is_required = true
+    WHERE id = v_crit_id;
   END IF;
+  INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
+  VALUES (v_template_id, v_crit_id, 0.05, 90, 6, '%')
+  ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 90, display_order = 6;
 
-  -- 7) Productivity & Target Achievement Rate
-  INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
-  VALUES ('Productivity & Target Achievement Rate', 'معدل الإنتاجية وتحقيق الأهداف المحددة', 'common', 'productivity',
-          'Volume of output and achievement rate compared to agreed quarterly department production quotas.',
-          'حجم الإنجاز الفعلي مقارنة بالأهداف الإنتاجية والخطط التشغيلية المعتمدة للربع السنوي.',
-          'Measured in %: (Actual completed units or milestones / Planned target quota) * 100.',
-          'يقاس بالنسبة المئوية: (الإنجاز الفعلي / المستهدف المخطط له) * 100.',
-          '%', 0.05, 'higher_is_better', true, true)
-  ON CONFLICT (id) DO NOTHING;
-  SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'Productivity & Target Achievement Rate' LIMIT 1;
-  IF v_crit_id IS NOT NULL THEN
-    INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
-    VALUES (v_template_id, v_crit_id, 0.05, 100, 7, '%')
-    ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 100, display_order = 7;
+  -- 7) Technical Competence & Standards Adherence
+  SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'Technical Competence & Standards Adherence' LIMIT 1;
+  IF v_crit_id IS NULL THEN
+    INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
+    VALUES ('Technical Competence & Standards Adherence', 'الكفاءة الفنية والالتزام بالمعايير', 'common', 'technical',
+            'Applying specialized job-related technical knowledge and strictly complying with industry best practices and technical manuals.',
+            'تطبيق المعرفة الفنية التخصصية بدقة والالتزام الصارم بالأدلة الإرشادية والمعايير المعتمدة.',
+            'Measured in %: Quarterly technical supervisor review score based on standard skill matrix evaluation.',
+            'يقاس بالنسبة المئوية عبر مصفوفة تقييم الكفاءة الفنية الدورية.',
+            '%', 0.05, 'higher_is_better', true, true)
+    RETURNING id INTO v_crit_id;
+  ELSE
+    UPDATE public.kpi_criteria
+    SET name_ar = 'الكفاءة الفنية والالتزام بالمعايير', criterion_type = 'common', category = 'technical',
+        description_en = 'Applying specialized job-related technical knowledge and strictly complying with industry best practices and technical manuals.',
+        description_ar = 'تطبيق المعرفة الفنية التخصصية بدقة والالتزام الصارم بالأدلة الإرشادية والمعايير المعتمدة.',
+        how_measured_en = 'Measured in %: Quarterly technical supervisor review score based on standard skill matrix evaluation.',
+        how_measured_ar = 'يقاس بالنسبة المئوية عبر مصفوفة تقييم الكفاءة الفنية الدورية.',
+        unit = '%', default_weight = 0.05, scoring_direction = 'higher_is_better', is_active = true, is_required = true
+    WHERE id = v_crit_id;
   END IF;
+  INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
+  VALUES (v_template_id, v_crit_id, 0.05, 95, 7, '%')
+  ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 95, display_order = 7;
 
-  -- 8) Customer & Stakeholder Satisfaction
-  INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
-  VALUES ('Customer & Stakeholder Satisfaction', 'رضا العملاء وأصحاب المصلحة', 'common', 'quality',
-          'Achieving high satisfaction ratings from internal departments, external clients, and key partners.',
-          'تحقيق مستويات رضا عالية من العملاء الداخليين والخارجيين وحسن الاستجابة لمتطلباتهم.',
-          'Measured in %: Average CSAT rating score from customer feedback surveys.',
-          'يقاس بنسبة متوسط تقييم رضا العملاء من استبيانات التقييم المعتمدة.',
-          '%', 0.05, 'higher_is_better', true, true)
-  ON CONFLICT (id) DO NOTHING;
-  SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'Customer & Stakeholder Satisfaction' LIMIT 1;
-  IF v_crit_id IS NOT NULL THEN
-    INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
-    VALUES (v_template_id, v_crit_id, 0.05, 90, 8, '%')
-    ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 90, display_order = 8;
+  -- 8) Daily Output & Productivity Rate
+  SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'Daily Output & Productivity Rate' LIMIT 1;
+  IF v_crit_id IS NULL THEN
+    INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
+    VALUES ('Daily Output & Productivity Rate', 'معدل الإنتاجية والإنجاز اليومي', 'common', 'productivity',
+            'Volume of approved deliverables or operational transactions processed relative to scheduled production quotas.',
+            'حجم المخرجات المعتمدة أو المعاملات المنجزة مقارنة بالمستهدفات القياسية المحددة للوظيفة.',
+            'Measured in %: (Actual completed units / Target benchmark units) * 100.',
+            'يقاس بالنسبة المئوية: (الوحدات المنجزة فعلياً / المستهدف القياسي) * 100.',
+            '%', 0.05, 'higher_is_better', true, true)
+    RETURNING id INTO v_crit_id;
+  ELSE
+    UPDATE public.kpi_criteria
+    SET name_ar = 'معدل الإنتاجية والإنجاز اليومي', criterion_type = 'common', category = 'productivity',
+        description_en = 'Volume of approved deliverables or operational transactions processed relative to scheduled production quotas.',
+        description_ar = 'حجم المخرجات المعتمدة أو المعاملات المنجزة مقارنة بالمستهدفات القياسية المحددة للوظيفة.',
+        how_measured_en = 'Measured in %: (Actual completed units / Target benchmark units) * 100.',
+        how_measured_ar = 'يقاس بالنسبة المئوية: (الوحدات المنجزة فعلياً / المستهدف القياسي) * 100.',
+        unit = '%', default_weight = 0.05, scoring_direction = 'higher_is_better', is_active = true, is_required = true
+    WHERE id = v_crit_id;
   END IF;
+  INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
+  VALUES (v_template_id, v_crit_id, 0.05, 100, 8, '%')
+  ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 100, display_order = 8;
 
-  -- 9) Cost Control & Resource Optimization
-  INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
-  VALUES ('Cost Control & Resource Optimization', 'ترشيد النفقات والاستخدام الأمثل للموارد', 'common', 'productivity',
-          'Optimizing material usage, preventing wastage, and operating within allocated budgetary allowances.',
-          'الاستغلال الأمثل لموارد وأصول الشركة والحد من الهدر والالتزام بالميزانيات التقديرية المعتمدة.',
-          'Measured in %: (Actual expenditure / Budgeted cost) variance within <= 0% overspend.',
-          'يقاس بنسبة التزام النفقات الفعلية مقارنة بالميزانية المعتمدة مع عدم وجود عجز.',
-          '%', 0.05, 'higher_is_better', true, true)
-  ON CONFLICT (id) DO NOTHING;
-  SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'Cost Control & Resource Optimization' LIMIT 1;
-  IF v_crit_id IS NOT NULL THEN
-    INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
-    VALUES (v_template_id, v_crit_id, 0.05, 100, 9, '%')
-    ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 100, display_order = 9;
+  -- 9) Process Optimization & Efficiency
+  SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'Process Optimization & Efficiency' LIMIT 1;
+  IF v_crit_id IS NULL THEN
+    INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
+    VALUES ('Process Optimization & Efficiency', 'تحسين وتطوير كفاءة العمليات', 'common', 'productivity',
+            'Proactive efforts to reduce processing cycle times, eliminate manual redundancies, and streamline operational workflows.',
+            'المبادرة إلى تقليص زمن إنجاز العمليات والقضاء على التكرار وتبسيط الإجراءات اليومية.',
+            'Measured in %: Documented reduction in cycle time or verified process improvement milestones.',
+            'يقاس بنسبة التحسن في زمن المعالجة وتقليص الإهدار الموثق.',
+            '%', 0.05, 'higher_is_better', true, true)
+    RETURNING id INTO v_crit_id;
+  ELSE
+    UPDATE public.kpi_criteria
+    SET name_ar = 'تحسين وتطوير كفاءة العمليات', criterion_type = 'common', category = 'productivity',
+        description_en = 'Proactive efforts to reduce processing cycle times, eliminate manual redundancies, and streamline operational workflows.',
+        description_ar = 'المبادرة إلى تقليص زمن إنجاز العمليات والقضاء على التكرار وتبسيط الإجراءات اليومية.',
+        how_measured_en = 'Measured in %: Documented reduction in cycle time or verified process improvement milestones.',
+        how_measured_ar = 'يقاس بنسبة التحسن في زمن المعالجة وتقليص الإهدار الموثق.',
+        unit = '%', default_weight = 0.05, scoring_direction = 'higher_is_better', is_active = true, is_required = true
+    WHERE id = v_crit_id;
   END IF;
+  INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
+  VALUES (v_template_id, v_crit_id, 0.05, 90, 9, '%')
+  ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 90, display_order = 9;
 
-  -- 10) Safety & Regulatory Policy Compliance
-  INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
-  VALUES ('Safety & Regulatory Policy Compliance', 'الالتزام بالسلامة المهنية والسياسات المؤسسية', 'common', 'safety',
-          'Strict adherence to occupational health and safety rules, cybersecurity guidelines, and company SOPs.',
-          'الالتزام بقواعد السلامة والصحة المهنية والأمن السيبراني واللوائح الداخلية للشركة.',
-          'Measured in %: Zero safety or compliance violations recorded during the evaluation period.',
-          'يقاس بنسبة مئوية (100% تعني خلو السجل من أي مخالفات سلامة أو إجراءات تشغيلية).',
-          '%', 0.05, 'higher_is_better', true, true)
-  ON CONFLICT (id) DO NOTHING;
-  SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'Safety & Regulatory Policy Compliance' LIMIT 1;
-  IF v_crit_id IS NOT NULL THEN
-    INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
-    VALUES (v_template_id, v_crit_id, 0.05, 100, 10, '%')
-    ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 100, display_order = 10;
+  -- 10) Resource & Budget Utilization
+  SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'Resource & Budget Utilization' LIMIT 1;
+  IF v_crit_id IS NULL THEN
+    INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
+    VALUES ('Resource & Budget Utilization', 'كفاءة إدارة الموارد والميزانية', 'common', 'productivity',
+            'Prudent management of assigned budgets, consumables, equipment, and company assets without wasteful expenditure.',
+            'الترشيد في استخدام الموارد المتاحة والميزانيات المخصصة وحماية أصول وممتلكات المنشأة.',
+            'Measured in %: ((Allocated budget - Cost variance) / Allocated budget) * 100 within +/- 5% tolerance.',
+            'يقاس بنسبة الالتزام بالميزانية المحددة وتجنب الهدر المالي.',
+            '%', 0.05, 'higher_is_better', true, true)
+    RETURNING id INTO v_crit_id;
+  ELSE
+    UPDATE public.kpi_criteria
+    SET name_ar = 'كفاءة إدارة الموارد والميزانية', criterion_type = 'common', category = 'productivity',
+        description_en = 'Prudent management of assigned budgets, consumables, equipment, and company assets without wasteful expenditure.',
+        description_ar = 'الترشيد في استخدام الموارد المتاحة والميزانيات المخصصة وحماية أصول وممتلكات المنشأة.',
+        how_measured_en = 'Measured in %: ((Allocated budget - Cost variance) / Allocated budget) * 100 within +/- 5% tolerance.',
+        how_measured_ar = 'يقاس بنسبة الالتزام بالميزانية المحددة وتجنب الهدر المالي.',
+        unit = '%', default_weight = 0.05, scoring_direction = 'higher_is_better', is_active = true, is_required = true
+    WHERE id = v_crit_id;
   END IF;
+  INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
+  VALUES (v_template_id, v_crit_id, 0.05, 100, 10, '%')
+  ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 100, display_order = 10;
 
-  -- 11) Continuous Learning & Professional Training
-  INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
-  VALUES ('Continuous Learning & Professional Training', 'التطوير الذاتي والتدريب المستمر', 'common', 'behavioral',
-          'Completing mandatory skill development courses, acquiring relevant certifications, and attending workshops.',
-          'إتمام الدورات التدريبية المعتمدة وتطوير المهارات التخصصية ونقل المعرفة للزملاء.',
-          'Measured in %: (Actual training hours completed / Planned annual training hours) * 100.',
-          'يقاس بنسبة ساعات التدريب المنجزة مقارنة بالساعات المقررة سنوياً.',
-          '%', 0.05, 'higher_is_better', true, true)
-  ON CONFLICT (id) DO NOTHING;
-  SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'Continuous Learning & Professional Training' LIMIT 1;
-  IF v_crit_id IS NOT NULL THEN
-    INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
-    VALUES (v_template_id, v_crit_id, 0.05, 100, 11, '%')
-    ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 100, display_order = 11;
+  -- 11) Customer / Stakeholder Satisfaction
+  SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'Customer / Stakeholder Satisfaction' LIMIT 1;
+  IF v_crit_id IS NULL THEN
+    INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
+    VALUES ('Customer / Stakeholder Satisfaction', 'رضا العملاء والجهات المستفيدة', 'common', 'quality',
+            'Satisfaction rating from internal departments, external clients, or stakeholders regarding service delivery and responsiveness.',
+            'نسبة رضا العملاء الداخليين والخارجيين وأصحاب المصلحة عن جودة وسرعة تقديم الخدمات.',
+            'Measured in %: Positive feedback score percentage from periodic customer/stakeholder surveys.',
+            'يقاس بالنسبة المئوية عبر استطلاعات قياس رضا العملاء والمستفيدين.',
+            '%', 0.05, 'higher_is_better', true, true)
+    RETURNING id INTO v_crit_id;
+  ELSE
+    UPDATE public.kpi_criteria
+    SET name_ar = 'رضا العملاء والجهات المستفيدة', criterion_type = 'common', category = 'quality',
+        description_en = 'Satisfaction rating from internal departments, external clients, or stakeholders regarding service delivery and responsiveness.',
+        description_ar = 'نسبة رضا العملاء الداخليين والخارجيين وأصحاب المصلحة عن جودة وسرعة تقديم الخدمات.',
+        how_measured_en = 'Measured in %: Positive feedback score percentage from periodic customer/stakeholder surveys.',
+        how_measured_ar = 'يقاس بالنسبة المئوية عبر استطلاعات قياس رضا العملاء والمستفيدين.',
+        unit = '%', default_weight = 0.05, scoring_direction = 'higher_is_better', is_active = true, is_required = true
+    WHERE id = v_crit_id;
   END IF;
+  INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
+  VALUES (v_template_id, v_crit_id, 0.05, 90, 11, '%')
+  ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 90, display_order = 11;
 
-  -- 12) Initiative & Process Innovation
-  INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
-  VALUES ('Initiative & Process Innovation', 'المبادرة والابتكار في تحسين بيئة العمل', 'common', 'productivity',
-          'Proactively proposing and implementing process optimizations, automation scripts, or efficiency ideas.',
-          'تقديم مقترحات بناءة وحلول ابتكارية تسهم في تبسيط الإجراءات وأتمتة العمليات وتقليل التكاليف.',
-          'Measured in scale (1-5): Number of accepted improvement initiatives submitted per quarter.',
-          'يقاس بمقياس (1 إلى 5) بحسب عدد المبادرات التحسينية المعتمدة والمنفذة خلال الربع.',
-          'scale', 0.05, 'higher_is_better', true, true)
-  ON CONFLICT (id) DO NOTHING;
-  SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'Initiative & Process Innovation' LIMIT 1;
-  IF v_crit_id IS NOT NULL THEN
-    INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
-    VALUES (v_template_id, v_crit_id, 0.05, 100, 12, 'scale')
-    ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 100, display_order = 12;
+  -- 12) Workplace Safety & Compliance
+  SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'Workplace Safety & Compliance' LIMIT 1;
+  IF v_crit_id IS NULL THEN
+    INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
+    VALUES ('Workplace Safety & Compliance', 'السلامة المهنية والامتثال للأنظمة', 'common', 'safety',
+            'Compliance with environmental health, safety standards, PPE requirements, and statutory regulatory requirements.',
+            'الالتزام الصارم بقواعد السلامة والصحة المهنية وارتداء معدات الوقاية والامتثال للأنظمة.',
+            'Measured in %: Safety checklist compliance rate and zero recorded non-compliance incidents.',
+            'يقاس بنسبة الالتزام بقوائم التحقق للسلامة وخلو السجل من أي مخالفات.',
+            '%', 0.05, 'higher_is_better', true, true)
+    RETURNING id INTO v_crit_id;
+  ELSE
+    UPDATE public.kpi_criteria
+    SET name_ar = 'السلامة المهنية والامتثال للأنظمة', criterion_type = 'common', category = 'safety',
+        description_en = 'Compliance with environmental health, safety standards, PPE requirements, and statutory regulatory requirements.',
+        description_ar = 'الالتزام الصارم بقواعد السلامة والصحة المهنية وارتداء معدات الوقاية والامتثال للأنظمة.',
+        how_measured_en = 'Measured in %: Safety checklist compliance rate and zero recorded non-compliance incidents.',
+        how_measured_ar = 'يقاس بنسبة الالتزام بقوائم التحقق للسلامة وخلو السجل من أي مخالفات.',
+        unit = '%', default_weight = 0.05, scoring_direction = 'higher_is_better', is_active = true, is_required = true
+    WHERE id = v_crit_id;
   END IF;
+  INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
+  VALUES (v_template_id, v_crit_id, 0.05, 100, 12, '%')
+  ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 100, display_order = 12;
 
-  -- 13) Documentation Completeness & Archiving
-  INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
-  VALUES ('Documentation Completeness & Archiving', 'اكتمال التوثيق والأرشفة المؤسسية', 'common', 'quality',
-          'Maintaining up-to-date documentation of workflows, system configurations, technical specifications, and logs.',
-          'توثيق كافة المستندات وسجلات العمل والكتيبات الفنية وأرشفتها بنظام الشركة الموحد.',
-          'Measured in %: Audit compliance score on documentation completeness and accessibility.',
-          'يقاس بنسبة اكتمال الملفات والوثائق المؤرشفة أثناء المراجعة الدورية.',
-          '%', 0.05, 'higher_is_better', true, true)
-  ON CONFLICT (id) DO NOTHING;
-  SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'Documentation Completeness & Archiving' LIMIT 1;
-  IF v_crit_id IS NOT NULL THEN
-    INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
-    VALUES (v_template_id, v_crit_id, 0.05, 100, 13, '%')
-    ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 100, display_order = 13;
+  -- 13) Confidentiality & Data Security
+  SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'Confidentiality & Data Security' LIMIT 1;
+  IF v_crit_id IS NULL THEN
+    INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
+    VALUES ('Confidentiality & Data Security', 'السرية وأمن المعلومات والبيانات', 'common', 'safety',
+            'Protecting proprietary company data, maintaining credential security, and preventing unauthorized information leaks.',
+            'حماية خصوصية وسرية بيانات الشركة والعملاء والالتزام بضوابط الأمن السيبراني ومنع تسريب المعلومات.',
+            'Measured in %: Compliance with information security controls and zero security audit infractions.',
+            'يقاس بنسبة الالتزام بضوابط أمن المعلومات وخلو السجل من أي انتهاكات سرية.',
+            '%', 0.05, 'higher_is_better', true, true)
+    RETURNING id INTO v_crit_id;
+  ELSE
+    UPDATE public.kpi_criteria
+    SET name_ar = 'السرية وأمن المعلومات والبيانات', criterion_type = 'common', category = 'safety',
+        description_en = 'Protecting proprietary company data, maintaining credential security, and preventing unauthorized information leaks.',
+        description_ar = 'حماية خصوصية وسرية بيانات الشركة والعملاء والالتزام بضوابط الأمن السيبراني ومنع تسريب المعلومات.',
+        how_measured_en = 'Measured in %: Compliance with information security controls and zero security audit infractions.',
+        how_measured_ar = 'يقاس بنسبة الالتزام بضوابط أمن المعلومات وخلو السجل من أي انتهاكات سرية.',
+        unit = '%', default_weight = 0.05, scoring_direction = 'higher_is_better', is_active = true, is_required = true
+    WHERE id = v_crit_id;
   END IF;
+  INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
+  VALUES (v_template_id, v_crit_id, 0.05, 100, 13, '%')
+  ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 100, display_order = 13;
 
-  -- 14) System & Service Uptime Availability
-  INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
-  VALUES ('System & Service Uptime Availability', 'جاهزية واستمرارية الأنظمة والخدمات', 'common', 'technical',
-          'Ensuring assigned systems, databases, software platforms, or infrastructure assets remain online with minimal downtime.',
-          'الحفاظ على استمرارية تشغيل الأنظمة والمنصات التقنية والأجهزة وتفادي التوقفات غير المخططة.',
-          'Measured in %: (Actual operational uptime hours / Total scheduled hours) * 100.',
-          'يقاس بنسبة الجاهزية والتشغيل الفعلي مقارنة بإجمالي ساعات العمل المجدولة.',
-          '%', 0.05, 'higher_is_better', true, true)
-  ON CONFLICT (id) DO NOTHING;
-  SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'System & Service Uptime Availability' LIMIT 1;
-  IF v_crit_id IS NOT NULL THEN
-    INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
-    VALUES (v_template_id, v_crit_id, 0.05, 99, 14, '%')
-    ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 99, display_order = 14;
+  -- 14) Initiative & Continuous Improvement
+  SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'Initiative & Continuous Improvement' LIMIT 1;
+  IF v_crit_id IS NULL THEN
+    INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
+    VALUES ('Initiative & Continuous Improvement', 'روح المبادرة والتطوير المستمر', 'common', 'behavioral',
+            'Demonstrating self-directed initiative, proposing practical workflow enhancements, and executing value-adding ideas.',
+            'تقديم مقترحات بناءة لتطوير بيئة العمل والمبادرة الذاتية لتحقيق قيمة مضافة للمنشأة.',
+            'Measured in %: Number of approved improvement proposals or value-add contributions implemented.',
+            'يقاس بنسبة المبادرات والمقترحات المطبقة بنجاح.',
+            '%', 0.05, 'higher_is_better', true, true)
+    RETURNING id INTO v_crit_id;
+  ELSE
+    UPDATE public.kpi_criteria
+    SET name_ar = 'روح المبادرة والتطوير المستمر', criterion_type = 'common', category = 'behavioral',
+        description_en = 'Demonstrating self-directed initiative, proposing practical workflow enhancements, and executing value-adding ideas.',
+        description_ar = 'تقديم مقترحات بناءة لتطوير بيئة العمل والمبادرة الذاتية لتحقيق قيمة مضافة للمنشأة.',
+        how_measured_en = 'Measured in %: Number of approved improvement proposals or value-add contributions implemented.',
+        how_measured_ar = 'يقاس بنسبة المبادرات والمقترحات المطبقة بنجاح.',
+        unit = '%', default_weight = 0.05, scoring_direction = 'higher_is_better', is_active = true, is_required = true
+    WHERE id = v_crit_id;
   END IF;
+  INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
+  VALUES (v_template_id, v_crit_id, 0.05, 90, 14, '%')
+  ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 90, display_order = 14;
 
-  -- 15) Response Time to Service Inquiries
-  INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
-  VALUES ('Response Time to Service Inquiries', 'سرعة الاستجابة لطلبات الخدمة والدعم', 'common', 'productivity',
-          'Timely initial response and continuous update cycle for all incoming support tickets, internal requests, and client calls.',
-          'الالتزام بالرد السريع ومتابعة التذاكر وطلبات الدعم الفني والخدمات الموجهة خلال الوقت المحدد.',
-          'Measured in %: (Inquiries acknowledged within standard SLA / Total received inquiries) * 100.',
-          'يقاس بالنسبة المئوية للطلبات التي تم الرد عليها ضمن معيار اتفاقية مستوى الخدمة SLA.',
-          '%', 0.05, 'higher_is_better', true, true)
-  ON CONFLICT (id) DO NOTHING;
-  SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'Response Time to Service Inquiries' LIMIT 1;
-  IF v_crit_id IS NOT NULL THEN
-    INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
-    VALUES (v_template_id, v_crit_id, 0.05, 95, 15, '%')
-    ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 95, display_order = 15;
+  -- 15) Adaptability & Change Management
+  SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'Adaptability & Change Management' LIMIT 1;
+  IF v_crit_id IS NULL THEN
+    INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
+    VALUES ('Adaptability & Change Management', 'المرونة والتكيف مع التغييرات', 'common', 'behavioral',
+            'Flexibility in responding to changing operational requirements, organizational transitions, and new technological platforms.',
+            'المرونة في التعامل مع متطلبات العمل المتغيرة والتكيف السريع مع الأدوات والأنظمة والسياسات الجديدة.',
+            'Measured in %: Managerial evaluation rubric score on response and resilience during organizational shifts.',
+            'يقاس بدرجة تقييم المرونة وسرعة الاستجابة للمتغيرات الوظيفية.',
+            '%', 0.05, 'higher_is_better', true, true)
+    RETURNING id INTO v_crit_id;
+  ELSE
+    UPDATE public.kpi_criteria
+    SET name_ar = 'المرونة والتكيف مع التغييرات', criterion_type = 'common', category = 'behavioral',
+        description_en = 'Flexibility in responding to changing operational requirements, organizational transitions, and new technological platforms.',
+        description_ar = 'المرونة في التعامل مع متطلبات العمل المتغيرة والتكيف السريع مع الأدوات والأنظمة والسياسات الجديدة.',
+        how_measured_en = 'Measured in %: Managerial evaluation rubric score on response and resilience during organizational shifts.',
+        how_measured_ar = 'يقاس بدرجة تقييم المرونة وسرعة الاستجابة للمتغيرات الوظيفية.',
+        unit = '%', default_weight = 0.05, scoring_direction = 'higher_is_better', is_active = true, is_required = true
+    WHERE id = v_crit_id;
   END IF;
+  INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
+  VALUES (v_template_id, v_crit_id, 0.05, 90, 15, '%')
+  ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 90, display_order = 15;
 
-  -- 16) Budget Adherence & Financial Accuracy
-  INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
-  VALUES ('Budget Adherence & Financial Accuracy', 'الالتزام بالموازنة التقديرية والدقة المالية', 'common', 'productivity',
-          'Accurate accounting entries, zero financial discrepancies, and strictly operating within designated budget caps.',
-          'الدقة في إعداد القيود والمطالبات المالية والالتزام بسقوف الإنفاق المعتمدة دون تجاوز.',
-          'Measured in %: Accuracy rate of invoices, purchase orders, and zero recurring accounting reconciliations.',
-          'يقاس بنسبة الدقة وخلو المطالبات وأوامر الشراء من الأخطاء والتباينات المالية.',
-          '%', 0.05, 'higher_is_better', true, true)
-  ON CONFLICT (id) DO NOTHING;
-  SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'Budget Adherence & Financial Accuracy' LIMIT 1;
-  IF v_crit_id IS NOT NULL THEN
-    INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
-    VALUES (v_template_id, v_crit_id, 0.05, 100, 16, '%')
-    ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 100, display_order = 16;
+  -- 16) Documentation & Knowledge Base Maintenance
+  SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'Documentation & Knowledge Base Maintenance' LIMIT 1;
+  IF v_crit_id IS NULL THEN
+    INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
+    VALUES ('Documentation & Knowledge Base Maintenance', 'التوثيق وتحديث قاعدة المعرفة', 'common', 'coordination',
+            'Maintaining accurate, structured, and up-to-date documentation, operational manuals, and team knowledge assets.',
+            'الحرص على توثيق إجراءات العمل وتحديث الأدلة التشغيلية ومشاركة المعرفة المؤسسية.',
+            'Measured in %: Audit score of assigned documentation completeness and update frequency.',
+            'يقاس بنسبة اكتمال وتحديث المستندات التشغيلية وفق المراجعات الدورية.',
+            '%', 0.05, 'higher_is_better', true, true)
+    RETURNING id INTO v_crit_id;
+  ELSE
+    UPDATE public.kpi_criteria
+    SET name_ar = 'التوثيق وتحديث قاعدة المعرفة', criterion_type = 'common', category = 'coordination',
+        description_en = 'Maintaining accurate, structured, and up-to-date documentation, operational manuals, and team knowledge assets.',
+        description_ar = 'الحرص على توثيق إجراءات العمل وتحديث الأدلة التشغيلية ومشاركة المعرفة المؤسسية.',
+        how_measured_en = 'Measured in %: Audit score of assigned documentation completeness and update frequency.',
+        how_measured_ar = 'يقاس بنسبة اكتمال وتحديث المستندات التشغيلية وفق المراجعات الدورية.',
+        unit = '%', default_weight = 0.05, scoring_direction = 'higher_is_better', is_active = true, is_required = true
+    WHERE id = v_crit_id;
   END IF;
+  INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
+  VALUES (v_template_id, v_crit_id, 0.05, 95, 16, '%')
+  ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 95, display_order = 16;
 
-  -- 17) Leadership & Team Mentorship
-  INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
-  VALUES ('Leadership & Team Mentorship', 'القيادة والتوجيه والإشراف الفعال', 'common', 'behavioral',
-          'Providing constructive guidance, coaching junior team members, setting clear objectives, and evaluating performance fairly.',
-          'توجيه وتدريب الموظفين الجدد وقيادة الفريق بكفاءة ومتابعة تحقيق الأهداف التشغيلية بعدالة.',
-          'Measured in %: Quarterly leadership assessment rubric score and team member growth progress.',
-          'يقاس بنسبة إنجاز خطط تطوير أعضاء الفريق ومعدل تحقيق مؤشرات أداء القسم.',
-          '%', 0.05, 'higher_is_better', true, true)
-  ON CONFLICT (id) DO NOTHING;
-  SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'Leadership & Team Mentorship' LIMIT 1;
-  IF v_crit_id IS NOT NULL THEN
-    INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
-    VALUES (v_template_id, v_crit_id, 0.05, 100, 17, '%')
-    ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 100, display_order = 17;
+  -- 17) SLA & Response Time Compliance
+  SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'SLA & Response Time Compliance' LIMIT 1;
+  IF v_crit_id IS NULL THEN
+    INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
+    VALUES ('SLA & Response Time Compliance', 'الالتزام باتفاقيات مستوى الخدمة وسرعة الرد', 'common', 'productivity',
+            'Speed and responsiveness in attending to internal tickets, customer inquiries, and escalation workflows within agreed SLA thresholds.',
+            'السرعة والالتزام باتفاقيات مستوى الخدمة في الرد على التذاكر واستفسارات العملاء والطلبات الداخلية.',
+            'Measured in %: (Requests responded to within SLA / Total assigned requests) * 100.',
+            'يقاس بالنسبة المئوية: (الطلبات المنجزة ضمن وقت الاستجابة / إجمالي الطلبات) * 100.',
+            '%', 0.05, 'higher_is_better', true, true)
+    RETURNING id INTO v_crit_id;
+  ELSE
+    UPDATE public.kpi_criteria
+    SET name_ar = 'الالتزام باتفاقيات مستوى الخدمة وسرعة الرد', criterion_type = 'common', category = 'productivity',
+        description_en = 'Speed and responsiveness in attending to internal tickets, customer inquiries, and escalation workflows within agreed SLA thresholds.',
+        description_ar = 'السرعة والالتزام باتفاقيات مستوى الخدمة في الرد على التذاكر واستفسارات العملاء والطلبات الداخلية.',
+        how_measured_en = 'Measured in %: (Requests responded to within SLA / Total assigned requests) * 100.',
+        how_measured_ar = 'يقاس بالنسبة المئوية: (الطلبات المنجزة ضمن وقت الاستجابة / إجمالي الطلبات) * 100.',
+        unit = '%', default_weight = 0.05, scoring_direction = 'higher_is_better', is_active = true, is_required = true
+    WHERE id = v_crit_id;
   END IF;
+  INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
+  VALUES (v_template_id, v_crit_id, 0.05, 95, 17, '%')
+  ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 95, display_order = 17;
 
-  -- 18) Operational Risk Management & Mitigation
-  INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
-  VALUES ('Operational Risk Management & Mitigation', 'إدارة المخاطر التشغيلية والوقاية من الأزمات', 'common', 'safety',
-          'Anticipating operational vulnerabilities, implementing mitigation actions, and preventing high-severity business disruptions.',
-          'التنبؤ المبكر بالمخاطر وتطبيق خطط الطوارئ لتفادي أي تعطل في سير العمليات التشغيلية.',
-          'Measured in %: Zero unmitigated high-risk incidents and full adherence to preventative risk matrix.',
-          'يقاس بنسبة عدم حدوث أي انقطاع حرج وتطبيق خطط الوقاية من المخاطر بنجاح.',
-          '%', 0.05, 'higher_is_better', true, true)
-  ON CONFLICT (id) DO NOTHING;
-  SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'Operational Risk Management & Mitigation' LIMIT 1;
-  IF v_crit_id IS NOT NULL THEN
-    INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
-    VALUES (v_template_id, v_crit_id, 0.05, 100, 18, '%')
-    ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 100, display_order = 18;
+  -- 18) Equipment & Asset Care
+  SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'Equipment & Asset Care' LIMIT 1;
+  IF v_crit_id IS NULL THEN
+    INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
+    VALUES ('Equipment & Asset Care', 'سلامة وصيانة الأجهزة والمعدات', 'common', 'technical',
+            'Proper handling, routine maintenance adherence, and preservation of assigned digital and physical machinery and devices.',
+            'المحافظة على المعدات والأجهزة المسندة والالتزام بجداول الصيانة الدورية لمنع التلف والأعطال.',
+            'Measured in %: Periodic asset condition audit score and compliance with scheduled maintenance.',
+            'يقاس بنسبة المحافظة على سلامة الأجهزة والالتزام بجداول الفحص الدوري.',
+            '%', 0.025, 'higher_is_better', true, true)
+    RETURNING id INTO v_crit_id;
+  ELSE
+    UPDATE public.kpi_criteria
+    SET name_ar = 'سلامة وصيانة الأجهزة والمعدات', criterion_type = 'common', category = 'technical',
+        description_en = 'Proper handling, routine maintenance adherence, and preservation of assigned digital and physical machinery and devices.',
+        description_ar = 'المحافظة على المعدات والأجهزة المسندة والالتزام بجداول الصيانة الدورية لمنع التلف والأعطال.',
+        how_measured_en = 'Measured in %: Periodic asset condition audit score and compliance with scheduled maintenance.',
+        how_measured_ar = 'يقاس بنسبة المحافظة على سلامة الأجهزة والالتزام بجداول الفحص الدوري.',
+        unit = '%', default_weight = 0.025, scoring_direction = 'higher_is_better', is_active = true, is_required = true
+    WHERE id = v_crit_id;
   END IF;
+  INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
+  VALUES (v_template_id, v_crit_id, 0.025, 100, 18, '%')
+  ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.025, target_benchmark = 100, display_order = 18;
 
-  -- 19) Vendor & Contractor Performance Oversight
-  INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
-  VALUES ('Vendor & Contractor Performance Oversight', 'متابعة أداء الموردين والمقاولين الخارجيين', 'common', 'coordination',
-          'Monitoring contractor delivery timelines, ensuring service level agreement compliance, and managing billing disputes.',
-          'متابعة التزام الموردين والمقاولين بالمواصفات المعتمدة وجداول التوريد والشروط التعاقدية.',
-          'Measured in %: (Vendor milestones approved on-time / Total contracted milestones) * 100.',
-          'يقاس بالنسبة المئوية للتوريدات والأعمال المنفذة مطابقة للشروط والوقت المحدد.',
-          '%', 0.05, 'higher_is_better', true, true)
-  ON CONFLICT (id) DO NOTHING;
-  SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'Vendor & Contractor Performance Oversight' LIMIT 1;
-  IF v_crit_id IS NOT NULL THEN
-    INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
-    VALUES (v_template_id, v_crit_id, 0.05, 95, 19, '%')
-    ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 95, display_order = 19;
+  -- 19) Training & Professional Development
+  SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'Training & Professional Development' LIMIT 1;
+  IF v_crit_id IS NULL THEN
+    INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
+    VALUES ('Training & Professional Development', 'التدريب والتطوير المهني الذاتي', 'common', 'behavioral',
+            'Completion of assigned internal/external training programs, certifications, and proactive skill enhancement.',
+            'إتمام الدورات التدريبية المعتمدة والحصول على الشهادات المهنية وتطوير المهارات الوظيفية.',
+            'Measured in %: (Completed training hours / Required training hours) * 100.',
+            'يقاس بالنسبة المئوية: (ساعات التدريب المنجزة / الساعات المطلوبة سنوياً) * 100.',
+            '%', 0.025, 'higher_is_better', true, true)
+    RETURNING id INTO v_crit_id;
+  ELSE
+    UPDATE public.kpi_criteria
+    SET name_ar = 'التدريب والتطوير المهني الذاتي', criterion_type = 'common', category = 'behavioral',
+        description_en = 'Completion of assigned internal/external training programs, certifications, and proactive skill enhancement.',
+        description_ar = 'إتمام الدورات التدريبية المعتمدة والحصول على الشهادات المهنية وتطوير المهارات الوظيفية.',
+        how_measured_en = 'Measured in %: (Completed training hours / Required training hours) * 100.',
+        how_measured_ar = 'يقاس بالنسبة المئوية: (ساعات التدريب المنجزة / الساعات المطلوبة سنوياً) * 100.',
+        unit = '%', default_weight = 0.025, scoring_direction = 'higher_is_better', is_active = true, is_required = true
+    WHERE id = v_crit_id;
   END IF;
+  INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
+  VALUES (v_template_id, v_crit_id, 0.025, 100, 19, '%')
+  ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.025, target_benchmark = 100, display_order = 19;
 
-  -- 20) Client Retention & Account Growth
-  INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
-  VALUES ('Client Retention & Account Growth', 'استبقاء العملاء وتنمية الأعمال', 'common', 'coordination',
-          'Maintaining long-term client relationships, prompt issue escalations resolution, and identifying account renewal opportunities.',
-          'الحفاظ على العلاقات المستمرة مع العملاء وتجديد العقود وفتح فرص أعمال جديدة وتطوير الخدمات.',
-          'Measured in %: (Active client contracts renewed / Total contracts up for renewal) * 100.',
-          'يقاس بنسبة تجديد العقود مع العملاء القائمين ونمو القيمة الإجمالية للعقود.',
-          '%', 0.05, 'higher_is_better', true, true)
-  ON CONFLICT (id) DO NOTHING;
-  SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'Client Retention & Account Growth' LIMIT 1;
-  IF v_crit_id IS NOT NULL THEN
-    INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
-    VALUES (v_template_id, v_crit_id, 0.05, 95, 20, '%')
-    ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 95, display_order = 20;
+  -- 20) Audit & Policy Compliance
+  SELECT id INTO v_crit_id FROM public.kpi_criteria WHERE name_en = 'Audit & Policy Compliance' LIMIT 1;
+  IF v_crit_id IS NULL THEN
+    INSERT INTO public.kpi_criteria (name_en, name_ar, criterion_type, category, description_en, description_ar, how_measured_en, how_measured_ar, unit, default_weight, scoring_direction, is_active, is_required)
+    VALUES ('Audit & Policy Compliance', 'الامتثال للسياسات وتدقيق الجودة', 'common', 'coordination',
+            'Full adherence to internal corporate governance policies, company bylaws, and passing internal/external audit reviews.',
+            'الالتزام باللوائح والسياسات الداخلية ومعايير الحوكمة واجتياز عمليات التدقيق الدوري بنجاح.',
+            'Measured in %: Internal governance audit score (%) and zero policy violations.',
+            'يقاس بنسبة الامتثال في تقارير التدقيق الداخلي وخلو السجل من المخالفات.',
+            '%', 0.05, 'higher_is_better', true, true)
+    RETURNING id INTO v_crit_id;
+  ELSE
+    UPDATE public.kpi_criteria
+    SET name_ar = 'الامتثال للسياسات وتدقيق الجودة', criterion_type = 'common', category = 'coordination',
+        description_en = 'Full adherence to internal corporate governance policies, company bylaws, and passing internal/external audit reviews.',
+        description_ar = 'الالتزام باللوائح والسياسات الداخلية ومعايير الحوكمة واجتياز عمليات التدقيق الدوري بنجاح.',
+        how_measured_en = 'Measured in %: Internal governance audit score (%) and zero policy violations.',
+        how_measured_ar = 'يقاس بنسبة الامتثال في تقارير التدقيق الداخلي وخلو السجل من المخالفات.',
+        unit = '%', default_weight = 0.05, scoring_direction = 'higher_is_better', is_active = true, is_required = true
+    WHERE id = v_crit_id;
   END IF;
+  INSERT INTO public.kpi_template_items (template_id, criterion_id, weight, target_benchmark, display_order, unit)
+  VALUES (v_template_id, v_crit_id, 0.05, 100, 20, '%')
+  ON CONFLICT (template_id, criterion_id) DO UPDATE SET weight = 0.05, target_benchmark = 100, display_order = 20;
 
 END $$;
