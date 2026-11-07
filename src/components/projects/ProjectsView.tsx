@@ -28,6 +28,7 @@ import { Project, ProjectEmployee, formatProjectCode } from "@/lib/projects/proj
 import { ProjectDetailView } from "./ProjectDetailView";
 import { EmployeeAvatar } from "@/components/EmployeeAvatar";
 import { SearchableManagerSelect } from "./SearchableManagerSelect";
+import { TwoWordsPerLine } from "./TwoWordsPerLine";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -660,7 +661,7 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
                             className="h-7 w-7 rounded-full shrink-0"
                             fallbackClassName="text-[10px]"
                           />
-                          <span className="font-medium text-foreground whitespace-nowrap">{proj.projectManager.name}</span>
+                          <TwoWordsPerLine text={proj.projectManager.name} />
                         </div>
                       </td>
 
@@ -674,7 +675,7 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
                             className="h-7 w-7 rounded-full shrink-0"
                             fallbackClassName="text-[10px]"
                           />
-                          <span className="font-medium text-foreground whitespace-nowrap">{proj.reportedManager.name}</span>
+                          <TwoWordsPerLine text={proj.reportedManager.name} />
                         </div>
                       </td>
 

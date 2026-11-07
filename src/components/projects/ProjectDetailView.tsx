@@ -38,6 +38,7 @@ import {
 import { Project, ProjectTask, ProjectEmployee, ProjectFile, ProjectUpdate, formatProjectCode } from "@/lib/projects/projects.data";
 import { EmployeeAvatar } from "@/components/EmployeeAvatar";
 import { SearchableManagerSelect } from "./SearchableManagerSelect";
+import { TwoWordsPerLine } from "./TwoWordsPerLine";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -789,7 +790,7 @@ export function ProjectDetailView({
                         className="h-7 w-7 rounded-full shrink-0"
                         fallbackClassName="text-[10px]"
                       />
-                      <span className="font-medium text-foreground">{project.projectManager.name}</span>
+                      <TwoWordsPerLine text={project.projectManager.name} />
                     </div>
                   </div>
 
@@ -806,7 +807,7 @@ export function ProjectDetailView({
                         className="h-7 w-7 rounded-full shrink-0"
                         fallbackClassName="text-[10px]"
                       />
-                      <span className="font-medium text-foreground">{project.reportedManager.name}</span>
+                      <TwoWordsPerLine text={project.reportedManager.name} />
                     </div>
                   </div>
 
