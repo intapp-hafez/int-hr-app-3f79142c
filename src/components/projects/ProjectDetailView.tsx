@@ -23,6 +23,12 @@ import {
   Plus,
   UserPlus,
   Upload,
+  UploadCloud,
+  AlertCircle,
+  X,
+  FileSpreadsheet,
+  FileImage,
+  Presentation,
   Send,
   Trash2,
   ChevronRight,
@@ -64,6 +70,110 @@ import {
   listProjectAssignablePeople,
 } from "@/backend/functions/projects.functions";
 
+const ALLOWED_PROJECT_FILE_EXTENSIONS = [
+  "pdf",
+  "doc",
+  "docx",
+  "xls",
+  "xlsx",
+  "csv",
+  "ppt",
+  "pptx",
+  "png",
+  "jpg",
+  "jpeg",
+  "webp",
+] as const;
+
+const MAX_PROJECT_FILE_SIZE_BYTES = 2 * 1024 * 1024; // 2 MB
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function getFileExtension(filename: string): string {
+  const parts = filename.split(".");
+  return parts.length > 1 ? parts.pop()!.toLowerCase().trim() : "";
+}
+
+function getProjectFileCategory(filename: string): "pdf" | "doc" | "image" | "sheet" {
+  const ext = getFileExtension(filename);
+  if (ext === "pdf") return "pdf";
+  if (["doc", "docx", "ppt", "pptx"].includes(ext)) return "doc";
+  if (["xls", "xlsx", "csv"].includes(ext)) return "sheet";
+  if (["png", "jpg", "jpeg", "webp"].includes(ext)) return "image";
+  return "pdf";
+}
+
+function getFileFormatBadge(filename: string): { label: string; color: string } {
+  const ext = getFileExtension(filename);
+  switch (ext) {
+    case "pdf":
+      return { label: "PDF Document", color: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20" };
+    case "doc":
+    case "docx":
+      return { label: "Word Document", color: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20" };
+    case "xls":
+    case "xlsx":
+    case "csv":
+      return { label: "Excel Spreadsheet", color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20" };
+    case "ppt":
+    case "pptx":
+      return { label: "PowerPoint Presentation", color: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20" };
+    case "png":
+    case "jpg":
+    case "jpeg":
+    case "webp":
+      return { label: "Image / Graphic", color: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20" };
+    default:
+      return { label: "Document", color: "bg-muted text-muted-foreground border-border" };
+  }
+}
+
+function validateProjectFile(file: File): { valid: boolean; errorEn?: string; errorAr?: string } {
+  const ext = getFileExtension(file.name);
+  if (!ALLOWED_PROJECT_FILE_EXTENSIONS.includes(ext as any)) {
+    return {
+      valid: false,
+      errorEn: `Unsupported file type (.${ext || "unknown"}). Allowed formats: PDF, Word (.doc, .docx), Excel (.xls, .xlsx, .csv), PowerPoint (.ppt, .pptx), PNG, JPG, JPEG, WEBP.`,
+      errorAr: `نوع الملف غير مدعوم (.${ext || "مجهول"}). الصيغ المسموح بها: PDF، وWord (.doc, .docx)، وExcel (.xls, .xlsx, .csv)، وPowerPoint (.ppt, .pptx)، وPNG، وJPG، وJPEG، وWEBP.`,
+    };
+  }
+
+  if (file.size > MAX_PROJECT_FILE_SIZE_BYTES) {
+    const sizeFormatted = (file.size / (1024 * 1024)).toFixed(2);
+    return {
+      valid: false,
+      errorEn: `File size (${sizeFormatted} MB) exceeds the 2 MB limit. Please select a file smaller than 2 MB.`,
+      errorAr: `حجم الملف (${sizeFormatted} ميجابايت) يتجاوز الحد الأقصى (2 ميجابايت). يرجى اختيار ملف بحجم أقل من 2 ميجابايت.`,
+    };
+  }
+
+  return { valid: true };
+}
+
+function getFileIcon(fileName: string, type?: string) {
+  const ext = getFileExtension(fileName);
+  if (ext === "pdf" || type === "pdf") {
+    return <FileText className="h-5 w-5 text-red-500" />;
+  }
+  if (["doc", "docx"].includes(ext) || type === "doc") {
+    return <FileText className="h-5 w-5 text-blue-500" />;
+  }
+  if (["xls", "xlsx", "csv"].includes(ext) || type === "sheet") {
+    return <FileSpreadsheet className="h-5 w-5 text-emerald-500" />;
+  }
+  if (["ppt", "pptx"].includes(ext)) {
+    return <Presentation className="h-5 w-5 text-amber-500" />;
+  }
+  if (["png", "jpg", "jpeg", "webp"].includes(ext) || type === "image") {
+    return <FileImage className="h-5 w-5 text-purple-500" />;
+  }
+  return <FileText className="h-5 w-5 text-orange-500" />;
+}
+
 interface ProjectDetailViewProps {
   project: Project;
   onBack: () => void;
@@ -93,7 +203,7 @@ export function ProjectDetailView({
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskPriority, setNewTaskPriority] = useState<"low" | "medium" | "high">("medium");
   const [newTaskDueDate, setNewTaskDueDate] = useState("");
-  const [newTaskAssignee, setNewTaskAssignee] = useState(project.employees[0]?.name || "John Doe");
+  const [newTaskAssignee, setNewTaskAssignee] = useState(project.employees[0]?.name || "Hafez");
 
   // Edit Task modal state
   const [editingTask, setEditingTask] = useState<ProjectTask | null>(null);
@@ -108,8 +218,12 @@ export function ProjectDetailView({
   const [selectedToAssignIds, setSelectedToAssignIds] = useState<string[]>([]);
 
   const [newFileName, setNewFileName] = useState("");
-  const [newFileSize, setNewFileSize] = useState("2.4 MB");
+  const [newFileSize, setNewFileSize] = useState("");
   const [newFileType, setNewFileType] = useState<"pdf" | "doc" | "image" | "sheet">("pdf");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileUploadError, setFileUploadError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const [newUpdateText, setNewUpdateText] = useState("");
 
@@ -250,7 +364,7 @@ export function ProjectDetailView({
           status: "pending",
           due_date: newTaskDueDate || undefined,
         },
-      }).catch(() => {});
+      }).catch(() => { });
     }
 
     setNewTaskTitle("");
@@ -278,16 +392,16 @@ export function ProjectDetailView({
     const updatedTasks = project.tasks.map((t) =>
       t.id === editingTask.id
         ? {
-            ...t,
-            title: editTaskTitle.trim(),
-            priority: editTaskPriority,
-            dueDate: editTaskDueDate.trim(),
-            status: editTaskStatus,
-            assignee: {
-              ...t.assignee,
-              name: editTaskAssignee.trim() || t.assignee.name,
-            },
-          }
+          ...t,
+          title: editTaskTitle.trim(),
+          priority: editTaskPriority,
+          dueDate: editTaskDueDate.trim(),
+          status: editTaskStatus,
+          assignee: {
+            ...t.assignee,
+            name: editTaskAssignee.trim() || t.assignee.name,
+          },
+        }
         : t
     );
 
@@ -411,19 +525,93 @@ export function ProjectDetailView({
     );
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    processSelectedFile(file);
+  };
+
+  const processSelectedFile = (file: File) => {
+    const validation = validateProjectFile(file);
+    if (!validation.valid) {
+      setSelectedFile(null);
+      setFileUploadError(isAr ? validation.errorAr! : validation.errorEn!);
+      toast.error(isAr ? validation.errorAr! : validation.errorEn!);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    setSelectedFile(file);
+    setFileUploadError(null);
+    setNewFileName(file.name);
+    setNewFileSize(formatFileSize(file.size));
+    setNewFileType(getProjectFileCategory(file.name));
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      processSelectedFile(file);
+    }
+  };
+
+  const handleClearSelectedFile = () => {
+    setSelectedFile(null);
+    setFileUploadError(null);
+    setNewFileName("");
+    setNewFileSize("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleCloseUploadModal = () => {
+    setIsUploadFileOpen(false);
+    handleClearSelectedFile();
+  };
+
   const handleUploadFile = () => {
+    if (!selectedFile) {
+      toast.error(isAr ? "يرجى اختيار ملف لرفعه أولاً" : "Please select a file to upload first");
+      return;
+    }
+
+    const validation = validateProjectFile(selectedFile);
+    if (!validation.valid) {
+      toast.error(isAr ? validation.errorAr! : validation.errorEn!);
+      return;
+    }
+
     if (!newFileName.trim()) {
       toast.error(isAr ? "يرجى كتابة اسم الملف" : "File name is required");
       return;
     }
+
+    const formattedSize = formatFileSize(selectedFile.size);
+    const category = getProjectFileCategory(newFileName.trim());
+
     const newFile: ProjectFile = {
       id: `file-${Date.now()}`,
       name: newFileName.trim(),
-      size: newFileSize,
-      type: newFileType,
+      size: formattedSize,
+      type: category,
       uploadedBy: project.projectManager.name,
       uploadedAt: "Just now",
     };
+
     const updated: Project = {
       ...project,
       files: [newFile, ...project.files],
@@ -437,12 +625,13 @@ export function ProjectDetailView({
           name: newFile.name,
           size: newFile.size,
           type: newFile.type.toUpperCase(),
+          url: "#",
+          uploaded_by_name: project.projectManager.name,
         },
-      }).catch(() => {});
+      }).catch((e) => console.warn("addFileFn error:", e));
     }
 
-    setNewFileName("");
-    setIsUploadFileOpen(false);
+    handleCloseUploadModal();
     toast.success(isAr ? "تم رفع الملف بنجاح" : "File uploaded successfully");
   };
 
@@ -476,7 +665,7 @@ export function ProjectDetailView({
           author_name: project.projectManager.name,
           author_role: "Project Manager",
         },
-      }).catch(() => {});
+      }).catch(() => { });
     }
 
     setNewUpdateText("");
@@ -537,7 +726,7 @@ export function ProjectDetailView({
           id: task.id,
           status: nextStatus,
         },
-      }).catch(() => {});
+      }).catch(() => { });
     }
   };
 
@@ -553,7 +742,7 @@ export function ProjectDetailView({
     onUpdateProject(updated);
 
     if (isProjectUuid && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(taskId)) {
-      deleteTaskFn({ data: { id: taskId } }).catch(() => {});
+      deleteTaskFn({ data: { id: taskId } }).catch(() => { });
     }
     toast.success(isAr ? "تم حذف المهمة" : "Task removed");
   };
@@ -568,7 +757,7 @@ export function ProjectDetailView({
     onUpdateProject(updated);
 
     if (isProjectUuid && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(empId)) {
-      removeMemberFn({ data: { id: empId } }).catch(() => {});
+      removeMemberFn({ data: { id: empId } }).catch(() => { });
     }
     toast.success(isAr ? "تم إزالة الموظف من المشروع" : "Member removed from project");
   };
@@ -582,7 +771,7 @@ export function ProjectDetailView({
     onUpdateProject(updated);
 
     if (isProjectUuid && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(fileId)) {
-      deleteFileFn({ data: { id: fileId } }).catch(() => {});
+      deleteFileFn({ data: { id: fileId } }).catch(() => { });
     }
     toast.success(isAr ? "تم حذف الملف" : "File removed");
   };
@@ -668,11 +857,10 @@ export function ProjectDetailView({
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
           <button
             onClick={() => setActiveTab("details")}
-            className={`flex items-center gap-2 py-3 px-4 border-b-2 font-semibold text-xs sm:text-sm transition-all whitespace-nowrap ${
-              activeTab === "details"
+            className={`flex items-center gap-2 py-3 px-4 border-b-2 font-semibold text-xs sm:text-sm transition-all whitespace-nowrap ${activeTab === "details"
                 ? "border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-500/5 rounded-t-lg"
                 : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30"
-            }`}
+              }`}
           >
             <Info className="h-4 w-4" />
             <span>{isAr ? "تفاصيل المشروع" : "Project Details"}</span>
@@ -680,11 +868,10 @@ export function ProjectDetailView({
 
           <button
             onClick={() => setActiveTab("employees")}
-            className={`flex items-center gap-2 py-3 px-4 border-b-2 font-semibold text-xs sm:text-sm transition-all whitespace-nowrap ${
-              activeTab === "employees"
+            className={`flex items-center gap-2 py-3 px-4 border-b-2 font-semibold text-xs sm:text-sm transition-all whitespace-nowrap ${activeTab === "employees"
                 ? "border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-500/5 rounded-t-lg"
                 : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30"
-            }`}
+              }`}
           >
             <Users className="h-4 w-4" />
             <span>{isAr ? "فريق العمل" : "Employees"}</span>
@@ -695,11 +882,10 @@ export function ProjectDetailView({
 
           <button
             onClick={() => setActiveTab("tasks")}
-            className={`flex items-center gap-2 py-3 px-4 border-b-2 font-semibold text-xs sm:text-sm transition-all whitespace-nowrap ${
-              activeTab === "tasks"
+            className={`flex items-center gap-2 py-3 px-4 border-b-2 font-semibold text-xs sm:text-sm transition-all whitespace-nowrap ${activeTab === "tasks"
                 ? "border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-500/5 rounded-t-lg"
                 : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30"
-            }`}
+              }`}
           >
             <CheckSquare className="h-4 w-4" />
             <span>{isAr ? "المهام" : "Tasks"}</span>
@@ -710,11 +896,10 @@ export function ProjectDetailView({
 
           <button
             onClick={() => setActiveTab("files")}
-            className={`flex items-center gap-2 py-3 px-4 border-b-2 font-semibold text-xs sm:text-sm transition-all whitespace-nowrap ${
-              activeTab === "files"
+            className={`flex items-center gap-2 py-3 px-4 border-b-2 font-semibold text-xs sm:text-sm transition-all whitespace-nowrap ${activeTab === "files"
                 ? "border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-500/5 rounded-t-lg"
                 : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30"
-            }`}
+              }`}
           >
             <Paperclip className="h-4 w-4" />
             <span>{isAr ? "المستندات والملفات" : "Files"}</span>
@@ -725,11 +910,10 @@ export function ProjectDetailView({
 
           <button
             onClick={() => setActiveTab("updates")}
-            className={`flex items-center gap-2 py-3 px-4 border-b-2 font-semibold text-xs sm:text-sm transition-all whitespace-nowrap ${
-              activeTab === "updates"
+            className={`flex items-center gap-2 py-3 px-4 border-b-2 font-semibold text-xs sm:text-sm transition-all whitespace-nowrap ${activeTab === "updates"
                 ? "border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-500/5 rounded-t-lg"
                 : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30"
-            }`}
+              }`}
           >
             <MessageSquare className="h-4 w-4" />
             <span>{isAr ? "التحديثات والملاحظات" : "Updates"}</span>
@@ -1222,13 +1406,12 @@ export function ProjectDetailView({
                     </td>
                     <td className="py-3 px-4 text-foreground/90">{task.assignee.name}</td>
                     <td className="py-3 px-4">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                        task.priority === "high"
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${task.priority === "high"
                           ? "bg-rose-500/15 text-rose-600 dark:text-rose-400"
                           : task.priority === "medium"
-                          ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
-                          : "bg-muted text-muted-foreground"
-                      }`}>
+                            ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                            : "bg-muted text-muted-foreground"
+                        }`}>
                         {task.priority}
                       </span>
                     </td>
@@ -1238,13 +1421,12 @@ export function ProjectDetailView({
                         type="button"
                         onClick={() => handleToggleTaskStatus(task)}
                         title={isAr ? "انقر لتغيير حالة المهمة" : "Click to cycle status: Pending ➔ In Progress ➔ Completed"}
-                        className={`px-2.5 py-1 rounded-full text-[11px] font-semibold cursor-pointer transition-transform hover:scale-105 active:scale-95 ${
-                          task.status === "completed"
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-semibold cursor-pointer transition-transform hover:scale-105 active:scale-95 ${task.status === "completed"
                             ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25"
                             : task.status === "in_progress"
-                            ? "bg-sky-500/15 text-sky-600 dark:text-sky-400 hover:bg-sky-500/25"
-                            : "bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25"
-                        }`}
+                              ? "bg-sky-500/15 text-sky-600 dark:text-sky-400 hover:bg-sky-500/25"
+                              : "bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25"
+                          }`}
                       >
                         {task.status === "completed" ? "Completed ✓" : task.status === "in_progress" ? "In Progress ↻" : "Pending ⏳"}
                       </button>
@@ -1300,8 +1482,8 @@ export function ProjectDetailView({
               {project.files.map((file) => (
                 <div key={file.id} className="rounded-2xl border bg-card p-4 shadow-2xs hover:shadow-sm transition-all flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-10 w-10 shrink-0 rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400 flex items-center justify-center">
-                      <FileText className="h-5 w-5" />
+                    <div className="h-10 w-10 shrink-0 rounded-xl bg-muted/60 border flex items-center justify-center">
+                      {getFileIcon(file.name, file.type)}
                     </div>
                     <div className="min-w-0">
                       <h4 className="font-semibold text-xs text-foreground truncate">{file.name}</h4>
@@ -1584,8 +1766,8 @@ export function ProjectDetailView({
                         isAlreadyInProject
                           ? "opacity-60 bg-muted/20"
                           : isSelected
-                          ? "bg-orange-500/10"
-                          : "hover:bg-muted/40 cursor-pointer"
+                            ? "bg-orange-500/10"
+                            : "hover:bg-muted/40 cursor-pointer"
                       )}
                       onClick={() => {
                         if (isAlreadyInProject) return;
@@ -1680,49 +1862,181 @@ export function ProjectDetailView({
       </Dialog>
 
       {/* ── MODAL: UPLOAD FILE ── */}
-      <Dialog open={isUploadFileOpen} onOpenChange={setIsUploadFileOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Upload className="h-5 w-5 text-orange-500" />
-              {isAr ? "رفع ملف ومستند للمشروع" : "Upload Project Document"}
+      <Dialog
+        open={isUploadFileOpen}
+        onOpenChange={(open) => {
+          if (!open) handleCloseUploadModal();
+          else setIsUploadFileOpen(true);
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader className="border-b border-border/60 pb-3">
+            <DialogTitle className="flex items-center gap-2.5 text-base sm:text-lg font-bold">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400">
+                <Upload className="h-5 w-5" />
+              </div>
+              <span>{isAr ? "رفع ملف ومستند للمشروع" : "Upload Project Document"}</span>
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-3.5 py-2 text-xs">
-            <div className="space-y-1">
-              <Label>{isAr ? "اسم المستند *" : "File Name *"}</Label>
-              <Input
-                placeholder="e.g. Electrical_Single_Line_Diagram_v2.pdf"
-                value={newFileName}
-                onChange={(e) => setNewFileName(e.target.value)}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label>{isAr ? "نوع الملف" : "File Type"}</Label>
-                <select
-                  value={newFileType}
-                  onChange={(e: any) => setNewFileType(e.target.value)}
-                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs"
-                >
-                  <option value="pdf">PDF Document</option>
-                  <option value="doc">Word / Text</option>
-                  <option value="sheet">Excel Spreadsheet</option>
-                  <option value="image">Image / Blueprint</option>
-                </select>
+
+          <div className="space-y-4 py-3 text-xs">
+            {/* Hidden native input */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.png,.jpg,.jpeg,.webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,image/png,image/jpeg,image/webp"
+              className="hidden"
+            />
+
+            {/* Error Banner */}
+            {fileUploadError && (
+              <div className="flex items-start gap-2.5 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                <span className="leading-snug">{fileUploadError}</span>
               </div>
-              <div className="space-y-1">
-                <Label>{isAr ? "الحجم التقديري" : "Estimated Size"}</Label>
-                <Input
-                  value={newFileSize}
-                  onChange={(e) => setNewFileSize(e.target.value)}
-                />
+            )}
+
+            {/* Dropzone Area or File Preview */}
+            {!selectedFile ? (
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={cn(
+                  "border-2 border-dashed rounded-2xl p-6 sm:p-8 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2.5 select-none",
+                  isDragging
+                    ? "border-orange-500 bg-orange-50/50 dark:bg-orange-950/20 scale-[0.99]"
+                    : "border-border/80 hover:border-orange-500/80 hover:bg-orange-50/20 dark:hover:bg-orange-950/10"
+                )}
+              >
+                <div className="h-12 w-12 rounded-2xl bg-orange-500/10 text-orange-600 dark:text-orange-400 flex items-center justify-center shadow-xs">
+                  <UploadCloud className="h-6 w-6" />
+                </div>
+                <div className="space-y-1">
+                  <p className="font-semibold text-sm text-foreground">
+                    {isAr ? "انقر لاختيار ملف أو اسحبه إلى هنا" : "Click to browse or drag and drop a file here"}
+                  </p>
+                  <p className="text-muted-foreground text-[11px]">
+                    {isAr
+                      ? "يدعم PDF، Word، Excel، PowerPoint، وصور PNG/JPG/WEBP"
+                      : "Supports PDF, Word, Excel, PowerPoint, and PNG/JPG/WEBP images"}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-center gap-1.5 mt-1">
+                  <Badge variant="outline" className="text-[10px] font-semibold text-orange-600 dark:text-orange-400 border-orange-500/30 bg-orange-500/5">
+                    {isAr ? "الحد الأقصى: 2 ميجابايت" : "Limit: Max 2 MB"}
+                  </Badge>
+                  <Badge variant="outline" className="text-[10px] text-muted-foreground border-border/80">
+                    PDF, DOC, DOCX, XLS, XLSX, CSV, PPT, PPTX, PNG, JPG, WEBP
+                  </Badge>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-3.5">
+                {/* Selected File Card */}
+                <div className="p-3.5 rounded-2xl border border-border bg-muted/30 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-11 w-11 shrink-0 rounded-xl bg-background border flex items-center justify-center shadow-2xs">
+                      {getFileIcon(selectedFile.name, newFileType)}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-bold text-xs text-foreground truncate max-w-[200px] sm:max-w-[260px]">
+                          {selectedFile.name}
+                        </p>
+                        <Badge
+                          variant="outline"
+                          className={cn("text-[9px] px-1.5 py-0 font-medium shrink-0", getFileFormatBadge(selectedFile.name).color)}
+                        >
+                          {getFileFormatBadge(selectedFile.name).label}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5 text-[11px] text-muted-foreground">
+                        <span className="font-medium text-foreground/80">{formatFileSize(selectedFile.size)}</span>
+                        <span>•</span>
+                        <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium">
+                          <CheckCircle2 className="h-3 w-3" />
+                          {isAr ? "أقل من 2 ميجابايت" : "Under 2 MB limit"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="text-xs text-muted-foreground hover:text-foreground h-8 px-2 rounded-lg"
+                    >
+                      {isAr ? "تغيير" : "Change"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleClearSelectedFile}
+                      className="h-8 w-8 text-muted-foreground/70 hover:text-rose-500 rounded-lg"
+                      title={isAr ? "إزالة" : "Remove"}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Editable File Name Input */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="font-semibold text-foreground/90">{isAr ? "اسم المستند للمشروع *" : "Project Document Name *"}</Label>
+                    <span className="text-[10px] text-muted-foreground">
+                      {isAr ? "يمكنك تعديل الاسم المعروض" : "You can customize the display name"}
+                    </span>
+                  </div>
+                  <Input
+                    value={newFileName}
+                    onChange={(e) => setNewFileName(e.target.value)}
+                    placeholder="e.g. Project_Blueprint_v1.pdf"
+                    className="h-10 rounded-xl"
+                  />
+                </div>
+
+                {/* File Details Grid */}
+                <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-background/60 border border-border/60 text-xs">
+                  <div>
+                    <span className="text-muted-foreground text-[10px] block">{isAr ? "الحجم الفعلي" : "Actual Size"}</span>
+                    <span className="font-semibold text-foreground">{formatFileSize(selectedFile.size)}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground text-[10px] block">{isAr ? "الحد الأقصى" : "Size Limit"}</span>
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">2.0 MB Max</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsUploadFileOpen(false)}>{isAr ? "إلغاء" : "Cancel"}</Button>
-            <Button onClick={handleUploadFile} className="bg-brand text-brand-foreground">{isAr ? "رفع" : "Upload"}</Button>
+
+          <DialogFooter className="gap-2 border-t border-border/60 pt-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleCloseUploadModal}
+              className="rounded-xl h-10 px-4 text-xs font-semibold"
+            >
+              {isAr ? "إلغاء" : "Cancel"}
+            </Button>
+            <Button
+              type="button"
+              onClick={handleUploadFile}
+              disabled={!selectedFile || !!fileUploadError}
+              className="rounded-xl h-10 px-5 text-xs font-semibold bg-orange-600 hover:bg-orange-700 text-white shadow-sm shadow-orange-600/20 disabled:opacity-50"
+            >
+              <Upload className="h-3.5 w-3.5 mr-1.5 rtl:ml-1.5 rtl:mr-0" />
+              {isAr ? "رفع الملف" : "Upload File"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1913,9 +2227,8 @@ export function ProjectDetailView({
                               isSelected ? prev.filter((id) => id !== emp.id) : [...prev, emp.id]
                             );
                           }}
-                          className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition-colors ${
-                            isSelected ? "bg-orange-500/10" : "hover:bg-muted/50"
-                          }`}
+                          className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition-colors ${isSelected ? "bg-orange-500/10" : "hover:bg-muted/50"
+                            }`}
                         >
                           <Checkbox checked={isSelected} className="data-[state=checked]:bg-orange-600 data-[state=checked]:border-orange-600" />
                           <EmployeeAvatar

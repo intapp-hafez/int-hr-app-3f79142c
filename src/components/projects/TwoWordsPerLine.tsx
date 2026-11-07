@@ -31,3 +31,4 @@ export function TwoWordsPerLine({ text, className, lineClassName }: TwoWordsPerL
     </div>
   );
 }
+
