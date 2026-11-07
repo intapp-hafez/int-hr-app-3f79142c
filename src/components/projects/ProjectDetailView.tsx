@@ -38,6 +38,7 @@ import {
 import { Project, ProjectTask, ProjectEmployee, ProjectFile, ProjectUpdate, formatProjectCode } from "@/lib/projects/projects.data";
 import { EmployeeAvatar } from "@/components/EmployeeAvatar";
 import { SearchableManagerSelect } from "./SearchableManagerSelect";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -93,10 +94,9 @@ export function ProjectDetailView({
   const [newTaskDueDate, setNewTaskDueDate] = useState("");
   const [newTaskAssignee, setNewTaskAssignee] = useState(project.employees[0]?.name || "John Doe");
 
-  const [newEmpName, setNewEmpName] = useState("");
-  const [newEmpRole, setNewEmpRole] = useState("");
-  const [newEmpDept, setNewEmpDept] = useState("Engineering");
-  const [newEmpEmail, setNewEmpEmail] = useState("");
+  // Assign Employee modal state (Database-driven search)
+  const [assignSearch, setAssignSearch] = useState("");
+  const [selectedToAssignIds, setSelectedToAssignIds] = useState<string[]>([]);
 
   const [newFileName, setNewFileName] = useState("");
   const [newFileSize, setNewFileSize] = useState("2.4 MB");
@@ -175,6 +175,18 @@ export function ProjectDetailView({
     );
   }, [availableEmployees, editEmployeeSearchQuery]);
 
+  const assignableFilteredEmployees = useMemo(() => {
+    if (!assignSearch.trim()) return availableEmployees;
+    const q = assignSearch.toLowerCase().trim();
+    return availableEmployees.filter(
+      (e) =>
+        e.name.toLowerCase().includes(q) ||
+        e.role.toLowerCase().includes(q) ||
+        e.department.toLowerCase().includes(q) ||
+        (e.email && e.email.toLowerCase().includes(q))
+    );
+  }, [availableEmployees, assignSearch]);
+
   const isProjectUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(project.id);
 
   // Calculate task statistics
@@ -223,41 +235,95 @@ export function ProjectDetailView({
     toast.success(isAr ? "تمت إضافة المهمة بنجاح" : "Task added successfully");
   };
 
-  const handleAddEmployee = () => {
-    if (!newEmpName.trim()) {
-      toast.error(isAr ? "يرجى كتابة اسم الموظف" : "Employee name is required");
+  const handleAssignSingleEmployee = async (emp: ProjectEmployee) => {
+    if (project.employees.some((e) => e.id === emp.id || e.name === emp.name)) {
+      toast.error(isAr ? "الموظف موجود بالفعل في هذا المشروع" : "Employee is already assigned to this project");
       return;
     }
     const newEmp: ProjectEmployee = {
-      id: `emp-${Date.now()}`,
-      name: newEmpName.trim(),
-      role: newEmpRole.trim() || "Team Member",
-      department: newEmpDept,
-      email: newEmpEmail.trim() || `${newEmpName.toLowerCase().replace(/\s+/g, ".")}@integ.com`,
+      id: emp.id,
+      name: emp.name,
+      role: emp.role || "Team Member",
+      department: emp.department || "Operations",
+      email: emp.email || "",
+      avatarUrl: emp.avatarUrl,
     };
     const updated: Project = {
       ...project,
-      employees: [newEmp, ...project.employees],
+      employees: [...project.employees, newEmp],
       employeesCount: project.employees.length + 1,
     };
     onUpdateProject(updated);
 
     if (isProjectUuid) {
-      addMemberFn({
-        data: {
-          project_id: project.id,
-          name: newEmp.name,
-          email: newEmp.email,
-          role: newEmp.role,
-          department: newEmp.department,
-        },
-      }).catch(() => {});
+      try {
+        await addMemberFn({
+          data: {
+            project_id: project.id,
+            name: newEmp.name,
+            email: newEmp.email,
+            role: newEmp.role,
+            department: newEmp.department,
+            employee_id: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(newEmp.id)
+              ? newEmp.id
+              : null,
+          },
+        });
+      } catch (err: any) {
+        console.warn("[addMemberFn] error:", err);
+      }
     }
 
-    setNewEmpName("");
-    setNewEmpRole("");
     setIsAddEmployeeOpen(false);
-    toast.success(isAr ? "تم تعيين الموظف في المشروع" : "Employee assigned to project");
+    setAssignSearch("");
+    setSelectedToAssignIds([]);
+    toast.success(isAr ? `تم تعيين ${emp.name} في المشروع` : `${emp.name} assigned to project`);
+  };
+
+  const handleAssignMultipleEmployees = async () => {
+    if (selectedToAssignIds.length === 0) return;
+    const empsToAdd = availableEmployees.filter(
+      (e) =>
+        selectedToAssignIds.includes(e.id) &&
+        !project.employees.some((pe) => pe.id === e.id || pe.name === e.name)
+    );
+    if (empsToAdd.length === 0) {
+      toast.error(isAr ? "الموظفون المختارون موجودون بالفعل في المشروع" : "Selected employees are already in project");
+      return;
+    }
+    const updatedEmployees = [...project.employees, ...empsToAdd];
+    const updated: Project = {
+      ...project,
+      employees: updatedEmployees,
+      employeesCount: updatedEmployees.length,
+    };
+    onUpdateProject(updated);
+
+    if (isProjectUuid) {
+      for (const emp of empsToAdd) {
+        addMemberFn({
+          data: {
+            project_id: project.id,
+            name: emp.name,
+            email: emp.email,
+            role: emp.role || "Team Member",
+            department: emp.department || "Operations",
+            employee_id: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(emp.id)
+              ? emp.id
+              : null,
+          },
+        }).catch((e) => console.warn("batch addMemberFn error:", e));
+      }
+    }
+
+    setIsAddEmployeeOpen(false);
+    setAssignSearch("");
+    setSelectedToAssignIds([]);
+    toast.success(
+      isAr
+        ? `تم تعيين ${empsToAdd.length} موظف في المشروع بنجاح`
+        : `Successfully assigned ${empsToAdd.length} employee(s) to project`
+    );
   };
 
   const handleUploadFile = () => {
@@ -1261,53 +1327,170 @@ export function ProjectDetailView({
         </DialogContent>
       </Dialog>
 
-      {/* ── MODAL: ASSIGN EMPLOYEE ── */}
+      {/* ── MODAL: ASSIGN EMPLOYEE (DATABASE-DRIVEN SEARCH) ── */}
       <Dialog open={isAddEmployeeOpen} onOpenChange={setIsAddEmployeeOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <UserPlus className="h-5 w-5 text-orange-500" />
-              {isAr ? "تعيين موظف في المشروع" : "Assign Team Member"}
+        <DialogContent className="sm:max-w-xl md:max-w-2xl max-h-[88vh] flex flex-col overflow-hidden p-0">
+          <DialogHeader className="p-5 pb-3 border-b border-border/60">
+            <DialogTitle className="flex items-center gap-2.5 text-base sm:text-lg font-bold">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400">
+                <UserPlus className="h-5 w-5" />
+              </div>
+              <span>{isAr ? "تعيين موظف في المشروع" : "Assign Team Member"}</span>
             </DialogTitle>
+            <p className="text-xs text-muted-foreground pt-1">
+              {isAr
+                ? "ابحث عن موظف من قاعدة البيانات لتعيينه مباشرة بدون إدخال أي بيانات إضافية"
+                : "Search employees from the database to assign directly to this project with zero manual data entry"}
+            </p>
           </DialogHeader>
-          <div className="space-y-3.5 py-2 text-xs">
-            <div className="space-y-1">
-              <Label>{isAr ? "اسم الموظف *" : "Employee Name *"}</Label>
+
+          <div className="p-5 space-y-3.5 flex-1 overflow-hidden flex flex-col">
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="e.g. Omar Hassan"
-                value={newEmpName}
-                onChange={(e) => setNewEmpName(e.target.value)}
+                placeholder={isAr ? "ابحث بالاسم، الإدارة، الدور الوظيفي، أو البريد الإلكتروني..." : "Search employee by name, role, department, or email..."}
+                value={assignSearch}
+                onChange={(e) => setAssignSearch(e.target.value)}
+                className="pl-10 h-10 rounded-xl text-xs bg-muted/30 focus-visible:bg-background shadow-2xs"
+                autoFocus
               />
+              {assignSearch && (
+                <button
+                  type="button"
+                  onClick={() => setAssignSearch("")}
+                  className="absolute right-3.5 top-2.5 text-xs text-muted-foreground hover:text-foreground font-medium"
+                >
+                  {isAr ? "مسح" : "Clear"}
+                </button>
+              )}
             </div>
-            <div className="space-y-1">
-              <Label>{isAr ? "الدور في المشروع" : "Project Role"}</Label>
-              <Input
-                placeholder="e.g. Commissioning Engineer"
-                value={newEmpRole}
-                onChange={(e) => setNewEmpRole(e.target.value)}
-              />
+
+            {/* List Header / Stats */}
+            <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
+              <span>
+                {assignableFilteredEmployees.length} {isAr ? "موظف متاح في قاعدة البيانات" : "employees found"}
+              </span>
+              {selectedToAssignIds.length > 0 && (
+                <span className="font-semibold text-orange-600 dark:text-orange-400">
+                  {selectedToAssignIds.length} {isAr ? "محدد للتعيين" : "selected for assignment"}
+                </span>
+              )}
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label>{isAr ? "الإدارة" : "Department"}</Label>
-                <Input
-                  value={newEmpDept}
-                  onChange={(e) => setNewEmpDept(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label>{isAr ? "البريد الإلكتروني" : "Email"}</Label>
-                <Input
-                  placeholder="omar.h@integ.com"
-                  value={newEmpEmail}
-                  onChange={(e) => setNewEmpEmail(e.target.value)}
-                />
-              </div>
+
+            {/* Scrollable Employee Results List */}
+            <div className="flex-1 overflow-y-auto divide-y divide-border/40 rounded-2xl border border-border/70 bg-card p-1.5 min-h-[220px] max-h-[360px]">
+              {assignableFilteredEmployees.length === 0 ? (
+                <div className="py-12 text-center text-muted-foreground text-xs space-y-1">
+                  <p className="font-medium text-foreground/80">{isAr ? "لا توجد نتائج مطابقة" : "No matching employees found"}</p>
+                  <p className="text-[11px]">{isAr ? "جرّب البحث باسم أو إدارة أخرى" : "Try searching by another name or department"}</p>
+                </div>
+              ) : (
+                assignableFilteredEmployees.map((emp) => {
+                  const isAlreadyInProject = project.employees.some(
+                    (pe) => pe.id === emp.id || pe.name.trim().toLowerCase() === emp.name.trim().toLowerCase()
+                  );
+                  const isSelected = selectedToAssignIds.includes(emp.id);
+
+                  return (
+                    <div
+                      key={emp.id}
+                      className={cn(
+                        "flex items-center justify-between p-3 rounded-xl transition-colors",
+                        isAlreadyInProject
+                          ? "opacity-60 bg-muted/20"
+                          : isSelected
+                          ? "bg-orange-500/10"
+                          : "hover:bg-muted/40 cursor-pointer"
+                      )}
+                      onClick={() => {
+                        if (isAlreadyInProject) return;
+                        setSelectedToAssignIds((prev) =>
+                          isSelected ? prev.filter((id) => id !== emp.id) : [...prev, emp.id]
+                        );
+                      }}
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1 mr-3">
+                        {!isAlreadyInProject && (
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => {
+                              setSelectedToAssignIds((prev) =>
+                                isSelected ? prev.filter((id) => id !== emp.id) : [...prev, emp.id]
+                              );
+                            }}
+                            className="data-[state=checked]:bg-orange-600 data-[state=checked]:border-orange-600"
+                          />
+                        )}
+                        <EmployeeAvatar
+                          id={emp.id}
+                          name={emp.name}
+                          url={emp.avatarUrl}
+                          className="h-9 w-9 rounded-full shrink-0"
+                          fallbackClassName="text-xs"
+                        />
+                        <div className="min-w-0 flex-1 text-xs">
+                          <p className="font-semibold text-foreground truncate">{emp.name}</p>
+                          <p className="text-[11px] text-orange-600 dark:text-orange-400 font-medium truncate">
+                            {emp.role} {emp.department ? `• ${emp.department}` : ""}
+                          </p>
+                          {emp.email && (
+                            <p className="text-[10px] text-muted-foreground font-mono truncate">{emp.email}</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="shrink-0 flex items-center gap-2">
+                        {isAlreadyInProject ? (
+                          <Badge variant="outline" className="text-[10px] bg-muted/50 text-muted-foreground border-border/60">
+                            {isAr ? "معين بالفعل" : "Already in project"}
+                          </Badge>
+                        ) : (
+                          <Button
+                            size="sm"
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAssignSingleEmployee(emp);
+                            }}
+                            className="h-8 px-3.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold gap-1.5 shadow-sm shadow-orange-600/20"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            <span>{isAr ? "تعيين" : "Assign"}</span>
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddEmployeeOpen(false)}>{isAr ? "إلغاء" : "Cancel"}</Button>
-            <Button onClick={handleAddEmployee} className="bg-brand text-brand-foreground">{isAr ? "تعيين" : "Assign"}</Button>
+
+          <DialogFooter className="p-4 border-t border-border/60 bg-muted/10 gap-2">
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => {
+                setIsAddEmployeeOpen(false);
+                setSelectedToAssignIds([]);
+                setAssignSearch("");
+              }}
+              className="rounded-xl h-10 px-5 text-xs font-semibold"
+            >
+              {isAr ? "إلغاء" : "Cancel"}
+            </Button>
+            {selectedToAssignIds.length > 0 && (
+              <Button
+                type="button"
+                onClick={handleAssignMultipleEmployees}
+                className="bg-orange-600 hover:bg-orange-700 text-white rounded-xl h-10 px-6 text-xs font-semibold shadow-sm shadow-orange-600/20"
+              >
+                {isAr
+                  ? `تعيين المحددين (${selectedToAssignIds.length})`
+                  : `Assign Selected (${selectedToAssignIds.length})`}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
