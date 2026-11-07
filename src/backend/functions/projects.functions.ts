@@ -22,8 +22,47 @@ export const listCompanyProjects = createServerFn({ method: "GET" })
   .validator((d: unknown) => ListProjectsSchema.parse(d || {}))
   .handler(async ({ data, context }) => {
     const supabase = context.supabase;
+    const userId = context.userId;
 
     try {
+      // 1. Resolve user authorization roles and profile
+      const [{ data: roleRows }, { data: profile }] = await Promise.all([
+        supabase.from("user_roles").select("role").eq("user_id", userId),
+        supabase.from("profiles").select("id, full_name, email").eq("id", userId).maybeSingle(),
+      ]);
+
+      const userRoles = (roleRows || []).map((r: any) => r.role);
+      const isAdminOrHr = userRoles.includes("admin") || userRoles.includes("hr");
+      // If user is a manager or non-admin, or explicitly viewing manager portal, enforce manager-only visibility
+      const isManagerScope = !isAdminOrHr || data.role === "manager";
+
+      // 2. If manager scope, look up which projects they belong to as a team member
+      const memberProjectIds = new Set<string>();
+      if (isManagerScope) {
+        const { data: memberRows } = await supabase
+          .from("project_members")
+          .select("project_id")
+          .eq("employee_id", userId);
+        if (memberRows) {
+          for (const m of memberRows) {
+            if (m.project_id) memberProjectIds.add(m.project_id);
+          }
+        }
+
+        if (profile?.email) {
+          const { data: emailMemberRows } = await supabase
+            .from("project_members")
+            .select("project_id")
+            .eq("email", profile.email);
+          if (emailMemberRows) {
+            for (const m of emailMemberRows) {
+              if (m.project_id) memberProjectIds.add(m.project_id);
+            }
+          }
+        }
+      }
+
+      // 3. Query projects from database
       let query = supabase
         .from("company_projects")
         .select(`
@@ -35,6 +74,7 @@ export const listCompanyProjects = createServerFn({ method: "GET" })
           project_manager_id,
           reported_manager_name,
           reported_manager_id,
+          created_by,
           location,
           start_date,
           end_date,
@@ -42,7 +82,7 @@ export const listCompanyProjects = createServerFn({ method: "GET" })
           status,
           created_at,
           tasks:project_tasks(id, status),
-          members:project_members(id)
+          members:project_members(id, employee_id, email)
         `)
         .order("created_at", { ascending: false });
 
@@ -52,7 +92,7 @@ export const listCompanyProjects = createServerFn({ method: "GET" })
       if (data.location && data.location !== "all") {
         query = query.ilike("location", `%${data.location}%`);
       }
-      if (data.manager && data.manager !== "all") {
+      if (data.manager && data.manager !== "all" && !isManagerScope) {
         query = query.ilike("project_manager_name", `%${data.manager}%`);
       }
       if (data.search && data.search.trim()) {
@@ -66,8 +106,48 @@ export const listCompanyProjects = createServerFn({ method: "GET" })
         return [];
       }
 
-      // Transform into frontend representation with dynamic task completion calculation
-      return (rows || []).map((row: any, index: number) => {
+      // 4. Filter to manager's related projects if manager scope
+      let effectiveRows = rows || [];
+      if (isManagerScope) {
+        const userFullName = (profile?.full_name || "").trim().toLowerCase();
+        const userEmail = (profile?.email || "").trim().toLowerCase();
+
+        effectiveRows = effectiveRows.filter((row: any) => {
+          const isPmId = row.project_manager_id && row.project_manager_id === userId;
+          const isRmId = row.reported_manager_id && row.reported_manager_id === userId;
+          const isCreator = row.created_by && row.created_by === userId;
+          const isMember = memberProjectIds.has(row.id);
+
+          const pmName = (row.project_manager_name || "").trim().toLowerCase();
+          const rmName = (row.reported_manager_name || "").trim().toLowerCase();
+
+          const isPmName = Boolean(
+            userFullName && pmName && (pmName === userFullName || pmName.includes(userFullName) || userFullName.includes(pmName))
+          );
+          const isRmName = Boolean(
+            userFullName && rmName && (rmName === userFullName || rmName.includes(userFullName) || userFullName.includes(rmName))
+          );
+
+          const isMemberEmail = Boolean(
+            userEmail &&
+            Array.isArray(row.members) &&
+            row.members.some((m: any) => m.email && m.email.trim().toLowerCase() === userEmail)
+          );
+
+          const isRelated = isPmId || isRmId || isCreator || isMember || isPmName || isRmName || isMemberEmail;
+          if (!isRelated) return false;
+
+          // Sub-filter for specific manager relation
+          if (data.managerRelation === "as_pm" && !(isPmId || isPmName)) return false;
+          if (data.managerRelation === "as_rm" && !(isRmId || isRmName)) return false;
+          if (data.managerRelation === "as_member" && !(isMember || isMemberEmail)) return false;
+
+          return true;
+        });
+      }
+
+      // 5. Transform into frontend representation with dynamic task completion calculation
+      return effectiveRows.map((row: any, index: number) => {
         const tasks = row.tasks || [];
         const totalTasks = tasks.length;
         const completedTasks = tasks.filter((t: any) => t.status === "completed").length;
@@ -122,6 +202,7 @@ export const getCompanyProject = createServerFn({ method: "GET" })
   .validator((d: unknown) => GetProjectSchema.parse(d))
   .handler(async ({ data, context }) => {
     const supabase = context.supabase;
+    const userId = context.userId;
 
     // Check if input is UUID or project_code
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.id);
@@ -136,6 +217,41 @@ export const getCompanyProject = createServerFn({ method: "GET" })
     const { data: project, error } = await query.maybeSingle();
     if (error || !project) {
       throw new Error(error?.message || "Project not found");
+    }
+
+    // Role verification: managers can only view related projects
+    const [{ data: roleRows }, { data: profile }] = await Promise.all([
+      supabase.from("user_roles").select("role").eq("user_id", userId),
+      supabase.from("profiles").select("id, full_name, email").eq("id", userId).maybeSingle(),
+    ]);
+
+    const userRoles = (roleRows || []).map((r: any) => r.role);
+    const isAdminOrHr = userRoles.includes("admin") || userRoles.includes("hr");
+
+    if (!isAdminOrHr || data.role === "manager") {
+      const userFullName = (profile?.full_name || "").trim().toLowerCase();
+      const userEmail = (profile?.email || "").trim().toLowerCase();
+      const pmName = (project.project_manager_name || "").trim().toLowerCase();
+      const rmName = (project.reported_manager_name || "").trim().toLowerCase();
+
+      const { data: memberRecord } = await supabase
+        .from("project_members")
+        .select("id")
+        .eq("project_id", project.id)
+        .or(`employee_id.eq.${userId}${userEmail ? `,email.eq.${userEmail}` : ""}`)
+        .maybeSingle();
+
+      const isRelated =
+        project.project_manager_id === userId ||
+        project.reported_manager_id === userId ||
+        project.created_by === userId ||
+        Boolean(memberRecord) ||
+        Boolean(userFullName && pmName && (pmName === userFullName || pmName.includes(userFullName) || userFullName.includes(pmName))) ||
+        Boolean(userFullName && rmName && (rmName === userFullName || rmName.includes(userFullName) || userFullName.includes(rmName)));
+
+      if (!isAdminOrHr && !isRelated) {
+        throw new Error("Unauthorized: You do not have permission to view this project");
+      }
     }
 
     const [tasksRes, membersRes, filesRes, updatesRes] = await Promise.all([
@@ -337,6 +453,23 @@ export const deleteCompanyProject = createServerFn({ method: "POST" })
   .validator((d: unknown) => DeleteProjectSchema.parse(d))
   .handler(async ({ data, context }) => {
     const supabase = context.supabase;
+    const userId = context.userId;
+
+    const { data: roleRows } = await supabase.from("user_roles").select("role").eq("user_id", userId);
+    const roles = (roleRows || []).map((r: any) => r.role);
+    const isAdminOrHr = roles.includes("admin") || roles.includes("hr");
+
+    if (!isAdminOrHr) {
+      const { data: proj } = await supabase
+        .from("company_projects")
+        .select("project_manager_id, created_by")
+        .eq("id", data.id)
+        .maybeSingle();
+
+      if (!proj || (proj.project_manager_id !== userId && proj.created_by !== userId)) {
+        throw new Error("Unauthorized: You do not have permission to delete this project");
+      }
+    }
 
     const { error } = await supabase.from("company_projects").delete().eq("id", data.id);
     if (error) {

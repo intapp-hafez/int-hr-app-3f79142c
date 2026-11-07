@@ -45,6 +45,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useI18n } from "@/lib/i18n";
+import { useSession } from "@/lib/auth";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -63,6 +64,8 @@ interface ProjectsViewProps {
 
 export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
   const { isAr } = useI18n();
+  const session = useSession();
+  const isManagerView = role === "manager" || (session?.role === "manager" && role !== "admin");
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [detailProject, setDetailProject] = useState<Project | null>(null);
@@ -179,15 +182,17 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
     isLoading: isProjectsLoading,
     refetch: refetchProjects,
   } = useQuery({
-    queryKey: ["company-projects", statusFilter, locationFilter, managerFilter, searchQuery],
+    queryKey: ["company-projects", isManagerView ? "manager" : "admin", statusFilter, locationFilter, managerFilter, searchQuery],
     queryFn: async () => {
       try {
         const res = await listProjectsFn({
           data: {
             status: statusFilter,
             location: locationFilter,
-            manager: managerFilter,
+            manager: !isManagerView ? managerFilter : undefined,
+            managerRelation: isManagerView && managerFilter !== "all" ? (managerFilter as any) : undefined,
             search: searchQuery,
+            role: isManagerView ? "manager" : "admin",
           },
         });
         return (res as Project[]) || [];
@@ -221,7 +226,9 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
     setDetailInitialTab(tab);
     setDetailProject(proj);
     try {
-      const full = await getProjectFn({ data: { id: proj.id } });
+      const full = await getProjectFn({
+        data: { id: proj.id, role: isManagerView ? "manager" : "admin" },
+      });
       if (full && full.id) {
         setDetailProject(full as any);
       }
@@ -358,7 +365,37 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
       if (locationFilter !== "all" && p.location !== locationFilter) return false;
 
       // 4. Manager filter
-      if (managerFilter !== "all" && p.projectManager.name !== managerFilter) return false;
+      if (isManagerView) {
+        const uId = session?.employeeId;
+        const uName = (session?.name || "").trim().toLowerCase();
+        const uEmail = (session?.email || "").trim().toLowerCase();
+
+        const isPm = Boolean(
+          (uId && p.projectManager.id === uId) ||
+          (uName && (p.projectManager.name.toLowerCase().includes(uName) || uName.includes(p.projectManager.name.toLowerCase())))
+        );
+        const isRm = Boolean(
+          (uId && p.reportedManager.id === uId) ||
+          (uName && (p.reportedManager.name.toLowerCase().includes(uName) || uName.includes(p.reportedManager.name.toLowerCase())))
+        );
+        const isMember = Boolean(
+          Array.isArray(p.employees) &&
+          p.employees.some(
+            (e) =>
+              (uId && e.id === uId) ||
+              (uEmail && e.email && e.email.toLowerCase() === uEmail) ||
+              (uName && (e.name.toLowerCase().includes(uName) || uName.includes(e.name.toLowerCase())))
+          )
+        );
+
+        if (!isPm && !isRm && !isMember) return false;
+
+        if (managerFilter === "as_pm" && !isPm) return false;
+        if (managerFilter === "as_rm" && !isRm) return false;
+        if (managerFilter === "as_member" && !isMember) return false;
+      } else {
+        if (managerFilter !== "all" && p.projectManager.name !== managerFilter) return false;
+      }
 
       // 5. Search query
       if (searchQuery.trim()) {
@@ -426,10 +463,14 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
           </div>
           <div>
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-              {isAr ? "إدارة المشاريع" : "Projects"}
+              {isAr
+                ? (isManagerView ? "مشاريعي والفرق التابعة" : "إدارة المشاريع")
+                : (isManagerView ? "My Projects" : "Projects")}
             </h1>
             <p className="text-xs sm:text-sm text-muted-foreground">
-              {isAr ? "إدارة ومتابعة مشاريع الشركة، والمهام الميدانية، والفرق المعينة" : "Manage company projects, assignments, and related tasks"}
+              {isAr
+                ? (isManagerView ? "متابعة وإدارة المشاريع التي تديرها أو تتبع إشرافك المباشر" : "إدارة ومتابعة مشاريع الشركة، والمهام الميدانية، والفرق المعينة")
+                : (isManagerView ? "Manage and track projects assigned to you or under your direct supervision" : "Manage company projects, assignments, and related tasks")}
             </p>
           </div>
         </div>
@@ -534,18 +575,30 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
 
         {/* Manager Dropdown */}
         <div className="lg:col-span-2">
-          <select
-            value={managerFilter}
-            onChange={(e) => setManagerFilter(e.target.value)}
-            className="w-full h-10 rounded-xl border border-border bg-card px-3 text-xs font-medium text-foreground focus:outline-hidden focus:ring-1 focus:ring-brand"
-          >
-            <option value="all">{isAr ? "جميع المديرين" : "All Managers"}</option>
-            {uniqueManagers.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
+          {isManagerView ? (
+            <select
+              value={managerFilter}
+              onChange={(e) => setManagerFilter(e.target.value)}
+              className="w-full h-10 rounded-xl border border-border bg-card px-3 text-xs font-medium text-foreground focus:outline-hidden focus:ring-1 focus:ring-brand"
+            >
+              <option value="all">{isAr ? "جميع مشاريعي التابعة" : "All My Related Projects"}</option>
+              <option value="as_pm">{isAr ? "بصفتي مدير المشروع" : "As Project Manager"}</option>
+              <option value="as_rm">{isAr ? "بصفتي المدير المباشر" : "As Reported Manager"}</option>
+            </select>
+          ) : (
+            <select
+              value={managerFilter}
+              onChange={(e) => setManagerFilter(e.target.value)}
+              className="w-full h-10 rounded-xl border border-border bg-card px-3 text-xs font-medium text-foreground focus:outline-hidden focus:ring-1 focus:ring-brand"
+            >
+              <option value="all">{isAr ? "جميع المديرين" : "All Managers"}</option>
+              {uniqueManagers.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         {/* Status Dropdown */}

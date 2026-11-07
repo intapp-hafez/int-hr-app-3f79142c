@@ -40,10 +40,13 @@ export const ListProjectsSchema = z.object({
   location: z.string().optional(),
   manager: z.string().optional(),
   search: z.string().optional(),
+  role: z.enum(["admin", "manager"]).optional(),
+  managerRelation: z.enum(["all", "as_pm", "as_rm", "as_member"]).optional(),
 });
 
 export const GetProjectSchema = z.object({
   id: z.string(), // can be UUID or project_code
+  role: z.enum(["admin", "manager"]).optional(),
 });
 
 export const DeleteProjectSchema = z.object({
