@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, Play, Pause, Check, X, Search, MapPin, History, ChevronDown, ChevronUp, Users, Upload, Download, ChevronLeft, ChevronRight, LayoutGrid, Table as TableIcon, Loader2, CheckCircle2, Info, RefreshCw } from "lucide-react";
+import { Plus, Trash2, Play, Pause, Check, X, Search, MapPin, History, ChevronDown, ChevronUp, Users, Upload, Download, ChevronLeft, ChevronRight, LayoutGrid, Table as TableIcon, Loader2, CheckCircle2, Info, RefreshCw, Calendar, Clock, Flag, FileText, ListPlus, Sparkles, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { getState, type TaskPriority, type TaskStatus, type ManagerTask } from "@/lib/store";
 import { useSession } from "@/lib/auth";
@@ -1104,158 +1104,213 @@ function AddTaskModal({
 
   return (
     <div
-      className="fixed inset-0 z-[1000] grid place-items-center bg-foreground/40 p-4"
+      className="fixed inset-0 z-[1000] grid place-items-center bg-black/50 backdrop-blur-xs p-3 sm:p-4"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[92vh] w-full max-w-3xl md:max-w-4xl flex-col rounded-3xl bg-background p-6 shadow-soft"
+        className="flex max-h-[92vh] w-full max-w-4xl flex-col rounded-3xl bg-card border border-border/80 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-border pb-3">
-          <div>
-            <h3 className="font-display text-base font-semibold">
-              {t("createTaskTitle") || (isAr ? "إضافة مهمة جديدة" : "Create New Task")}
-            </h3>
-            <p className="text-xs text-muted-foreground">
-              {t("createTaskDesc") ||
-                (isAr
-                  ? "حدد تفاصيل التكليف ومواعيد التنفيذ وموقع العمل الجغرافي بدقة"
-                  : "Specify assignment details, scheduled time, and geofenced work location")}
-            </p>
+        <div className="flex items-center justify-between border-b border-border/70 px-5 sm:px-6 py-4 bg-muted/20 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-2xl bg-brand/10 text-brand grid place-items-center shadow-xs shrink-0">
+              <ListPlus className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-display text-base font-bold text-foreground">
+                  {t("createTaskTitle") || (isAr ? "إضافة مهمة جديدة" : "Create New Task")}
+                </h3>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-brand/10 text-brand border border-brand/20">
+                  {isAr ? "تكليف عمل" : "Task Assignment"}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {t("createTaskDesc") ||
+                  (isAr
+                    ? "حدد تفاصيل التكليف، مواعيد التنفيذ، المكلفين، وموقع العمل الميداني"
+                    : "Specify assignment details, scheduled time, assignees, and geofenced work location")}
+              </p>
+            </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-1.5 hover:bg-muted"
+            className="rounded-full p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleCreateTask} className="flex-1 overflow-y-auto py-4 text-xs">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* ── Left Column: Task Core Details ── */}
-            <div className="space-y-3.5">
-              {/* Title */}
-              <div>
-                <label className="block font-semibold text-foreground mb-1">
-                  {t("taskTitle") || (isAr ? "عنوان المهمة" : "Task Title")} <span className="text-destructive">*</span>
-                </label>
-                <input
-                  required
-                  value={createForm.title}
-                  onChange={(e) => setCreateForm({ ...createForm, title: e.target.value })}
-                  placeholder={isAr ? "مثال: صيانة معدات فرع المعادي" : "e.g. Inspect branch equipment"}
-                  className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs focus:outline-hidden"
-                />
-              </div>
-
-              {/* Description */}
-              <div>
-                <label className="block font-semibold text-foreground mb-1">
-                  {t("taskDescription") || (isAr ? "الوصف" : "Description")}
-                </label>
-                <textarea
-                  rows={3}
-                  value={createForm.description}
-                  onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
-                  placeholder={isAr ? "تفاصيل إضافية وملاحظات تنفيذ المهمة…" : "Details about the task…"}
-                  className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs focus:outline-hidden resize-none"
-                />
-              </div>
-
-              {/* Priority & Estimated Hours */}
-              <div className="grid grid-cols-2 gap-3">
+        {/* Form with Flex Layout (Scrollable Body + Sticky Footer) */}
+        <form onSubmit={handleCreateTask} className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
+          {/* Scrollable Body */}
+          <div className="flex-1 overflow-y-auto px-5 sm:px-6 py-4 space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* ── Left Column: Task Core Details & Schedule ── */}
+              <div className="space-y-4">
+                {/* Title */}
                 <div>
-                  <label className="block font-semibold text-foreground mb-1">
-                    {t("filterByPriority") || (isAr ? "الأولوية" : "Priority")}
-                  </label>
-                  <select
-                    value={createForm.priority}
-                    onChange={(e) =>
-                      setCreateForm({ ...createForm, priority: e.target.value as TaskPriority })
-                    }
-                    className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs focus:outline-hidden font-medium"
-                  >
-                    <option value="low">{t("priorityLow") || (isAr ? "منخفضة" : "Low")}</option>
-                    <option value="medium">{t("priorityMedium") || (isAr ? "متوسطة" : "Medium")}</option>
-                    <option value="high">{t("priorityHigh") || (isAr ? "عالية" : "High")}</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-foreground mb-1">
-                    {t("estimatedHoursLabel") || (isAr ? "الساعات التقديرية" : "Estimated Hours")}
+                  <label className="block font-semibold text-foreground mb-1.5 flex items-center gap-1.5">
+                    <FileText className="h-3.5 w-3.5 text-brand" />
+                    <span>{t("taskTitle") || (isAr ? "عنوان المهمة" : "Task Title")}</span>
+                    <span className="text-destructive">*</span>
                   </label>
                   <input
-                    type="number"
-                    step="0.5"
-                    min="0"
-                    max="100"
-                    value={createForm.estimated_hours}
-                    onChange={(e) => setCreateForm({ ...createForm, estimated_hours: e.target.value })}
-                    className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs focus:outline-hidden"
-                  />
-                </div>
-              </div>
-
-              {/* Due Date & Time */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-foreground mb-1">
-                    {t("date") || (isAr ? "التاريخ" : "Date")}
-                  </label>
-                  <input
-                    type="date"
-                    value={createForm.due_date}
-                    onChange={(e) => setCreateForm({ ...createForm, due_date: e.target.value })}
-                    className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs focus:outline-hidden"
+                    required
+                    value={createForm.title}
+                    onChange={(e) => setCreateForm({ ...createForm, title: e.target.value })}
+                    placeholder={isAr ? "مثال: صيانة معدات فرع المعادي" : "e.g. Inspect branch equipment"}
+                    className="w-full rounded-xl border border-input bg-background px-3.5 py-2.5 text-xs font-medium focus:outline-hidden focus:ring-2 focus:ring-brand/20 transition-all placeholder:text-muted-foreground/60 shadow-xs"
                   />
                 </div>
 
+                {/* Description */}
                 <div>
-                  <label className="block font-semibold text-foreground mb-1">
-                    {isAr ? "الوقت" : "Time"}
+                  <label className="block font-semibold text-foreground mb-1.5">
+                    {t("taskDescription") || (isAr ? "الوصف والتوجيهات" : "Description & Instructions")}
                   </label>
-                  <input
-                    type="time"
-                    value={createForm.due_time}
-                    onChange={(e) => setCreateForm({ ...createForm, due_time: e.target.value })}
-                    className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs focus:outline-hidden"
+                  <textarea
+                    rows={3}
+                    value={createForm.description}
+                    onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
+                    placeholder={isAr ? "تفاصيل إضافية وملاحظات تنفيذ المهمة والمعدات المطلوبة…" : "Details about the task, requirements, gate pass…"}
+                    className="w-full rounded-xl border border-input bg-background px-3.5 py-2.5 text-xs focus:outline-hidden focus:ring-2 focus:ring-brand/20 transition-all resize-none placeholder:text-muted-foreground/60 shadow-xs"
                   />
                 </div>
-              </div>
-            </div>
 
-            {/* ── Right Column: Assignees & Database Location ── */}
-            <div className="space-y-3.5">
-              {/* Assignees */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="font-semibold text-foreground">
-                    {t("assignees") || (isAr ? "المكلفون" : "Assignees")} <span className="text-destructive">*</span>
+                {/* Priority Selection Pills */}
+                <div>
+                  <label className="block font-semibold text-foreground text-xs mb-1.5 flex items-center gap-1.5">
+                    <Flag className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span>{t("filterByPriority") || (isAr ? "مستوى الأولوية" : "Priority Level")}</span>
                   </label>
-                  <span className="text-[11px] text-muted-foreground">
-                    {createForm.assignees.length} {isAr ? "محدد" : "selected"}
-                  </span>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      {
+                        id: "low" as TaskPriority,
+                        label: t("priorityLow") || (isAr ? "منخفضة" : "Low"),
+                        dot: "bg-emerald-500",
+                        active: "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500/30 font-bold",
+                      },
+                      {
+                        id: "medium" as TaskPriority,
+                        label: t("priorityMedium") || (isAr ? "متوسطة" : "Medium"),
+                        dot: "bg-amber-500",
+                        active: "border-amber-500 bg-amber-500/10 text-amber-700 dark:text-amber-300 ring-1 ring-amber-500/30 font-bold",
+                      },
+                      {
+                        id: "high" as TaskPriority,
+                        label: t("priorityHigh") || (isAr ? "عالية / عاجلة" : "High"),
+                        dot: "bg-rose-500 animate-pulse",
+                        active: "border-rose-500 bg-rose-500/10 text-rose-700 dark:text-rose-300 ring-1 ring-rose-500/30 font-bold",
+                      },
+                    ].map((p) => {
+                      const isSelected = createForm.priority === p.id;
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => setCreateForm({ ...createForm, priority: p.id })}
+                          className={`flex items-center justify-center gap-2 py-2 px-2.5 rounded-xl border text-xs transition-all ${
+                            isSelected
+                              ? p.active
+                              : "border-input bg-background/50 hover:bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          <span className={`h-2 w-2 rounded-full ${p.dot}`} />
+                          <span className="truncate">{p.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                {/* Filter / Search within assignees */}
-                <div className="rounded-xl border border-input bg-background overflow-hidden">
-                  <div className="border-b border-border/60 p-1.5 flex items-center gap-2 bg-muted/20">
-                    <Search className="h-3 w-3 text-muted-foreground ms-1.5 shrink-0" />
+                {/* Scheduling & Estimated Hours */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block font-semibold text-foreground mb-1.5 flex items-center gap-1.5">
+                      <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span>{t("date") || (isAr ? "التاريخ" : "Date")}</span>
+                    </label>
                     <input
-                      value={assigneeSearch}
-                      onChange={(e) => setAssigneeSearch(e.target.value)}
-                      placeholder={isAr ? "بحث بالاسم…" : "Filter employees…"}
-                      className="w-full bg-transparent text-xs focus:outline-hidden"
+                      type="date"
+                      value={createForm.due_date}
+                      onChange={(e) => setCreateForm({ ...createForm, due_date: e.target.value })}
+                      className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-brand/20 font-medium shadow-xs"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-foreground mb-1.5 flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span>{isAr ? "الوقت" : "Time"}</span>
+                    </label>
+                    <input
+                      type="time"
+                      value={createForm.due_time}
+                      onChange={(e) => setCreateForm({ ...createForm, due_time: e.target.value })}
+                      className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-brand/20 font-medium shadow-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="font-semibold text-foreground flex items-center gap-1 truncate">
+                        <span>{t("estimatedHoursLabel") || (isAr ? "الساعات" : "Est. Hours")}</span>
+                      </label>
+                      <div className="flex items-center gap-0.5">
+                        {["1", "2", "4"].map((hr) => (
+                          <button
+                            key={hr}
+                            type="button"
+                            onClick={() => setCreateForm({ ...createForm, estimated_hours: hr })}
+                            className={`px-1 py-0.2 rounded text-[9px] font-semibold transition-colors ${
+                              createForm.estimated_hours === hr
+                                ? "bg-brand text-brand-foreground"
+                                : "bg-muted text-muted-foreground hover:bg-muted/80"
+                            }`}
+                          >
+                            {hr}h
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        step="0.5"
+                        min="0"
+                        max="100"
+                        value={createForm.estimated_hours}
+                        onChange={(e) => setCreateForm({ ...createForm, estimated_hours: e.target.value })}
+                        className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-brand/20 font-medium pe-7 shadow-xs"
+                      />
+                      <span className="absolute end-2 top-2 text-[10px] text-muted-foreground pointer-events-none">
+                        {isAr ? "ساعة" : "h"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Right Column: Assignees ── */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="font-semibold text-foreground flex items-center gap-1.5">
+                    <Users className="h-3.5 w-3.5 text-brand" />
+                    <span>{t("assignees") || (isAr ? "المكلفون بالمهمة" : "Task Assignees")}</span>
+                    <span className="text-destructive">*</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-muted text-foreground">
+                      {createForm.assignees.length} {isAr ? "محدد" : "selected"}
+                    </span>
                     <button
                       type="button"
                       onClick={toggleSelectAllAssignees}
-                      className="text-[10px] text-brand font-semibold hover:underline shrink-0 px-1"
+                      className="text-[11px] text-brand font-semibold hover:underline"
                     >
                       {createForm.assignees.length === assigneesList.length
                         ? isAr
@@ -1266,13 +1321,72 @@ function AddTaskModal({
                         : "Select all"}
                     </button>
                   </div>
+                </div>
 
-                  <div className="max-h-36 overflow-y-auto p-1.5 space-y-0.5">
+                {/* Selected Assignees Chips */}
+                {createForm.assignees.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto p-1.5 rounded-xl bg-brand/5 border border-brand/15">
+                    {createForm.assignees.map((id) => {
+                      const emp = assigneesList.find((e) => e.id === id);
+                      if (!emp) return null;
+                      return (
+                        <span
+                          key={id}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-brand/10 text-brand border border-brand/20 animate-in fade-in zoom-in-95 duration-100"
+                        >
+                          <span className="h-3.5 w-3.5 rounded-full bg-brand text-brand-foreground text-[8px] font-bold grid place-items-center">
+                            {emp.name.charAt(0).toUpperCase()}
+                          </span>
+                          <span className="truncate max-w-[110px]">{emp.name}</span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setCreateForm((prev) => ({
+                                ...prev,
+                                assignees: prev.assignees.filter((aid) => aid !== id),
+                              }))
+                            }
+                            className="hover:text-destructive rounded-full p-0.5 transition-colors"
+                          >
+                            <X className="h-2.5 w-2.5" />
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Assignees Card with Filter & List */}
+                <div className="rounded-2xl border border-input bg-background/80 overflow-hidden shadow-xs">
+                  <div className="border-b border-border/60 p-2 flex items-center gap-2 bg-muted/20">
+                    <Search className="h-3.5 w-3.5 text-muted-foreground ms-1 shrink-0" />
+                    <input
+                      value={assigneeSearch}
+                      onChange={(e) => setAssigneeSearch(e.target.value)}
+                      placeholder={isAr ? "بحث بالاسم أو الكود…" : "Search employees…"}
+                      className="w-full bg-transparent text-xs focus:outline-hidden"
+                    />
+                    {assigneeSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setAssigneeSearch("")}
+                        className="text-muted-foreground hover:text-foreground p-0.5"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="max-h-52 overflow-y-auto p-1.5 space-y-1">
                     {filteredEmployeeList.length === 0 ? (
-                      <p className="p-2 text-center text-[11px] text-muted-foreground">
+                      <p className="p-4 text-center text-xs text-muted-foreground">
                         {assigneesList.length === 0
-                          ? (isAr ? "لا يوجد موظفون في فريقك" : "No team members assigned")
-                          : (isAr ? "لا يوجد موظفين مطابقين" : "No matching employees")}
+                          ? isAr
+                            ? "لا يوجد موظفون متاحون"
+                            : "No team members available"
+                          : isAr
+                          ? "لم يتم العثور على موظفين مطابقين"
+                          : "No matching employees found"}
                       </p>
                     ) : (
                       filteredEmployeeList.map((emp) => {
@@ -1280,30 +1394,102 @@ function AddTaskModal({
                         return (
                           <label
                             key={emp.id}
-                            className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-colors text-xs ${
-                              checked ? "bg-brand/10 font-semibold text-brand" : "hover:bg-muted text-foreground"
+                            className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl cursor-pointer transition-all border ${
+                              checked
+                                ? "bg-brand/10 border-brand/30 text-brand font-semibold shadow-xs"
+                                : "bg-card/50 border-transparent hover:bg-muted text-foreground"
                             }`}
                           >
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={() => {
-                                setCreateForm((prev) => ({
-                                  ...prev,
-                                  assignees: checked
-                                    ? prev.assignees.filter((id) => id !== emp.id)
-                                    : [...prev.assignees, emp.id],
-                                }));
-                              }}
-                              className="rounded border-input text-brand"
-                            />
-                            <span className="truncate">{emp.name}</span>
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div
+                                className={`h-6 w-6 rounded-full text-[10px] font-bold grid place-items-center shrink-0 ${
+                                  checked
+                                    ? "bg-brand text-brand-foreground"
+                                    : "bg-muted text-muted-foreground"
+                                }`}
+                              >
+                                {emp.name.charAt(0).toUpperCase()}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="truncate text-xs">{emp.name}</div>
+                                {(emp as any).role && (
+                                  <div className="text-[10px] text-muted-foreground truncate opacity-80">
+                                    {(emp as any).role} {(emp as any).dept ? `· ${(emp as any).dept}` : ""}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div
+                              className={`h-4 w-4 rounded-md grid place-items-center border shrink-0 transition-colors ${
+                                checked
+                                  ? "bg-brand border-brand text-white"
+                                  : "border-input bg-background"
+                              }`}
+                            >
+                              {checked && <Check className="h-3 w-3 stroke-[3]" />}
+                            </div>
                           </label>
                         );
                       })
                     )}
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* ── Unified Work Location & Geofencing Card ── */}
+            <div className="rounded-2xl border border-border/80 bg-muted/20 p-4 space-y-3.5 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-border/60">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-xl bg-brand/10 text-brand grid place-items-center shrink-0">
+                    <MapPin className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-foreground flex items-center gap-2">
+                      <span>{isAr ? "موقع العمل ونطاق تسجيل الحضور الميداني" : "Work Location & Check-in Geofence"}</span>
+                      {createForm.lat != null && createForm.lng != null && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                          {isAr ? "الموقع موقّع" : "Location Signed"}
+                        </span>
+                      )}
+                    </h4>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      {isAr
+                        ? "اختر من مواقع العمل المعتمدة أو حدد الموقع ونصف قطر السماح لتأكيد الحضور"
+                        : "Select a predefined work site or pinpoint coordinates with check-in radius"}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setCreateForm((prev) => ({ ...prev, showMap: !prev.showMap }))}
+                  className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all shrink-0 ${
+                    createForm.lat != null && createForm.lng != null
+                      ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 shadow-xs"
+                      : createForm.showMap
+                      ? "border-brand bg-brand/10 text-brand"
+                      : "border-border bg-background hover:bg-muted text-foreground"
+                  }`}
+                >
+                  <MapPin className={`h-3.5 w-3.5 ${createForm.lat != null ? "text-emerald-600 dark:text-emerald-400" : "text-brand"}`} />
+                  <span>
+                    {createForm.showMap
+                      ? isAr
+                        ? "إخفاء الخريطة"
+                        : "Hide Map"
+                      : createForm.lat != null
+                      ? isAr
+                        ? "عرض وتعديل بالخريطة"
+                        : "View on Map"
+                      : isAr
+                      ? "توقيع الموقع على الخريطة"
+                      : "Sign on Map"}
+                  </span>
+                  <ChevronDown
+                    className={`h-3.5 w-3.5 transition-transform ${createForm.showMap ? "rotate-180" : ""}`}
+                  />
+                </button>
               </div>
 
               {/* Work Location Selector */}
@@ -1339,12 +1525,11 @@ function AddTaskModal({
                 }}
               />
 
-              {/* Location: City & District from Database */}
-              <div className="grid grid-cols-2 gap-3">
-                {/* City from DB */}
+              {/* City & District Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-foreground mb-1">
-                    {isAr ? "المدينة (من قاعدة البيانات)" : "City"}
+                  <label className="block font-semibold text-foreground mb-1 text-xs">
+                    {isAr ? "المدينة" : "City"}
                   </label>
                   <select
                     value={createForm.cityId}
@@ -1360,9 +1545,8 @@ function AddTaskModal({
                   </select>
                 </div>
 
-                {/* District from DB */}
                 <div>
-                  <label className="block font-semibold text-foreground mb-1">
+                  <label className="block font-semibold text-foreground mb-1 text-xs">
                     {isAr ? "الحي / المنطقة" : "District"}
                   </label>
                   <select
@@ -1380,11 +1564,11 @@ function AddTaskModal({
                 </div>
               </div>
 
-              {/* Detailed Address */}
+              {/* Address with Map Reverse-Geocode Refresh */}
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="block font-semibold text-foreground">
-                    {isAr ? "العنوان بالتفصيل" : "Address"}
+                  <label className="block font-semibold text-foreground text-xs">
+                    {isAr ? "العنوان التفصيلي" : "Street Address / Landmark"}
                   </label>
                   {isGeocodingAddress && (
                     <span className="inline-flex items-center gap-1 text-[11px] text-brand font-medium animate-pulse">
@@ -1422,167 +1606,161 @@ function AddTaskModal({
                   )}
                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* ── Radius & Location Geofence Signing Section ── */}
-          <div className="mt-4 rounded-2xl border border-border/80 bg-muted/20 p-3.5 space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div>
-                <div className="flex items-center gap-1.5 font-semibold text-foreground text-xs">
-                  <MapPin className="h-3.5 w-3.5 text-brand shrink-0" />
-                  <span>{isAr ? "نصف قطر وموقع المهمة (لتسجيل الحضور)" : "Task Location & Check-in Radius"}</span>
+              {/* Radius Controls & Coords Summary */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-border/50">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-semibold text-foreground whitespace-nowrap">
+                      {isAr ? "نصف القطر:" : "Check-in Radius:"}
+                    </label>
+                    <div className="relative w-24">
+                      <input
+                        type="number"
+                        min={10}
+                        max={10000}
+                        step={10}
+                        value={createForm.radius_m}
+                        onChange={(e) => {
+                          const val = Math.max(10, Math.min(100000, Number(e.target.value) || 10));
+                          setCreateForm((prev) => ({ ...prev, radius_m: val }));
+                        }}
+                        className="w-full rounded-xl border border-input bg-background px-3 py-1.5 pe-7 text-xs font-mono font-semibold focus:outline-hidden"
+                      />
+                      <span className="absolute end-2 top-1.5 text-[10px] text-muted-foreground pointer-events-none">
+                        {isAr ? "متر" : "m"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Preset Pills */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {[50, 100, 200, 300, 500, 1000].map((preset) => {
+                      const isSelected = createForm.radius_m === preset;
+                      return (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => setCreateForm((prev) => ({ ...prev, radius_m: preset }))}
+                          className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all ${
+                            isSelected
+                              ? "bg-brand text-brand-foreground shadow-xs"
+                              : "border border-border/70 bg-background hover:bg-muted text-foreground/80"
+                          }`}
+                        >
+                          {preset} {isAr ? "م" : "m"}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-                <p className="text-[11px] text-muted-foreground mt-0.5">
-                  {isAr
-                    ? "حدد نطاق السماح بالمتر ووقّع الموقع على الخريطة لتأكيد الحضور ضمن النطاق الصحيح."
-                    : "Define the check-in radius in meters and sign the exact site on the map."}
-                </p>
-              </div>
 
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setCreateForm((prev) => ({ ...prev, showMap: !prev.showMap }))}
-                  className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all ${
-                    createForm.lat != null && createForm.lng != null
-                      ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                      : createForm.showMap
-                      ? "border-brand bg-brand/10 text-brand"
-                      : "border-border bg-background hover:bg-muted text-foreground"
-                  }`}
-                >
-                  <MapPin className={`h-3.5 w-3.5 ${createForm.lat != null ? "text-emerald-600 dark:text-emerald-400" : "text-brand"}`} />
-                  <span>
-                    {createForm.lat != null && createForm.lng != null
-                      ? isAr
-                        ? "الموقع موقّع على الخريطة"
-                        : "Location Signed"
-                      : isAr
-                      ? "توقيع الموقع على الخريطة"
-                      : "Sign on Map"}
-                  </span>
-                  <ChevronDown
-                    className={`h-3 w-3 transition-transform ${createForm.showMap ? "rotate-180" : ""}`}
-                  />
-                </button>
-              </div>
-            </div>
-
-            {/* Radius Controls (Input + Presets) */}
-            <div className="flex flex-wrap items-center gap-3 pt-1 border-t border-border/50">
-              <div className="flex items-center gap-2">
-                <label className="text-xs font-medium text-muted-foreground whitespace-nowrap">
-                  {isAr ? "نصف القطر:" : "Radius:"}
-                </label>
-                <div className="relative w-28">
-                  <input
-                    type="number"
-                    min={10}
-                    max={10000}
-                    step={10}
-                    value={createForm.radius_m}
-                    onChange={(e) => {
-                      const val = Math.max(10, Math.min(100000, Number(e.target.value) || 10));
-                      setCreateForm((prev) => ({ ...prev, radius_m: val }));
-                    }}
-                    className="w-full rounded-xl border border-input bg-background px-3 py-1.5 pe-8 text-xs font-mono font-semibold focus:outline-hidden"
-                  />
-                  <span className="absolute end-2.5 top-2 text-[10px] text-muted-foreground pointer-events-none">
-                    {isAr ? "متر" : "m"}
-                  </span>
-                </div>
-              </div>
-
-              {/* Preset Pills */}
-              <div className="flex flex-wrap items-center gap-1.5">
-                {[50, 100, 200, 300, 500, 1000].map((preset) => {
-                  const isSelected = createForm.radius_m === preset;
-                  return (
+                {/* Signed Coordinates Badge */}
+                {createForm.lat != null && createForm.lng != null && (
+                  <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 text-[11px] text-emerald-800 dark:text-emerald-200">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <span className="font-mono">
+                      {createForm.lat.toFixed(5)}, {createForm.lng.toFixed(5)}
+                    </span>
+                    <span className="text-[10px] opacity-75">
+                      · {isAr ? `دائرة ${createForm.radius_m}م` : `${createForm.radius_m}m zone`}
+                    </span>
                     <button
-                      key={preset}
                       type="button"
-                      onClick={() => setCreateForm((prev) => ({ ...prev, radius_m: preset }))}
-                      className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all ${
-                        isSelected
-                          ? "bg-brand text-brand-foreground shadow-xs"
-                          : "border border-border/70 bg-background hover:bg-muted text-foreground/80"
-                      }`}
+                      onClick={() =>
+                        setCreateForm((prev) => ({ ...prev, lat: undefined, lng: undefined }))
+                      }
+                      className="ms-1 text-[10px] text-destructive hover:underline font-semibold"
                     >
-                      {preset} {isAr ? "م" : "m"}
+                      {isAr ? "مسح" : "Clear"}
                     </button>
-                  );
-                })}
+                  </div>
+                )}
               </div>
 
-              {/* Signed coordinates indicator */}
-              {createForm.lat != null && createForm.lng != null && (
-                <div className="ms-auto flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 text-[11px] text-emerald-800 dark:text-emerald-200">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                  <span className="font-mono">
-                    {createForm.lat.toFixed(5)}, {createForm.lng.toFixed(5)}
-                  </span>
-                  <span className="text-[10px] opacity-75">
-                    · {isAr ? `دائرة ${createForm.radius_m}م` : `${createForm.radius_m}m zone`}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setCreateForm((prev) => ({ ...prev, lat: undefined, lng: undefined }))
-                    }
-                    className="ms-1 text-[10px] text-destructive hover:underline font-semibold"
-                  >
-                    {isAr ? "مسح" : "Clear"}
-                  </button>
+              {/* Expandable Leaflet Map */}
+              {createForm.showMap && (
+                <div className="space-y-2 pt-2 border-t border-border/50 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground px-0.5">
+                    <span className="flex items-center gap-1.5 font-medium">
+                      <Info className="h-3.5 w-3.5 text-brand shrink-0" />
+                      {isAr
+                        ? "انقر على الخريطة لتوقيع الموقع بدقة. الدائرة تمثل نطاق الحضور المطلوب."
+                        : "Click anywhere on the map to pin the exact site. The circle represents the check-in perimeter."}
+                    </span>
+                  </div>
+
+                  <div className="rounded-2xl overflow-hidden border border-border shadow-inner">
+                    <TaskLocationPicker
+                      lat={createForm.lat}
+                      lng={createForm.lng}
+                      radius_m={createForm.radius_m}
+                      cityName={createForm.city}
+                      districtName={createForm.district}
+                      onChange={handleLocationPicked}
+                    />
+                  </div>
                 </div>
               )}
             </div>
-
-            {/* Map Display */}
-            {createForm.showMap && (
-              <div className="space-y-1.5 pt-1">
-                <div className="flex items-center justify-between text-[11px] text-muted-foreground px-0.5">
-                  <span className="flex items-center gap-1">
-                    <Info className="h-3 w-3 text-brand shrink-0" />
-                    {isAr
-                      ? "انقر في أي مكان على الخريطة لتوقيع الموقع الدقيق. الدائرة الزرقاء تمثل نطاق الحضور المحدد."
-                      : "Click anywhere on the map to pin the exact location. The blue circle represents the check-in radius."}
-                  </span>
-                </div>
-
-                <TaskLocationPicker
-                  lat={createForm.lat}
-                  lng={createForm.lng}
-                  radius_m={createForm.radius_m}
-                  cityName={createForm.city}
-                  districtName={createForm.district}
-                  onChange={handleLocationPicked}
-                />
-              </div>
-            )}
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center justify-end gap-2 pt-4 mt-4 border-t border-border">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-full border border-border px-4 py-2 text-xs font-semibold hover:bg-muted"
-            >
-              {t("cancel") || (isAr ? "إلغاء" : "Cancel")}
-            </button>
-            <button
-              type="submit"
-              disabled={creatingTask}
-              className="inline-flex items-center gap-1.5 rounded-full bg-gradient-brand px-6 py-2 text-xs font-semibold text-brand-foreground shadow-brand hover:opacity-95 disabled:opacity-50"
-            >
-              {creatingTask ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Plus className="h-3.5 w-3.5" />
+          {/* Sticky Modal Footer with Live Summary & Actions */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border/80 bg-muted/20 px-5 sm:px-6 py-3.5 shrink-0">
+            {/* Live Summary Chips */}
+            <div className="flex flex-wrap items-center gap-2 text-[11px]">
+              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium ${
+                createForm.assignees.length > 0
+                  ? "bg-brand/10 text-brand border border-brand/20"
+                  : "bg-muted text-muted-foreground"
+              }`}>
+                <Users className="h-3 w-3" />
+                <span>
+                  {createForm.assignees.length > 0
+                    ? `${createForm.assignees.length} ${isAr ? "مكلفون" : "assignees"}`
+                    : isAr
+                    ? "لم يتم اختيار مكلفين"
+                    : "No assignees"}
+                </span>
+              </span>
+
+              {createForm.due_date && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium bg-muted text-foreground">
+                  <Calendar className="h-3 w-3 text-muted-foreground" />
+                  <span>{createForm.due_date}</span>
+                </span>
               )}
-              {t("addNewTask") || (isAr ? "إضافة المهمة" : "Add Task")}
-            </button>
+
+              {createForm.lat != null && createForm.lng != null && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+                  <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                  <span>{isAr ? "الموقع موقّع" : "Site Pinned"}</span>
+                </span>
+              )}
+            </div>
+
+            {/* Buttons */}
+            <div className="flex items-center gap-2 ms-auto">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-xl border border-border px-4 py-2 text-xs font-semibold hover:bg-muted transition-colors"
+              >
+                {t("cancel") || (isAr ? "إلغاء" : "Cancel")}
+              </button>
+              <button
+                type="submit"
+                disabled={creatingTask || createForm.assignees.length === 0 || !createForm.title.trim()}
+                className="inline-flex items-center gap-2 rounded-xl bg-gradient-brand px-6 py-2 text-xs font-semibold text-brand-foreground shadow-brand hover:opacity-95 disabled:opacity-50 transition-all cursor-pointer disabled:cursor-not-allowed"
+              >
+                {creatingTask ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Plus className="h-3.5 w-3.5" />
+                )}
+                <span>{t("addNewTask") || (isAr ? "إضافة المهمة" : "Create Task")}</span>
+              </button>
+            </div>
           </div>
         </form>
       </div>
