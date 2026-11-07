@@ -94,6 +94,14 @@ export function ProjectDetailView({
   const [newTaskDueDate, setNewTaskDueDate] = useState("");
   const [newTaskAssignee, setNewTaskAssignee] = useState(project.employees[0]?.name || "John Doe");
 
+  // Edit Task modal state
+  const [editingTask, setEditingTask] = useState<ProjectTask | null>(null);
+  const [editTaskTitle, setEditTaskTitle] = useState("");
+  const [editTaskPriority, setEditTaskPriority] = useState<"low" | "medium" | "high">("medium");
+  const [editTaskDueDate, setEditTaskDueDate] = useState("");
+  const [editTaskAssignee, setEditTaskAssignee] = useState("");
+  const [editTaskStatus, setEditTaskStatus] = useState<"completed" | "in_progress" | "pending">("pending");
+
   // Assign Employee modal state (Database-driven search)
   const [assignSearch, setAssignSearch] = useState("");
   const [selectedToAssignIds, setSelectedToAssignIds] = useState<string[]>([]);
@@ -225,14 +233,76 @@ export function ProjectDetailView({
           assignee_name: newTask.assignee.name,
           priority: newTask.priority,
           status: "pending",
-          due_date: "2025-05-30",
+          due_date: newTaskDueDate || undefined,
         },
       }).catch(() => {});
     }
 
     setNewTaskTitle("");
+    setNewTaskDueDate("");
     setIsAddTaskOpen(false);
     toast.success(isAr ? "تمت إضافة المهمة بنجاح" : "Task added successfully");
+  };
+
+  const handleOpenEditTask = (task: ProjectTask) => {
+    setEditingTask(task);
+    setEditTaskTitle(task.title);
+    setEditTaskAssignee(task.assignee.name);
+    setEditTaskPriority(task.priority);
+    setEditTaskDueDate(task.dueDate || "");
+    setEditTaskStatus(task.status);
+  };
+
+  const handleSaveEditTask = async () => {
+    if (!editingTask) return;
+    if (!editTaskTitle.trim()) {
+      toast.error(isAr ? "يرجى كتابة عنوان المهمة" : "Task title is required");
+      return;
+    }
+
+    const updatedTasks = project.tasks.map((t) =>
+      t.id === editingTask.id
+        ? {
+            ...t,
+            title: editTaskTitle.trim(),
+            priority: editTaskPriority,
+            dueDate: editTaskDueDate.trim(),
+            status: editTaskStatus,
+            assignee: {
+              ...t.assignee,
+              name: editTaskAssignee.trim() || t.assignee.name,
+            },
+          }
+        : t
+    );
+
+    const completedCount = updatedTasks.filter((t) => t.status === "completed").length;
+    const updated: Project = {
+      ...project,
+      tasks: updatedTasks,
+      completedTasksCount: completedCount,
+    };
+    onUpdateProject(updated);
+
+    if (isProjectUuid && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(editingTask.id)) {
+      try {
+        await updateTaskFn({
+          data: {
+            id: editingTask.id,
+            title: editTaskTitle.trim(),
+            assignee_name: editTaskAssignee.trim() || undefined,
+            priority: editTaskPriority,
+            status: editTaskStatus,
+            due_date: editTaskDueDate.trim() || undefined,
+          },
+        });
+      } catch (err: any) {
+        console.warn("Failed syncing task update to DB:", err);
+      }
+    }
+
+    toast.success(isAr ? "تم تحديث المهمة بنجاح" : "Task updated successfully");
+    setEditingTask(null);
   };
 
   const handleAssignSingleEmployee = async (emp: ProjectEmployee) => {
@@ -1118,14 +1188,23 @@ export function ProjectDetailView({
                   <th className="py-3 px-4">{isAr ? "الأولوية" : "Priority"}</th>
                   <th className="py-3 px-4">{isAr ? "تاريخ الاستحقاق" : "Due Date"}</th>
                   <th className="py-3 px-4 text-center">{isAr ? "الحالة" : "Status"}</th>
-                  <th className="py-3 px-3 text-center w-12">{isAr ? "حذف" : "Action"}</th>
+                  <th className="py-3 px-3 text-center w-24">{isAr ? "الإجراءات" : "Action"}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
                 {project.tasks.map((task, idx) => (
                   <tr key={task.id} className="hover:bg-muted/30 transition-colors group">
                     <td className="py-3 px-4 text-center font-mono text-muted-foreground font-medium">{idx + 1}</td>
-                    <td className="py-3 px-4 font-semibold text-foreground">{task.title}</td>
+                    <td className="py-3 px-4 font-semibold text-foreground">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditTask(task)}
+                        className="hover:underline hover:text-orange-600 dark:hover:text-orange-400 text-left font-semibold text-foreground transition-colors inline-block"
+                        title={isAr ? "انقر لتعديل المهمة" : "Click to edit task"}
+                      >
+                        {task.title}
+                      </button>
+                    </td>
                     <td className="py-3 px-4 text-foreground/90">{task.assignee.name}</td>
                     <td className="py-3 px-4">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
@@ -1155,15 +1234,25 @@ export function ProjectDetailView({
                         {task.status === "completed" ? "Completed ✓" : task.status === "in_progress" ? "In Progress ↻" : "Pending ⏳"}
                       </button>
                     </td>
-                    <td className="py-3 px-3 text-center">
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteTask(task.id)}
-                        className="text-muted-foreground/60 hover:text-rose-500 transition-colors p-1 rounded-lg"
-                        title={isAr ? "حذف المهمة" : "Delete task"}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                    <td className="py-3 px-3 text-center whitespace-nowrap">
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditTask(task)}
+                          className="text-muted-foreground/70 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-500/10 transition-colors p-1.5 rounded-lg"
+                          title={isAr ? "تعديل المهمة" : "Edit task"}
+                        >
+                          <Edit className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteTask(task.id)}
+                          className="text-muted-foreground/60 hover:text-rose-500 hover:bg-rose-500/10 transition-colors p-1.5 rounded-lg"
+                          title={isAr ? "حذف المهمة" : "Delete task"}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -1297,32 +1386,144 @@ export function ProjectDetailView({
                   onChange={(e: any) => setNewTaskPriority(e.target.value)}
                   className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs"
                 >
-                  <option value="high">High</option>
-                  <option value="medium">Medium</option>
-                  <option value="low">Low</option>
+                  <option value="high">{isAr ? "عالية (High)" : "High"}</option>
+                  <option value="medium">{isAr ? "متوسطة (Medium)" : "Medium"}</option>
+                  <option value="low">{isAr ? "منخفضة (Low)" : "Low"}</option>
                 </select>
               </div>
               <div className="space-y-1">
                 <Label>{isAr ? "تاريخ الاستحقاق" : "Due Date"}</Label>
                 <Input
-                  placeholder="e.g. May 30, 2025"
+                  type="date"
                   value={newTaskDueDate}
                   onChange={(e) => setNewTaskDueDate(e.target.value)}
+                  className="h-9"
                 />
               </div>
             </div>
             <div className="space-y-1">
               <Label>{isAr ? "المسؤول عن التنفيذ" : "Assignee"}</Label>
-              <Input
-                placeholder="Assignee name"
-                value={newTaskAssignee}
-                onChange={(e) => setNewTaskAssignee(e.target.value)}
-              />
+              {project.employees.length > 0 ? (
+                <select
+                  value={newTaskAssignee}
+                  onChange={(e) => setNewTaskAssignee(e.target.value)}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs"
+                >
+                  <option value="">{isAr ? "-- اختر من الفريق --" : "-- Select team member --"}</option>
+                  {project.employees.map((emp) => (
+                    <option key={emp.id} value={emp.name}>
+                      {emp.name} ({emp.role})
+                    </option>
+                  ))}
+                  {newTaskAssignee && !project.employees.some((e) => e.name === newTaskAssignee) && (
+                    <option value={newTaskAssignee}>{newTaskAssignee}</option>
+                  )}
+                </select>
+              ) : (
+                <Input
+                  placeholder="Assignee name"
+                  value={newTaskAssignee}
+                  onChange={(e) => setNewTaskAssignee(e.target.value)}
+                />
+              )}
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setIsAddTaskOpen(false)}>{isAr ? "إلغاء" : "Cancel"}</Button>
             <Button onClick={handleCreateTask} className="bg-brand text-brand-foreground">{isAr ? "حفظ المهمة" : "Save Task"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── MODAL: EDIT TASK ── */}
+      <Dialog open={!!editingTask} onOpenChange={(open) => !open && setEditingTask(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="h-5 w-5 text-orange-500" />
+              {isAr ? "تعديل مهمة المشروع" : "Edit Project Task"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3.5 py-2 text-xs">
+            <div className="space-y-1">
+              <Label>{isAr ? "عنوان المهمة *" : "Task Title *"}</Label>
+              <Input
+                placeholder="e.g. Server Rack Installation & Cabling"
+                value={editTaskTitle}
+                onChange={(e) => setEditTaskTitle(e.target.value)}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>{isAr ? "الأولوية" : "Priority"}</Label>
+                <select
+                  value={editTaskPriority}
+                  onChange={(e: any) => setEditTaskPriority(e.target.value)}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs"
+                >
+                  <option value="high">{isAr ? "عالية (High)" : "High"}</option>
+                  <option value="medium">{isAr ? "متوسطة (Medium)" : "Medium"}</option>
+                  <option value="low">{isAr ? "منخفضة (Low)" : "Low"}</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <Label>{isAr ? "الحالة" : "Status"}</Label>
+                <select
+                  value={editTaskStatus}
+                  onChange={(e: any) => setEditTaskStatus(e.target.value)}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs"
+                >
+                  <option value="pending">{isAr ? "معلقة (Pending)" : "Pending"}</option>
+                  <option value="in_progress">{isAr ? "قيد التنفيذ (In Progress)" : "In Progress"}</option>
+                  <option value="completed">{isAr ? "مكتملة (Completed)" : "Completed"}</option>
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>{isAr ? "المسؤول عن التنفيذ" : "Assignee"}</Label>
+                {project.employees.length > 0 ? (
+                  <select
+                    value={editTaskAssignee}
+                    onChange={(e) => setEditTaskAssignee(e.target.value)}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs"
+                  >
+                    <option value="">{isAr ? "-- اختر من الفريق --" : "-- Select team member --"}</option>
+                    {project.employees.map((emp) => (
+                      <option key={emp.id} value={emp.name}>
+                        {emp.name}
+                      </option>
+                    ))}
+                    {editTaskAssignee && !project.employees.some((e) => e.name === editTaskAssignee) && (
+                      <option value={editTaskAssignee}>{editTaskAssignee}</option>
+                    )}
+                  </select>
+                ) : (
+                  <Input
+                    placeholder="Assignee name"
+                    value={editTaskAssignee}
+                    onChange={(e) => setEditTaskAssignee(e.target.value)}
+                  />
+                )}
+              </div>
+              <div className="space-y-1">
+                <Label>{isAr ? "تاريخ الاستحقاق" : "Due Date"}</Label>
+                <Input
+                  type="date"
+                  value={editTaskDueDate}
+                  onChange={(e) => setEditTaskDueDate(e.target.value)}
+                  className="h-9"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setEditingTask(null)}>
+              {isAr ? "إلغاء" : "Cancel"}
+            </Button>
+            <Button onClick={handleSaveEditTask} className="bg-brand text-brand-foreground">
+              {isAr ? "حفظ التعديلات" : "Save Changes"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
