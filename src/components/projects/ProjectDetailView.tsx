@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { Project, ProjectTask, ProjectEmployee, ProjectFile, ProjectUpdate, formatProjectCode } from "@/lib/projects/projects.data";
 import { EmployeeAvatar } from "@/components/EmployeeAvatar";
+import { SearchableManagerSelect } from "./SearchableManagerSelect";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -1443,37 +1444,23 @@ export function ProjectDetailView({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div className="space-y-1.5">
                 <Label className="font-semibold text-foreground/90">{isAr ? "مدير المشروع" : "Project Manager"}</Label>
-                <select
+                <SearchableManagerSelect
                   value={editProjectManager}
-                  onChange={(e) => setEditProjectManager(e.target.value)}
-                  className="w-full h-10 rounded-xl border border-input bg-background px-3 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand shadow-2xs"
-                >
-                  {availableManagers.map((m) => (
-                    <option key={m.id || m.name} value={m.name}>
-                      {m.name} ({m.department})
-                    </option>
-                  ))}
-                  {availableManagers.length === 0 && (
-                    <option value={project.projectManager.name}>{project.projectManager.name}</option>
-                  )}
-                </select>
+                  onChange={(m) => setEditProjectManager(m.name)}
+                  options={availableManagers}
+                  placeholder={isAr ? "اختر مدير المشروع..." : "Select project manager..."}
+                  isAr={isAr}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label className="font-semibold text-foreground/90">{isAr ? "المدير المباشر" : "Reported Manager"}</Label>
-                <select
+                <SearchableManagerSelect
                   value={editReportedManager}
-                  onChange={(e) => setEditReportedManager(e.target.value)}
-                  className="w-full h-10 rounded-xl border border-input bg-background px-3 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand shadow-2xs"
-                >
-                  {availableManagers.map((m) => (
-                    <option key={m.id || m.name} value={m.name}>
-                      {m.name} ({m.department})
-                    </option>
-                  ))}
-                  {availableManagers.length === 0 && (
-                    <option value={project.reportedManager.name}>{project.reportedManager.name}</option>
-                  )}
-                </select>
+                  onChange={(m) => setEditReportedManager(m.name)}
+                  options={availableManagers}
+                  placeholder={isAr ? "اختر المدير المباشر..." : "Select reported manager..."}
+                  isAr={isAr}
+                />
               </div>
             </div>
 

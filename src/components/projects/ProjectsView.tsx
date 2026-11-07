@@ -27,6 +27,7 @@ import {
 import { Project, ProjectEmployee, formatProjectCode } from "@/lib/projects/projects.data";
 import { ProjectDetailView } from "./ProjectDetailView";
 import { EmployeeAvatar } from "@/components/EmployeeAvatar";
+import { SearchableManagerSelect } from "./SearchableManagerSelect";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -1065,37 +1066,23 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div className="space-y-1.5">
                 <Label className="font-semibold text-foreground/90">{isAr ? "مدير المشروع" : "Project Manager"}</Label>
-                <select
+                <SearchableManagerSelect
                   value={newProjManager}
-                  onChange={(e) => setNewProjManager(e.target.value)}
-                  className="w-full h-10 rounded-xl border border-input bg-background px-3 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand shadow-2xs"
-                >
-                  {availableManagers.length === 0 && (
-                    <option value="">{isPeopleLoading ? (isAr ? "جاري تحميل المديرين من قاعدة البيانات..." : "Loading managers from DB...") : (isAr ? "لا يوجد مديرين" : "No managers found")}</option>
-                  )}
-                  {availableManagers.map((m) => (
-                    <option key={m.id || m.name} value={m.name}>
-                      {m.name} ({m.department})
-                    </option>
-                  ))}
-                </select>
+                  onChange={(m) => setNewProjManager(m.name)}
+                  options={availableManagers}
+                  placeholder={isAr ? "اختر مدير المشروع..." : "Select project manager..."}
+                  isAr={isAr}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label className="font-semibold text-foreground/90">{isAr ? "المدير المباشر" : "Reported Manager"}</Label>
-                <select
+                <SearchableManagerSelect
                   value={newProjReportedManager}
-                  onChange={(e) => setNewProjReportedManager(e.target.value)}
-                  className="w-full h-10 rounded-xl border border-input bg-background px-3 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand shadow-2xs"
-                >
-                  {availableManagers.length === 0 && (
-                    <option value="">{isPeopleLoading ? (isAr ? "جاري تحميل المديرين من قاعدة البيانات..." : "Loading managers from DB...") : (isAr ? "لا يوجد مديرين" : "No managers found")}</option>
-                  )}
-                  {availableManagers.map((m) => (
-                    <option key={m.id || m.name} value={m.name}>
-                      {m.name} ({m.department})
-                    </option>
-                  ))}
-                </select>
+                  onChange={(m) => setNewProjReportedManager(m.name)}
+                  options={availableManagers}
+                  placeholder={isAr ? "اختر المدير المباشر..." : "Select reported manager..."}
+                  isAr={isAr}
+                />
               </div>
             </div>
 
@@ -1337,49 +1324,43 @@ export function ProjectsView({ role = "admin" }: ProjectsViewProps) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div className="space-y-1.5">
                   <Label className="font-semibold text-foreground/90">{isAr ? "مدير المشروع" : "Project Manager"}</Label>
-                  <select
+                  <SearchableManagerSelect
                     value={editingProject.projectManager.name}
-                    onChange={(e) =>
+                    onChange={(m) =>
                       setEditingProject({
                         ...editingProject,
                         projectManager: {
                           ...editingProject.projectManager,
-                          name: e.target.value,
-                          id: availableManagers.find((m) => m.name === e.target.value)?.id || editingProject.projectManager.id,
+                          name: m.name,
+                          id: m.id || editingProject.projectManager.id,
+                          avatarUrl: m.avatarUrl,
                         },
                       })
                     }
-                    className="w-full h-10 rounded-xl border border-input bg-background px-3 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand shadow-2xs"
-                  >
-                    {availableManagers.map((m) => (
-                      <option key={m.id || m.name} value={m.name}>
-                        {m.name} ({m.department})
-                      </option>
-                    ))}
-                  </select>
+                    options={availableManagers}
+                    placeholder={isAr ? "اختر مدير المشروع..." : "Select project manager..."}
+                    isAr={isAr}
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="font-semibold text-foreground/90">{isAr ? "المدير المباشر" : "Reported Manager"}</Label>
-                  <select
+                  <SearchableManagerSelect
                     value={editingProject.reportedManager.name}
-                    onChange={(e) =>
+                    onChange={(m) =>
                       setEditingProject({
                         ...editingProject,
                         reportedManager: {
                           ...editingProject.reportedManager,
-                          name: e.target.value,
-                          id: availableManagers.find((m) => m.name === e.target.value)?.id || editingProject.reportedManager.id,
+                          name: m.name,
+                          id: m.id || editingProject.reportedManager.id,
+                          avatarUrl: m.avatarUrl,
                         },
                       })
                     }
-                    className="w-full h-10 rounded-xl border border-input bg-background px-3 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand shadow-2xs"
-                  >
-                    {availableManagers.map((m) => (
-                      <option key={m.id || m.name} value={m.name}>
-                        {m.name} ({m.department})
-                      </option>
-                    ))}
-                  </select>
+                    options={availableManagers}
+                    placeholder={isAr ? "اختر المدير المباشر..." : "Select reported manager..."}
+                    isAr={isAr}
+                  />
                 </div>
               </div>
 
