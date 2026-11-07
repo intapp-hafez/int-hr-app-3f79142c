@@ -47,6 +47,7 @@ import type { ManagerTask, TaskPriority, TaskStatus } from "@/lib/store";
 import { MyWorkdayTimeline } from "@/components/employee/MyWorkdayTimeline";
 import { TaskLocationPicker } from "@/components/admin/TaskLocationPicker";
 import { reverseGeocodeCoords } from "@/lib/reverse-geocode";
+import { TripAllowanceLocationPicker } from "@/components/admin/TripAllowanceLocationPicker";
 
 function formatMinutes(minutes: number): string {
   const h = Math.floor(minutes / 60);
@@ -155,6 +156,7 @@ export function AdminTimeManagementView() {
     radius_m: 200,
     showMap: false,
     assignees: [] as string[],
+    selectedTripLocationId: "" as string,
   });
 
   // Filtered districts based on chosen city
@@ -432,6 +434,7 @@ export function AdminTimeManagementView() {
         radius_m: 200,
         showMap: false,
         assignees: [],
+        selectedTripLocationId: "",
       });
     } catch (e: any) {
       toast.error(e?.message || "Failed to create task");
@@ -2184,6 +2187,39 @@ export function AdminTimeManagementView() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Trip Allowance Work Location Selector */}
+                  <TripAllowanceLocationPicker
+                    selectedLocationId={createForm.selectedTripLocationId}
+                    cityName={createForm.city}
+                    districtName={createForm.district}
+                    lat={createForm.lat}
+                    lng={createForm.lng}
+                    radius_m={createForm.radius_m}
+                    dbCities={dbCities}
+                    dbDistricts={dbDistricts}
+                    isAr={isAr}
+                    onSelectLocation={(payload) => {
+                      setCreateForm((prev) => ({
+                        ...prev,
+                        selectedTripLocationId: payload.id,
+                        address: payload.name,
+                        lat: payload.lat,
+                        lng: payload.lng,
+                        radius_m: payload.radius_m,
+                        cityId: payload.cityId || prev.cityId,
+                        city: payload.city || prev.city,
+                        districtId: payload.districtId || prev.districtId,
+                        district: payload.district || prev.district,
+                      }));
+                    }}
+                    onClearLocation={() => {
+                      setCreateForm((prev) => ({
+                        ...prev,
+                        selectedTripLocationId: "",
+                      }));
+                    }}
+                  />
 
                   {/* Location: City & District from Database */}
                   <div className="grid grid-cols-2 gap-3">
