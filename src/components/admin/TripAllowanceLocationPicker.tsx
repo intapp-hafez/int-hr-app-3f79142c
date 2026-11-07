@@ -279,12 +279,12 @@ export function TripAllowanceLocationPicker({
       <div className="flex items-center justify-between">
         <label className="block font-semibold text-foreground text-xs flex items-center gap-1.5">
           <Compass className="h-3.5 w-3.5 text-brand" />
-          <span>{isAr ? "موقع بدل السفر / موقع عمل معتمد" : "Trip Allowance Work Location"}</span>
+          <span>{isAr ? "موقع العمل" : "Work Location"}</span>
         </label>
         {selectedLoc ? (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
             <CheckCircle2 className="h-3 w-3" />
-            {isAr ? "موقع معتمد لبدل السفر" : "Verified Trip Site"}
+            {isAr ? "موقع عمل معتمد" : "Verified Work Location"}
           </span>
         ) : (
           <span className="text-[10px] text-muted-foreground">
@@ -358,8 +358,8 @@ export function TripAllowanceLocationPicker({
                     ? "جاري تحميل مواقع العمل…"
                     : "Loading work locations…"
                   : isAr
-                  ? "— اختر من مواقع بدل السفر ومواقع العمل المعتمدة —"
-                  : "— Select Trip Allowance / Work Site —"}
+                  ? "— اختر موقع العمل —"
+                  : "— Select Work Location —"}
               </span>
             </span>
             <ChevronDown

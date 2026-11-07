@@ -2188,7 +2188,7 @@ export function AdminTimeManagementView() {
                     </div>
                   </div>
 
-                  {/* Trip Allowance Work Location Selector */}
+                  {/* Work Location Selector */}
                   <TripAllowanceLocationPicker
                     selectedLocationId={createForm.selectedTripLocationId}
                     cityName={createForm.city}
