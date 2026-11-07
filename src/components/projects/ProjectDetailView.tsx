@@ -155,6 +155,20 @@ export function ProjectDetailView({
   const availableManagers = useMemo(() => assignablePeople?.managers || [], [assignablePeople]);
   const availableEmployees = useMemo<ProjectEmployee[]>(() => assignablePeople?.employees || [], [assignablePeople]);
 
+  // Unified list of all company employees for selection, sorted alphabetically
+  const allCompanyEmployees = useMemo(() => {
+    const map = new Map<string, ProjectEmployee>();
+    for (const emp of availableEmployees) {
+      if (emp.name) map.set(emp.name.trim().toLowerCase(), emp);
+    }
+    for (const emp of project.employees) {
+      if (emp.name && !map.has(emp.name.trim().toLowerCase())) {
+        map.set(emp.name.trim().toLowerCase(), emp);
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [availableEmployees, project.employees]);
+
   // Sync edit form fields whenever modal opens or project updates
   useEffect(() => {
     if (isEditProjectOpen) {
@@ -1402,30 +1416,15 @@ export function ProjectDetailView({
               </div>
             </div>
             <div className="space-y-1">
-              <Label>{isAr ? "المسؤول عن التنفيذ" : "Assignee"}</Label>
-              {project.employees.length > 0 ? (
-                <select
-                  value={newTaskAssignee}
-                  onChange={(e) => setNewTaskAssignee(e.target.value)}
-                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs"
-                >
-                  <option value="">{isAr ? "-- اختر من الفريق --" : "-- Select team member --"}</option>
-                  {project.employees.map((emp) => (
-                    <option key={emp.id} value={emp.name}>
-                      {emp.name} ({emp.role})
-                    </option>
-                  ))}
-                  {newTaskAssignee && !project.employees.some((e) => e.name === newTaskAssignee) && (
-                    <option value={newTaskAssignee}>{newTaskAssignee}</option>
-                  )}
-                </select>
-              ) : (
-                <Input
-                  placeholder="Assignee name"
-                  value={newTaskAssignee}
-                  onChange={(e) => setNewTaskAssignee(e.target.value)}
-                />
-              )}
+              <Label className="font-semibold text-foreground/90">{isAr ? "المسؤول عن التنفيذ (جميع الموظفين)" : "Assignee"}</Label>
+              <SearchableManagerSelect
+                value={newTaskAssignee}
+                onChange={(emp) => setNewTaskAssignee(emp.name)}
+                options={allCompanyEmployees}
+                placeholder={isAr ? "اختر الموظف المسئول من جميع الموظفين..." : "Select employee..."}
+                searchPlaceholder={isAr ? "ابحث عن موظف بالاسم، الدور، أو الإدارة..." : "Search employee by name, role, department..."}
+                isAr={isAr}
+              />
             </div>
           </div>
           <DialogFooter className="gap-2">
@@ -1479,42 +1478,25 @@ export function ProjectDetailView({
                 </select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label>{isAr ? "المسؤول عن التنفيذ" : "Assignee"}</Label>
-                {project.employees.length > 0 ? (
-                  <select
-                    value={editTaskAssignee}
-                    onChange={(e) => setEditTaskAssignee(e.target.value)}
-                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs"
-                  >
-                    <option value="">{isAr ? "-- اختر من الفريق --" : "-- Select team member --"}</option>
-                    {project.employees.map((emp) => (
-                      <option key={emp.id} value={emp.name}>
-                        {emp.name}
-                      </option>
-                    ))}
-                    {editTaskAssignee && !project.employees.some((e) => e.name === editTaskAssignee) && (
-                      <option value={editTaskAssignee}>{editTaskAssignee}</option>
-                    )}
-                  </select>
-                ) : (
-                  <Input
-                    placeholder="Assignee name"
-                    value={editTaskAssignee}
-                    onChange={(e) => setEditTaskAssignee(e.target.value)}
-                  />
-                )}
-              </div>
-              <div className="space-y-1">
-                <Label>{isAr ? "تاريخ الاستحقاق" : "Due Date"}</Label>
-                <Input
-                  type="date"
-                  value={editTaskDueDate}
-                  onChange={(e) => setEditTaskDueDate(e.target.value)}
-                  className="h-9"
-                />
-              </div>
+            <div className="space-y-1">
+              <Label className="font-semibold text-foreground/90">{isAr ? "المسؤول عن التنفيذ (جميع الموظفين)" : "Assignee"}</Label>
+              <SearchableManagerSelect
+                value={editTaskAssignee}
+                onChange={(emp) => setEditTaskAssignee(emp.name)}
+                options={allCompanyEmployees}
+                placeholder={isAr ? "اختر الموظف المسئول من جميع الموظفين..." : "Select employee..."}
+                searchPlaceholder={isAr ? "ابحث عن موظف بالاسم، الدور، أو الإدارة..." : "Search employee by name, role, department..."}
+                isAr={isAr}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="font-semibold text-foreground/90">{isAr ? "تاريخ الاستحقاق" : "Due Date"}</Label>
+              <Input
+                type="date"
+                value={editTaskDueDate}
+                onChange={(e) => setEditTaskDueDate(e.target.value)}
+                className="h-9"
+              />
             </div>
           </div>
           <DialogFooter className="gap-2">

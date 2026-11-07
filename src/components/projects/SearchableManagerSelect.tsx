@@ -19,6 +19,8 @@ interface SearchableManagerSelectProps {
   onChange: (selected: ManagerOption) => void;
   options: ManagerOption[];
   placeholder?: string;
+  searchPlaceholder?: string;
+  emptyMessage?: string;
   isAr?: boolean;
   disabled?: boolean;
   className?: string;
@@ -28,13 +30,18 @@ export function SearchableManagerSelect({
   value,
   onChange,
   options,
-  placeholder = "Select manager...",
+  placeholder = "Select employee...",
+  searchPlaceholder,
+  emptyMessage,
   isAr = false,
   disabled = false,
   className,
 }: SearchableManagerSelectProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+
+  const defaultSearchPlaceholder = isAr ? "بحث بالاسم، الدور، أو الإدارة..." : "Search by name, role, or department...";
+  const defaultEmptyMessage = isAr ? "لا توجد نتائج مطابقة للبحث" : "No matching employees found";
 
   const selectedManager = useMemo(() => {
     return options.find((m) => m.name === value || m.id === value) || (value ? { name: value } : null);
@@ -103,7 +110,7 @@ export function SearchableManagerSelect({
         <div className="p-1.5 border-b border-border/50 flex items-center gap-2 mb-1">
           <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
           <Input
-            placeholder={isAr ? "بحث بالاسم أو الإدارة..." : "Search by name or department..."}
+            placeholder={searchPlaceholder || defaultSearchPlaceholder}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="h-7 border-none bg-transparent shadow-none focus-visible:ring-0 text-xs px-1"
@@ -123,7 +130,7 @@ export function SearchableManagerSelect({
         <div className="max-h-60 overflow-y-auto divide-y divide-border/30">
           {filtered.length === 0 ? (
             <div className="py-6 text-center text-muted-foreground text-xs">
-              {isAr ? "لا يوجد مدراء مطابقون للبحث" : "No managers match search"}
+              {emptyMessage || defaultEmptyMessage}
             </div>
           ) : (
             filtered.map((m) => {
@@ -153,9 +160,11 @@ export function SearchableManagerSelect({
                     />
                     <div className="truncate">
                       <p className="truncate font-medium">{m.name}</p>
-                      {m.department && (
-                        <p className="text-[10px] text-muted-foreground truncate">{m.department}</p>
-                      )}
+                      <p className="text-[10px] text-muted-foreground truncate">
+                        {m.role ? `${m.role}` : ""}
+                        {m.role && m.department ? " • " : ""}
+                        {m.department || ""}
+                      </p>
                     </div>
                   </div>
                   {isSelected && <Check className="h-4 w-4 text-orange-600 shrink-0" />}
