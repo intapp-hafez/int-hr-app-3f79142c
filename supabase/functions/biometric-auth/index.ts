@@ -39,6 +39,7 @@ function safeDistance(a: unknown, b: unknown): { valid: boolean; dist: number | 
 }
 
 const FACE_THRESHOLD = 0.5;
+const FACE_STRICT_THRESHOLD = 0.44; // Borderline score boundary (gray zone for audit/review)
 
 async function sha256Hex(text: string): Promise<string> {
   const msgUint8 = new TextEncoder().encode(text);
@@ -136,7 +137,8 @@ function calculateByteEntropyAndVariance(bytes: Uint8Array): { entropy: number; 
 // ── Server-Side Visual Keyframe Liveness & Optical Variance ─────────────────
 function verifyVisualKeyframesLiveness(
   keyframes: Array<{ step: string; t: number; image_b64: string }>,
-  expectedSequence: string[]
+  expectedSequence: string[],
+  challengeCreatedAt?: string
 ): { valid: boolean; reason?: string } {
   if (!Array.isArray(keyframes) || keyframes.length !== expectedSequence.length) {
     return {
@@ -145,7 +147,17 @@ function verifyVisualKeyframesLiveness(
     };
   }
 
-  // 1. Validate step matching and monotonic timestamps across all keyframes first
+  // 1. Validate step matching, monotonic timestamps, and realistic human reaction times
+  if (challengeCreatedAt) {
+    const chalCreatedMs = new Date(challengeCreatedAt).getTime();
+    if (typeof keyframes[0]?.t === "number" && keyframes[0].t < chalCreatedMs - 5000) {
+      return {
+        valid: false,
+        reason: "Keyframe timestamps precede challenge issuance time. Replay attack rejected.",
+      };
+    }
+  }
+
   for (let i = 0; i < keyframes.length; i++) {
     const kf = keyframes[i];
     const expectedStep = expectedSequence[i];
@@ -156,6 +168,22 @@ function verifyVisualKeyframesLiveness(
 
     if (typeof kf.t !== "number" || (i > 0 && kf.t <= keyframes[i - 1].t)) {
       return { valid: false, reason: `Keyframe timestamps must be strictly monotonic ascending numbers.` };
+    }
+
+    if (i > 0) {
+      const deltaMs = kf.t - keyframes[i - 1].t;
+      if (deltaMs < 250) {
+        return {
+          valid: false,
+          reason: `Keyframe transition interval (${deltaMs}ms) is physically impossible for human pose execution (<250ms). Presentation attack rejected.`,
+        };
+      }
+      if (deltaMs > 35000) {
+        return {
+          valid: false,
+          reason: `Keyframe interval exceeded human interaction timeout (${Math.round(deltaMs / 1000)}s).`,
+        };
+      }
     }
   }
 
@@ -200,6 +228,17 @@ function verifyVisualKeyframesLiveness(
       decodedBuffers.push(bytes);
     } catch {
       return { valid: false, reason: `Failed to decode base64 binary for step ${expectedStep}.` };
+    }
+  }
+
+  // Dynamic optical variance: check that multiple poses don't have strictly identical byte lengths
+  if (decodedBuffers.length > 1) {
+    const allExactSameSize = decodedBuffers.every((b) => b.length === decodedBuffers[0].length);
+    if (allExactSameSize) {
+      return {
+        valid: false,
+        reason: "Keyframe binary payloads have zero dynamic variation. Presentation attack rejected.",
+      };
     }
   }
 
@@ -476,7 +515,7 @@ Deno.serve(async (req) => {
       }
 
       // 2. Evaluate Server-Side Visual Keyframe Liveness (Binary image inspection & Optical motion)
-      const visualLiveness = verifyVisualKeyframesLiveness(visualKeyframes, challenge.expected_sequence);
+      const visualLiveness = verifyVisualKeyframesLiveness(visualKeyframes, challenge.expected_sequence, challenge.created_at);
       if (!visualLiveness.valid) {
         return await recordFailureAndReturn(`Visual Liveness Rejected: ${visualLiveness.reason}`, "LIVENESS_FAILED", 400);
       }
@@ -500,6 +539,30 @@ Deno.serve(async (req) => {
 
       if (matchResult.dist > FACE_THRESHOLD) {
         return await recordFailureAndReturn("Face did not match enrolled template", "FACE_MISMATCH", 403);
+      }
+
+      // Gray Zone Audit Logging (borderline similarity score 0.44 - 0.50)
+      if (matchResult.dist > FACE_STRICT_THRESHOLD) {
+        try {
+          await supabaseAdmin.from("biometric_audit_log").insert({
+            user_id: user.id,
+            device_id: deviceId,
+            method: "face",
+            event: challenge.action,
+            success: true,
+            reason: `Borderline similarity score (${matchResult.dist.toFixed(4)}) - flagged for review`,
+            distance: Number(matchResult.dist.toFixed(4)),
+            metadata: {
+              review_flag: true,
+              threshold: FACE_THRESHOLD,
+              strict_threshold: FACE_STRICT_THRESHOLD,
+              score: matchResult.dist,
+              challenge_id: challenge.id,
+            },
+          });
+        } catch {
+          // Non-blocking audit write
+        }
       }
 
       // 5. ATOMIC CHALLENGE CONSUMPTION & PROOF MINTING
@@ -586,6 +649,79 @@ Deno.serve(async (req) => {
             error: `Invalid cryptographic device signature: ${sigVerify.reason}`,
           });
         }
+      }
+
+      // 2. DevTools Mock Location Detector
+      const acc = location.accuracy_meters != null ? Number(location.accuracy_meters) : null;
+      if (acc !== null && (acc === 0 || (acc > 0 && acc < 0.1))) {
+        try {
+          await supabaseAdmin.from("biometric_audit_log").insert({
+            user_id: user.id,
+            device_id: deviceId,
+            method: "face",
+            event: reqAction,
+            success: false,
+            reason: `Synthetic GPS accuracy (${acc}m) detected. Typical of DevTools Sensors mock or fake location emulator.`,
+            metadata: {
+              mock_gps_detected: true,
+              accuracy_meters: acc,
+              lat: location.lat,
+              lng: location.lng,
+            },
+          });
+        } catch {
+          // Non-blocking audit write
+        }
+      }
+
+      // 3. Teleportation / Travel Velocity Guard
+      try {
+        const { data: lastAtt } = await supabaseAdmin
+          .from("attendance")
+          .select("lat, lng, in_time, out_time, created_at")
+          .eq("employee_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (lastAtt && lastAtt.lat != null && lastAtt.lng != null) {
+          const lastTime = new Date(lastAtt.out_time || lastAtt.in_time || lastAtt.created_at).getTime();
+          const currentTime = new Date(location.captured_at || Date.now()).getTime();
+          const timeDeltaHours = (currentTime - lastTime) / (1000 * 60 * 60);
+
+          if (timeDeltaHours > 0.005 && timeDeltaHours < 4) {
+            const dLat = (location.lat - lastAtt.lat) * (Math.PI / 180);
+            const dLng = (location.lng - lastAtt.lng) * (Math.PI / 180);
+            const a =
+              Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lastAtt.lat * (Math.PI / 180)) *
+                Math.cos(location.lat * (Math.PI / 180)) *
+                Math.sin(dLng / 2) * Math.sin(dLng / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const distKm = 6371 * c;
+            const speedKmH = distKm / timeDeltaHours;
+
+            if (distKm > 25 && speedKmH > 160) {
+              await supabaseAdmin.from("biometric_audit_log").insert({
+                user_id: user.id,
+                device_id: deviceId,
+                method: "face",
+                event: reqAction,
+                success: false,
+                reason: `Impossible travel velocity: ${Math.round(speedKmH)} km/h across ${Math.round(distKm)} km in ${Math.round(timeDeltaHours * 60)} min.`,
+                metadata: {
+                  impossible_travel: true,
+                  speed_kmh: Math.round(speedKmH),
+                  dist_km: Math.round(distKm),
+                  prev_lat: lastAtt.lat,
+                  prev_lng: lastAtt.lng,
+                },
+              });
+            }
+          }
+        }
+      } catch {
+        // Non-blocking audit write
       }
 
       const proofHash = await sha256Hex(proofSecret);

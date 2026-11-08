@@ -136,6 +136,21 @@ export function FaceChallengeCapture({
           video: { facingMode: "user", width: 480, height: 360 },
           audio: false,
         });
+
+        // Anti-Spoofing: Check for virtual camera feeds (OBS, ManyCam, DroidCam, etc.)
+        const videoTrack = stream.getVideoTracks()[0];
+        const trackLabel = (videoTrack?.label || "").toLowerCase();
+        const VIRTUAL_CAM_REGEX = /\b(obs|virtual|manycam|droidcam|v4l2|splitcam|fake|screen-capture|screen|xsplit)\b/i;
+        if (VIRTUAL_CAM_REGEX.test(trackLabel)) {
+          stream.getTracks().forEach((t) => t.stop());
+          throw new BiometricApiError(
+            "VIRTUAL_CAMERA_DETECTED",
+            isAr
+              ? "تم اكتشاف كاميرا وهمية أو برنامج بث. يرجى استخدام كاميرا الجهاز الحقيقية."
+              : "Virtual or software camera detected. Please use a physical webcam or device camera."
+          );
+        }
+
         if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
         streamRef.current = stream;
         if (videoRef.current) {
@@ -373,6 +388,17 @@ export function FaceChallengeCapture({
     if (!isError) return null;
     const code = (errorCode || "").toUpperCase();
     const msg = (errorMsg || "").toLowerCase();
+
+    if (code === "VIRTUAL_CAMERA_DETECTED" || msg.includes("virtual camera") || msg.includes("كاميرا وهمية")) {
+      return {
+        pill: isAr ? "كاميرا وهمية" : "Virtual Camera",
+        title: isAr ? "تم اكتشاف كاميرا وهمية غير مصرح بها" : "Virtual Camera Detected",
+        description: isAr
+          ? "تم حظر التحقق لأن مصدر الفيديو برنامج وهمي (مثل OBS أو ManyCam). يرجى التبديل إلى كاميرا الجهاز الحقيقية وتحديث الصفحة."
+          : "Verification was blocked because the video stream is provided by a virtual camera or broadcast tool. Please switch to a physical device webcam.",
+        code: "VIRTUAL_CAMERA",
+      };
+    }
 
     if (code === "FACE_MISMATCH" || msg.includes("face did not match") || msg.includes("mismatch")) {
       return {

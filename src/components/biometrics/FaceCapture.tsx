@@ -96,6 +96,19 @@ export function FaceCapture({
           video: { facingMode: "user", width: 480, height: 360 },
           audio: false,
         });
+
+        // Anti-Spoofing: Reject virtual cameras
+        const videoTrack = stream.getVideoTracks()[0];
+        const trackLabel = (videoTrack?.label || "").toLowerCase();
+        const VIRTUAL_CAM_REGEX = /\b(obs|virtual|manycam|droidcam|v4l2|splitcam|fake|screen-capture|screen|xsplit)\b/i;
+        if (VIRTUAL_CAM_REGEX.test(trackLabel)) {
+          stream.getTracks().forEach((t) => t.stop());
+          if (mountedRef.current) {
+            setStatus("Virtual camera detected. Please connect a physical camera.");
+          }
+          return;
+        }
+
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
