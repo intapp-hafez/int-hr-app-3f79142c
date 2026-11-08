@@ -220,8 +220,8 @@ export function captureKeyframe(video: HTMLVideoElement): string {
 /**
  * Human-readable label for a pose step (shown to the user during challenge).
  */
-export function poseLabel(step: string): string {
-  const labels: Record<string, string> = {
+export function poseLabel(step: string, isAr = false): string {
+  const labelsEn: Record<string, string> = {
     turn_left:  "Turn your head left",
     turn_right: "Turn your head right",
     blink:      "Blink naturally",
@@ -229,5 +229,13 @@ export function poseLabel(step: string): string {
     nod:        "Nod slowly",
     smile:      "Smile",
   };
-  return labels[step] ?? step.replace(/_/g, " ");
+  const labelsAr: Record<string, string> = {
+    turn_left:  "التفت برأسك إلى اليسار",
+    turn_right: "التفت برأسك إلى اليمين",
+    blink:      "ارمِش بعينيك بشكل طبيعي",
+    center:     "انظر إلى الكاميرا مباشرة",
+    nod:        "حرّك رأسك للأعلى والأسفل",
+    smile:      "ابتسم للكاميرا",
+  };
+  return isAr ? (labelsAr[step] ?? step) : (labelsEn[step] ?? step.replace(/_/g, " "));
 }
