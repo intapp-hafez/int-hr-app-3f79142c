@@ -13,7 +13,8 @@ function loadFaceApi() {
 let modelsLoaded = false;
 async function ensureModels(faceapi: typeof import("face-api.js")) {
   if (modelsLoaded) return;
-  const url = "/models";
+  const baseUrl = (import.meta.env.BASE_URL || "/").replace(/\/$/, "");
+  const url = `${baseUrl}/models`;
   await Promise.all([
     faceapi.nets.tinyFaceDetector.loadFromUri(url),
     faceapi.nets.faceLandmark68Net.loadFromUri(url),

@@ -1,0 +1,4 @@
+# Treat binary model weight files strictly as binary
+# Prevents line-ending conversion (CRLF/LF) or text mangling on Git checkout/deployment
+*.bin binary
+public/models/* binary
