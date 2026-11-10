@@ -1659,7 +1659,7 @@ export const reviewQuarterlyEvaluation = createServerFn({ method: "POST" })
         if (input.action === "return" && input.reason) {
           notes.returnReason = `[${selectedQ.toUpperCase()}]: ${input.reason}`;
           notes.growthAreas = (notes.growthAreas ? notes.growthAreas + "\n" : "") + `[HR Return Note - ${selectedQ.toUpperCase()}]: ${input.reason}`;
-          evalStatus = "draft";
+          evalStatus = "returned";
         } else {
           // If individual Q approved, check if all 4 quarters are approved
           const allQs = ["q1", "q2", "q3", "q4"] as const;
@@ -1693,6 +1693,7 @@ export const reviewQuarterlyEvaluation = createServerFn({ method: "POST" })
         if (input.action === "return" && input.reason) {
           notes.returnReason = input.reason;
           notes.growthAreas = (notes.growthAreas ? notes.growthAreas + "\n" : "") + `[HR Return Note]: ${input.reason}`;
+          evalStatus = "returned";
         }
       }
 
@@ -1973,9 +1974,16 @@ export const listManagerReturnedEvaluations = createServerFn({ method: "POST" })
         let foundQuarterReturn = false;
         for (const q of ["q1", "q2", "q3", "q4"] as const) {
           const key = `${r.employee_id}-${r.evaluation_year}-${q}`;
-          if (qStatuses[q]?.status === "returned" && !seenKeys.has(key)) {
+          const isQReturned = qStatuses[q]?.status === "returned";
+          const hasQuarterNote = typeof notes.growthAreas === "string" && notes.growthAreas.toLowerCase().includes(`[hr return note - ${q}]`);
+          if ((isQReturned || hasQuarterNote) && !seenKeys.has(key)) {
             foundQuarterReturn = true;
             seenKeys.add(key);
+            const cleanQuarterReason = qStatuses[q]?.return_reason ||
+              notes.returnReason ||
+              (hasQuarterNote ? notes.growthAreas.replace(/.*\[HR Return Note.*?\]:\s*/i, "") : null) ||
+              "Returned by HR Admin for revision";
+
             items.push({
               id: `${r.id}-${q}`,
               evaluation_id: r.id,
@@ -1984,7 +1992,7 @@ export const listManagerReturnedEvaluations = createServerFn({ method: "POST" })
               quarter: q,
               status: "returned",
               score: Number(r.summary?.totalScore ?? 0),
-              return_reason: qStatuses[q]?.return_reason || notes.returnReason || "Returned by HR Admin for revision",
+              return_reason: cleanQuarterReason,
               returned_at: qStatuses[q]?.returned_at || r.updated_at,
               employee: r.employee,
               source: "kpi_evaluations",
@@ -1992,10 +2000,15 @@ export const listManagerReturnedEvaluations = createServerFn({ method: "POST" })
           }
         }
 
-        if (!foundQuarterReturn && (r.status === "returned" || notes.returnReason)) {
+        const hasHrReturnNote = typeof notes.growthAreas === "string" && notes.growthAreas.includes("[HR Return Note]");
+        if (!foundQuarterReturn && (r.status === "returned" || notes.returnReason || hasHrReturnNote)) {
           const key = `${r.employee_id}-${r.evaluation_year}-annual`;
           if (!seenKeys.has(key)) {
             seenKeys.add(key);
+            const cleanReason = notes.returnReason ||
+              (hasHrReturnNote ? notes.growthAreas.replace(/.*\[HR Return Note.*?\]:\s*/i, "") : notes.growthAreas) ||
+              "Returned by HR Admin for revision";
+
             items.push({
               id: r.id,
               evaluation_id: r.id,
@@ -2004,7 +2017,7 @@ export const listManagerReturnedEvaluations = createServerFn({ method: "POST" })
               quarter: "annual",
               status: "returned",
               score: Number(r.summary?.totalScore ?? 0),
-              return_reason: notes.returnReason || notes.growthAreas || "Returned by HR Admin for revision",
+              return_reason: cleanReason,
               returned_at: r.updated_at,
               employee: r.employee,
               source: "kpi_evaluations",
