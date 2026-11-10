@@ -1549,6 +1549,7 @@ export const reviewQuarterlyEvaluation = createServerFn({ method: "POST" })
     const targetId = input.id;
     const now = new Date().toISOString();
     const newStatus = input.action === "approve" ? "approved" : "returned";
+    const selectedQ = input.quarter as "q1" | "q2" | "q3" | "q4" | undefined;
 
     // 1. Try finding in kpi_quarterly_evaluations
     const { data: record, error: fetchErr } = await (supabase as any)
@@ -1582,13 +1583,42 @@ export const reviewQuarterlyEvaluation = createServerFn({ method: "POST" })
         created_at: now,
       });
 
+      // Also sync to parent kpi_evaluations notes.quarterStatuses if parent exists
+      try {
+        const { data: parentRecord } = await (supabase as any)
+          .from("kpi_evaluations")
+          .select("id, notes, status")
+          .eq("employee_id", record.employee_id)
+          .eq("evaluation_year", record.evaluation_year)
+          .maybeSingle();
+        if (parentRecord) {
+          const pNotes = typeof parentRecord.notes === "object" && parentRecord.notes ? { ...parentRecord.notes } : {};
+          pNotes.quarterStatuses = pNotes.quarterStatuses || {};
+          pNotes.quarterStatuses[record.quarter] = {
+            status: newStatus,
+            updated_at: now,
+            ...(newStatus === "approved" ? { approved_at: now, approved_by: userId, return_reason: null } : {}),
+            ...(newStatus === "returned" ? { returned_at: now, return_reason: input.reason } : {}),
+          };
+          if (input.action === "return") {
+            pNotes.returnReason = `[${record.quarter.toUpperCase()}]: ${input.reason}`;
+          }
+          await (supabase as any)
+            .from("kpi_evaluations")
+            .update({ notes: pNotes, updated_at: now })
+            .eq("id", parentRecord.id);
+        }
+      } catch (err) {
+        console.error("Failed to sync quarter status to kpi_evaluations parent:", err);
+      }
+
       // Notify Manager & Employee
       if (record.evaluator_id) {
         if (input.action === "approve") {
           await notifyKpiAction({
             userIds: [record.evaluator_id, record.employee_id],
             title: `KPI Evaluation Approved (${record.quarter.toUpperCase()} ${record.evaluation_year})`,
-            body: `The evaluation has been officially approved with a score of ${record.score}%.`,
+            body: `The ${record.quarter.toUpperCase()} evaluation has been officially approved with a score of ${record.score}%. Remaining quarters remain open for evaluation.`,
             url: "/admin/kpi-evaluations",
             severity: "success",
           });
@@ -1609,23 +1639,68 @@ export const reviewQuarterlyEvaluation = createServerFn({ method: "POST" })
     // 2. Try finding in kpi_evaluations (standard/annual evaluation records)
     const { data: oldRecord } = await (supabase as any)
       .from("kpi_evaluations")
-      .select("id, employee_id, evaluator_id, evaluation_year, status, summary, notes")
+      .select("id, employee_id, evaluator_id, evaluation_year, status, summary, notes, scores")
       .eq("id", targetId)
       .maybeSingle();
 
     if (oldRecord) {
-      const evalStatus = input.action === "approve" ? "approved" : "draft";
       const notes = typeof oldRecord.notes === "object" && oldRecord.notes ? { ...oldRecord.notes } : {};
-      if (input.action === "return" && input.reason) {
-        notes.returnReason = input.reason;
-        notes.growthAreas = (notes.growthAreas ? notes.growthAreas + "\n" : "") + `[HR Return Note]: ${input.reason}`;
+      let evalStatus = input.action === "approve" ? "approved" : "draft";
+
+      if (selectedQ) {
+        notes.quarterStatuses = notes.quarterStatuses || {};
+        notes.quarterStatuses[selectedQ] = {
+          status: newStatus,
+          updated_at: now,
+          ...(newStatus === "approved" ? { approved_at: now, approved_by: userId, return_reason: null } : {}),
+          ...(newStatus === "returned" ? { returned_at: now, return_reason: input.reason } : {}),
+        };
+
+        if (input.action === "return" && input.reason) {
+          notes.returnReason = `[${selectedQ.toUpperCase()}]: ${input.reason}`;
+          notes.growthAreas = (notes.growthAreas ? notes.growthAreas + "\n" : "") + `[HR Return Note - ${selectedQ.toUpperCase()}]: ${input.reason}`;
+          evalStatus = "draft";
+        } else {
+          // If individual Q approved, check if all 4 quarters are approved
+          const allQs = ["q1", "q2", "q3", "q4"] as const;
+          const allApproved = allQs.every((q) => notes.quarterStatuses?.[q]?.status === "approved");
+          // If not all 4 are approved, remain in draft so manager can evaluate remaining Qs!
+          evalStatus = allApproved ? "approved" : "draft";
+        }
+
+        // Also upsert individual quarterly record into kpi_quarterly_evaluations
+        try {
+          await (supabase as any)
+            .from("kpi_quarterly_evaluations")
+            .upsert(
+              {
+                employee_id: oldRecord.employee_id,
+                evaluator_id: oldRecord.evaluator_id || userId,
+                evaluation_year: oldRecord.evaluation_year,
+                quarter: selectedQ,
+                status: newStatus,
+                score: Number(oldRecord.summary?.totalScore ?? 0),
+                updated_at: now,
+                ...(newStatus === "approved" ? { approved_at: now, return_reason: null } : {}),
+                ...(newStatus === "returned" ? { returned_at: now, return_reason: input.reason } : {}),
+              },
+              { onConflict: "employee_id,evaluation_year,quarter" }
+            );
+        } catch (err) {
+          console.error("Failed to upsert kpi_quarterly_evaluations row:", err);
+        }
+      } else {
+        if (input.action === "return" && input.reason) {
+          notes.returnReason = input.reason;
+          notes.growthAreas = (notes.growthAreas ? notes.growthAreas + "\n" : "") + `[HR Return Note]: ${input.reason}`;
+        }
       }
 
       const updatePayload: Record<string, any> = {
         status: evalStatus,
         notes,
         updated_at: now,
-        ...(input.action === "approve" ? { approved_at: now } : {}),
+        ...(evalStatus === "approved" ? { approved_at: now } : {}),
       };
 
       const { error: updErr } = await (supabase as any)
@@ -1638,26 +1713,29 @@ export const reviewQuarterlyEvaluation = createServerFn({ method: "POST" })
       // Notify Manager & Employee
       const evaluatorId = oldRecord.evaluator_id;
       if (evaluatorId) {
+        const qLabel = selectedQ ? selectedQ.toUpperCase() : oldRecord.evaluation_year;
         if (input.action === "approve") {
           await notifyKpiAction({
             userIds: [evaluatorId, oldRecord.employee_id],
-            title: `KPI Evaluation Approved (${oldRecord.evaluation_year})`,
-            body: `The evaluation has been officially approved with a score of ${oldRecord.summary?.totalScore ?? 0}%.`,
+            title: `KPI Evaluation ${selectedQ ? selectedQ.toUpperCase() + " " : ""}Approved (${oldRecord.evaluation_year})`,
+            body: selectedQ
+              ? `The ${selectedQ.toUpperCase()} evaluation has been approved. Remaining quarters remain open for evaluation.`
+              : `The evaluation has been officially approved with a score of ${oldRecord.summary?.totalScore ?? 0}%.`,
             url: "/admin/kpi-evaluations",
             severity: "success",
           });
         } else {
           await notifyKpiAction({
             userIds: [evaluatorId],
-            title: `KPI Evaluation Returned for Revision (${oldRecord.evaluation_year})`,
-            body: `HR requested revisions: ${input.reason}`,
+            title: `KPI Evaluation ${selectedQ ? selectedQ.toUpperCase() + " " : ""}Returned for Revision (${oldRecord.evaluation_year})`,
+            body: `HR requested revisions${selectedQ ? ` for ${selectedQ.toUpperCase()}` : ""}: ${input.reason}`,
             url: "/manager/kpi-evaluations",
             severity: "warning",
           });
         }
       }
 
-      return { success: true, id: targetId, status: evalStatus };
+      return { success: true, id: targetId, status: evalStatus, quarter: selectedQ };
     }
 
     throw new Error("Evaluation record not found");
@@ -1754,6 +1832,7 @@ export const listPendingApprovals = createServerFn({ method: "POST" })
         evaluator_id: r.evaluator_id,
         evaluator_name: r.evaluator_name || r.evaluator?.full_name || "Manager",
         notes: r.notes || {},
+        quarter_statuses: r.notes?.quarterStatuses || {},
         submitted_at: r.submitted_at || r.updated_at,
         employee: r.employee,
         evaluator: r.evaluator,
@@ -1775,6 +1854,168 @@ export const listPendingApprovals = createServerFn({ method: "POST" })
     }
 
     return rows;
+  });
+
+export const listManagerReturnedEvaluations = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ year: z.number().int().min(2020).max(2100).optional() }).parse(input ?? {}))
+  .handler(async ({ data: input, context }) => {
+    const { supabase, userId } = context;
+    const { isAdmin, isManager } = await assertKpiAccess(supabase, userId);
+
+    const year = (input as any)?.year ?? new Date().getFullYear();
+    const scope = await resolveTeamMemberScope(supabase, userId);
+
+    let teamIds: string[] = [];
+    if (!isAdmin && isManager && !scope.isAdmin) {
+      const { data: teamProfiles } = await supabase
+        .from("profiles")
+        .select("id")
+        .or(`manager_id.eq.${userId}${scope.managedDeptIds?.length ? `,department_id.in.(${scope.managedDeptIds.join(",")})` : ""}`);
+      teamIds = (teamProfiles || []).map((t: any) => t.id);
+    }
+
+    // 1. Query kpi_quarterly_evaluations where status = 'returned'
+    let qQuery = (supabase as any)
+      .from("kpi_quarterly_evaluations")
+      .select(`
+        id,
+        employee_id,
+        evaluator_id,
+        evaluation_year,
+        quarter,
+        status,
+        score,
+        return_reason,
+        returned_at,
+        updated_at,
+        notes,
+        employee:profiles!kpi_quarterly_evaluations_employee_id_fkey(
+          id,
+          full_name,
+          emp_code,
+          department:departments!profiles_department_id_fkey(name_en),
+          position:positions!profiles_position_id_fkey(name_en, name_ar)
+        )
+      `)
+      .eq("status", "returned")
+      .eq("evaluation_year", year);
+
+    if (!isAdmin && isManager && !scope.isAdmin) {
+      if (teamIds.length > 0) {
+        qQuery = qQuery.or(`evaluator_id.eq.${userId},employee_id.in.(${teamIds.join(",")})`);
+      } else {
+        qQuery = qQuery.eq("evaluator_id", userId);
+      }
+    }
+
+    // 2. Query kpi_evaluations
+    let aQuery = (supabase as any)
+      .from("kpi_evaluations")
+      .select(`
+        id,
+        employee_id,
+        evaluator_id,
+        evaluator_name,
+        evaluation_year,
+        template_type,
+        status,
+        scores,
+        summary,
+        notes,
+        updated_at,
+        employee:profiles!kpi_evaluations_employee_id_fkey(
+          id,
+          full_name,
+          emp_code,
+          department:departments!profiles_department_id_fkey(name_en),
+          position:positions!profiles_position_id_fkey(name_en, name_ar)
+        )
+      `)
+      .eq("evaluation_year", year);
+
+    if (!isAdmin && isManager && !scope.isAdmin) {
+      if (teamIds.length > 0) {
+        aQuery = aQuery.or(`evaluator_id.eq.${userId},employee_id.in.(${teamIds.join(",")})`);
+      } else {
+        aQuery = aQuery.eq("evaluator_id", userId);
+      }
+    }
+
+    const [qRes, aRes] = await Promise.all([qQuery, aQuery]);
+    const items: any[] = [];
+    const seenKeys = new Set<string>();
+
+    if (qRes.data) {
+      for (const r of qRes.data) {
+        const key = `${r.employee_id}-${r.evaluation_year}-${r.quarter}`;
+        seenKeys.add(key);
+        items.push({
+          id: r.id,
+          employee_id: r.employee_id,
+          evaluation_year: r.evaluation_year,
+          quarter: r.quarter,
+          status: "returned",
+          score: Number(r.score ?? 0),
+          return_reason: r.return_reason || r.notes?.returnReason || "Returned by HR Admin for revision",
+          returned_at: r.returned_at || r.updated_at,
+          employee: r.employee,
+          source: "kpi_quarterly_evaluations",
+        });
+      }
+    }
+
+    if (aRes.data) {
+      for (const r of aRes.data) {
+        const notes = typeof r.notes === "object" && r.notes ? r.notes : {};
+        const qStatuses = notes.quarterStatuses || {};
+
+        let foundQuarterReturn = false;
+        for (const q of ["q1", "q2", "q3", "q4"] as const) {
+          const key = `${r.employee_id}-${r.evaluation_year}-${q}`;
+          if (qStatuses[q]?.status === "returned" && !seenKeys.has(key)) {
+            foundQuarterReturn = true;
+            seenKeys.add(key);
+            items.push({
+              id: `${r.id}-${q}`,
+              evaluation_id: r.id,
+              employee_id: r.employee_id,
+              evaluation_year: r.evaluation_year,
+              quarter: q,
+              status: "returned",
+              score: Number(r.summary?.totalScore ?? 0),
+              return_reason: qStatuses[q]?.return_reason || notes.returnReason || "Returned by HR Admin for revision",
+              returned_at: qStatuses[q]?.returned_at || r.updated_at,
+              employee: r.employee,
+              source: "kpi_evaluations",
+            });
+          }
+        }
+
+        if (!foundQuarterReturn && (r.status === "returned" || notes.returnReason)) {
+          const key = `${r.employee_id}-${r.evaluation_year}-annual`;
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            items.push({
+              id: r.id,
+              evaluation_id: r.id,
+              employee_id: r.employee_id,
+              evaluation_year: r.evaluation_year,
+              quarter: "annual",
+              status: "returned",
+              score: Number(r.summary?.totalScore ?? 0),
+              return_reason: notes.returnReason || notes.growthAreas || "Returned by HR Admin for revision",
+              returned_at: r.updated_at,
+              employee: r.employee,
+              source: "kpi_evaluations",
+            });
+          }
+        }
+      }
+    }
+
+    items.sort((a, b) => new Date(b.returned_at || 0).getTime() - new Date(a.returned_at || 0).getTime());
+    return items;
   });
 
 export const getQuarterlyHistory = createServerFn({ method: "POST" })

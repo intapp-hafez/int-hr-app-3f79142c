@@ -177,11 +177,13 @@ export type GetQuarterlyEvaluationInput = z.infer<typeof GetQuarterlyEvaluationS
 export const ReviewQuarterlyEvaluationSchema = z.object({
   id: z.string().uuid().optional(),
   evaluation_id: z.string().uuid().optional(),
+  quarter: EvaluationQuarterSchema.optional(),
   action: z.enum(["approve", "return"]),
   reason: z.string().max(1000).optional(),
   return_reason: z.string().max(1000).optional(),
 }).transform((data) => ({
   id: (data.id || data.evaluation_id) as string,
+  quarter: data.quarter,
   action: data.action,
   reason: data.reason || data.return_reason,
 })).refine(

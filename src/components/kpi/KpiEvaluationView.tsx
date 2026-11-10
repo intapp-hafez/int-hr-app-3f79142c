@@ -78,6 +78,7 @@ import {
   deleteKpiEvaluation,
   listPendingApprovals,
   reviewQuarterlyEvaluation,
+  listManagerReturnedEvaluations,
   listKpiCriteria,
   saveKpiCriterion,
   archiveKpiCriterion,
@@ -229,7 +230,12 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
   const [pageSize, setPageSize] = useState<number>(15);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [activeQuarterFilter, setActiveQuarterFilter] = useState<"all" | "q1" | "q2" | "q3" | "q4">("all");
-  const [notes, setNotes] = useState({
+  const [notes, setNotes] = useState<{
+    strengths: string;
+    growthAreas: string;
+    recommendations: string;
+    returnReason?: string;
+  }>({
     strengths: "",
     growthAreas: "",
     recommendations: "",
@@ -453,6 +459,16 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
     queryFn: () => listPendingFn({ data: { year: selectedYear } }),
     enabled: !!session && !isManagerMode,
   });
+
+  // ── MANAGER RETURNED EVALUATIONS QUERY ──
+  const listReturnedFn = useServerFn(listManagerReturnedEvaluations);
+  const { data: returnedEvaluations = [], refetch: refetchReturned, isLoading: isLoadingReturned } = useQuery({
+    queryKey: ["kpi-returned-evaluations", selectedYear],
+    queryFn: () => listReturnedFn({ data: { year: selectedYear } }),
+    enabled: !!session && isManagerMode,
+  });
+  const [returnedQuarterFilter, setReturnedQuarterFilter] = useState<"all" | "q1" | "q2" | "q3" | "q4">("all");
+  const [selectedReturnQuarter, setSelectedReturnQuarter] = useState<string | null>(null);
 
   // ── CRITERIA CATALOG QUERY ──
   const { data: kpiCriteria = [], refetch: refetchCriteria, isLoading: isLoadingCriteria } = useQuery({
@@ -768,7 +784,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
   // Quarterly Evaluation Scorecard State
   const [activeQuarterStep, setActiveQuarterStep] = useState<"q1" | "q2" | "q3" | "q4">("q1");
   const [activeScorecardQuarter, setActiveScorecardQuarter] = useState<"q1" | "q2" | "q3" | "q4">("q1");
-  const [quarterStatuses, setQuarterStatuses] = useState<Record<string, { status: string; returnReason?: string; score?: number }>>({
+  const [quarterStatuses, setQuarterStatuses] = useState<Record<string, { status: string; returnReason?: string; score?: number; approved_at?: string; return_reason?: string }>>({
     q1: { status: "draft" },
     q2: { status: "draft" },
     q3: { status: "draft" },
@@ -803,21 +819,29 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const handleApprovePending = async (item: any) => {
+  const handleApproveQuarter = async (item: any, quarter?: string) => {
     try {
       setIsSubmittingReview(true);
       await reviewQuarterlyFn({
         data: {
-          id: item.id,
-          evaluation_id: item.id,
+          id: item.id || item.evaluation_id,
+          evaluation_id: item.id || item.evaluation_id,
+          quarter: (quarter as any) || undefined,
           action: "approve",
         },
       });
-      toast.success(isAr ? "تم اعتماد التقييم بنجاح" : "KPI evaluation approved");
+      const qName = quarter ? quarter.toUpperCase() + " " : "";
+      toast.success(
+        isAr
+          ? `تم اعتماد تقييم ${qName}بنجاح. باقي الأرباع متاحة للتقييم.`
+          : `KPI evaluation ${qName}approved successfully. Remaining quarters remain open for evaluation.`
+      );
       refetchPending();
+      if (refetchReturned) refetchReturned();
       queryClient.invalidateQueries({ queryKey: ["kpi-pending-approvals"] });
       queryClient.invalidateQueries({ queryKey: ["kpi-evaluation"] });
       queryClient.invalidateQueries({ queryKey: ["kpi-evaluations-list"] });
+      queryClient.invalidateQueries({ queryKey: ["kpi-returned-evaluations"] });
     } catch (err: any) {
       toast.error(err.message || (isAr ? "فشل اعتماد التقييم" : "Failed to approve evaluation"));
     } finally {
@@ -825,10 +849,31 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
     }
   };
 
-  const handleOpenReturnModal = (item: any) => {
+  const handleApprovePending = async (item: any) => {
+    await handleApproveQuarter(item);
+  };
+
+  const handleApproveQuarterDirect = async (quarter: string) => {
+    if (!serverRecord?.id) {
+      toast.error(isAr ? "يرجى حفظ التقييم أولاً" : "Please save the evaluation first");
+      return;
+    }
+    await handleApproveQuarter(serverRecord, quarter);
+  };
+
+  const handleOpenReturnModal = (item: any, quarter?: string) => {
     setSelectedPendingItem(item);
+    setSelectedReturnQuarter(quarter || item.quarter || null);
     setReturnReason("");
     setReturnModalOpen(true);
+  };
+
+  const handleReturnQuarterDirect = (quarter: string) => {
+    if (!serverRecord?.id) {
+      toast.error(isAr ? "يرجى حفظ التقييم أولاً" : "Please save the evaluation first");
+      return;
+    }
+    handleOpenReturnModal(serverRecord, quarter);
   };
 
   const handleConfirmReturn = async () => {
@@ -841,26 +886,51 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
       setIsSubmittingReview(true);
       await reviewQuarterlyFn({
         data: {
-          id: selectedPendingItem.id,
-          evaluation_id: selectedPendingItem.id,
+          id: selectedPendingItem.id || selectedPendingItem.evaluation_id,
+          evaluation_id: selectedPendingItem.id || selectedPendingItem.evaluation_id,
+          quarter: (selectedReturnQuarter as any) || undefined,
           action: "return",
           reason: returnReason.trim(),
           return_reason: returnReason.trim(),
         },
       });
-      toast.warning(isAr ? "تمت إعادة التقييم إلى المُقيّم للمراجعة" : "Evaluation returned for revision");
+      toast.warning(
+        isAr
+          ? "تمت إعادة التقييم إلى المُقيّم للمراجعة مع تدوين الملاحظة"
+          : "Evaluation returned for revision with return notes"
+      );
       setReturnModalOpen(false);
       setSelectedPendingItem(null);
+      setSelectedReturnQuarter(null);
       setReturnReason("");
       refetchPending();
+      if (refetchReturned) refetchReturned();
       queryClient.invalidateQueries({ queryKey: ["kpi-pending-approvals"] });
       queryClient.invalidateQueries({ queryKey: ["kpi-evaluation"] });
       queryClient.invalidateQueries({ queryKey: ["kpi-evaluations-list"] });
+      queryClient.invalidateQueries({ queryKey: ["kpi-returned-evaluations"] });
     } catch (err: any) {
       toast.error(err.message || (isAr ? "فشل إعادة التقييم" : "Failed to return evaluation"));
     } finally {
       setIsSubmittingReview(false);
     }
+  };
+
+  const handleOpenReturnedEvaluation = (item: any) => {
+    setSelectedEmpId(item.employee_id);
+    if (item.quarter && ["q1", "q2", "q3", "q4"].includes(String(item.quarter).toLowerCase())) {
+      setActiveQuarterFilter(String(item.quarter).toLowerCase() as any);
+    } else {
+      setActiveQuarterFilter("all");
+    }
+    setMainTab("scorecard");
+    toast.info(
+      isAr
+        ? `تم فتح التقييم لتعديله. ملاحظة الإدارة: ${item.return_reason}`
+        : `Opened evaluation for revision. Return note: ${item.return_reason}`,
+      { duration: 7000 }
+    );
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleOpenMetricReturnModal = (kpi: any) => {
@@ -1499,6 +1569,13 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
           growthAreas: serverRecord.notes.growthAreas || "",
           recommendations: serverRecord.notes.recommendations || "",
         });
+        if (serverRecord.notes.quarterStatuses) {
+          setQuarterStatuses(serverRecord.notes.quarterStatuses);
+        } else {
+          setQuarterStatuses({});
+        }
+      } else {
+        setQuarterStatuses({});
       }
       if (serverRecord.evaluator_name) {
         setEvaluatorName(serverRecord.evaluator_name);
@@ -1652,7 +1729,11 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
           status: payload.targetStatus,
           scores: serializedScores,
           summary: summaryPayload,
-          notes,
+          notes: {
+            ...notes,
+            quarterStatuses,
+            ...(serverRecord?.notes?.returnReason ? { returnReason: serverRecord.notes.returnReason } : {}),
+          },
         },
       });
     },
@@ -1721,7 +1802,27 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
     },
   });
 
-  const isLocked = status === "Approved";
+  const isOverallApproved = status === "Approved";
+  const isQ1Approved = quarterStatuses.q1?.status === "approved" || (isOverallApproved && Object.keys(quarterStatuses).length === 0);
+  const isQ2Approved = quarterStatuses.q2?.status === "approved" || (isOverallApproved && Object.keys(quarterStatuses).length === 0);
+  const isQ3Approved = quarterStatuses.q3?.status === "approved" || (isOverallApproved && Object.keys(quarterStatuses).length === 0);
+  const isQ4Approved = quarterStatuses.q4?.status === "approved" || (isOverallApproved && Object.keys(quarterStatuses).length === 0);
+
+  const isQ1Disabled = isQ1Approved;
+  const isQ2Disabled = isQ2Approved;
+  const isQ3Disabled = isQ3Approved;
+  const isQ4Disabled = isQ4Approved;
+
+  const isQuarterDisabled = (q: "q1" | "q2" | "q3" | "q4") => {
+    if (q === "q1") return isQ1Disabled;
+    if (q === "q2") return isQ2Disabled;
+    if (q === "q3") return isQ3Disabled;
+    if (q === "q4") return isQ4Disabled;
+    return false;
+  };
+
+  const allQuartersApproved = isQ1Approved && isQ2Approved && isQ3Approved && isQ4Approved;
+  const isLocked = allQuartersApproved || (isOverallApproved && Object.keys(quarterStatuses).length === 0);
 
   // Cell Value Updates
   const handleActualChange = (
@@ -1729,8 +1830,12 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
     quarter: "q1" | "q2" | "q3" | "q4",
     rawValue: string
   ) => {
-    if (isLocked) {
-      toast.warning(isAr ? "التقييم معتمد ومقفل رسمياً ولا يمكن تعديله" : "This evaluation is approved and locked");
+    if (isQuarterDisabled(quarter)) {
+      toast.warning(
+        isAr
+          ? `الربع (${quarter.toUpperCase()}) معتمد ومقفل رسمياً ولا يمكن تعديله. يمكنك تقييم باقي الأرباع المتاحة للمدير.`
+          : `Quarter (${quarter.toUpperCase()}) is approved and locked. You can evaluate the remaining available quarters.`
+      );
       return;
     }
 
@@ -2191,6 +2296,60 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
             </Button>
           )}
 
+          {/* Admin Per-Quarter Approvals */}
+          {(role === "admin" || role === "hr") && serverRecord?.id && (
+            <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-border bg-muted/40 p-1.5">
+              <span className="text-[11px] font-semibold text-muted-foreground px-1.5 flex items-center gap-1">
+                <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                {isAr ? "اعتماد الأرباع:" : "Approve by Q:"}
+              </span>
+              {(["q1", "q2", "q3", "q4"] as const).map((q) => {
+                const isApproved =
+                  quarterStatuses[q]?.status === "approved" ||
+                  (isOverallApproved && Object.keys(quarterStatuses).length === 0);
+                const hasActuals = Object.values(kpiState).some((k: any) => k[q]?.actual != null);
+
+                if (isApproved) {
+                  return (
+                    <Badge key={q} className="bg-emerald-600 text-white text-[10px] gap-1 px-2 py-1 font-bold">
+                      <Check className="h-3 w-3" /> {q.toUpperCase()} {isAr ? "معتمد" : "Approved"}
+                    </Badge>
+                  );
+                }
+
+                return (
+                  <div key={q} className="flex items-center gap-1">
+                    <Button
+                      size="sm"
+                      onClick={() => handleApproveQuarterDirect(q)}
+                      disabled={isSubmittingReview || !hasActuals}
+                      className={`h-7 px-2.5 text-[11px] font-bold rounded-lg cursor-pointer ${
+                        hasActuals
+                          ? "bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs"
+                          : "bg-muted text-muted-foreground opacity-50 cursor-not-allowed"
+                      }`}
+                      title={hasActuals ? `Approve ${q.toUpperCase()}` : `No actual data in ${q.toUpperCase()}`}
+                    >
+                      <Check className="h-3 w-3" /> {isAr ? `اعتماد ${q.toUpperCase()}` : `Approve ${q.toUpperCase()}`}
+                    </Button>
+                    {hasActuals && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleReturnQuarterDirect(q)}
+                        disabled={isSubmittingReview}
+                        className="h-7 px-1.5 text-[10px] rounded-lg border-rose-300 text-rose-600 hover:bg-rose-50 cursor-pointer"
+                        title={`Return ${q.toUpperCase()} for revision`}
+                      >
+                        <RotateCcw className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {status === "Submitted" && (role === "admin" || role === "hr") && (
             <Button
               size="sm"
@@ -2199,7 +2358,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
               className="rounded-xl gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-xs"
             >
               <ShieldCheck className="h-4 w-4" />
-              <span>{isAr ? "اعتماد رسمي نهائي" : "Final Approve"}</span>
+              <span>{isAr ? "اعتماد كلي نهائي" : "Final Approve All"}</span>
             </Button>
           )}
 
@@ -2440,6 +2599,20 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
               <FileSpreadsheet className="h-4 w-4 transition-colors group-data-[state=active]:text-white" />
               <span>{isAr ? "بطاقة التقييم" : "Evaluation Scorecard"}</span>
             </TabsTrigger>
+            {isManagerMode && (
+              <TabsTrigger
+                value="pending-returns"
+                className="group rounded-xl px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer transition-all data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
+              >
+                <RotateCcw className="h-4 w-4 text-rose-500 transition-colors group-data-[state=active]:text-white" />
+                <span>{isAr ? "التقييمات المعادة" : "Pending Returns"}</span>
+                {returnedEvaluations.length > 0 && (
+                  <Badge className="bg-rose-500 text-white px-1.5 py-0 text-[10px] font-mono transition-colors group-data-[state=active]:bg-white/20 group-data-[state=active]:text-white group-data-[state=active]:border-transparent">
+                    {returnedEvaluations.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            )}
             {!isManagerMode && (
               <TabsTrigger
                 value="pending-approvals"
@@ -2920,15 +3093,33 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
           </div>
 
           {/* Returned for Revision Notice Banner */}
-          {status.toLowerCase() === "returned" && (
-            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 shrink-0 text-amber-600 mt-0.5" />
-              <div className="space-y-1">
-                <h4 className="font-bold text-xs">
-                  {isAr ? "تمت إعادة هذا التقييم للمراجعة والتعديل" : "Evaluation Returned for Revision"}
-                </h4>
-                <p className="text-xs leading-relaxed">
-                  {notes.growthAreas || (isAr ? "يرجى مراجعة وتدقيق نسب الإنجاز الميدانية وإعادة تقديمها للاعتماد." : "Please re-verify the site achievement values and re-submit for formal approval.")}
+          {(status.toLowerCase() === "returned" || serverRecord?.notes?.returnReason || notes.returnReason || Object.values(quarterStatuses).some((qs: any) => qs.status === "returned")) && (
+            <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-800 dark:text-rose-200 flex items-start gap-3">
+              <RotateCcw className="h-5 w-5 shrink-0 text-rose-600 mt-0.5" />
+              <div className="space-y-1.5 w-full">
+                <div className="flex items-center justify-between gap-2">
+                  <h4 className="font-bold text-xs flex items-center gap-1.5 text-rose-700 dark:text-rose-400">
+                    <AlertCircle className="h-4 w-4" />
+                    <span>{isAr ? "ملاحظات الإعادة من إدارة الموارد البشرية" : "Return Notes from Admin / HR"}</span>
+                  </h4>
+                  <Badge variant="outline" className="border-rose-400/50 bg-rose-500/10 text-rose-700 dark:text-rose-300 text-[10px]">
+                    {isAr ? "مطلوب المراجعة والتعديل" : "Revision Required"}
+                  </Badge>
+                </div>
+                <div className="rounded-xl bg-background/80 p-3 border border-rose-200 dark:border-rose-900/40 text-xs text-foreground font-medium whitespace-pre-wrap leading-relaxed shadow-xs">
+                  {serverRecord?.notes?.returnReason ||
+                    notes.returnReason ||
+                    Object.entries(quarterStatuses)
+                      .filter(([_, qs]: any) => qs.status === "returned" && qs.return_reason)
+                      .map(([q, qs]: any) => `[${q.toUpperCase()}]: ${qs.return_reason}`)
+                      .join("\n") ||
+                    notes.growthAreas ||
+                    (isAr ? "يرجى مراجعة وتدقيق نسب الإنجاز وإعادة تقديم التقييم للاعتماد." : "Please re-verify achievement rates and re-submit for approval.")}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {isAr
+                    ? "يمكنك تعديل الأرقام وملاحظات الأداء في الجدول أدناه ثم الضغط على 'إرسال للمراجعة' بعد الانتهاء."
+                    : "You can update the actual metrics in the table below and click 'Submit Review' once done."}
                 </p>
               </div>
             </div>
@@ -2948,13 +3139,24 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                     {/* Q1 Columns */}
                     {(activeQuarterFilter === "all" || activeQuarterFilter === "q1") && (
                       <>
-                        <th className="px-2 py-3 text-center bg-blue-500/5 text-blue-700 dark:text-blue-300 w-20">
-                          {isAr ? "Q1 الفعلي" : "Q1 Actual"}
+                        <th className="px-2 py-2 text-center bg-blue-500/5 text-blue-700 dark:text-blue-300 w-20">
+                          <div className="flex flex-col items-center justify-center gap-0.5">
+                            <span>{isAr ? "Q1 الفعلي" : "Q1 Actual"}</span>
+                            {isQ1Approved ? (
+                              <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                                {isAr ? "معتمد" : "Approved"}
+                              </span>
+                            ) : quarterStatuses.q1?.status === "returned" ? (
+                              <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
+                                {isAr ? "مُعاد" : "Returned"}
+                              </span>
+                            ) : null}
+                          </div>
                         </th>
-                        <th className="px-2 py-3 text-center bg-blue-500/5 text-blue-700 dark:text-blue-300 w-16">
+                        <th className="px-2 py-2 text-center bg-blue-500/5 text-blue-700 dark:text-blue-300 w-16">
                           {isAr ? "Q1 نسبة التحقيق" : "Q1 Achv%"}
                         </th>
-                        <th className="px-2 py-3 text-center bg-blue-500/5 text-blue-700 dark:text-blue-300 w-16">
+                        <th className="px-2 py-2 text-center bg-blue-500/5 text-blue-700 dark:text-blue-300 w-16">
                           {isAr ? "Q1 الدرجة" : "Q1 Score"}
                         </th>
                       </>
@@ -2963,13 +3165,24 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                     {/* Q2 Columns */}
                     {(activeQuarterFilter === "all" || activeQuarterFilter === "q2") && (
                       <>
-                        <th className="px-2 py-3 text-center bg-emerald-500/5 text-emerald-700 dark:text-emerald-300 w-20">
-                          {isAr ? "Q2 الفعلي" : "Q2 Actual"}
+                        <th className="px-2 py-2 text-center bg-emerald-500/5 text-emerald-700 dark:text-emerald-300 w-20">
+                          <div className="flex flex-col items-center justify-center gap-0.5">
+                            <span>{isAr ? "Q2 الفعلي" : "Q2 Actual"}</span>
+                            {isQ2Approved ? (
+                              <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                                {isAr ? "معتمد" : "Approved"}
+                              </span>
+                            ) : quarterStatuses.q2?.status === "returned" ? (
+                              <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
+                                {isAr ? "مُعاد" : "Returned"}
+                              </span>
+                            ) : null}
+                          </div>
                         </th>
-                        <th className="px-2 py-3 text-center bg-emerald-500/5 text-emerald-700 dark:text-emerald-300 w-16">
+                        <th className="px-2 py-2 text-center bg-emerald-500/5 text-emerald-700 dark:text-emerald-300 w-16">
                           {isAr ? "Q2 نسبة التحقيق" : "Q2 Achv%"}
                         </th>
-                        <th className="px-2 py-3 text-center bg-emerald-500/5 text-emerald-700 dark:text-emerald-300 w-16">
+                        <th className="px-2 py-2 text-center bg-emerald-500/5 text-emerald-700 dark:text-emerald-300 w-16">
                           {isAr ? "Q2 الدرجة" : "Q2 Score"}
                         </th>
                       </>
@@ -2978,13 +3191,24 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                     {/* Q3 Columns */}
                     {(activeQuarterFilter === "all" || activeQuarterFilter === "q3") && (
                       <>
-                        <th className="px-2 py-3 text-center bg-amber-500/5 text-amber-700 dark:text-amber-300 w-20">
-                          {isAr ? "Q3 الفعلي" : "Q3 Actual"}
+                        <th className="px-2 py-2 text-center bg-amber-500/5 text-amber-700 dark:text-amber-300 w-20">
+                          <div className="flex flex-col items-center justify-center gap-0.5">
+                            <span>{isAr ? "Q3 الفعلي" : "Q3 Actual"}</span>
+                            {isQ3Approved ? (
+                              <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                                {isAr ? "معتمد" : "Approved"}
+                              </span>
+                            ) : quarterStatuses.q3?.status === "returned" ? (
+                              <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
+                                {isAr ? "مُعاد" : "Returned"}
+                              </span>
+                            ) : null}
+                          </div>
                         </th>
-                        <th className="px-2 py-3 text-center bg-amber-500/5 text-amber-700 dark:text-amber-300 w-16">
+                        <th className="px-2 py-2 text-center bg-amber-500/5 text-amber-700 dark:text-amber-300 w-16">
                           {isAr ? "Q3 نسبة التحقيق" : "Q3 Achv%"}
                         </th>
-                        <th className="px-2 py-3 text-center bg-amber-500/5 text-amber-700 dark:text-amber-300 w-16">
+                        <th className="px-2 py-2 text-center bg-amber-500/5 text-amber-700 dark:text-amber-300 w-16">
                           {isAr ? "Q3 الدرجة" : "Q3 Score"}
                         </th>
                       </>
@@ -2993,13 +3217,24 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                     {/* Q4 Columns */}
                     {(activeQuarterFilter === "all" || activeQuarterFilter === "q4") && (
                       <>
-                        <th className="px-2 py-3 text-center bg-purple-500/5 text-purple-700 dark:text-purple-300 w-20">
-                          {isAr ? "Q4 الفعلي" : "Q4 Actual"}
+                        <th className="px-2 py-2 text-center bg-purple-500/5 text-purple-700 dark:text-purple-300 w-20">
+                          <div className="flex flex-col items-center justify-center gap-0.5">
+                            <span>{isAr ? "Q4 الفعلي" : "Q4 Actual"}</span>
+                            {isQ4Approved ? (
+                              <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                                {isAr ? "معتمد" : "Approved"}
+                              </span>
+                            ) : quarterStatuses.q4?.status === "returned" ? (
+                              <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
+                                {isAr ? "مُعاد" : "Returned"}
+                              </span>
+                            ) : null}
+                          </div>
                         </th>
-                        <th className="px-2 py-3 text-center bg-purple-500/5 text-purple-700 dark:text-purple-300 w-16">
+                        <th className="px-2 py-2 text-center bg-purple-500/5 text-purple-700 dark:text-purple-300 w-16">
                           {isAr ? "Q4 نسبة التحقيق" : "Q4 Achv%"}
                         </th>
-                        <th className="px-2 py-3 text-center bg-purple-500/5 text-purple-700 dark:text-purple-300 w-16">
+                        <th className="px-2 py-2 text-center bg-purple-500/5 text-purple-700 dark:text-purple-300 w-16">
                           {isAr ? "Q4 الدرجة" : "Q4 Score"}
                         </th>
                       </>
@@ -3115,11 +3350,13 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                                   <td className="px-1 py-1 text-center bg-blue-500/5">
                                     <Input
                                       type="text"
-                                      disabled={isLocked}
+                                      disabled={isQ1Disabled}
                                       value={formatActualDisplay(row.q1.actual, kpi.inputType, kpi.unit)}
                                       onChange={(e) => handleActualChange(kpi.id, "q1", e.target.value)}
                                       placeholder={placeholderText}
-                                      className="h-7 w-16 text-center font-mono text-xs mx-auto p-1 rounded-lg"
+                                      className={`h-7 w-16 text-center font-mono text-xs mx-auto p-1 rounded-lg ${
+                                        isQ1Approved ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-800 dark:text-emerald-300 font-bold" : ""
+                                      }`}
                                     />
                                   </td>
                                   <td className="px-2 py-2 text-center font-mono bg-blue-500/5">
@@ -3137,11 +3374,13 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                                   <td className="px-1 py-1 text-center bg-emerald-500/5">
                                     <Input
                                       type="text"
-                                      disabled={isLocked}
+                                      disabled={isQ2Disabled}
                                       value={formatActualDisplay(row.q2.actual, kpi.inputType, kpi.unit)}
                                       onChange={(e) => handleActualChange(kpi.id, "q2", e.target.value)}
                                       placeholder={placeholderText}
-                                      className="h-7 w-16 text-center font-mono text-xs mx-auto p-1 rounded-lg"
+                                      className={`h-7 w-16 text-center font-mono text-xs mx-auto p-1 rounded-lg ${
+                                        isQ2Approved ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-800 dark:text-emerald-300 font-bold" : ""
+                                      }`}
                                     />
                                   </td>
                                   <td className="px-2 py-2 text-center font-mono bg-emerald-500/5">
@@ -3159,11 +3398,13 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                                   <td className="px-1 py-1 text-center bg-amber-500/5">
                                     <Input
                                       type="text"
-                                      disabled={isLocked}
+                                      disabled={isQ3Disabled}
                                       value={formatActualDisplay(row.q3.actual, kpi.inputType, kpi.unit)}
                                       onChange={(e) => handleActualChange(kpi.id, "q3", e.target.value)}
                                       placeholder={placeholderText}
-                                      className="h-7 w-16 text-center font-mono text-xs mx-auto p-1 rounded-lg"
+                                      className={`h-7 w-16 text-center font-mono text-xs mx-auto p-1 rounded-lg ${
+                                        isQ3Approved ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-800 dark:text-emerald-300 font-bold" : ""
+                                      }`}
                                     />
                                   </td>
                                   <td className="px-2 py-2 text-center font-mono bg-amber-500/5">
@@ -3181,11 +3422,13 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                                   <td className="px-1 py-1 text-center bg-purple-500/5">
                                     <Input
                                       type="text"
-                                      disabled={isLocked}
+                                      disabled={isQ4Disabled}
                                       value={formatActualDisplay(row.q4.actual, kpi.inputType, kpi.unit)}
                                       onChange={(e) => handleActualChange(kpi.id, "q4", e.target.value)}
                                       placeholder={placeholderText}
-                                      className="h-7 w-16 text-center font-mono text-xs mx-auto p-1 rounded-lg"
+                                      className={`h-7 w-16 text-center font-mono text-xs mx-auto p-1 rounded-lg ${
+                                        isQ4Approved ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-800 dark:text-emerald-300 font-bold" : ""
+                                      }`}
                                     />
                                   </td>
                                   <td className="px-2 py-2 text-center font-mono bg-purple-500/5">
@@ -3406,6 +3649,162 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
           </div>
         </TabsContent>
 
+        {/* ── TAB: PENDING RETURNS (MANAGER PANEL) ── */}
+        {isManagerMode && (
+          <TabsContent value="pending-returns" className="space-y-4">
+            <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-sm space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-500/10 px-2.5 py-0.5 text-xs font-semibold text-rose-600">
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      {isAr ? "معاملات معادة للمراجعة" : "Returned Submissions"}
+                    </span>
+                    <Badge className="bg-rose-500 text-white text-[10px] font-mono px-2 py-0.5">
+                      {returnedEvaluations.length} {isAr ? "معاملة" : "Items"}
+                    </Badge>
+                  </div>
+                  <h2 className="font-display text-lg font-bold text-foreground mt-1">
+                    {isAr ? "التقييمات المعادة من الإدارة مع ملاحظات التدقيق" : "Pending Returns from Admin & HR Revision Notes"}
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    {isAr
+                      ? "قائمة التقييمات التي تمت إعادتها من قبل إدارة الموارد البشرية للتعديل والمراجعة. يرجى الاطلاع على ملاحظات الإدارة وإجراء التعديلات المطلوبة وإعادة تقديمها."
+                      : "Evaluations returned by HR Admin requiring revision. Review the return notes, update evaluation scores in the scorecard, and resubmit for approval."}
+                  </p>
+                </div>
+
+                {/* Quarter Filter Chips */}
+                <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-2xl border border-border text-xs shrink-0">
+                  {(["all", "q1", "q2", "q3", "q4"] as const).map((q) => (
+                    <button
+                      key={q}
+                      type="button"
+                      onClick={() => setReturnedQuarterFilter(q)}
+                      className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                        returnedQuarterFilter === q
+                          ? "bg-card text-foreground shadow-xs"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {q === "all" ? (isAr ? "الكل" : "All") : q.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {isLoadingReturned ? (
+                <div className="p-12 text-center text-xs text-muted-foreground flex flex-col items-center gap-2">
+                  <Loader2 className="h-6 w-6 animate-spin text-brand" />
+                  <span>{isAr ? "جارٍ تحميل التقييمات المعادة..." : "Loading returned evaluations..."}</span>
+                </div>
+              ) : returnedEvaluations.length === 0 ? (
+                <div className="p-12 text-center rounded-2xl border border-dashed border-border bg-muted/20 space-y-2">
+                  <CheckCircle2 className="h-8 w-8 text-emerald-500 mx-auto" />
+                  <h3 className="font-semibold text-sm text-foreground">
+                    {isAr ? "لا توجد أي تقييمات معادة بانتظار المراجعة" : "No Pending Returns"}
+                  </h3>
+                  <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                    {isAr
+                      ? "كافة التقييمات المقدمة لفريقك مقبولة ومعتمدة أو قيد التدقيق لدى الإدارة."
+                      : "All evaluations for your team are accepted, under review, or approved."}
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y divide-border rounded-2xl border border-border overflow-hidden bg-card">
+                  {returnedEvaluations
+                    .filter((item: any) => {
+                      if (returnedQuarterFilter === "all") return true;
+                      const q = String(item.quarter || "").toLowerCase();
+                      return q === returnedQuarterFilter || q === "annual";
+                    })
+                    .map((item: any) => {
+                      const empName = item.employee?.full_name || (isAr ? "موظف" : "Employee");
+                      const empCode = item.employee?.emp_code;
+                      const position = item.employee?.position?.name_en || (isAr ? "مهندس موقع" : "Site Engineer");
+                      const dept = item.employee?.department?.name_en || (isAr ? "الهندسة" : "Engineering");
+                      const quarterUpper = String(item.quarter || "q1").toUpperCase();
+                      const score = Number(item.score ?? 0);
+                      const rating = getRatingFromScore(score / 100, true);
+
+                      return (
+                        <div
+                          key={item.id}
+                          className="p-5 flex flex-col gap-3.5 hover:bg-muted/30 transition-colors"
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="flex items-start gap-3">
+                              <div className="h-10 w-10 rounded-2xl bg-rose-500/10 text-rose-600 font-bold text-xs flex items-center justify-center shrink-0 uppercase">
+                                {empName.slice(0, 2)}
+                              </div>
+                              <div className="space-y-0.5">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-bold text-sm text-foreground">{empName}</span>
+                                  {empCode && (
+                                    <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0">
+                                      {empCode}
+                                    </Badge>
+                                  )}
+                                  <Badge className="bg-rose-500 text-white text-[10px] font-bold px-2 py-0">
+                                    {quarterUpper === "ANNUAL" ? (isAr ? "تقييم سنوي" : "Annual") : `${quarterUpper} ${item.evaluation_year}`}
+                                  </Badge>
+                                  <Badge variant="secondary" className="text-[10px] text-rose-700 bg-rose-100 dark:bg-rose-950/40">
+                                    {isAr ? "معاد للمراجعة" : "Returned for Revision"}
+                                  </Badge>
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                  {position} • {dept}
+                                </p>
+                                {item.returned_at && (
+                                  <p className="text-[11px] text-muted-foreground">
+                                    {isAr ? "تاريخ الإعادة: " : "Returned at: "}
+                                    <span className="font-mono text-[10px]">
+                                      {new Date(item.returned_at).toLocaleString()}
+                                    </span>
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                              <div className="text-end">
+                                <div className="font-mono font-extrabold text-sm text-foreground">
+                                  {score.toFixed(1)}%
+                                </div>
+                                <span className="text-[10px] font-medium text-muted-foreground">
+                                  {isAr ? rating.tier_ar : rating.tier}
+                                </span>
+                              </div>
+                              <Button
+                                size="sm"
+                                onClick={() => handleOpenReturnedEvaluation(item)}
+                                className="h-8 rounded-xl text-xs gap-1.5 bg-orange-600 hover:bg-orange-700 text-white cursor-pointer shadow-xs"
+                              >
+                                <RotateCcw className="h-3.5 w-3.5" />
+                                <span>{isAr ? "تعديل في بطاقة التقييم" : "Revise in Scorecard"}</span>
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* Prominent Admin Return Note Box */}
+                          <div className="rounded-2xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/70 dark:bg-rose-950/20 p-3.5 space-y-1">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-rose-700 dark:text-rose-400">
+                              <AlertCircle className="h-4 w-4 shrink-0" />
+                              <span>{isAr ? "ملاحظة الإدارة وسبب الإعادة:" : "Admin Return Reason & Guidance:"}</span>
+                            </div>
+                            <p className="text-xs text-rose-950 dark:text-rose-200 leading-relaxed font-medium whitespace-pre-wrap">
+                              {item.return_reason}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+          </TabsContent>
+        )}
+
         {/* ── TAB: PENDING APPROVALS (HR ADMIN) ── */}
         {!isManagerMode && (
           <TabsContent value="pending-approvals" className="space-y-4">
@@ -3538,7 +3937,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                               </span>
                             </div>
 
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -3549,26 +3948,74 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                                 <span>{isAr ? "عرض التفاصيل" : "Scorecard"}</span>
                               </Button>
 
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleOpenReturnModal(item)}
-                                disabled={isSubmittingReview}
-                                className="h-8 rounded-xl text-xs gap-1 border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 cursor-pointer"
-                              >
-                                <RotateCcw className="h-3.5 w-3.5" />
-                                <span>{isAr ? "إعادة للتعديل" : "Return"}</span>
-                              </Button>
+                              {/* Per-Quarter Approval Buttons */}
+                              {Array.isArray(item.quarters) && item.quarters.length > 0 ? (
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  {item.quarters.map((q: string) => {
+                                    const isQApproved = item.quarter_statuses?.[q]?.status === "approved";
+                                    if (isQApproved) {
+                                      return (
+                                        <Badge
+                                          key={q}
+                                          variant="outline"
+                                          className="h-8 border-emerald-500/40 text-emerald-600 bg-emerald-500/5 text-[10px] gap-1 px-2 py-0"
+                                        >
+                                          <Check className="h-3 w-3" /> {q.toUpperCase()} {isAr ? "معتمد" : "Approved"}
+                                        </Badge>
+                                      );
+                                    }
 
-                              <Button
-                                size="sm"
-                                onClick={() => handleApprovePending(item)}
-                                disabled={isSubmittingReview}
-                                className="h-8 rounded-xl text-xs gap-1 bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer shadow-xs"
-                              >
-                                <Check className="h-3.5 w-3.5" />
-                                <span>{isAr ? "اعتماد رسمي" : "Approve"}</span>
-                              </Button>
+                                    return (
+                                      <div key={q} className="flex items-center gap-1">
+                                        <Button
+                                          size="sm"
+                                          onClick={() => handleApproveQuarter(item, q)}
+                                          disabled={isSubmittingReview}
+                                          className="h-8 rounded-xl text-xs gap-1 bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer shadow-xs"
+                                          title={`Approve ${q.toUpperCase()}`}
+                                        >
+                                          <Check className="h-3.5 w-3.5" />
+                                          <span>{isAr ? `اعتماد ${q.toUpperCase()}` : `Approve ${q.toUpperCase()}`}</span>
+                                        </Button>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => handleOpenReturnModal(item, q)}
+                                          disabled={isSubmittingReview}
+                                          className="h-8 rounded-xl text-xs gap-1 border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 cursor-pointer"
+                                          title={`Return ${q.toUpperCase()}`}
+                                        >
+                                          <RotateCcw className="h-3.5 w-3.5" />
+                                          <span>{isAr ? `إعادة ${q.toUpperCase()}` : `Return ${q.toUpperCase()}`}</span>
+                                        </Button>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ) : (
+                                <>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleOpenReturnModal(item)}
+                                    disabled={isSubmittingReview}
+                                    className="h-8 rounded-xl text-xs gap-1 border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 cursor-pointer"
+                                  >
+                                    <RotateCcw className="h-3.5 w-3.5" />
+                                    <span>{isAr ? "إعادة للتعديل" : "Return"}</span>
+                                  </Button>
+
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleApprovePending(item)}
+                                    disabled={isSubmittingReview}
+                                    className="h-8 rounded-xl text-xs gap-1 bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer shadow-xs"
+                                  >
+                                    <Check className="h-3.5 w-3.5" />
+                                    <span>{isAr ? "اعتماد رسمي" : "Approve"}</span>
+                                  </Button>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>
