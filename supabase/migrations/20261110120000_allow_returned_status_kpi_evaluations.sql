@@ -9,3 +9,4 @@ ALTER TABLE public.kpi_evaluations
 ALTER TABLE public.kpi_evaluations 
   ADD CONSTRAINT kpi_evaluations_status_check 
   CHECK (status IN ('draft', 'submitted', 'reviewed', 'approved', 'returned'));
+

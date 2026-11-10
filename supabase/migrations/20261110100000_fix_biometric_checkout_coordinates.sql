@@ -309,3 +309,4 @@ $$;
 
 REVOKE ALL ON FUNCTION public.commit_biometric_attendance FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.commit_biometric_attendance TO service_role;
+
