@@ -1584,6 +1584,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
           strengths: serverRecord.notes.strengths || "",
           growthAreas: serverRecord.notes.growthAreas || "",
           recommendations: serverRecord.notes.recommendations || "",
+          returnReason: serverRecord.notes.returnReason || "",
         });
         if (serverRecord.notes.quarterStatuses) {
           setQuarterStatuses(serverRecord.notes.quarterStatuses);
@@ -3117,7 +3118,11 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
           </div>
 
           {/* Returned for Revision Notice Banner */}
-          {(status.toLowerCase() === "returned" || serverRecord?.notes?.returnReason || notes.returnReason || Object.values(quarterStatuses).some((qs: any) => qs.status === "returned")) && (
+          {(status.toLowerCase() === "returned" ||
+            serverRecord?.notes?.returnReason ||
+            notes.returnReason ||
+            Object.values(quarterStatuses).some((qs: any) => qs.status === "returned") ||
+            Object.values(kpiState).some((r: any) => r.isReturned || r.adminNotes)) && (
             <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-800 dark:text-rose-200 flex items-start gap-3">
               <RotateCcw className="h-5 w-5 shrink-0 text-rose-600 mt-0.5" />
               <div className="space-y-1.5 w-full">
@@ -3133,6 +3138,14 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                 <div className="rounded-xl bg-background/80 p-3 border border-rose-200 dark:border-rose-900/40 text-xs text-foreground font-medium whitespace-pre-wrap leading-relaxed shadow-xs">
                   {serverRecord?.notes?.returnReason ||
                     notes.returnReason ||
+                    Object.entries(kpiState)
+                      .filter(([_, r]: any) => (r.isReturned || r.adminNotes) && r.adminNotes)
+                      .map(([id, r]: any) => {
+                        const it = activeScorecardItems.find((k) => String(k.id) === String(id));
+                        const name = isAr ? (it?.name_ar || it?.name) : (it?.name || id);
+                        return `[${name}]: ${r.adminNotes}`;
+                      })
+                      .join("\n") ||
                     Object.entries(quarterStatuses)
                       .filter(([_, qs]: any) => qs.status === "returned" && qs.return_reason)
                       .map(([q, qs]: any) => `[${q.toUpperCase()}]: ${qs.return_reason}`)

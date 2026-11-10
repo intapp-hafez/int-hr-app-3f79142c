@@ -225,7 +225,10 @@ export const KpiMetricStateSchema = z.object({
   q3: KpiQuarterDataSchema.optional(),
   q4: KpiQuarterDataSchema.optional(),
   annualScore: z.number().nullable().optional(),
-});
+  adminNotes: z.string().optional().default(""),
+  notes: z.string().optional().default(""),
+  isReturned: z.boolean().optional().default(false),
+}).passthrough();
 
 export const KpiCategorySummarySchema = z.object({
   category: z.string(),
@@ -242,10 +245,12 @@ export const KpiOverallSummarySchema = z.object({
 });
 
 export const KpiEvaluationNotesSchema = z.object({
-  strengths: z.string().max(2000).default(""),
-  growthAreas: z.string().max(2000).default(""),
-  recommendations: z.string().max(2000).default(""),
-});
+  strengths: z.string().max(4000).default(""),
+  growthAreas: z.string().max(4000).default(""),
+  recommendations: z.string().max(4000).default(""),
+  returnReason: z.string().max(2000).optional().nullable(),
+  quarterStatuses: z.record(z.string(), z.any()).optional().default({}),
+}).passthrough();
 
 export const SaveKpiEvaluationSchema = z.object({
   id: z.string().uuid().optional(),
