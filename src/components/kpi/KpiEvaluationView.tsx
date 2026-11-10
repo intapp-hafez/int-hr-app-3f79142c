@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import {
   Award,
   Calendar,
+  CalendarRange,
   CheckCircle2,
   ChevronsUpDown,
   ChevronDown,
@@ -2252,9 +2253,9 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
   return (
     <div dir={dir} className="space-y-6 pb-16 print:p-0 print:space-y-4">
       {/* Top Header Card */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-border/80 pb-5">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between border-b border-border/80 pb-5">
+        <div className="space-y-1.5">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-semibold text-brand">
               <Award className="h-3.5 w-3.5" />
               {isAr ? "نموذج تقييم الأداء — إنترجريتد تكنيكس" : "Integrated Technics Performance Model"}
@@ -2266,8 +2267,32 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                   ? isAr ? "بوابة الموارد البشرية" : "HR Portal"
                   : isAr ? "بوابة الإدارة العامة" : "Admin Portal"}
             </Badge>
+            <Badge
+              variant="outline"
+              className={`text-xs font-semibold gap-1.5 px-2.5 py-0.5 ${
+                status === "Approved"
+                  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+                  : status === "Returned"
+                    ? "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30"
+                    : status === "Submitted"
+                      ? "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30"
+                      : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
+              }`}
+            >
+              {status === "Approved" && <Check className="h-3 w-3" />}
+              {status === "Returned" && <RotateCcw className="h-3 w-3" />}
+              {status === "Submitted" && <Send className="h-3 w-3" />}
+              {status === "Draft" && <Clock className="h-3 w-3" />}
+              {status === "Approved"
+                ? isAr ? "معتمد كلياً" : "Fully Approved"
+                : status === "Returned"
+                  ? isAr ? "معاد للمراجعة" : "Returned for Revision"
+                  : status === "Submitted"
+                    ? isAr ? "مقدم للمراجعة" : "Submitted"
+                    : isAr ? "مسودة" : "Draft"}
+            </Badge>
           </div>
-          <h1 className="font-display text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+          <h1 className="font-display text-2xl md:text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
             {isAr ? "التقييم السنوي لمؤشرات الأداء" : "KPI Evaluation"}
             {isFetchingEval && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
           </h1>
@@ -2278,161 +2303,291 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
           </p>
         </div>
 
-        {/* Global Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Evaluations Directory Button */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsEvaluationsListOpen(true)}
-            className="rounded-xl gap-1.5 cursor-pointer relative"
-          >
-            <Layers className="h-4 w-4 text-brand" />
-            <span>{isAr ? "سجل التقييمات" : "Evaluations Directory"}</span>
-            {annualEvaluations.length > 0 && (
-              <Badge variant="secondary" className="px-1.5 py-0 text-[10px] font-mono">
-                {annualEvaluations.length}
-              </Badge>
-            )}
-          </Button>
-
-          {/* Save Draft Button */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => saveMutation.mutate({ targetStatus: "draft" })}
-            disabled={saveMutation.isPending || isLocked}
-            className="rounded-xl gap-1.5 cursor-pointer"
-          >
-            {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            <span>{isAr ? "حفظ كمسودة" : "Save Draft"}</span>
-          </Button>
-
-          {/* Submit / Approve Workflow Buttons */}
-          {status === "Draft" && (
-            <Button
-              size="sm"
-              onClick={() => saveMutation.mutate({ targetStatus: "submitted" })}
-              disabled={saveMutation.isPending}
-              className="rounded-xl gap-1.5 bg-blue-600 hover:bg-blue-700 text-white cursor-pointer shadow-xs"
-            >
-              <Send className="h-4 w-4" />
-              <span>{isAr ? "إرسال للمراجعة" : "Submit Review"}</span>
-            </Button>
-          )}
-
-          {/* Admin Per-Quarter Approvals */}
-          {(role === "admin" || role === "hr") && serverRecord?.id && (
-            <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-border bg-muted/40 p-1.5">
-              <span className="text-[11px] font-semibold text-muted-foreground px-1.5 flex items-center gap-1">
-                <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-                {isAr ? "اعتماد الأرباع:" : "Approve by Q:"}
-              </span>
-              {(["q1", "q2", "q3", "q4"] as const).map((q) => {
-                const isApproved =
-                  quarterStatuses[q]?.status === "approved" ||
-                  (isOverallApproved && Object.keys(quarterStatuses).length === 0);
-                const hasActuals = Object.values(kpiState).some((k: any) => k[q]?.actual != null);
-
-                if (isApproved) {
-                  return (
-                    <Badge key={q} className="bg-emerald-600 text-white text-[10px] gap-1 px-2 py-1 font-bold">
-                      <Check className="h-3 w-3" /> {q.toUpperCase()} {isAr ? "معتمد" : "Approved"}
-                    </Badge>
-                  );
-                }
-
-                return (
-                  <div key={q} className="flex items-center gap-1">
-                    <Button
-                      size="sm"
-                      onClick={() => handleApproveQuarterDirect(q)}
-                      disabled={isSubmittingReview || !hasActuals}
-                      className={`h-7 px-2.5 text-[11px] font-bold rounded-lg cursor-pointer ${
-                        hasActuals
-                          ? "bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs"
-                          : "bg-muted text-muted-foreground opacity-50 cursor-not-allowed"
-                      }`}
-                      title={hasActuals ? `Approve ${q.toUpperCase()}` : `No actual data in ${q.toUpperCase()}`}
-                    >
-                      <Check className="h-3 w-3" /> {isAr ? `اعتماد ${q.toUpperCase()}` : `Approve ${q.toUpperCase()}`}
-                    </Button>
-                    {hasActuals && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleReturnQuarterDirect(q)}
-                        disabled={isSubmittingReview}
-                        className="h-7 px-1.5 text-[10px] rounded-lg border-rose-300 text-rose-600 hover:bg-rose-50 cursor-pointer"
-                        title={`Return ${q.toUpperCase()} for revision`}
-                      >
-                        <RotateCcw className="h-3 w-3" />
-                      </Button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {status === "Submitted" && (role === "admin" || role === "hr") && (
-            <Button
-              size="sm"
-              onClick={() => updateStatusMutation.mutate("approved")}
-              disabled={updateStatusMutation.isPending}
-              className="rounded-xl gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-xs"
-            >
-              <ShieldCheck className="h-4 w-4" />
-              <span>{isAr ? "اعتماد كلي نهائي" : "Final Approve All"}</span>
-            </Button>
-          )}
-
-          {status === "Approved" && (role === "admin" || role === "hr") && (
+        {/* Global Action Toolbar */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Primary Operations Group */}
+          <div className="flex items-center gap-2">
+            {/* Evaluations Directory Button */}
             <Button
               variant="outline"
               size="sm"
-              onClick={() => updateStatusMutation.mutate("draft")}
-              disabled={updateStatusMutation.isPending}
-              className="rounded-xl gap-1.5 text-amber-600 border-amber-500/30 hover:bg-amber-50 dark:hover:bg-amber-950/20 cursor-pointer"
+              onClick={() => setIsEvaluationsListOpen(true)}
+              className="rounded-xl gap-1.5 cursor-pointer relative h-9 px-3"
             >
-              <Clock className="h-4 w-4" />
-              <span>{isAr ? "إلغاء القفل للتعديل" : "Unlock for Edit"}</span>
+              <Layers className="h-4 w-4 text-brand" />
+              <span>{isAr ? "سجل التقييمات" : "Evaluations Directory"}</span>
+              {annualEvaluations.length > 0 && (
+                <Badge variant="secondary" className="px-1.5 py-0 text-[10px] font-mono">
+                  {annualEvaluations.length}
+                </Badge>
+              )}
             </Button>
-          )}
 
-          {/* Excel Export Button */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportCurrent}
-            className="rounded-xl gap-1.5 cursor-pointer"
-          >
-            <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
-            <span className="hidden sm:inline">{isAr ? "تصدير إكسيل" : "Export Excel"}</span>
-          </Button>
-
-          {/* Print Button */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => window.print()}
-            className="rounded-xl gap-1.5 cursor-pointer print:hidden"
-          >
-            <Printer className="h-4 w-4" />
-          </Button>
-
-          {/* Delete Button (admin only) */}
-          {role === "admin" && serverRecord?.id && (
+            {/* Save Draft Button */}
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
-              onClick={() => setDeleteConfirmOpen(true)}
-              className="rounded-xl text-destructive hover:bg-destructive/10 cursor-pointer"
-              title={isAr ? "حذف التقييم" : "Delete Evaluation"}
+              onClick={() => saveMutation.mutate({ targetStatus: "draft" })}
+              disabled={saveMutation.isPending || isLocked}
+              className="rounded-xl gap-1.5 cursor-pointer h-9 px-3 font-medium"
             >
-              <Trash2 className="h-4 w-4" />
+              {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              <span>{isAr ? "حفظ كمسودة" : "Save Draft"}</span>
             </Button>
-          )}
+
+            {/* Submit / Approve Workflow Buttons */}
+            {status === "Draft" && (
+              <Button
+                size="sm"
+                onClick={() => saveMutation.mutate({ targetStatus: "submitted" })}
+                disabled={saveMutation.isPending}
+                className="rounded-xl gap-1.5 bg-blue-600 hover:bg-blue-700 text-white cursor-pointer shadow-xs h-9 px-3 font-medium"
+              >
+                <Send className="h-4 w-4" />
+                <span>{isAr ? "إرسال للمراجعة" : "Submit Review"}</span>
+              </Button>
+            )}
+
+            {status === "Submitted" && (role === "admin" || role === "hr") && (
+              <Button
+                size="sm"
+                onClick={() => updateStatusMutation.mutate("approved")}
+                disabled={updateStatusMutation.isPending}
+                className="rounded-xl gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-xs h-9 px-3 font-medium"
+              >
+                <ShieldCheck className="h-4 w-4" />
+                <span>{isAr ? "اعتماد كلي نهائي" : "Final Approve All"}</span>
+              </Button>
+            )}
+
+            {status === "Approved" && (role === "admin" || role === "hr") && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => updateStatusMutation.mutate("draft")}
+                disabled={updateStatusMutation.isPending}
+                className="rounded-xl gap-1.5 text-amber-600 border-amber-500/30 hover:bg-amber-50 dark:hover:bg-amber-950/20 cursor-pointer h-9 px-3 font-medium"
+              >
+                <Clock className="h-4 w-4" />
+                <span>{isAr ? "إلغاء القفل للتعديل" : "Unlock for Edit"}</span>
+              </Button>
+            )}
+          </div>
+
+          {/* Secondary Utilities Group */}
+          <div className="flex items-center gap-1.5 border-s border-border/80 ps-2">
+            {/* Excel Export Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportCurrent}
+              className="rounded-xl gap-1.5 cursor-pointer h-9 px-3 text-xs"
+              title={isAr ? "تصدير بطاقة التقييم إلى إكسيل" : "Export Scorecard to Excel"}
+            >
+              <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+              <span className="hidden sm:inline">{isAr ? "تصدير إكسيل" : "Export Excel"}</span>
+            </Button>
+
+            {/* Print Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.print()}
+              className="rounded-xl h-9 w-9 p-0 cursor-pointer print:hidden flex items-center justify-center text-muted-foreground hover:text-foreground"
+              title={isAr ? "طباعة" : "Print"}
+            >
+              <Printer className="h-4 w-4" />
+            </Button>
+
+            {/* Delete Button (admin only) */}
+            {role === "admin" && serverRecord?.id && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setDeleteConfirmOpen(true)}
+                className="rounded-xl h-9 w-9 p-0 text-destructive hover:bg-destructive/10 cursor-pointer flex items-center justify-center"
+                title={isAr ? "حذف التقييم" : "Delete Evaluation"}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Dedicated Quarter Governance & Approvals Bar */}
+      <div className="rounded-2xl border border-border bg-card/60 p-4 shadow-xs space-y-3.5">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-border/60 pb-2.5">
+          <div className="flex items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand/10 text-brand">
+              <CalendarRange className="h-4 w-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-foreground">
+                {isAr ? "حوكمة واعتمادات الأرباع السنوية" : "Quarterly Evaluation Governance & Approvals"}
+              </h2>
+              <p className="text-[11px] text-muted-foreground">
+                {isAr
+                  ? "اعتماد كل ربع بصورة مستقلة يُمكّن المدير من إكمال تقييم الأرباع التالية بمرونة."
+                  : "Approving evaluated quarters locks historical data while keeping upcoming quarters open for managers."}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <span className="text-[11px] text-muted-foreground font-medium">
+              {isAr ? "الأرباع المعتمدة:" : "Approved Quarters:"}
+            </span>
+            <Badge variant="secondary" className="px-2 py-0.5 text-xs font-mono font-bold">
+              {(["q1", "q2", "q3", "q4"] as const).filter((q) => {
+                return (
+                  quarterStatuses[q]?.status === "approved" ||
+                  (isOverallApproved && Object.keys(quarterStatuses).length === 0)
+                );
+              }).length}{" "}
+              / 4
+            </Badge>
+          </div>
+        </div>
+
+        {/* 4 Quarters Segmented Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {(
+            [
+              { key: "q1", label: "Q1", rangeEn: "Jan – Mar", rangeAr: "يناير – مارس", sum: summaryTotals.q1Sum },
+              { key: "q2", label: "Q2", rangeEn: "Apr – Jun", rangeAr: "أبريل – يونيو", sum: summaryTotals.q2Sum },
+              { key: "q3", label: "Q3", rangeEn: "Jul – Sep", rangeAr: "يوليو – سبتمبر", sum: summaryTotals.q3Sum },
+              { key: "q4", label: "Q4", rangeEn: "Oct – Dec", rangeAr: "أكتوبر – ديسمبر", sum: summaryTotals.q4Sum },
+            ] as const
+          ).map((q) => {
+            const isApproved =
+              quarterStatuses[q.key]?.status === "approved" ||
+              (isOverallApproved && Object.keys(quarterStatuses).length === 0);
+            const isReturned = quarterStatuses[q.key]?.status === "returned";
+            const hasActuals = Object.values(kpiState).some((k: any) => k[q.key]?.actual != null);
+            const returnReasonText = quarterStatuses[q.key]?.return_reason || quarterStatuses[q.key]?.returnReason;
+
+            return (
+              <div
+                key={q.key}
+                className={`relative rounded-xl border p-3 flex flex-col justify-between gap-2.5 transition-all shadow-2xs ${
+                  isApproved
+                    ? "bg-emerald-500/5 border-emerald-500/30 dark:bg-emerald-950/20"
+                    : isReturned
+                      ? "bg-rose-500/5 border-rose-500/30 dark:bg-rose-950/20"
+                      : hasActuals
+                        ? "bg-blue-500/5 border-blue-500/30 dark:bg-blue-950/15"
+                        : "bg-muted/30 border-border/60 opacity-80"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold text-sm tracking-tight text-foreground">{q.label}</span>
+                      <span className="text-[11px] text-muted-foreground font-medium">
+                        ({isAr ? q.rangeAr : q.rangeEn})
+                      </span>
+                    </div>
+                    {hasActuals && q.sum > 0 && (
+                      <span className="text-[11px] font-mono text-muted-foreground mt-0.5 block">
+                        {isAr ? "الدرجة:" : "Score:"} <strong className="text-foreground">{(q.sum * 100).toFixed(1)}%</strong>
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Quarter Status Badge */}
+                  {isApproved ? (
+                    <Badge className="bg-emerald-600 text-white text-[10px] font-bold gap-1 px-2 py-0.5 shadow-2xs">
+                      <Check className="h-3 w-3" /> {isAr ? "معتمد" : "Approved"}
+                    </Badge>
+                  ) : isReturned ? (
+                    <Badge
+                      variant="outline"
+                      className="bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/40 text-[10px] font-bold gap-1 px-2 py-0.5"
+                    >
+                      <RotateCcw className="h-3 w-3" /> {isAr ? "معاد للمراجعة" : "Returned"}
+                    </Badge>
+                  ) : hasActuals ? (
+                    <Badge
+                      variant="outline"
+                      className="bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30 text-[10px] font-semibold gap-1 px-2 py-0.5"
+                    >
+                      <Clock className="h-3 w-3" /> {isAr ? "جاهز للاعتماد" : "Ready"}
+                    </Badge>
+                  ) : (
+                    <span className="text-[10px] text-muted-foreground/70 font-medium">
+                      {isAr ? "لم يبدأ" : "Upcoming"}
+                    </span>
+                  )}
+                </div>
+
+                {/* Bottom Action / Indicator Area */}
+                <div className="pt-2 border-t border-border/50 flex items-center justify-between text-xs">
+                  {isApproved ? (
+                    <span className="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      {isAr ? "معتمد ومقفل" : "Approved & Locked"}
+                    </span>
+                  ) : isReturned ? (
+                    <div className="w-full flex items-center justify-between gap-1">
+                      <span
+                        className="text-[10px] text-rose-600 truncate font-medium flex items-center gap-1"
+                        title={returnReasonText || undefined}
+                      >
+                        <AlertTriangle className="h-3 w-3 shrink-0" />
+                        <span className="truncate">
+                          {returnReasonText ? returnReasonText : (isAr ? "مطلوب مراجعة" : "Revision needed")}
+                        </span>
+                      </span>
+                      {(role === "admin" || role === "hr") && serverRecord?.id && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleApproveQuarterDirect(q.key)}
+                          disabled={isSubmittingReview}
+                          className="h-6 px-1.5 text-[10px] text-emerald-600 hover:bg-emerald-50 rounded-md cursor-pointer shrink-0 font-semibold"
+                        >
+                          {isAr ? "اعتماد" : "Approve"}
+                        </Button>
+                      )}
+                    </div>
+                  ) : hasActuals ? (
+                    (role === "admin" || role === "hr") && serverRecord?.id ? (
+                      <div className="w-full flex items-center justify-between gap-1.5">
+                        <Button
+                          size="sm"
+                          onClick={() => handleApproveQuarterDirect(q.key)}
+                          disabled={isSubmittingReview}
+                          className="h-7 px-2.5 text-[11px] font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-2xs flex-1 justify-center gap-1"
+                        >
+                          <Check className="h-3 w-3" /> {isAr ? `اعتماد ${q.label}` : `Approve ${q.label}`}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleReturnQuarterDirect(q.key)}
+                          disabled={isSubmittingReview}
+                          className="h-7 px-2 text-[11px] rounded-lg border-rose-300 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 cursor-pointer gap-1"
+                          title={`Return ${q.label} for revision`}
+                        >
+                          <RotateCcw className="h-3 w-3" />
+                          <span className="hidden sm:inline">{isAr ? "إعادة" : "Return"}</span>
+                        </Button>
+                      </div>
+                    ) : (
+                      <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {isAr ? "بانتظار مراجعة الإدارة" : "Pending review"}
+                      </span>
+                    )
+                  ) : (
+                    <span className="text-[10px] text-muted-foreground/60 italic">
+                      {isAr ? "لا توجد نتائج مسجلة" : "No actuals recorded"}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
