@@ -936,10 +936,10 @@ export function KpisDefinitionTab({
                       <DropdownMenuTrigger asChild>
                         <button
                           type="button"
-                          className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold cursor-pointer whitespace-nowrap transition ${
+                          className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs cursor-pointer whitespace-nowrap transition-all shadow-xs ${
                             isOverflowActive
-                              ? "bg-brand text-brand-foreground shadow-xs"
-                              : "bg-muted text-muted-foreground hover:bg-muted/80"
+                              ? "bg-orange-600 text-white font-bold ring-2 ring-orange-400/40"
+                              : "bg-orange-500 text-white font-semibold hover:bg-orange-600"
                           }`}
                         >
                           <span>
@@ -947,23 +947,26 @@ export function KpisDefinitionTab({
                               ? formatCategoryName(categoryFilter, isAr)
                               : (isAr ? "المزيد" : "More")}
                           </span>
-                          <ChevronDown className="h-3.5 w-3.5 opacity-80" />
+                          <ChevronDown className="h-3.5 w-3.5 opacity-90" />
                         </button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-64 max-h-72 overflow-y-auto rounded-2xl p-1.5 shadow-lg border border-border bg-popover z-50">
+                      <DropdownMenuContent
+                        align="end"
+                        className="w-64 max-h-72 overflow-y-auto rounded-2xl p-1.5 shadow-xl border border-orange-500/30 bg-popover z-50 animate-in fade-in zoom-in-95"
+                      >
                         {overflowCategories.map((cat) => (
                           <DropdownMenuItem
                             key={cat}
                             onClick={() => setCategoryFilter(cat)}
                             className={`flex items-center justify-between rounded-xl px-3 py-2 text-xs cursor-pointer font-medium transition ${
                               categoryFilter === cat
-                                ? "bg-brand/10 text-brand font-bold"
-                                : "text-foreground hover:bg-muted"
+                                ? "bg-orange-500/15 text-orange-600 dark:text-orange-400 font-bold"
+                                : "text-foreground hover:bg-orange-500/10 hover:text-orange-600"
                             }`}
                           >
                             <span className="truncate">{formatCategoryName(cat, isAr)}</span>
                             {categoryFilter === cat && (
-                              <span className="h-2 w-2 rounded-full bg-brand shrink-0 ms-2" />
+                              <span className="h-2 w-2 rounded-full bg-orange-600 shrink-0 ms-2" />
                             )}
                           </DropdownMenuItem>
                         ))}
