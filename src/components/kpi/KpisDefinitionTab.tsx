@@ -42,6 +42,12 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { useI18n } from "@/lib/i18n";
 import { toast } from "sonner";
@@ -891,35 +897,82 @@ export function KpisDefinitionTab({
               />
             </div>
 
-            {categories.length > 1 && (
-              <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
-                <button
-                  type="button"
-                  onClick={() => setCategoryFilter("all")}
-                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold cursor-pointer whitespace-nowrap transition ${
-                    categoryFilter === "all"
-                      ? "bg-brand text-brand-foreground shadow-xs"
-                      : "bg-muted text-muted-foreground hover:bg-muted/80"
-                  }`}
-                >
-                  {isAr ? "الكل" : "All"} ({activeScorecardItems.length})
-                </button>
-                {categories.map((cat) => (
+            {categories.length > 1 && (() => {
+              const visibleCategories = categories.slice(0, 3);
+              const overflowCategories = categories.slice(3);
+              const isOverflowActive = overflowCategories.includes(categoryFilter);
+
+              return (
+                <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
                   <button
-                    key={cat}
                     type="button"
-                    onClick={() => setCategoryFilter(cat)}
+                    onClick={() => setCategoryFilter("all")}
                     className={`rounded-xl px-3 py-1.5 text-xs font-semibold cursor-pointer whitespace-nowrap transition ${
-                      categoryFilter === cat
+                      categoryFilter === "all"
                         ? "bg-brand text-brand-foreground shadow-xs"
                         : "bg-muted text-muted-foreground hover:bg-muted/80"
                     }`}
                   >
-                    {formatCategoryName(cat, isAr)}
+                    {isAr ? "الكل" : "All"} ({activeScorecardItems.length})
                   </button>
-                ))}
-              </div>
-            )}
+
+                  {visibleCategories.map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setCategoryFilter(cat)}
+                      className={`rounded-xl px-3 py-1.5 text-xs font-semibold cursor-pointer whitespace-nowrap transition ${
+                        categoryFilter === cat
+                          ? "bg-brand text-brand-foreground shadow-xs"
+                          : "bg-muted text-muted-foreground hover:bg-muted/80"
+                      }`}
+                    >
+                      {formatCategoryName(cat, isAr)}
+                    </button>
+                  ))}
+
+                  {overflowCategories.length > 0 && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold cursor-pointer whitespace-nowrap transition ${
+                            isOverflowActive
+                              ? "bg-brand text-brand-foreground shadow-xs"
+                              : "bg-muted text-muted-foreground hover:bg-muted/80"
+                          }`}
+                        >
+                          <span>
+                            {isOverflowActive
+                              ? formatCategoryName(categoryFilter, isAr)
+                              : (isAr ? "المزيد" : "More")}
+                          </span>
+                          <ChevronDown className="h-3.5 w-3.5 opacity-80" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-64 max-h-72 overflow-y-auto rounded-2xl p-1.5 shadow-lg border border-border bg-popover z-50">
+                        {overflowCategories.map((cat) => (
+                          <DropdownMenuItem
+                            key={cat}
+                            onClick={() => setCategoryFilter(cat)}
+                            className={`flex items-center justify-between rounded-xl px-3 py-2 text-xs cursor-pointer font-medium transition ${
+                              categoryFilter === cat
+                                ? "bg-brand/10 text-brand font-bold"
+                                : "text-foreground hover:bg-muted"
+                            }`}
+                          >
+                            <span className="truncate">{formatCategoryName(cat, isAr)}</span>
+                            {categoryFilter === cat && (
+                              <span className="h-2 w-2 rounded-full bg-brand shrink-0 ms-2" />
+                            )}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
 
