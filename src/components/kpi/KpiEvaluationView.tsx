@@ -2420,30 +2420,46 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
       <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
           <TabsList className="h-auto w-full sm:w-auto rounded-2xl p-1 bg-muted/60 flex overflow-x-auto no-scrollbar gap-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-            <TabsTrigger value="all-employees" className="rounded-xl px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer">
-              <Users className="h-4 w-4" />
+            <TabsTrigger
+              value="all-employees"
+              className="group rounded-xl px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer transition-all data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
+            >
+              <Users className="h-4 w-4 transition-colors group-data-[state=active]:text-white" />
               <span>{isManagerMode ? (isAr ? "تقييمات فريق العمل" : "Team Evaluations") : (isAr ? "سجل جميع الموظفين" : "All Employees Evaluations")}</span>
-              <Badge variant="secondary" className="px-1.5 py-0 text-[10px] font-mono">
+              <Badge
+                variant="secondary"
+                className="px-1.5 py-0 text-[10px] font-mono transition-colors group-data-[state=active]:bg-white/20 group-data-[state=active]:text-white group-data-[state=active]:border-transparent"
+              >
                 {employeesWithEvaluations.length}
               </Badge>
             </TabsTrigger>
-            <TabsTrigger value="scorecard" className="rounded-xl px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer">
-              <FileSpreadsheet className="h-4 w-4" /> {isAr ? "بطاقة التقييم" : "Evaluation Scorecard"}
+            <TabsTrigger
+              value="scorecard"
+              className="group rounded-xl px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer transition-all data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
+            >
+              <FileSpreadsheet className="h-4 w-4 transition-colors group-data-[state=active]:text-white" />
+              <span>{isAr ? "بطاقة التقييم" : "Evaluation Scorecard"}</span>
             </TabsTrigger>
             {!isManagerMode && (
-              <TabsTrigger value="pending-approvals" className="rounded-xl px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer">
-                <Clock className="h-4 w-4 text-amber-500" />
+              <TabsTrigger
+                value="pending-approvals"
+                className="group rounded-xl px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer transition-all data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
+              >
+                <Clock className="h-4 w-4 text-amber-500 transition-colors group-data-[state=active]:text-white" />
                 <span>{isAr ? "المعاملات المعلقة" : "Pending Approvals"}</span>
                 {pendingApprovals.length > 0 && (
-                  <Badge className="bg-amber-500 text-white px-1.5 py-0 text-[10px] font-mono">
+                  <Badge className="bg-amber-500 text-white px-1.5 py-0 text-[10px] font-mono transition-colors group-data-[state=active]:bg-white/20 group-data-[state=active]:text-white group-data-[state=active]:border-transparent">
                     {pendingApprovals.length}
                   </Badge>
                 )}
               </TabsTrigger>
             )}
             {!isManagerMode && (
-              <TabsTrigger value="templates-criteria" className="rounded-xl px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer">
-                <Award className="h-4 w-4 text-brand" />
+              <TabsTrigger
+                value="templates-criteria"
+                className="group rounded-xl px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer transition-all data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
+              >
+                <Award className="h-4 w-4 text-brand transition-colors group-data-[state=active]:text-white" />
                 <span>{isAr ? "القوالب والمعايير" : "Templates & Criteria"}</span>
               </TabsTrigger>
             )}
