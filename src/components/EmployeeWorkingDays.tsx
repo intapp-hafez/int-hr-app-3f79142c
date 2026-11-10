@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Save, Loader2, Trash2 } from "lucide-react";
+import { Save, Loader2, Trash2, AlertCircle } from "lucide-react";
+import { useSession } from "@/lib/auth";
+import { useI18n } from "@/lib/i18n";
 import {
   getEmployeeWorkingDays,
   setEmployeeWorkingDaysWeekly,
@@ -31,7 +33,23 @@ function ymKey(y: number, m: number) {
   return `${y}-${String(m).padStart(2, "0")}`;
 }
 
-export function EmployeeWorkingDays({ employeeId }: { employeeId: string }) {
+export function EmployeeWorkingDays({
+  employeeId,
+  isManager: isManagerProp,
+}: {
+  employeeId: string;
+  isManager?: boolean;
+}) {
+  const session = useSession();
+  const { isAr } = useI18n();
+
+  // If explicitly flagged or if the logged-in session is a manager (and not admin/hr)
+  const isManager =
+    isManagerProp ??
+    (session?.role === "manager" ||
+      (Boolean(session?.roles?.includes("manager")) &&
+        !session?.roles?.some((r) => ["admin", "hr"].includes(r))));
+
   const getFn = useServerFn(getEmployeeWorkingDays);
   const saveWeeklyFn = useServerFn(setEmployeeWorkingDaysWeekly);
   const saveMonthFn = useServerFn(setEmployeeWorkingDaysMonth);
@@ -80,10 +98,18 @@ export function EmployeeWorkingDays({ employeeId }: { employeeId: string }) {
   }, [ym, data]);
 
   async function saveWeekly() {
+    if (isManager && weekly.length < 5) {
+      toast.error(
+        isAr
+          ? "لا يمكن الحفظ: يجب تحديد 5 أيام عمل على الأقل أسبوعياً للمدير (بحد أقصى يومين إجازة أسبوعياً / 8 أيام شهرياً)"
+          : "Cannot save: managers must maintain at least 5 working days per week (maximum 8 days off per month).",
+      );
+      return;
+    }
     setBusy("weekly");
     try {
       await saveWeeklyFn({ data: { employee_id: employeeId, days: weekly } });
-      toast.success("Weekly working days saved");
+      toast.success(isAr ? "تم حفظ النمط الأسبوعي" : "Weekly working days saved");
       refetch();
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to save");
@@ -91,42 +117,6 @@ export function EmployeeWorkingDays({ employeeId }: { employeeId: string }) {
       setBusy(null);
     }
   }
-
-  async function saveMonth() {
-    setBusy("month");
-    try {
-      const [y, m] = ym.split("-").map(Number);
-      await saveMonthFn({ data: { employee_id: employeeId, year: y, month: m, days: monthDays } });
-      await saveDatesFn({
-        data: { employee_id: employeeId, year: y, month: m, on_days: dateOn, off_days: dateOff },
-      });
-      toast.success("Month override saved");
-      refetch();
-    } catch (e: any) {
-      toast.error(e?.message ?? "Failed to save");
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function clearMonth() {
-    setBusy("month-clear");
-    try {
-      const [y, m] = ym.split("-").map(Number);
-      await clearMonthFn({ data: { employee_id: employeeId, year: y, month: m } });
-      toast.success("Override removed — falls back to weekly pattern");
-      refetch();
-    } catch (e: any) {
-      toast.error(e?.message ?? "Failed to remove");
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  const monthLabel = useMemo(() => {
-    const [y, m] = ym.split("-").map(Number);
-    return new Date(y, m - 1, 1).toLocaleString(undefined, { month: "long", year: "numeric" });
-  }, [ym]);
 
   const calendar = useMemo(() => {
     const [y, m] = ym.split("-").map(Number);
@@ -156,6 +146,72 @@ export function EmployeeWorkingDays({ employeeId }: { employeeId: string }) {
     [calendar, monthDays, dateOn, dateOff],
   );
   const totalDays = useMemo(() => calendar.filter((c) => c.day !== null).length, [calendar]);
+  const offCount = totalDays - allowedCount;
+
+  async function saveMonth() {
+    if (isManager && offCount > 8) {
+      toast.error(
+        isAr
+          ? `لا يمكن الحفظ: لا يمكن للمدير تحديد أكثر من 8 أيام إجازة في الشهر (حالياً ${offCount} أيام إجازة)`
+          : `Cannot save: managers cannot select more than 8 days off per month (currently ${offCount} days off).`,
+      );
+      return;
+    }
+    setBusy("month");
+    try {
+      const [y, m] = ym.split("-").map(Number);
+      await saveMonthFn({
+        data: {
+          employee_id: employeeId,
+          year: y,
+          month: m,
+          days: monthDays,
+          on_days: dateOn,
+          off_days: dateOff,
+        },
+      });
+      await saveDatesFn({
+        data: { employee_id: employeeId, year: y, month: m, on_days: dateOn, off_days: dateOff },
+      });
+      toast.success(isAr ? "تم حفظ جدول الشهر" : "Month override saved");
+      refetch();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to save");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function clearMonth() {
+    if (isManager) {
+      const fallbackAllowed = calendar.filter((c) => c.day !== null && weekly.includes(c.weekday)).length;
+      const fallbackOff = totalDays - fallbackAllowed;
+      if (fallbackOff > 8) {
+        toast.error(
+          isAr
+            ? `لا يمكن إلغاء التخصيص: النمط الأسبوعي ينتج عنه ${fallbackOff} أيام إجازة في هذا الشهر (الحد الأقصى للمدير 8 أيام)`
+            : `Cannot remove override: weekly pattern results in ${fallbackOff} days off in this month (limit is 8 for managers).`,
+        );
+        return;
+      }
+    }
+    setBusy("month-clear");
+    try {
+      const [y, m] = ym.split("-").map(Number);
+      await clearMonthFn({ data: { employee_id: employeeId, year: y, month: m } });
+      toast.success(isAr ? "تمت إزالة التخصيص — العودة للنمط الأسبوعي" : "Override removed — falls back to weekly pattern");
+      refetch();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to remove");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const monthLabel = useMemo(() => {
+    const [y, m] = ym.split("-").map(Number);
+    return new Date(y, m - 1, 1).toLocaleString(undefined, { month: "long", year: "numeric" });
+  }, [ym]);
 
   const monthOptions = useMemo(() => {
     const opts: { value: string; label: string }[] = [];
@@ -174,7 +230,15 @@ export function EmployeeWorkingDays({ employeeId }: { employeeId: string }) {
   return (
     <section className="rounded-2xl border border-border bg-card">
       <header className="border-b border-border px-4 py-3">
-        <h3 className="font-display text-sm font-semibold">Working days</h3>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="font-display text-sm font-semibold">Working days</h3>
+          {isManager && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-400">
+              <AlertCircle className="h-3 w-3" />
+              {isAr ? "الحد الأقصى للمدير: 8 أيام إجازة/شهر" : "Manager rule: max 8 days off/mo"}
+            </span>
+          )}
+        </div>
         <p className="text-[11px] text-muted-foreground">
           Default weekday pattern, plus optional month-specific overrides (e.g. allow Fridays in one month only).
         </p>
@@ -203,7 +267,14 @@ export function EmployeeWorkingDays({ employeeId }: { employeeId: string }) {
       {/* Weekly pattern */}
       <div className="border-b border-border px-4 py-4">
         <div className="mb-2 flex items-center justify-between">
-          <p className="text-xs font-medium text-foreground">Default weekly pattern</p>
+          <div>
+            <p className="text-xs font-medium text-foreground">Default weekly pattern</p>
+            {isManager && (
+              <p className="text-[10px] text-muted-foreground">
+                {isAr ? "يجب اختيار 5 أيام عمل على الأقل أسبوعياً" : "Managers must select at least 5 working days/week"}
+              </p>
+            )}
+          </div>
           <button
             onClick={saveWeekly}
             disabled={busy === "weekly" || isLoading}
@@ -220,7 +291,18 @@ export function EmployeeWorkingDays({ employeeId }: { employeeId: string }) {
               <button
                 key={d.idx}
                 type="button"
-                onClick={() => setWeekly((p) => toggle(p, d.idx))}
+                onClick={() => {
+                  const nextWeekly = toggle(weekly, d.idx);
+                  if (isManager && nextWeekly.length < 5) {
+                    toast.error(
+                      isAr
+                        ? "يجب تحديد 5 أيام عمل على الأقل أسبوعياً للمدير (بحد أقصى يومين إجازة أسبوعياً / 8 أيام شهرياً)"
+                        : "Managers must maintain at least 5 working days per week (max 8 days off per month).",
+                    );
+                    return;
+                  }
+                  setWeekly(nextWeekly);
+                }}
                 className={
                   "rounded-full border px-3 py-1 text-xs font-medium transition " +
                   (on
@@ -287,7 +369,27 @@ export function EmployeeWorkingDays({ employeeId }: { employeeId: string }) {
               <button
                 key={d.idx}
                 type="button"
-                onClick={() => setMonthDays((p) => toggle(p, d.idx))}
+                onClick={() => {
+                  const nextMonthDays = toggle(monthDays, d.idx);
+                  if (isManager) {
+                    const nextAllowedCount = calendar.filter((c) => {
+                      if (c.day === null) return false;
+                      if (dateOn.includes(c.day)) return true;
+                      if (dateOff.includes(c.day)) return false;
+                      return nextMonthDays.includes(c.weekday);
+                    }).length;
+                    const nextOffCount = totalDays - nextAllowedCount;
+                    if (nextOffCount > 8) {
+                      toast.error(
+                        isAr
+                          ? `لا يمكن للمدير تحديد أكثر من 8 أيام إجازة في الشهر (هذا التحديد سينتج عنه ${nextOffCount} أيام إجازة)`
+                          : `Managers cannot select more than 8 days off per month (this would result in ${nextOffCount} days off).`,
+                      );
+                      return;
+                    }
+                  }
+                  setMonthDays(nextMonthDays);
+                }}
                 className={
                   "rounded-full border px-3 py-1 text-xs font-medium transition " +
                   (on
@@ -304,10 +406,10 @@ export function EmployeeWorkingDays({ employeeId }: { employeeId: string }) {
           Tick a normally-off day (e.g. Fri) to let the employee work that day this month. Counts as a regular working day.
         </p>
 
-        <div className="mt-4 mx-auto max-w-[300px] rounded-2xl border border-border bg-card p-4 shadow-sm">
+        <div className="mt-4 mx-auto max-w-[320px] rounded-2xl border border-border bg-card p-4 shadow-sm">
           <div className="mb-2 flex items-center justify-between">
             <p className="text-xs font-medium text-foreground">{monthLabel}</p>
-            <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+            <div className="flex items-center gap-2.5 text-[10px] text-muted-foreground">
               <span className="inline-flex items-center gap-1">
                 <span className="h-2.5 w-2.5 rounded-sm bg-gradient-brand" /> Allowed
               </span>
@@ -319,6 +421,27 @@ export function EmployeeWorkingDays({ employeeId }: { employeeId: string }) {
               </span>
             </div>
           </div>
+
+          {isManager && (
+            <div className="mb-2.5 flex items-center justify-between rounded-lg border border-border/70 bg-muted/40 px-2.5 py-1.5 text-[11px]">
+              <span className="text-muted-foreground">
+                {isAr ? "إجازات الشهر (الحد الأقصى للمدير):" : "Month off days (manager limit):"}
+              </span>
+              <span
+                className={`font-semibold ${
+                  offCount > 8
+                    ? "text-destructive"
+                    : offCount === 8
+                    ? "text-amber-600 dark:text-amber-400"
+                    : "text-foreground"
+                }`}
+              >
+                {offCount} / 8 {isAr ? "أيام" : "days"}{" "}
+                {offCount === 8 ? (isAr ? "(الحد الأقصى)" : "(Max reached)") : offCount > 8 ? (isAr ? "(تجاوز الحد)" : "(Exceeds limit)") : ""}
+              </span>
+            </div>
+          )}
+
           <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-muted-foreground">
             {WEEKDAY_SHORT.map((w, i) => (
               <div key={i} className="py-1">{w}</div>
@@ -340,7 +463,8 @@ export function EmployeeWorkingDays({ employeeId }: { employeeId: string }) {
                   month: "long",
                 }) +
                 (allowed ? " — allowed" : " — not allowed") +
-                (overridden ? " (per-date override — click to reset)" : " — click to toggle this date");
+                (overridden ? " (per-date override — click to reset)" : " — click to toggle this date") +
+                (isManager && allowed && offCount >= 8 ? (isAr ? " — (تم بلوغ الحد الأقصى 8 أيام إجازة)" : " — (Max 8 days off reached)") : "");
               return (
                 <button
                   key={i}
@@ -351,14 +475,37 @@ export function EmployeeWorkingDays({ employeeId }: { employeeId: string }) {
                     //  overridden → clear override (back to weekday pattern)
                     //  base allowed → force OFF just this day
                     //  base not allowed → force ON just this day
+                    let nextOn = dateOn;
+                    let nextOff = dateOff;
                     if (overridden) {
-                      setDateOn((p) => p.filter((d) => d !== c.day));
-                      setDateOff((p) => p.filter((d) => d !== c.day));
+                      nextOn = dateOn.filter((d) => d !== c.day);
+                      nextOff = dateOff.filter((d) => d !== c.day);
                     } else if (baseAllowed) {
-                      setDateOff((p) => [...p.filter((d) => d !== c.day), c.day!].sort((a, b) => a - b));
+                      nextOff = [...dateOff.filter((d) => d !== c.day), c.day!].sort((a, b) => a - b);
                     } else {
-                      setDateOn((p) => [...p.filter((d) => d !== c.day), c.day!].sort((a, b) => a - b));
+                      nextOn = [...dateOn.filter((d) => d !== c.day), c.day!].sort((a, b) => a - b);
                     }
+
+                    if (isManager) {
+                      const nextAllowed = calendar.filter((item) => {
+                        if (item.day === null) return false;
+                        if (nextOn.includes(item.day)) return true;
+                        if (nextOff.includes(item.day)) return false;
+                        return monthDays.includes(item.weekday);
+                      }).length;
+                      const nextOffDays = totalDays - nextAllowed;
+                      if (nextOffDays > 8) {
+                        toast.error(
+                          isAr
+                            ? "لا يمكن للمدير تحديد أكثر من 8 أيام إجازة في الشهر (تم الوصول للحد الأقصى 8 أيام)"
+                            : "Managers cannot select more than 8 days off per month (maximum 8 days off reached).",
+                        );
+                        return;
+                      }
+                    }
+
+                    setDateOn(nextOn);
+                    setDateOff(nextOff);
                   }}
                   className={
                     "flex aspect-square items-center justify-center rounded-md border text-[11px] font-medium transition hover:scale-[1.04] hover:shadow-sm active:scale-95 " +

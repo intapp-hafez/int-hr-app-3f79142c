@@ -234,7 +234,7 @@ function TeamPage() {
                   </Button>
                   {openDaysFor === e.id && (
                     <div className="mt-3">
-                      <EmployeeWorkingDays employeeId={e.id} />
+                      <EmployeeWorkingDays employeeId={e.id} isManager={true} />
                     </div>
                   )}
                 </div>
