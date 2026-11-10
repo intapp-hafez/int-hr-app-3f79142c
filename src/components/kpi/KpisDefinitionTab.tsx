@@ -654,17 +654,17 @@ export function KpisDefinitionTab({
       <div className="rounded-3xl border border-border bg-card p-4 sm:p-6 shadow-sm space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-border pb-4">
           <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-orange-500/10 px-2.5 py-0.5 text-xs font-semibold text-orange-600 dark:text-orange-400">
-                <Target className="h-3.5 w-3.5" />
-                {isAr ? "دليل وبطاقة تعريف المؤشرات" : "KPIs Definition & Measurement Matrix"}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-orange-500/10 px-2.5 py-0.5 text-xs font-semibold text-orange-600 dark:text-orange-400 whitespace-nowrap shrink-0">
+                <Target className="h-3.5 w-3.5 shrink-0" />
+                <span>{isAr ? "دليل وبطاقة تعريف المؤشرات" : "KPIs Definition & Measurement Matrix"}</span>
               </span>
-              <Badge variant="outline" className="text-[10px] font-mono">
+              <Badge variant="outline" className="text-[10px] font-mono whitespace-nowrap shrink-0">
                 {isEditing ? editableRows.length : activeScorecardItems.length} {isAr ? "معيار" : "Metrics"}
               </Badge>
               <Badge
                 variant="outline"
-                className={`text-[10px] font-mono transition-colors ${
+                className={`text-[10px] font-mono transition-colors whitespace-nowrap shrink-0 ${
                   currentTotalWeight === 100
                     ? "border-emerald-500/40 text-emerald-600 bg-emerald-500/5"
                     : "border-amber-500/60 text-amber-600 bg-amber-500/10 font-bold animate-pulse"
@@ -674,7 +674,7 @@ export function KpisDefinitionTab({
               </Badge>
 
               {isEditing && (
-                <span className="inline-flex items-center rounded-full bg-blue-500/10 px-2 py-0.5 text-[11px] font-bold text-blue-600 dark:text-blue-400">
+                <span className="inline-flex items-center rounded-full bg-blue-500/10 px-2 py-0.5 text-[11px] font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap shrink-0">
                   {isAr ? "وضع التعديل مفعل" : "Edit Mode Active"}
                 </span>
               )}
