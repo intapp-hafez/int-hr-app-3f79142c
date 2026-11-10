@@ -220,7 +220,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
   const [evaluatorName, setEvaluatorName] = useState<string>(
     session?.name || (role === "manager" ? (isAr ? "المدير المباشر" : "Direct Manager") : (isAr ? "مهندس الإشراف / HR" : "Engineering Lead / HR"))
   );
-  const [status, setStatus] = useState<"Draft" | "Submitted" | "Reviewed" | "Approved">("Draft");
+  const [status, setStatus] = useState<"Draft" | "Submitted" | "Reviewed" | "Approved" | "Returned">("Draft");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [mainTab, setMainTab] = useState<string>("all-employees");
   const [empSearch, setEmpSearch] = useState<string>("");
@@ -944,33 +944,45 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
   const handleSaveMetricReturnNote = async (returnEvaluation = false) => {
     if (!selectedReturnKpi) return;
     const kpiId = String(selectedReturnKpi.id);
+    const updatedRow = {
+      ...(kpiState[kpiId] || {}),
+      id: selectedReturnKpi.id,
+      targetAnnual: selectedReturnKpi.target,
+      adminNotes: metricReturnNote.trim(),
+      notes: metricReturnNote.trim(),
+      isReturned: metricIsReturned,
+    };
     const updatedState = {
       ...kpiState,
-      [kpiId]: {
-        ...kpiState[kpiId],
-        adminNotes: metricReturnNote.trim(),
-        notes: metricReturnNote.trim(),
-        isReturned: metricIsReturned,
-      },
+      [kpiId]: updatedRow,
     };
     setKpiState(updatedState as any);
     setHasUnsavedChanges(true);
 
+    const targetStatus = returnEvaluation ? "returned" : (status.toLowerCase() as any);
+    const metricLabel = isAr ? (selectedReturnKpi.name_ar || selectedReturnKpi.name) : selectedReturnKpi.name;
+    const updatedNotes = {
+      ...notes,
+      quarterStatuses,
+      ...(returnEvaluation
+        ? {
+            returnReason: metricReturnNote.trim()
+              ? `[${metricLabel}]: ${metricReturnNote.trim()}`
+              : serverRecord?.notes?.returnReason || `Returned for revision on metric: ${metricLabel}`,
+            growthAreas: `${notes.growthAreas ? notes.growthAreas + "\n" : ""}[HR Return Note - ${metricLabel}]: ${metricReturnNote.trim()}`,
+          }
+        : serverRecord?.notes?.returnReason
+          ? { returnReason: serverRecord.notes.returnReason }
+          : {}),
+    };
+
     if (returnEvaluation) {
-      if (serverRecord?.id) {
-        try {
-          await updateStatusMutation.mutateAsync("draft");
-          toast.warning(
-            isAr
-              ? `تمت إعادة التقييم للمراجعة مع حفظ ملاحظة: ${selectedReturnKpi.name}`
-              : `Evaluation returned to Draft with notes on: ${selectedReturnKpi.name}`
-          );
-        } catch (err: any) {
-          toast.error(err.message || "Failed to return evaluation");
-        }
-      } else {
-        setStatus("Draft" as any);
-      }
+      setStatus("Returned");
+      toast.warning(
+        isAr
+          ? `تمت إعادة التقييم للمراجعة مع حفظ ملاحظة: ${metricLabel}`
+          : `Evaluation returned for revision with notes on: ${metricLabel}`
+      );
     } else {
       toast.success(
         isAr ? "تم حفظ ملاحظة المؤشر بنجاح" : "Metric note saved successfully"
@@ -978,9 +990,13 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
     }
 
     if (selectedEmpId && selectedYear) {
-      saveMutation.mutate({
-        targetStatus: returnEvaluation ? "draft" : (status.toLowerCase() as any),
+      await saveMutation.mutateAsync({
+        targetStatus,
+        overrideKpiState: updatedState as any,
+        overrideNotes: updatedNotes,
       });
+      queryClient.invalidateQueries({ queryKey: ["kpi-returned-evaluations"] });
+      if (refetchReturned) refetchReturned();
     }
 
     setMetricReturnModalOpen(false);
@@ -1691,10 +1707,13 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
   // Mutations
   const saveMutation = useMutation({
     mutationFn: async (payload: {
-      targetStatus: "draft" | "submitted" | "reviewed" | "approved";
+      targetStatus: "draft" | "submitted" | "reviewed" | "approved" | "returned";
+      overrideKpiState?: Record<string, KpiRowState>;
+      overrideNotes?: any;
     }) => {
+      const stateToUse = payload.overrideKpiState || kpiState;
       const serializedScores: Record<string, any> = {};
-      Object.entries(kpiState).forEach(([key, val]: [string, any]) => {
+      Object.entries(stateToUse).forEach(([key, val]: [string, any]) => {
         serializedScores[String(key)] = {
           targetAnnual: val.targetAnnual,
           q1: val.q1,
@@ -1720,6 +1739,12 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
         })),
       };
 
+      const notesPayload = payload.overrideNotes || {
+        ...notes,
+        quarterStatuses,
+        ...(serverRecord?.notes?.returnReason ? { returnReason: serverRecord.notes.returnReason } : {}),
+      };
+
       return saveEvalFn({
         data: {
           employeeId: selectedEmpId,
@@ -1729,11 +1754,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
           status: payload.targetStatus,
           scores: serializedScores,
           summary: summaryPayload,
-          notes: {
-            ...notes,
-            quarterStatuses,
-            ...(serverRecord?.notes?.returnReason ? { returnReason: serverRecord.notes.returnReason } : {}),
-          },
+          notes: notesPayload,
         },
       });
     },
@@ -1743,6 +1764,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
       setStatus(capStatus);
       queryClient.invalidateQueries({ queryKey: ["kpi-evaluation", selectedEmpId, selectedYear] });
       queryClient.invalidateQueries({ queryKey: ["kpi-evaluations-list", selectedYear] });
+      queryClient.invalidateQueries({ queryKey: ["kpi-returned-evaluations"] });
 
       if (vars.targetStatus === "draft") {
         toast.success(isAr ? "تم حفظ مسودة التقييم في السحابة بنجاح" : "Evaluation draft saved to cloud");
@@ -1750,6 +1772,8 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
         toast.success(isAr ? "تم إرسال التقييم بنجاح لمراجعة الموارد البشرية" : "Evaluation submitted for HR review");
       } else if (vars.targetStatus === "approved") {
         toast.success(isAr ? "تم اعتماد التقييم السنوي رسمياً" : "KPI Evaluation officially approved");
+      } else if (vars.targetStatus === "returned") {
+        toast.warning(isAr ? "تمت إعادة التقييم إلى المُقيّم للمراجعة" : "Evaluation returned for revision");
       } else {
         toast.success(isAr ? "تم تحديث حالة التقييم بنجاح" : "Evaluation status updated successfully");
       }
@@ -3317,24 +3341,48 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
 
                           const placeholderText = kpi.inputType === "rating_5" || kpi.unit === "scale" ? "1-5" : kpi.unit || "%";
 
+                          const hasRowReturn = Boolean((row as any).isReturned || (row as any).adminNotes);
+
                           return (
-                            <tr key={kpi.id} className="hover:bg-muted/20 transition-colors">
+                            <tr
+                              key={kpi.id}
+                              className={`transition-colors ${
+                                hasRowReturn
+                                  ? "bg-amber-500/10 dark:bg-amber-950/25 border-s-4 border-s-amber-500"
+                                  : "hover:bg-muted/20"
+                              }`}
+                            >
                               <td className="px-3 py-2 text-muted-foreground font-mono font-medium text-center">
                                 {kpi.numericIndex}
                               </td>
                               <td className="px-3 py-2">
                                 <div className="space-y-0.5">
-                                  <div className="font-semibold text-foreground leading-snug flex items-center gap-1.5">
+                                  <div className="font-semibold text-foreground leading-snug flex items-center flex-wrap gap-1.5">
                                     <span>{isAr ? kpi.name_ar : kpi.name}</span>
                                     {kpi.direction === "lower_is_better" && (
                                       <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 font-normal">
                                         {isAr ? "الأقل أفضل" : "Lower is better"}
                                       </span>
                                     )}
+                                    {hasRowReturn && (
+                                      <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-800 dark:text-amber-300 font-bold border border-amber-500/30">
+                                        <AlertTriangle className="h-3 w-3 text-amber-600 animate-pulse" />
+                                        <span>{isAr ? "مطلوب مراجعة المؤشر" : "Revision Needed"}</span>
+                                      </span>
+                                    )}
                                   </div>
                                   <p className="text-[11px] text-muted-foreground line-clamp-1">
                                     {isAr ? kpi.definition_ar : kpi.definition}
                                   </p>
+                                  {(row as any).adminNotes && (
+                                    <div className="mt-1 p-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-[11px] flex items-start gap-1.5 font-medium leading-relaxed shadow-xs">
+                                      <AlertCircle className="h-3.5 w-3.5 text-amber-600 shrink-0 mt-0.5" />
+                                      <div>
+                                        <span className="font-bold text-amber-800 dark:text-amber-300">{isAr ? "ملاحظة الإدارة:" : "Admin Return Note:"} </span>
+                                        <span className="whitespace-pre-wrap">{(row as any).adminNotes}</span>
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               </td>
                               <td className="px-3 py-2 text-center font-mono font-medium">
@@ -3445,7 +3493,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                                 {fmtRawScore(row.annualScore)}
                               </td>
 
-                              {/* Actions: Return / Add Notes (for admin) & Info Dialog */}
+                              {/* Actions: Return / Add Notes (for admin) & Alert Popover (for manager) & Info Dialog */}
                               <td className="px-2 py-2 text-center print:hidden">
                                 <div className="flex items-center justify-center gap-1">
                                   {(role === "admin" || role === "hr") && (
@@ -3454,19 +3502,45 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                                       variant="ghost"
                                       size="icon"
                                       onClick={() => handleOpenMetricReturnModal(kpi)}
-                                      className={`h-6 w-6 rounded-lg cursor-pointer transition-colors ${row.adminNotes || row.isReturned
+                                      className={`h-6 w-6 rounded-lg cursor-pointer transition-colors ${(row as any).adminNotes || (row as any).isReturned
                                         ? "text-amber-600 bg-amber-500/15 hover:bg-amber-500/25 ring-1 ring-amber-500/40"
                                         : "text-muted-foreground hover:text-amber-600 hover:bg-amber-500/10"
                                         }`}
                                       title={
-                                        row.adminNotes
-                                          ? (isAr ? `ملاحظة الإعادة: ${row.adminNotes}` : `Return note: ${row.adminNotes}`)
+                                        (row as any).adminNotes
+                                          ? (isAr ? `ملاحظة الإعادة: ${(row as any).adminNotes}` : `Return note: ${(row as any).adminNotes}`)
                                           : (isAr ? "إعادة المؤشر وإضافة ملاحظات" : "Return metric & add notes")
                                       }
                                     >
                                       <RotateCcw className="h-3.5 w-3.5" />
                                     </Button>
                                   )}
+
+                                  {role === "manager" && hasRowReturn && (
+                                    <Popover>
+                                      <PopoverTrigger asChild>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-6 w-6 rounded-lg text-amber-600 bg-amber-500/20 hover:bg-amber-500/30 ring-1 ring-amber-500/50 cursor-pointer animate-pulse"
+                                          title={isAr ? `تنبيه مراجعة: ${(row as any).adminNotes || "المؤشر مطلوب مراجعته"}` : `Review Needed: ${(row as any).adminNotes || "This metric requires revision"}`}
+                                        >
+                                          <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                                        </Button>
+                                      </PopoverTrigger>
+                                      <PopoverContent className="w-72 p-3 text-xs space-y-1.5 border-amber-300 bg-amber-50/95 dark:bg-amber-950/95 dark:border-amber-800 text-foreground shadow-lg" align="end">
+                                        <div className="flex items-center gap-1.5 font-bold text-amber-800 dark:text-amber-300 text-xs">
+                                          <AlertCircle className="h-4 w-4 text-amber-600" />
+                                          <span>{isAr ? "ملاحظة الإعادة من الإدارة" : "Admin Return Instructions"}</span>
+                                        </div>
+                                        <p className="text-[11px] text-foreground whitespace-pre-wrap leading-relaxed">
+                                          {(row as any).adminNotes || (isAr ? "يرجى مراجعة وتعديل هذا المؤشر وإعادة تقديمه." : "Please review and revise this metric before resubmitting.")}
+                                        </p>
+                                      </PopoverContent>
+                                    </Popover>
+                                  )}
+
                                   <Button
                                     type="button"
                                     variant="ghost"

@@ -253,7 +253,7 @@ export const SaveKpiEvaluationSchema = z.object({
   year: z.number().int().min(2020).max(2100),
   templateType: z.string().default("light_current_engineer"),
   evaluatorName: z.string().max(200).optional(),
-  status: z.enum(["draft", "submitted", "reviewed", "approved"]).default("draft"),
+  status: z.enum(["draft", "submitted", "reviewed", "approved", "returned"]).default("draft"),
   scores: z.record(z.string(), KpiMetricStateSchema),
   summary: KpiOverallSummarySchema.optional().default({
     totalScore: 0,
@@ -277,7 +277,7 @@ export type GetKpiEvaluationInput = z.infer<typeof GetKpiEvaluationSchema>;
 
 export const ListKpiEvaluationsSchema = z.object({
   year: z.number().int().min(2020).max(2100).optional(),
-  status: z.enum(["draft", "submitted", "reviewed", "approved", "all"]).optional(),
+  status: z.enum(["draft", "submitted", "reviewed", "approved", "returned", "all"]).optional(),
   departmentId: z.string().uuid().optional(),
   search: z.string().max(100).optional(),
 });
@@ -285,7 +285,7 @@ export type ListKpiEvaluationsInput = z.infer<typeof ListKpiEvaluationsSchema>;
 
 export const UpdateKpiStatusSchema = z.object({
   id: z.string().uuid(),
-  status: z.enum(["draft", "submitted", "reviewed", "approved"]),
+  status: z.enum(["draft", "submitted", "reviewed", "approved", "returned"]),
 });
 export type UpdateKpiStatusInput = z.infer<typeof UpdateKpiStatusSchema>;
 
