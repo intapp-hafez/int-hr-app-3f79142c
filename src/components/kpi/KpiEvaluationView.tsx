@@ -820,6 +820,27 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const handleQuarterCardClick = (quarterKey: "q1" | "q2" | "q3" | "q4") => {
+    setMainTab("scorecard");
+    setActiveScorecardQuarter(quarterKey);
+    setActiveQuarterFilter(quarterKey);
+
+    const qLabel = quarterKey.toUpperCase();
+    toast.info(
+      isAr
+        ? `تم الانتقال لسجلات وبنود تقييم ${qLabel}`
+        : `Viewing ${qLabel} scorecard records & evaluation items`,
+      { duration: 2500 }
+    );
+
+    setTimeout(() => {
+      const el = document.getElementById("kpi-scorecard-section");
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }, 100);
+  };
+
   const handleApproveQuarter = async (item: any, quarter?: string) => {
     try {
       setIsSubmittingReview(true);
@@ -2465,11 +2486,25 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
             const isReturned = quarterStatuses[q.key]?.status === "returned";
             const hasActuals = Object.values(kpiState).some((k: any) => k[q.key]?.actual != null);
             const returnReasonText = quarterStatuses[q.key]?.return_reason || quarterStatuses[q.key]?.returnReason;
+            const isCurrentScorecardQuarter =
+              mainTab === "scorecard" &&
+              (activeQuarterFilter === q.key || (activeQuarterFilter === "all" && activeScorecardQuarter === q.key));
 
             return (
               <div
                 key={q.key}
-                className={`relative rounded-xl border p-3 flex flex-col justify-between gap-2.5 transition-all shadow-2xs ${
+                role="button"
+                tabIndex={0}
+                onClick={() => handleQuarterCardClick(q.key)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleQuarterCardClick(q.key);
+                  }
+                }}
+                className={`relative rounded-xl border p-3 flex flex-col justify-between gap-2.5 transition-all shadow-2xs cursor-pointer group hover:border-brand/70 hover:shadow-md select-none ${
+                  isCurrentScorecardQuarter ? "ring-2 ring-brand/80 border-brand shadow-sm" : ""
+                } ${
                   isApproved
                     ? "bg-emerald-500/5 border-emerald-500/30 dark:bg-emerald-950/20"
                     : isReturned
@@ -2478,14 +2513,22 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                         ? "bg-blue-500/5 border-blue-500/30 dark:bg-blue-950/15"
                         : "bg-muted/30 border-border/60 opacity-80"
                 }`}
+                title={
+                  isAr
+                    ? `انقر لعرض سجلات وبنود تقييم ${q.label}`
+                    : `Click to view ${q.label} scorecard records`
+                }
               >
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <div className="flex items-center gap-1.5">
-                      <span className="font-bold text-sm tracking-tight text-foreground">{q.label}</span>
+                      <span className="font-bold text-sm tracking-tight text-foreground group-hover:text-brand transition-colors">
+                        {q.label}
+                      </span>
                       <span className="text-[11px] text-muted-foreground font-medium">
                         ({isAr ? q.rangeAr : q.rangeEn})
                       </span>
+                      <ExternalLink className="h-3 w-3 text-brand opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
                     {hasActuals && q.sum > 0 && (
                       <span className="text-[11px] font-mono text-muted-foreground mt-0.5 block">
@@ -2523,10 +2566,15 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                 {/* Bottom Action / Indicator Area */}
                 <div className="pt-2 border-t border-border/50 flex items-center justify-between text-xs">
                   {isApproved ? (
-                    <span className="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      {isAr ? "معتمد ومقفل" : "Approved & Locked"}
-                    </span>
+                    <div className="w-full flex items-center justify-between">
+                      <span className="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        {isAr ? "معتمد ومقفل" : "Approved & Locked"}
+                      </span>
+                      <span className="text-[10px] text-brand font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                        {isAr ? "عرض السجلات ←" : "View records →"}
+                      </span>
+                    </div>
                   ) : isReturned ? (
                     <div className="w-full flex items-center justify-between gap-1">
                       <span
@@ -2542,7 +2590,10 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => handleApproveQuarterDirect(q.key)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleApproveQuarterDirect(q.key);
+                          }}
                           disabled={isSubmittingReview}
                           className="h-6 px-1.5 text-[10px] text-emerald-600 hover:bg-emerald-50 rounded-md cursor-pointer shrink-0 font-semibold"
                         >
@@ -2555,7 +2606,10 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                       <div className="w-full flex items-center justify-between gap-1.5">
                         <Button
                           size="sm"
-                          onClick={() => handleApproveQuarterDirect(q.key)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleApproveQuarterDirect(q.key);
+                          }}
                           disabled={isSubmittingReview}
                           className="h-7 px-2.5 text-[11px] font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-2xs flex-1 justify-center gap-1"
                         >
@@ -2564,7 +2618,10 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleReturnQuarterDirect(q.key)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleReturnQuarterDirect(q.key);
+                          }}
                           disabled={isSubmittingReview}
                           className="h-7 px-2 text-[11px] rounded-lg border-rose-300 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 cursor-pointer gap-1"
                           title={`Return ${q.label} for revision`}
@@ -2574,15 +2631,25 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                         </Button>
                       </div>
                     ) : (
-                      <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {isAr ? "بانتظار مراجعة الإدارة" : "Pending review"}
-                      </span>
+                      <div className="w-full flex items-center justify-between">
+                        <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {isAr ? "بانتظار مراجعة الإدارة" : "Pending review"}
+                        </span>
+                        <span className="text-[10px] text-brand font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                          {isAr ? "عرض السجلات ←" : "View records →"}
+                        </span>
+                      </div>
                     )
                   ) : (
-                    <span className="text-[10px] text-muted-foreground/60 italic">
-                      {isAr ? "لا توجد نتائج مسجلة" : "No actuals recorded"}
-                    </span>
+                    <div className="w-full flex items-center justify-between">
+                      <span className="text-[10px] text-muted-foreground/60 italic">
+                        {isAr ? "لا توجد نتائج مسجلة" : "No actuals recorded"}
+                      </span>
+                      <span className="text-[10px] text-brand font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                        {isAr ? "إدخال السجلات ←" : "Enter records →"}
+                      </span>
+                    </div>
                   )}
                 </div>
               </div>
@@ -3196,7 +3263,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
         </TabsContent>
 
         {/* ── TAB 1: FULL SCORECARD TABLE ── */}
-        <TabsContent value="scorecard" className="space-y-4">
+        <TabsContent value="scorecard" className="space-y-4" id="kpi-scorecard-section">
           {/* Missing Template Guard Alert */}
           {matchedTemplateData && !matchedTemplateData.matched && (
             <div className="rounded-2xl border border-amber-300 bg-amber-50/90 dark:bg-amber-950/20 p-4 flex items-start gap-3.5 shadow-xs">
