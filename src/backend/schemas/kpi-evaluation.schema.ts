@@ -240,7 +240,14 @@ export const KpiCategorySummarySchema = z.object({
 
 export const KpiOverallSummarySchema = z.object({
   totalScore: z.number(),
-  rating: z.enum(["Exceeds Expectations", "Meets Expectations", "Needs Improvement", "Unsatisfactory", "N/A"]),
+  rating: z.enum([
+    "Exceeds Expectations",
+    "Meets Expectations",
+    "Needs Improvement",
+    "Unsatisfactory",
+    "Pending Evaluation",
+    "N/A",
+  ]),
   categories: z.array(KpiCategorySummarySchema).optional(),
 });
 

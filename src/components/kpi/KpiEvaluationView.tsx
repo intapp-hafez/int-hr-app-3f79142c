@@ -1863,6 +1863,34 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
     });
   }, [activeCategories, kpiState]);
 
+  // Helper to convert raw Zod JSON arrays or technical error strings into readable messages
+  const formatReadableError = (err: any, fallback: string) => {
+    const raw = err?.message;
+    if (!raw || typeof raw !== "string") return fallback;
+    const trimmed = raw.trim();
+    if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        const issues = Array.isArray(parsed) ? parsed : [parsed];
+        const messages = issues
+          .map((item: any) => {
+            if (!item) return "";
+            const field = Array.isArray(item.path) && item.path.length > 0 ? item.path.join(".") : "";
+            const msg = item.message || "";
+            if (field && msg) return `${field}: ${msg}`;
+            return msg || "";
+          })
+          .filter(Boolean);
+        if (messages.length > 0) {
+          return messages.join(" • ");
+        }
+      } catch {
+        // Fall through
+      }
+    }
+    return raw;
+  };
+
   // Mutations
   const saveMutation = useMutation({
     mutationFn: async (payload: {
@@ -1983,7 +2011,12 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
       }
     },
     onError: (err: any) => {
-      toast.error(err?.message || (isAr ? "تعذر حفظ التقييم على الخادم" : "Failed to save evaluation to server"));
+      toast.error(
+        formatReadableError(
+          err,
+          isAr ? "تعذر حفظ التقييم على الخادم" : "Failed to save evaluation to server"
+        )
+      );
     },
   });
 
