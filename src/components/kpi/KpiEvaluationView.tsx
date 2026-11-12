@@ -998,7 +998,6 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
             returnReason: metricReturnNote.trim()
               ? `[${metricLabel}]: ${metricReturnNote.trim()}`
               : serverRecord?.notes?.returnReason || `Returned for revision on metric: ${metricLabel}`,
-            growthAreas: `${notes.growthAreas ? notes.growthAreas + "\n" : ""}[HR Return Note - ${metricLabel}]: ${metricReturnNote.trim()}`,
           }
         : serverRecord?.notes?.returnReason
           ? { returnReason: serverRecord.notes.returnReason }
@@ -1692,7 +1691,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
       if (serverRecord.notes) {
         setNotes({
           strengths: serverRecord.notes.strengths || "",
-          growthAreas: serverRecord.notes.growthAreas || "",
+          growthAreas: (serverRecord.notes.growthAreas || "").replace(/\[HR Return Note.*?\]:[^\n]*\n?/gi, "").trim(),
           recommendations: serverRecord.notes.recommendations || "",
           returnReason: serverRecord.notes.returnReason || "",
         });

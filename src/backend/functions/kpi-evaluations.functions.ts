@@ -1658,7 +1658,6 @@ export const reviewQuarterlyEvaluation = createServerFn({ method: "POST" })
 
         if (input.action === "return" && input.reason) {
           notes.returnReason = `[${selectedQ.toUpperCase()}]: ${input.reason}`;
-          notes.growthAreas = (notes.growthAreas ? notes.growthAreas + "\n" : "") + `[HR Return Note - ${selectedQ.toUpperCase()}]: ${input.reason}`;
           evalStatus = "returned";
         } else {
           // If individual Q approved, check if all 4 quarters are approved
@@ -1692,7 +1691,6 @@ export const reviewQuarterlyEvaluation = createServerFn({ method: "POST" })
       } else {
         if (input.action === "return" && input.reason) {
           notes.returnReason = input.reason;
-          notes.growthAreas = (notes.growthAreas ? notes.growthAreas + "\n" : "") + `[HR Return Note]: ${input.reason}`;
           evalStatus = "returned";
         }
       }

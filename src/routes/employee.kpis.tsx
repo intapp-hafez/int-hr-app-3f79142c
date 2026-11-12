@@ -1302,20 +1302,10 @@ export function EmployeeKpiPage() {
                                             {isAr ? "الأقل أفضل" : "Lower is better"}
                                           </span>
                                         )}
-                                        {row.isReturned && (
-                                          <Badge className="bg-amber-500/15 text-amber-700 border-amber-500/30 text-[9px] px-1.5 py-0">
-                                            {isAr ? "مُعاد" : "Returned"}
-                                          </Badge>
-                                        )}
                                       </div>
                                       <p className="text-[11px] text-muted-foreground line-clamp-1">
                                         {isAr ? kpi.definition_ar : kpi.definition}
                                       </p>
-                                      {row.adminNotes && (
-                                        <div className="text-[10px] text-amber-600 bg-amber-500/10 border border-amber-500/20 rounded-md px-2 py-0.5 mt-1 inline-block">
-                                          <strong>{isAr ? "ملاحظة: " : "Note: "}</strong>{row.adminNotes}
-                                        </div>
-                                      )}
                                     </div>
                                   </td>
                                   <td className="px-3 py-2 text-center font-mono font-medium">
@@ -1493,8 +1483,9 @@ export function EmployeeKpiPage() {
                     <span className="text-xs font-bold text-amber-700 dark:text-amber-400">
                       {isAr ? "2. مجالات التطوير الفني وتحسين كفاءة التنفيذ" : "2. Areas for Technical Development & Optimization"}
                     </span>
-                    <p className="text-xs leading-relaxed text-foreground">
-                      {evaluation?.notes?.growthAreas || (isAr ? "لم يتم تسجيل مجالات تطوير بعد." : "No growth areas recorded yet.")}
+                    <p className="text-xs leading-relaxed text-foreground whitespace-pre-wrap">
+                      {(evaluation?.notes?.growthAreas || "").replace(/\[HR Return Note.*?\]:[^\n]*\n?/gi, "").trim() ||
+                        (isAr ? "لم يتم تسجيل مجالات تطوير بعد." : "No growth areas recorded yet.")}
                     </p>
                   </div>
 
