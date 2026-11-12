@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import {
   Award,
   Calendar,
+  CalendarClock,
   CalendarRange,
   CheckCircle2,
   ChevronsUpDown,
@@ -13,6 +14,7 @@ import {
   HelpCircle,
   Info,
   Layers,
+  Lock,
   Printer,
   RefreshCw,
   Save,
@@ -92,6 +94,7 @@ import {
   getQuarterlyEvaluation,
   saveQuarterlyEvaluation,
   seedDefaultKpiTemplates,
+  getMyManagerEvaluationPeriods,
   KpiEvaluationRecord,
 } from "@/backend/functions/kpi-evaluations.functions";
 import {
@@ -115,6 +118,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { JobDescriptionsTab } from "@/components/kpi/JobDescriptionsTab";
 import { KpisDefinitionTab } from "@/components/kpi/KpisDefinitionTab";
+import { EvaluationPeriodsTab } from "@/components/kpi/EvaluationPeriodsTab";
 
 export interface ScorecardItem {
   id: string;
@@ -477,6 +481,26 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
       setMainTab("all-employees");
     }
   }, [mainTab, isLoadingReturned, returnedEvaluations.length]);
+
+  // ── MANAGER EVALUATION PERIODS ACCESS CONTROL QUERY ──
+  const getMyPeriodsFn = useServerFn(getMyManagerEvaluationPeriods);
+  const { data: myManagerPeriods = [], isLoading: isLoadingMyPeriods } = useQuery({
+    queryKey: ["kpi-my-manager-periods", selectedYear],
+    queryFn: () => getMyPeriodsFn({ data: { year: selectedYear } }),
+    enabled: !!session && isManagerMode,
+  });
+
+  const activeManagerQuarters = useMemo(() => {
+    const set = new Set<"q1" | "q2" | "q3" | "q4">();
+    for (const p of myManagerPeriods as any[]) {
+      if (p.status === "active") {
+        set.add(p.quarter);
+      }
+    }
+    return set;
+  }, [myManagerPeriods]);
+
+  const hasAnyActiveManagerPeriod = !isManagerMode || activeManagerQuarters.size > 0;
 
   // ── CRITERIA CATALOG QUERY ──
   const { data: kpiCriteria = [], refetch: refetchCriteria, isLoading: isLoadingCriteria } = useQuery({
@@ -1987,10 +2011,10 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
   const isQ3Approved = quarterStatuses.q3?.status === "approved" || (isOverallApproved && Object.keys(quarterStatuses).length === 0);
   const isQ4Approved = quarterStatuses.q4?.status === "approved" || (isOverallApproved && Object.keys(quarterStatuses).length === 0);
 
-  const isQ1Disabled = isQ1Approved;
-  const isQ2Disabled = isQ2Approved;
-  const isQ3Disabled = isQ3Approved;
-  const isQ4Disabled = isQ4Approved;
+  const isQ1Disabled = isQ1Approved || (isManagerMode && !activeManagerQuarters.has("q1"));
+  const isQ2Disabled = isQ2Approved || (isManagerMode && !activeManagerQuarters.has("q2"));
+  const isQ3Disabled = isQ3Approved || (isManagerMode && !activeManagerQuarters.has("q3"));
+  const isQ4Disabled = isQ4Approved || (isManagerMode && !activeManagerQuarters.has("q4"));
 
   const isQuarterDisabled = (q: "q1" | "q2" | "q3" | "q4") => {
     if (q === "q1") return isQ1Disabled;
@@ -2481,7 +2505,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
               variant="outline"
               size="sm"
               onClick={() => saveMutation.mutate({ targetStatus: "draft" })}
-              disabled={saveMutation.isPending || isLocked}
+              disabled={saveMutation.isPending || isLocked || (isManagerMode && !hasAnyActiveManagerPeriod)}
               className="rounded-xl gap-1.5 cursor-pointer h-9 px-3 font-medium"
             >
               {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
@@ -2493,7 +2517,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
               <Button
                 size="sm"
                 onClick={() => saveMutation.mutate({ targetStatus: "submitted" })}
-                disabled={saveMutation.isPending}
+                disabled={saveMutation.isPending || (isManagerMode && !hasAnyActiveManagerPeriod)}
                 className="rounded-xl gap-1.5 bg-blue-600 hover:bg-blue-700 text-white cursor-pointer shadow-xs h-9 px-3 font-medium"
               >
                 <Send className="h-4 w-4" />
@@ -2571,6 +2595,75 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
           </div>
         </div>
       </div>
+
+      {/* Manager Evaluation Period Access Banner */}
+      {isManagerMode && !isLoadingMyPeriods && (
+        <div
+          className={`rounded-2xl border p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs ${
+            hasAnyActiveManagerPeriod
+              ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-800 dark:text-emerald-300"
+              : "border-rose-500/30 bg-rose-500/10 text-rose-800 dark:text-rose-300"
+          }`}
+        >
+          <div className="flex items-center gap-2.5">
+            {hasAnyActiveManagerPeriod ? (
+              <CalendarClock className="h-4 w-4 text-emerald-600 shrink-0" />
+            ) : (
+              <Lock className="h-4 w-4 text-rose-600 shrink-0" />
+            )}
+            <div>
+              <span className="font-bold block">
+                {hasAnyActiveManagerPeriod
+                  ? isAr
+                    ? "فترة التقييم مفتوحة حالياً"
+                    : "Evaluation Window Active"
+                  : isAr
+                    ? "الوصول لتعديل التقييمات مغلق حالياً"
+                    : "Evaluation Access Locked"}
+              </span>
+              <span className="text-[11px] opacity-90">
+                {hasAnyActiveManagerPeriod
+                  ? isAr
+                    ? "يمكنك تقييم موظفي فريقك في الأرباع المفتوحة أدناه. التقييمات السابقة محفوظة بأمان."
+                    : "You can evaluate your assigned team for the open quarters below. Previously submitted evaluations remain preserved."
+                  : isAr
+                    ? `لا توجد فترة تقييم نشطة لك لعام ${selectedYear}. التقييمات المرسلة سابقاً محفوظة للعرض فقط. يرجى التواصل مع الموارد البشرية لإعادة الفتح.`
+                    : `No active evaluation period is open for you in ${selectedYear}. Previously submitted evaluations are preserved in read-only mode. Contact HR Admin to reopen.`}
+              </span>
+            </div>
+          </div>
+
+          {(myManagerPeriods as any[]).length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+              {(myManagerPeriods as any[]).map((p: any) => (
+                <Badge
+                  key={p.id}
+                  variant="outline"
+                  className={`text-[10px] font-mono px-2 py-0.5 ${
+                    p.status === "active"
+                      ? "bg-emerald-500/15 text-emerald-700 border-emerald-500/30"
+                      : "bg-muted text-muted-foreground border-border"
+                  }`}
+                >
+                  {String(p.quarter).toUpperCase()}: {p.start_date} → {p.end_date} (
+                  {p.status === "active"
+                    ? isAr
+                      ? "مفتوح"
+                      : "Open"
+                    : p.status === "scheduled"
+                      ? isAr
+                        ? "مجدول"
+                        : "Scheduled"
+                      : isAr
+                        ? "مغلق"
+                        : "Locked"}
+                  )
+                </Badge>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Dedicated Quarter Governance & Approvals Bar */}
       <div className="rounded-2xl border border-border bg-card/60 p-4 shadow-xs space-y-3.5">
@@ -3017,6 +3110,15 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
               >
                 <Award className="h-4 w-4 text-brand transition-colors group-data-[state=active]:text-white" />
                 <span>{isAr ? "القوالب والمعايير" : "Templates & Criteria"}</span>
+              </TabsTrigger>
+            )}
+            {!isManagerMode && (
+              <TabsTrigger
+                value="evaluation-periods"
+                className="group rounded-xl px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer transition-all data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
+              >
+                <CalendarClock className="h-4 w-4 text-orange-500 transition-colors group-data-[state=active]:text-white" />
+                <span>{isAr ? "فترات التقييم" : "Evaluation Periods"}</span>
               </TabsTrigger>
             )}
           </TabsList>
@@ -5294,6 +5396,18 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                 )}
               </div>
             )}
+          </TabsContent>
+        )}
+
+        {/* ── TAB: EVALUATION PERIODS (HR ADMIN) ── */}
+        {!isManagerMode && (
+          <TabsContent value="evaluation-periods" className="space-y-4">
+            <EvaluationPeriodsTab
+              selectedYear={selectedYear}
+              onYearChange={setSelectedYear}
+              isAr={isAr}
+              dir={dir}
+            />
           </TabsContent>
         )}
       </Tabs>

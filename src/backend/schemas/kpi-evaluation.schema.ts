@@ -339,3 +339,53 @@ export const BatchImportCriteriaSchema = z.object({
   items: z.array(ImportKpiCriterionItemSchema).min(1, "At least one criterion is required to import"),
 });
 export type BatchImportCriteriaInput = z.infer<typeof BatchImportCriteriaSchema>;
+
+// ── EVALUATION PERIODS & ACCESS CONTROL SCHEMAS ──
+
+export const EvaluationPeriodStatusSchema = z.enum([
+  "scheduled",
+  "active",
+  "expired",
+  "manually_closed",
+]);
+export type EvaluationPeriodStatus = z.infer<typeof EvaluationPeriodStatusSchema>;
+
+export const ListEvaluationPeriodsSchema = z.object({
+  year: z.number().int().min(2020).max(2100).optional(),
+  quarter: z.enum(["all", "q1", "q2", "q3", "q4"]).optional().default("all"),
+  status: z.enum(["all", "scheduled", "active", "expired", "manually_closed"]).optional().default("all"),
+});
+export type ListEvaluationPeriodsInput = z.infer<typeof ListEvaluationPeriodsSchema>;
+
+export const SaveEvaluationPeriodSchema = z
+  .object({
+    id: z.string().uuid().optional(),
+    managerId: z.string().uuid(),
+    year: z.number().int().min(2020).max(2100),
+    quarter: z.enum(["q1", "q2", "q3", "q4"]),
+    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Start date must be YYYY-MM-DD"),
+    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "End date must be YYYY-MM-DD"),
+    notes: z.string().max(1000).optional().default(""),
+    reason: z.string().max(500).optional().default(""),
+  })
+  .refine((data) => data.endDate >= data.startDate, {
+    message: "End date must be on or after the start date",
+    path: ["endDate"],
+  });
+export type SaveEvaluationPeriodInput = z.infer<typeof SaveEvaluationPeriodSchema>;
+
+export const ToggleEvaluationPeriodSchema = z.object({
+  id: z.string().uuid(),
+  action: z.enum(["reopen", "close"]),
+  newEndDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "End date must be YYYY-MM-DD")
+    .optional(),
+  reason: z.string().max(500).optional().default(""),
+});
+export type ToggleEvaluationPeriodInput = z.infer<typeof ToggleEvaluationPeriodSchema>;
+
+export const GetMyManagerPeriodsSchema = z.object({
+  year: z.number().int().min(2020).max(2100).optional(),
+});
+export type GetMyManagerPeriodsInput = z.infer<typeof GetMyManagerPeriodsSchema>;

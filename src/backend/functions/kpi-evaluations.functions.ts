@@ -23,6 +23,10 @@ import {
   GetQuarterlyHistorySchema,
   SeedKpiTemplatesSchema,
   BatchImportCriteriaSchema,
+  ListEvaluationPeriodsSchema,
+  SaveEvaluationPeriodSchema,
+  ToggleEvaluationPeriodSchema,
+  GetMyManagerPeriodsSchema,
 } from "../schemas/kpi-evaluation.schema";
 import { resolveTeamMemberScope } from "@/lib/team.functions";
 import { getRatingFromScore } from "@/lib/kpi/light-current-kpi.data";
@@ -138,6 +142,80 @@ async function assertKpiAccess(supabase: any, userId: string) {
     isAdmin: roles.includes("admin") || roles.includes("hr"),
     isManager: roles.includes("manager"),
   };
+}
+
+function computePeriodStatus(
+  period: { start_date: string; end_date: string; is_manually_closed?: boolean },
+  todayStr: string = new Date().toISOString().slice(0, 10)
+): "scheduled" | "active" | "expired" | "manually_closed" {
+  if (period.is_manually_closed) return "manually_closed";
+  if (todayStr < period.start_date) return "scheduled";
+  if (todayStr > period.end_date) return "expired";
+  return "active";
+}
+
+async function assertManagerPeriodActive(
+  supabase: any,
+  userId: string,
+  year: number,
+  quartersToCheck: Array<"q1" | "q2" | "q3" | "q4">
+) {
+  const { data: periods, error } = await (supabase as any)
+    .from("kpi_evaluation_periods")
+    .select("*")
+    .eq("manager_id", userId)
+    .eq("evaluation_year", year);
+
+  if (error) {
+    throw new Error(`Failed to verify evaluation period: ${error.message}`);
+  }
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const allPeriods = periods || [];
+
+  if (allPeriods.length === 0) {
+    throw new Error(
+      `Access Locked: No evaluation period has been assigned to you for ${year}. Please contact HR Admin.`
+    );
+  }
+
+  if (quartersToCheck.length === 0) {
+    const hasAnyActive = allPeriods.some((p: any) => computePeriodStatus(p, todayStr) === "active");
+    if (!hasAnyActive) {
+      throw new Error(
+        `Access Locked: Your KPI evaluation period for ${year} is not currently active (expired, scheduled, or closed). Contact HR Admin.`
+      );
+    }
+    return;
+  }
+
+  for (const q of quartersToCheck) {
+    const qPeriods = allPeriods.filter((p: any) => p.quarter === q);
+    const activePeriod = qPeriods.find((p: any) => computePeriodStatus(p, todayStr) === "active");
+    if (!activePeriod) {
+      const closed = qPeriods.find((p: any) => p.is_manually_closed);
+      if (closed) {
+        throw new Error(
+          `Access Locked: The evaluation period for ${q.toUpperCase()} (${year}) was manually closed by HR Admin.`
+        );
+      }
+      const expired = qPeriods.find((p: any) => todayStr > p.end_date);
+      if (expired) {
+        throw new Error(
+          `Period Expired: The evaluation window for ${q.toUpperCase()} (${year}) ended on ${expired.end_date}. Contact HR Admin to reopen or extend.`
+        );
+      }
+      const scheduled = qPeriods.find((p: any) => todayStr < p.start_date);
+      if (scheduled) {
+        throw new Error(
+          `Period Scheduled: The evaluation window for ${q.toUpperCase()} (${year}) opens on ${scheduled.start_date}.`
+        );
+      }
+      throw new Error(
+        `Access Locked: No active evaluation period is configured for ${q.toUpperCase()} (${year}). Contact HR Admin.`
+      );
+    }
+  }
 }
 
 async function notifyKpiAction({
@@ -1352,6 +1430,7 @@ export const saveQuarterlyEvaluation = createServerFn({ method: "POST" })
           throw new Error("Forbidden: You can only evaluate employees within your assigned team or department");
         }
       }
+      await assertManagerPeriodActive(supabase, userId, input.evaluation_year, [input.quarter]);
     }
 
     // Check existing evaluation
@@ -2326,7 +2405,7 @@ export const saveKpiEvaluation = createServerFn({ method: "POST" })
 
     const { data: existing } = await (supabase as any)
       .from("kpi_evaluations")
-      .select("id, status")
+      .select("id, status, scores")
       .eq("employee_id", input.employeeId)
       .eq("evaluation_year", input.year)
       .eq("template_type", input.templateType || "light_current_engineer")
@@ -2334,6 +2413,32 @@ export const saveKpiEvaluation = createServerFn({ method: "POST" })
 
     if (existing?.status === "approved" && !isAdmin) {
       throw new Error("Locked: Approved evaluations cannot be edited by managers. Contact HR or an Admin.");
+    }
+
+    if (!isAdmin && isManager) {
+      const prevScores = (existing?.scores || {}) as Record<string, any>;
+      const nextScores = (input.scores || {}) as Record<string, any>;
+      const allKeys = new Set([...Object.keys(prevScores), ...Object.keys(nextScores)]);
+      const changedQuarters: Array<"q1" | "q2" | "q3" | "q4"> = [];
+
+      for (const q of ["q1", "q2", "q3", "q4"] as const) {
+        let qChanged = false;
+        for (const k of allKeys) {
+          const prevActual = prevScores[k]?.[q]?.actual ?? null;
+          const nextActual = nextScores[k]?.[q]?.actual ?? null;
+          if (!existing && nextActual != null) {
+            qChanged = true;
+            break;
+          }
+          if (existing && prevActual !== nextActual) {
+            qChanged = true;
+            break;
+          }
+        }
+        if (qChanged) changedQuarters.push(q);
+      }
+
+      await assertManagerPeriodActive(supabase, userId, input.year, changedQuarters);
     }
 
     const now = new Date().toISOString();
@@ -2404,6 +2509,10 @@ export const updateKpiEvaluationStatus = createServerFn({ method: "POST" })
 
     if (input.status === "approved" && !isAdmin) {
       throw new Error("Forbidden: Only HR or Admins can approve evaluations");
+    }
+
+    if (!isAdmin) {
+      await assertManagerPeriodActive(supabase, userId, existing.evaluation_year, []);
     }
 
     const now = new Date().toISOString();
@@ -2533,4 +2642,388 @@ export const listMyKpiEvaluations = createServerFn({ method: "POST" })
 
     if (error) throw new Error(`Failed to list your KPI evaluations: ${error.message}`);
     return (data || []) as KpiEvaluationRecord[];
+  });
+
+// ─── EVALUATION PERIODS & ACCESS CONTROL ──────────────────────────────────────
+
+export const listEvaluationPeriods = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => ListEvaluationPeriodsSchema.parse(input ?? {}))
+  .handler(async ({ data: input, context }) => {
+    const { supabase, userId } = context;
+    const { isAdmin } = await assertKpiAccess(supabase, userId);
+    if (!isAdmin) {
+      throw new Error("Forbidden: Only HR Admin can manage evaluation periods");
+    }
+
+    const targetYear = input.year ?? new Date().getFullYear();
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    // 1. Discover all managers (via user_roles AND direct reports in profiles)
+    const [{ data: roleRows }, { data: allProfiles }] = await Promise.all([
+      (supabase as any).from("user_roles").select("user_id, role").eq("role", "manager"),
+      (supabase as any)
+        .from("profiles")
+        .select(`
+          id,
+          full_name,
+          emp_code,
+          manager_id,
+          department_id,
+          department:departments!profiles_department_id_fkey(id, name_en, name_ar),
+          position:positions!profiles_position_id_fkey(id, name_en, name_ar)
+        `),
+    ]);
+
+    const roleManagerIds = new Set<string>((roleRows || []).map((r: any) => r.user_id));
+    const teamCountByManager = new Map<string, number>();
+    const profileMap = new Map<string, any>();
+
+    for (const p of allProfiles || []) {
+      profileMap.set(p.id, p);
+      if (p.manager_id) {
+        teamCountByManager.set(p.manager_id, (teamCountByManager.get(p.manager_id) || 0) + 1);
+      }
+    }
+
+    const managerIds = new Set<string>([...roleManagerIds, ...teamCountByManager.keys()]);
+    const managers = Array.from(managerIds)
+      .map((id) => {
+        const prof = profileMap.get(id);
+        if (!prof) return null;
+        return {
+          id: prof.id,
+          full_name: prof.full_name || "Manager",
+          emp_code: prof.emp_code || null,
+          department_name: prof.department?.name_en || null,
+          department_name_ar: prof.department?.name_ar || null,
+          position_name: prof.position?.name_en || null,
+          position_name_ar: prof.position?.name_ar || null,
+          team_count: teamCountByManager.get(id) || 0,
+        };
+      })
+      .filter(Boolean)
+      .sort((a: any, b: any) => String(a.full_name).localeCompare(String(b.full_name)));
+
+    // 2. Fetch periods for targetYear
+    let periodsQuery = (supabase as any)
+      .from("kpi_evaluation_periods")
+      .select("*")
+      .eq("evaluation_year", targetYear)
+      .order("quarter", { ascending: true })
+      .order("start_date", { ascending: true });
+
+    if (input.quarter && input.quarter !== "all") {
+      periodsQuery = periodsQuery.eq("quarter", input.quarter);
+    }
+
+    const { data: rawPeriods, error: periodsErr } = await periodsQuery;
+    if (periodsErr) {
+      throw new Error(`Failed to fetch evaluation periods: ${periodsErr.message}`);
+    }
+
+    const periods = (rawPeriods || [])
+      .map((p: any) => {
+        const computedStatus = computePeriodStatus(p, todayStr);
+        const mgr = profileMap.get(p.manager_id);
+        return {
+          ...p,
+          status: computedStatus,
+          manager_name: mgr?.full_name || "Manager",
+          manager_code: mgr?.emp_code || null,
+          department_name: mgr?.department?.name_en || null,
+          department_name_ar: mgr?.department?.name_ar || null,
+          team_count: teamCountByManager.get(p.manager_id) || 0,
+        };
+      })
+      .filter((p: any) => !input.status || input.status === "all" || p.status === input.status);
+
+    // 3. Fetch recent audit logs
+    const { data: rawLogs, error: logsErr } = await (supabase as any)
+      .from("kpi_evaluation_period_logs")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (logsErr) {
+      throw new Error(`Failed to fetch period audit logs: ${logsErr.message}`);
+    }
+
+    const logs = (rawLogs || []).map((l: any) => ({
+      ...l,
+      manager_name: profileMap.get(l.manager_id)?.full_name || "Manager",
+      admin_name: profileMap.get(l.performed_by)?.full_name || "HR Admin",
+    }));
+
+    return {
+      year: targetYear,
+      today: todayStr,
+      managers,
+      periods,
+      logs,
+    };
+  });
+
+export const saveEvaluationPeriod = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => SaveEvaluationPeriodSchema.parse(input))
+  .handler(async ({ data: input, context }) => {
+    const { supabase, userId } = context;
+    const { isAdmin } = await assertKpiAccess(supabase, userId);
+    if (!isAdmin) {
+      throw new Error("Forbidden: Only HR Admin can create or modify evaluation periods");
+    }
+
+    // Prevent overlapping periods for the same manager, year, and quarter
+    let overlapQuery = (supabase as any)
+      .from("kpi_evaluation_periods")
+      .select("id, start_date, end_date")
+      .eq("manager_id", input.managerId)
+      .eq("evaluation_year", input.year)
+      .eq("quarter", input.quarter)
+      .lte("start_date", input.endDate)
+      .gte("end_date", input.startDate);
+
+    if (input.id) {
+      overlapQuery = overlapQuery.neq("id", input.id);
+    }
+
+    const { data: overlaps, error: overlapErr } = await overlapQuery;
+    if (overlapErr) {
+      throw new Error(`Failed to validate period overlap: ${overlapErr.message}`);
+    }
+    if (overlaps && overlaps.length > 0) {
+      const first = overlaps[0];
+      throw new Error(
+        `Overlap Detected: This manager already has a ${input.quarter.toUpperCase()} (${input.year}) period covering ${first.start_date} to ${first.end_date}.`
+      );
+    }
+
+    const now = new Date().toISOString();
+
+    if (input.id) {
+      const { data: existing, error: fetchErr } = await (supabase as any)
+        .from("kpi_evaluation_periods")
+        .select("*")
+        .eq("id", input.id)
+        .single();
+
+      if (fetchErr || !existing) {
+        throw new Error("Evaluation period not found");
+      }
+
+      const { data: updated, error: updateErr } = await (supabase as any)
+        .from("kpi_evaluation_periods")
+        .update({
+          manager_id: input.managerId,
+          evaluation_year: input.year,
+          quarter: input.quarter,
+          start_date: input.startDate,
+          end_date: input.endDate,
+          notes: input.notes || null,
+          updated_by: userId,
+          updated_at: now,
+        })
+        .eq("id", input.id)
+        .select("*")
+        .single();
+
+      if (updateErr) {
+        throw new Error(`Failed to update evaluation period: ${updateErr.message}`);
+      }
+
+      const actionType = input.endDate > existing.end_date ? "extended" : "updated";
+      await (supabase as any).from("kpi_evaluation_period_logs").insert({
+        period_id: updated.id,
+        manager_id: input.managerId,
+        evaluation_year: input.year,
+        quarter: input.quarter,
+        action: actionType,
+        previous_start_date: existing.start_date,
+        previous_end_date: existing.end_date,
+        new_start_date: input.startDate,
+        new_end_date: input.endDate,
+        reason: input.reason || input.notes || null,
+        performed_by: userId,
+      });
+
+      return updated;
+    } else {
+      const { data: inserted, error: insertErr } = await (supabase as any)
+        .from("kpi_evaluation_periods")
+        .insert({
+          manager_id: input.managerId,
+          evaluation_year: input.year,
+          quarter: input.quarter,
+          start_date: input.startDate,
+          end_date: input.endDate,
+          is_manually_closed: false,
+          notes: input.notes || null,
+          created_by: userId,
+          updated_by: userId,
+          created_at: now,
+          updated_at: now,
+        })
+        .select("*")
+        .single();
+
+      if (insertErr) {
+        throw new Error(`Failed to create evaluation period: ${insertErr.message}`);
+      }
+
+      await (supabase as any).from("kpi_evaluation_period_logs").insert({
+        period_id: inserted.id,
+        manager_id: input.managerId,
+        evaluation_year: input.year,
+        quarter: input.quarter,
+        action: "created",
+        new_start_date: input.startDate,
+        new_end_date: input.endDate,
+        reason: input.reason || input.notes || null,
+        performed_by: userId,
+      });
+
+      return inserted;
+    }
+  });
+
+export const toggleEvaluationPeriodStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => ToggleEvaluationPeriodSchema.parse(input))
+  .handler(async ({ data: input, context }) => {
+    const { supabase, userId } = context;
+    const { isAdmin } = await assertKpiAccess(supabase, userId);
+    if (!isAdmin) {
+      throw new Error("Forbidden: Only HR Admin can reopen or close evaluation periods");
+    }
+
+    const { data: existing, error: fetchErr } = await (supabase as any)
+      .from("kpi_evaluation_periods")
+      .select("*")
+      .eq("id", input.id)
+      .single();
+
+    if (fetchErr || !existing) {
+      throw new Error("Evaluation period not found");
+    }
+
+    const now = new Date().toISOString();
+    const todayStr = now.slice(0, 10);
+
+    if (input.action === "close") {
+      const { data: updated, error: updateErr } = await (supabase as any)
+        .from("kpi_evaluation_periods")
+        .update({
+          is_manually_closed: true,
+          updated_by: userId,
+          updated_at: now,
+        })
+        .eq("id", input.id)
+        .select("*")
+        .single();
+
+      if (updateErr) {
+        throw new Error(`Failed to close evaluation period: ${updateErr.message}`);
+      }
+
+      await (supabase as any).from("kpi_evaluation_period_logs").insert({
+        period_id: updated.id,
+        manager_id: existing.manager_id,
+        evaluation_year: existing.evaluation_year,
+        quarter: existing.quarter,
+        action: "manually_closed",
+        previous_start_date: existing.start_date,
+        previous_end_date: existing.end_date,
+        new_start_date: existing.start_date,
+        new_end_date: existing.end_date,
+        reason: input.reason || "Manually closed by HR Admin",
+        performed_by: userId,
+      });
+
+      return updated;
+    } else {
+      const targetEndDate = input.newEndDate || (todayStr > existing.end_date ? todayStr : existing.end_date);
+      if (targetEndDate < existing.start_date) {
+        throw new Error("End date cannot be earlier than the period start date");
+      }
+
+      // Check overlap if extended
+      if (targetEndDate !== existing.end_date) {
+        const { data: overlaps } = await (supabase as any)
+          .from("kpi_evaluation_periods")
+          .select("id, start_date, end_date")
+          .eq("manager_id", existing.manager_id)
+          .eq("evaluation_year", existing.evaluation_year)
+          .eq("quarter", existing.quarter)
+          .neq("id", existing.id)
+          .lte("start_date", targetEndDate)
+          .gte("end_date", existing.start_date);
+
+        if (overlaps && overlaps.length > 0) {
+          throw new Error(
+            `Overlap Detected: Extending end date to ${targetEndDate} overlaps with another ${existing.quarter.toUpperCase()} period.`
+          );
+        }
+      }
+
+      const { data: updated, error: updateErr } = await (supabase as any)
+        .from("kpi_evaluation_periods")
+        .update({
+          is_manually_closed: false,
+          end_date: targetEndDate,
+          reopened_count: (existing.reopened_count || 0) + 1,
+          updated_by: userId,
+          updated_at: now,
+        })
+        .eq("id", input.id)
+        .select("*")
+        .single();
+
+      if (updateErr) {
+        throw new Error(`Failed to reopen evaluation period: ${updateErr.message}`);
+      }
+
+      await (supabase as any).from("kpi_evaluation_period_logs").insert({
+        period_id: updated.id,
+        manager_id: existing.manager_id,
+        evaluation_year: existing.evaluation_year,
+        quarter: existing.quarter,
+        action: "reopened",
+        previous_start_date: existing.start_date,
+        previous_end_date: existing.end_date,
+        new_start_date: existing.start_date,
+        new_end_date: targetEndDate,
+        reason: input.reason || "Reopened by HR Admin",
+        performed_by: userId,
+      });
+
+      return updated;
+    }
+  });
+
+export const getMyManagerEvaluationPeriods = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => GetMyManagerPeriodsSchema.parse(input ?? {}))
+  .handler(async ({ data: input, context }) => {
+    const { supabase, userId } = context;
+    await assertKpiAccess(supabase, userId);
+
+    const targetYear = input.year ?? new Date().getFullYear();
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    const { data, error } = await (supabase as any)
+      .from("kpi_evaluation_periods")
+      .select("*")
+      .eq("manager_id", userId)
+      .eq("evaluation_year", targetYear)
+      .order("quarter", { ascending: true });
+
+    if (error) {
+      throw new Error(`Failed to fetch your evaluation periods: ${error.message}`);
+    }
+
+    return (data || []).map((p: any) => ({
+      ...p,
+      status: computePeriodStatus(p, todayStr),
+    }));
   });
