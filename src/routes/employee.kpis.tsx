@@ -554,7 +554,14 @@ export function EmployeeKpiPage() {
       employeeCode: profileDetails?.emp_code || "",
       evaluatorName: evaluation.evaluator_name || profileDetails?.manager || "Manager",
       evaluationState: stateMap,
-      notes: evaluation.notes || { strengths: "", growthAreas: "", recommendations: "" },
+      notes: {
+        strengths: evaluation.notes?.strengths || "",
+        growthAreas: (evaluation.notes?.growthAreas || "")
+          .replace(/\[HR Return Note.*?\]:[^\n]*\n?/gi, "")
+          .replace(/\[Manager Reply.*?\]:[^\n]*\n?/gi, "")
+          .trim(),
+        recommendations: evaluation.notes?.recommendations || "",
+      },
       year: selectedYear,
       department: profileDetails?.department || (evaluation.employee as any)?.department?.name_en || "Engineering",
       jobTitle: profileDetails?.position || (evaluation.employee as any)?.position?.name_en || "Site Engineer",
@@ -1020,8 +1027,7 @@ export function EmployeeKpiPage() {
                 {quartersList.map((item) => {
                   // score is 0-100 (direct from kpi_quarterly_evaluations.score)
                   const isApproved = item.status === "approved";
-                  const isSubmitted = item.status === "submitted";
-                  const isReturned = item.status === "returned";
+                  const isSubmitted = item.status === "submitted" || item.status === "returned";
                   const hasScore = item.score !== null;
                   // progress: score / target * 100 (both are 0-100)
                   const progress = hasScore ? Math.min(100, Math.round((item.score! / item.target) * 100)) : 0;
@@ -1030,17 +1036,13 @@ export function EmployeeKpiPage() {
                     ? "bg-emerald-600 text-white border-transparent"
                     : isSubmitted
                       ? "bg-blue-600 text-white border-transparent"
-                      : isReturned
-                        ? "bg-amber-500 text-white border-transparent"
-                        : "";
+                      : "";
 
                   const badgeLabel = isApproved
                     ? (isAr ? "معتمد" : "Approved")
                     : isSubmitted
                       ? (isAr ? "بانتظار المراجعة" : "Pending Review")
-                      : isReturned
-                        ? (isAr ? "مُعاد" : "Returned")
-                        : null;
+                      : null;
 
                   return (
                     <div

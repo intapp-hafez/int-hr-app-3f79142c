@@ -2610,8 +2610,57 @@ export const getMyKpiEvaluation = createServerFn({ method: "POST" })
       return new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime();
     });
 
-    return (sorted[0] as KpiEvaluationRecord) || null;
+    return sanitizeEvaluationForEmployee(sorted[0]);
   });
+
+function sanitizeEvaluationForEmployee(record: any): KpiEvaluationRecord {
+  if (!record) return record;
+
+  const cleanNotes =
+    record.notes && typeof record.notes === "object"
+      ? { ...record.notes }
+      : { strengths: "", growthAreas: "", recommendations: "" };
+
+  delete cleanNotes.returnReason;
+  if (typeof cleanNotes.growthAreas === "string") {
+    cleanNotes.growthAreas = cleanNotes.growthAreas
+      .replace(/\[HR Return Note.*?\]:[^\n]*\n?/gi, "")
+      .replace(/\[Manager Reply.*?\]:[^\n]*\n?/gi, "")
+      .trim();
+  }
+  if (cleanNotes.quarterStatuses && typeof cleanNotes.quarterStatuses === "object") {
+    const sanitizedQS: Record<string, any> = {};
+    for (const [qKey, qVal] of Object.entries(cleanNotes.quarterStatuses)) {
+      if (qVal && typeof qVal === "object") {
+        const { return_reason, returnReason, ...rest } = qVal as any;
+        sanitizedQS[qKey] = {
+          ...rest,
+          status: rest.status === "returned" ? "submitted" : rest.status,
+        };
+      }
+    }
+    cleanNotes.quarterStatuses = sanitizedQS;
+  }
+
+  const cleanScores: Record<string, any> = {};
+  if (record.scores && typeof record.scores === "object") {
+    for (const [k, v] of Object.entries(record.scores)) {
+      if (v && typeof v === "object") {
+        const { adminNotes, isReturned, notes: rowNotes, ...rest } = v as any;
+        cleanScores[k] = rest;
+      } else {
+        cleanScores[k] = v;
+      }
+    }
+  }
+
+  return {
+    ...record,
+    status: record.status === "returned" ? "submitted" : record.status,
+    scores: cleanScores,
+    notes: cleanNotes,
+  } as KpiEvaluationRecord;
+}
 
 export const listMyKpiEvaluations = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -2641,7 +2690,7 @@ export const listMyKpiEvaluations = createServerFn({ method: "POST" })
       .order("evaluation_year", { ascending: false });
 
     if (error) throw new Error(`Failed to list your KPI evaluations: ${error.message}`);
-    return (data || []) as KpiEvaluationRecord[];
+    return (data || []).map(sanitizeEvaluationForEmployee);
   });
 
 // ─── EVALUATION PERIODS & ACCESS CONTROL ──────────────────────────────────────
