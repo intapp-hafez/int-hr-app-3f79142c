@@ -3901,6 +3901,18 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                                   <p className="text-[11px] text-muted-foreground line-clamp-1">
                                     {isAr ? kpi.definition_ar : kpi.definition}
                                   </p>
+                                  {(kpi.inputType === "rating_5" || kpi.unit === "scale") && (
+                                    <div className="mt-1 inline-flex flex-wrap items-center gap-x-2.5 gap-y-0.5 rounded-lg border border-blue-500/20 bg-blue-500/5 px-2 py-1 text-[10px] text-blue-800 dark:text-blue-300 font-medium">
+                                      <span className="font-bold text-blue-700 dark:text-blue-200">
+                                        {isAr ? "مقياس التقييم (1-5):" : "Rating Scale:"}
+                                      </span>
+                                      <span>{isAr ? "1 = ضعيف" : "1 = Poor"}</span>
+                                      <span>{isAr ? "2 = أقل من المتوقع" : "2 = Below Expectations"}</span>
+                                      <span>{isAr ? "3 = يفي بالتوقعات" : "3 = Meets Expectations"}</span>
+                                      <span>{isAr ? "4 = يفوق التوقعات" : "4 = Exceeds Expectations"}</span>
+                                      <span>{isAr ? "5 = متميز" : "5 = Outstanding"}</span>
+                                    </div>
+                                  )}
                                   {(row as any).adminNotes && (
                                     <div className="mt-1 p-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-[11px] flex items-start gap-1.5 font-medium leading-relaxed shadow-xs">
                                       <AlertCircle className="h-3.5 w-3.5 text-amber-600 shrink-0 mt-0.5" />
