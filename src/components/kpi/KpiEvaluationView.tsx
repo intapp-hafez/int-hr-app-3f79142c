@@ -728,9 +728,34 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
   // State for Criteria Management
   const [criteriaLayerFilter, setCriteriaLayerFilter] = useState<"all" | "common" | "role" | "custom">("all");
   const [criteriaCategoryFilter, setCriteriaCategoryFilter] = useState<string>("all");
-  const [groupByCategory, setGroupByCategory] = useState<boolean>(true);
+  const [groupByCategory, setGroupByCategory] = useState<boolean>(false);
+  const [criteriaPage, setCriteriaPage] = useState<number>(1);
+  const CRITERIA_PAGE_SIZE = 30;
   const [criterionModalOpen, setCriterionModalOpen] = useState(false);
   const [editingCriterion, setEditingCriterion] = useState<any | null>(null);
+
+  useEffect(() => {
+    setCriteriaPage(1);
+  }, [criteriaLayerFilter, criteriaCategoryFilter]);
+
+  const filteredCriteriaList = useMemo(() => {
+    return (kpiCriteria || []).filter((crit: any) => {
+      const matchLayer = criteriaLayerFilter === "all" || crit.layer === criteriaLayerFilter;
+      const critCat = crit.category_en || crit.category || "operational";
+      const matchCat =
+        criteriaCategoryFilter === "all" ||
+        critCat === criteriaCategoryFilter ||
+        crit.category === criteriaCategoryFilter;
+      return matchLayer && matchCat;
+    });
+  }, [kpiCriteria, criteriaLayerFilter, criteriaCategoryFilter]);
+
+  const criteriaTotalPages = Math.max(1, Math.ceil(filteredCriteriaList.length / CRITERIA_PAGE_SIZE));
+  const safeCriteriaPage = Math.min(criteriaPage, criteriaTotalPages);
+  const paginatedCriteria = useMemo(() => {
+    const start = (safeCriteriaPage - 1) * CRITERIA_PAGE_SIZE;
+    return filteredCriteriaList.slice(start, start + CRITERIA_PAGE_SIZE);
+  }, [filteredCriteriaList, safeCriteriaPage]);
 
   // Unique categories in Criteria Catalog for filtering
   const criteriaCategoriesList = useMemo(() => {
@@ -5278,116 +5303,193 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                     )}
                   </div>
                 ) : (
-                  /* Flat List View */
-                  <div className="divide-y divide-border rounded-2xl border border-border overflow-hidden bg-card">
-                    {kpiCriteria
-                      .filter((crit: any) => {
-                        const matchLayer = criteriaLayerFilter === "all" || crit.layer === criteriaLayerFilter;
-                        const critCat = crit.category_en || crit.category || "operational";
-                        const matchCat =
-                          criteriaCategoryFilter === "all" ||
-                          critCat === criteriaCategoryFilter ||
-                          crit.category === criteriaCategoryFilter;
-                        return matchLayer && matchCat;
-                      })
-                      .map((crit: any) => {
-                        const weightPct = crit.default_weight ? (crit.default_weight * 100).toFixed(1) : "—";
-                        const targetPct =
-                          crit.default_target !== undefined && crit.default_target !== null
-                            ? (crit.default_target <= 1
-                              ? (crit.default_target * 100).toFixed(0)
-                              : crit.default_target)
-                            : crit.max_value !== undefined && crit.max_value !== null
-                              ? crit.max_value
-                              : "—";
+                  /* Default Table View with Pagination (30 per page) */
+                  <div className="rounded-2xl border border-border overflow-hidden bg-card shadow-2xs">
+                    {paginatedCriteria.length === 0 ? (
+                      <div className="p-12 text-center text-xs text-muted-foreground">
+                        {isAr ? "لا توجد معايير مطابقة للفلاتر المحددة" : "No criteria match the selected filters."}
+                      </div>
+                    ) : (
+                      <>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs text-start border-collapse">
+                            <thead>
+                              <tr className="border-b border-border bg-muted/40 text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
+                                <th className="px-3.5 py-3 text-center w-12">#</th>
+                                <th className="px-3.5 py-3 text-start">{isAr ? "الكود" : "Code"}</th>
+                                <th className="px-3.5 py-3 text-start">{isAr ? "المعيار وطريقة القياس" : "Criterion & Measurement"}</th>
+                                <th className="px-3.5 py-3 text-start">{isAr ? "الفئة" : "Category"}</th>
+                                <th className="px-3.5 py-3 text-center">{isAr ? "الطبقة" : "Layer"}</th>
+                                <th className="px-3.5 py-3 text-center">{isAr ? "الاتجاه / الوحدة" : "Direction / Unit"}</th>
+                                <th className="px-3.5 py-3 text-center">{isAr ? "الوزن" : "Weight"}</th>
+                                <th className="px-3.5 py-3 text-center">{isAr ? "الهدف" : "Target"}</th>
+                                <th className="px-3.5 py-3 text-end">{isAr ? "إجراءات" : "Actions"}</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border/70">
+                              {paginatedCriteria.map((crit: any, idx: number) => {
+                                const rowNum = (safeCriteriaPage - 1) * CRITERIA_PAGE_SIZE + idx + 1;
+                                const weightPct = crit.default_weight ? (crit.default_weight * 100).toFixed(1) : "—";
+                                const targetPct =
+                                  crit.default_target !== undefined && crit.default_target !== null
+                                    ? (crit.default_target <= 1
+                                      ? (crit.default_target * 100).toFixed(0)
+                                      : crit.default_target)
+                                    : crit.max_value !== undefined && crit.max_value !== null
+                                      ? crit.max_value
+                                      : "—";
 
-                        return (
-                          <div
-                            key={crit.id}
-                            className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-muted/30 transition-colors"
-                          >
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0">
-                                  {crit.code}
-                                </Badge>
-                                <span className="font-bold text-xs text-foreground">
-                                  {isAr ? crit.name_ar : crit.name_en}
-                                </span>
-                                <Badge
-                                  className={`text-[10px] px-2 py-0 ${crit.layer === "common"
-                                    ? "bg-blue-600 text-white"
-                                    : crit.layer === "role"
-                                      ? "bg-emerald-600 text-white"
-                                      : "bg-purple-600 text-white"
+                                return (
+                                  <tr key={crit.id} className="hover:bg-muted/25 transition-colors">
+                                    <td className="px-3.5 py-2.5 text-center font-mono text-[11px] text-muted-foreground">
+                                      {rowNum}
+                                    </td>
+                                    <td className="px-3.5 py-2.5">
+                                      <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0 whitespace-nowrap">
+                                        {crit.code}
+                                      </Badge>
+                                    </td>
+                                    <td className="px-3.5 py-2.5 max-w-md">
+                                      <div className="font-bold text-xs text-foreground">
+                                        {isAr ? crit.name_ar : crit.name_en}
+                                      </div>
+                                      {crit.how_measured_en && crit.how_measured_en !== crit.category_en && (
+                                        <p className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5">
+                                          {isAr ? crit.how_measured_ar : crit.how_measured_en}
+                                        </p>
+                                      )}
+                                    </td>
+                                    <td className="px-3.5 py-2.5 text-[11px] text-muted-foreground">
+                                      {isAr ? crit.category_ar : crit.category_en}
+                                    </td>
+                                    <td className="px-3.5 py-2.5 text-center">
+                                      <Badge
+                                        className={`text-[10px] px-2 py-0 ${crit.layer === "common"
+                                          ? "bg-blue-600 text-white"
+                                          : crit.layer === "role"
+                                            ? "bg-emerald-600 text-white"
+                                            : "bg-purple-600 text-white"
+                                          }`}
+                                      >
+                                        {crit.layer === "common"
+                                          ? isAr ? "عام" : "Common"
+                                          : crit.layer === "role"
+                                            ? isAr ? "تخصصي" : "Role"
+                                            : isAr ? "مخصص" : "Custom"}
+                                      </Badge>
+                                    </td>
+                                    <td className="px-3.5 py-2.5 text-center">
+                                      <div className="inline-flex items-center gap-1">
+                                        {crit.scoring_direction && (
+                                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono text-muted-foreground whitespace-nowrap">
+                                            {crit.scoring_direction === "higher_is_better"
+                                              ? isAr ? "الأعلى ↑" : "Higher ↑"
+                                              : crit.scoring_direction === "lower_is_better"
+                                                ? isAr ? "الأقل ↓" : "Lower ↓"
+                                                : crit.scoring_direction === "rating_5"
+                                                  ? isAr ? "1-5 ★" : "1-5 ★"
+                                                  : crit.scoring_direction}
+                                          </Badge>
+                                        )}
+                                        {crit.unit && (
+                                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono text-muted-foreground">
+                                            {crit.unit}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    </td>
+                                    <td className="px-3.5 py-2.5 text-center font-mono font-bold text-foreground">
+                                      {weightPct}%
+                                    </td>
+                                    <td className="px-3.5 py-2.5 text-center font-mono font-bold text-emerald-600">
+                                      {targetPct}%
+                                    </td>
+                                    <td className="px-3.5 py-2.5 text-end">
+                                      <div className="inline-flex items-center gap-1">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => handleOpenEditCriterion(crit)}
+                                          className="h-7 w-7 p-0 rounded-lg text-muted-foreground hover:text-brand cursor-pointer"
+                                          title={isAr ? "تعديل" : "Edit"}
+                                        >
+                                          <Pencil className="h-3.5 w-3.5" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => handleArchiveCriterion(crit.id)}
+                                          className="h-7 w-7 p-0 rounded-lg text-muted-foreground hover:text-rose-600 cursor-pointer"
+                                          title={isAr ? "أرشفة" : "Archive"}
+                                        >
+                                          <Trash2 className="h-3.5 w-3.5" />
+                                        </Button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* Pagination Footer (30 per page) */}
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border/70 px-4 py-3 bg-muted/20 text-xs">
+                          <span className="text-muted-foreground">
+                            {isAr
+                              ? `عرض ${(safeCriteriaPage - 1) * CRITERIA_PAGE_SIZE + 1} إلى ${Math.min(safeCriteriaPage * CRITERIA_PAGE_SIZE, filteredCriteriaList.length)} من أصل ${filteredCriteriaList.length} معيار (30 لكل صفحة)`
+                              : `Showing ${(safeCriteriaPage - 1) * CRITERIA_PAGE_SIZE + 1} to ${Math.min(safeCriteriaPage * CRITERIA_PAGE_SIZE, filteredCriteriaList.length)} of ${filteredCriteriaList.length} criteria (30 per page)`}
+                          </span>
+
+                          <div className="flex items-center gap-1.5">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setCriteriaPage((p) => Math.max(1, p - 1))}
+                              disabled={safeCriteriaPage <= 1}
+                              className="h-7 rounded-xl px-2.5 text-xs cursor-pointer"
+                            >
+                              {isAr ? "السابق" : "Previous"}
+                            </Button>
+
+                            <div className="flex items-center gap-1 font-mono font-semibold">
+                              {Array.from({ length: Math.min(5, criteriaTotalPages) }, (_, idx) => {
+                                let pageNum = idx + 1;
+                                if (criteriaTotalPages > 5 && safeCriteriaPage > 3) {
+                                  pageNum = safeCriteriaPage - 2 + idx;
+                                  if (pageNum > criteriaTotalPages) pageNum = criteriaTotalPages - (4 - idx);
+                                }
+                                const isCur = pageNum === safeCriteriaPage;
+                                return (
+                                  <button
+                                    key={pageNum}
+                                    type="button"
+                                    onClick={() => setCriteriaPage(pageNum)}
+                                    className={`h-7 w-7 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                      isCur
+                                        ? "bg-orange-600 text-white shadow-xs"
+                                        : "border border-border bg-card text-muted-foreground hover:bg-muted/40 hover:text-foreground"
                                     }`}
-                                >
-                                  {crit.layer === "common"
-                                    ? isAr ? "معيار عام" : "Common"
-                                    : crit.layer === "role"
-                                      ? isAr ? "معيار تخصصي" : "Role"
-                                      : isAr ? "مخصص" : "Custom"}
-                                </Badge>
-
-                                {crit.scoring_direction && (
-                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono text-muted-foreground">
-                                    {crit.scoring_direction === "higher_is_better"
-                                      ? isAr ? "الأعلى أفضل ↑" : "Higher ↑"
-                                      : crit.scoring_direction === "lower_is_better"
-                                        ? isAr ? "الأقل أفضل ↓" : "Lower ↓"
-                                        : crit.scoring_direction === "rating_5"
-                                          ? isAr ? "مقياس 1-5 ★" : "Scale 1-5"
-                                          : crit.scoring_direction}
-                                  </Badge>
-                                )}
-                                {crit.unit && (
-                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono text-muted-foreground">
-                                    {crit.unit}
-                                  </Badge>
-                                )}
-                              </div>
-                              <p className="text-[11px] text-muted-foreground">
-                                {isAr ? crit.category_ar : crit.category_en}
-                                {crit.how_measured_en && crit.how_measured_en !== crit.category_en && (
-                                  <span className="ms-2 text-muted-foreground/80">
-                                    • {isAr ? crit.how_measured_ar : crit.how_measured_en}
-                                  </span>
-                                )}
-                              </p>
+                                  >
+                                    {pageNum}
+                                  </button>
+                                );
+                              })}
                             </div>
 
-                            <div className="flex items-center gap-3 shrink-0">
-                              <div className="text-end font-mono text-xs">
-                                <span className="text-muted-foreground">{isAr ? "الوزن:" : "Weight:"} </span>
-                                <strong className="text-foreground">{weightPct}%</strong>
-                                <span className="ms-2 text-muted-foreground">{isAr ? "الهدف:" : "Target:"} </span>
-                                <strong className="text-emerald-600">{targetPct}%</strong>
-                              </div>
-
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleOpenEditCriterion(crit)}
-                                  className="h-7 w-7 p-0 rounded-lg text-muted-foreground hover:text-brand cursor-pointer"
-                                  title={isAr ? "تعديل" : "Edit"}
-                                >
-                                  <Pencil className="h-3.5 w-3.5" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleArchiveCriterion(crit.id)}
-                                  className="h-7 w-7 p-0 rounded-lg text-muted-foreground hover:text-rose-600 cursor-pointer"
-                                  title={isAr ? "أرشفة" : "Archive"}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
-                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setCriteriaPage((p) => Math.min(criteriaTotalPages, p + 1))}
+                              disabled={safeCriteriaPage >= criteriaTotalPages}
+                              className="h-7 rounded-xl px-2.5 text-xs cursor-pointer"
+                            >
+                              {isAr ? "التالي" : "Next"}
+                            </Button>
                           </div>
-                        );
-                      })}
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
