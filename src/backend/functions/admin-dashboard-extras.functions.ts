@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireAdminAccess } from "@/integrations/supabase/admin-auth-middleware";
+import { resolveTeamMemberScope } from "@/lib/team.functions";
 
 function dateKey(d: Date) { return d.toISOString().slice(0, 10); }
 function startOfDay(d: Date) { const x = new Date(d); x.setHours(0,0,0,0); return x; }
@@ -82,7 +83,8 @@ export type AlertKind =
   | "late"
   | "absent"
   | "checkin"
-  | "checkout";
+  | "checkout"
+  | "task_status";
 
 export type AdminAlert = {
   id: string;
@@ -102,7 +104,124 @@ export const getAdminAlerts = createServerFn({ method: "GET" })
     const in30Iso = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
     const past30Iso = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
 
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    const roles = ((context as any).roles ?? []) as string[];
+    const isHrOrAdmin = roles.includes("admin") || roles.includes("hr");
+
+    // Non-HR/Admin (Managers): strictly scoped to team employee check-in/out & task status (no HR expirations, advances, or company-wide absent counts)
+    if (!isHrOrAdmin) {
+      const scope = await resolveTeamMemberScope(supabase, userId);
+      let teamIds: string[] = [];
+      if (!scope.isAdmin) {
+        const { data: teamProfiles } = await supabase
+          .from("profiles")
+          .select("id")
+          .or(
+            `manager_id.eq.${userId}${
+              scope.managedDeptIds?.length ? `,department_id.in.(${scope.managedDeptIds.join(",")})` : ""
+            }`
+          );
+        teamIds = (teamProfiles ?? []).map((p: any) => p.id);
+      }
+
+      const managerAlerts: AdminAlert[] = [];
+      let lateCount = 0;
+      let checkoutCount = 0;
+
+      if (teamIds.length > 0) {
+        const { data: teamAtt } = await supabase
+          .from("attendance")
+          .select("id, status, in_time, out_time, branch, employee_id, profiles:employee_id(full_name)")
+          .eq("date", today)
+          .in("employee_id", teamIds)
+          .order("in_time", { ascending: false })
+          .limit(40);
+
+        for (const r of (teamAtt ?? []) as any[]) {
+          if (r.out_time) {
+            checkoutCount++;
+            managerAlerts.push({
+              id: `out-${r.id}`,
+              kind: "checkout",
+              severity: "info",
+              title: `${r.profiles?.full_name ?? "Employee"} checked out`,
+              description: `${r.branch ?? "—"} • ${new Date(r.out_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
+              ts: r.out_time,
+              link: "/manager/check",
+            });
+          }
+          if (r.status === "late") {
+            lateCount++;
+            managerAlerts.push({
+              id: `att-${r.id}`,
+              kind: "late",
+              severity: "danger",
+              title: `${r.profiles?.full_name ?? "Employee"} checked in late`,
+              description: `${r.branch ?? "—"} • ${r.in_time ? new Date(r.in_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}`,
+              ts: r.in_time ?? new Date().toISOString(),
+              link: "/manager/check",
+            });
+          } else if (r.status === "present" && r.in_time) {
+            managerAlerts.push({
+              id: `att-${r.id}`,
+              kind: "checkin",
+              severity: "info",
+              title: `${r.profiles?.full_name ?? "Employee"} checked in`,
+              description: `${r.branch ?? "—"} • ${new Date(r.in_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
+              ts: r.in_time,
+              link: "/manager/check",
+            });
+          }
+        }
+      }
+
+      // Recent team task status updates (tasks created by manager or assigned to manager/team)
+      const { data: recentTasks } = await supabase
+        .from("tasks")
+        .select("id, title, status, priority, assignees, created_by, started_at, completed_at, created_at")
+        .order("created_at", { ascending: false })
+        .limit(40);
+
+      const teamIdSet = new Set([...teamIds, userId]);
+      for (const t of (recentTasks ?? []) as any[]) {
+        const assignees: string[] = Array.isArray(t.assignees) ? t.assignees : [];
+        const isRelated = t.created_by === userId || assignees.some((id) => teamIdSet.has(id));
+        if (!isRelated) continue;
+
+        const statusLabel =
+          t.status === "done"
+            ? "Completed"
+            : t.status === "in_progress"
+              ? "In Progress"
+              : t.status === "cancelled"
+                ? "Cancelled"
+                : "Pending";
+        const ts = t.completed_at || t.started_at || t.created_at;
+        managerAlerts.push({
+          id: `task-${t.id}-${t.status}`,
+          kind: "task_status",
+          severity: t.status === "done" ? "info" : t.status === "cancelled" ? "warning" : "info",
+          title: `Task "${t.title}" — ${statusLabel}`,
+          description: `Priority: ${t.priority ?? "normal"}`,
+          ts,
+          link: "/manager/tasks",
+        });
+      }
+
+      managerAlerts.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
+
+      return {
+        alerts: managerAlerts.slice(0, 40),
+        counts: {
+          pendingLeaves: 0,
+          late: lateCount,
+          absent: 0,
+          checkout: checkoutCount,
+          total: managerAlerts.length,
+        },
+        isManagerScoped: true,
+      };
+    }
     const [pend, decidedLeaves, att, totalEmp, expiringProfiles, pendingAdvances] = await Promise.all([
       supabase
         .from("leaves")
@@ -330,5 +449,6 @@ export const getAdminAlerts = createServerFn({ method: "GET" })
         checkout: checkoutCount,
         total: alerts.length,
       },
+      isManagerScoped: false,
     };
   });

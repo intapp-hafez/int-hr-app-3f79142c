@@ -17,6 +17,7 @@ import {
   Award,
   Timer,
   DollarSign,
+  CheckSquare,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { supabase } from "@/integrations/supabase/client";
@@ -39,6 +40,7 @@ const ICONS: Record<AdminAlert["kind"], typeof Bell> = {
   military_expiry: Award,
   probation_end: Timer,
   advance_payment: DollarSign,
+  task_status: CheckSquare,
 };
 const TONES: Record<string, string> = {
   info: "bg-info/10 text-info",
@@ -132,6 +134,7 @@ export function NotificationsBell() {
       .channel("admin-bell-realtime")
       .on("postgres_changes", { event: "*", schema: "public", table: "attendance" }, refresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "leaves" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, refresh)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [qc]);
@@ -207,7 +210,7 @@ export function NotificationsBell() {
             return (
               <button key={k} onClick={() => setTab(k)}
                 className={`rounded-md px-2 py-1.5 text-xs font-medium transition ${tab === k ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/60"}`}>
-                {k === "alerts" ? "HR alerts" : "My inbox"}{c > 0 ? ` (${c > 99 ? "99+" : c})` : ""}
+                {k === "alerts" ? ((data as any)?.isManagerScoped ? "Team alerts" : "HR alerts") : "My inbox"}{c > 0 ? ` (${c > 99 ? "99+" : c})` : ""}
               </button>
             );
           })}

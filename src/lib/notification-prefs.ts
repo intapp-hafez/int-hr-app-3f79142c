@@ -14,6 +14,7 @@ export type AlertCategory =
   | "absent"
   | "checkin"
   | "checkout"
+  | "task_status"
   | "face_missing"
   | "face_invalid"
   | "face_ready";
@@ -135,6 +136,7 @@ export const CATEGORY_META: {
   { id: "face_missing", label: "Face enrollment missing", description: "Your face is not enrolled and check in/out is blocked", group: "biometrics" },
   { id: "face_invalid", label: "Face enrollment invalid", description: "Your stored face data is corrupted and must be redone", group: "biometrics" },
   { id: "face_ready", label: "Face enrollment ready", description: "Your face is enrolled and ready for check in/out", group: "biometrics" },
+  { id: "task_status", label: "Team task status", description: "Updates when assigned tasks change status", group: "requests" },
 ];
 
 export const CHANNEL_META: { id: AlertChannel; label: string; description: string }[] = [
@@ -159,6 +161,7 @@ const DEFAULT: CategoryPrefs = {
   face_missing:    { inapp: true, email: true,  push: false },
   face_invalid:    { inapp: true, email: true,  push: false },
   face_ready:      { inapp: true, email: false, push: false },
+  task_status:     { inapp: true, email: false, push: false },
 };
 
 const KEY = "notification-prefs:v1";
