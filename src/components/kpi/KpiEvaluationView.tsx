@@ -2596,6 +2596,97 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
         </div>
       </div>
 
+      {/* Main Tabs Navigation */}
+      <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
+          <TabsList className="h-auto w-full sm:w-auto bg-transparent p-0 flex overflow-x-auto no-scrollbar gap-1.5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            {!isManagerMode && (
+              <TabsTrigger
+                value="evaluation-periods"
+                className="group rounded-full px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer transition-all text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
+              >
+                <span>{isAr ? "فترات التقييم" : "Evaluation Periods"}</span>
+              </TabsTrigger>
+            )}
+            <TabsTrigger
+              value="all-employees"
+              className="group rounded-full px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer transition-all text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
+            >
+              <span>{isManagerMode ? (isAr ? "تقييمات فريق العمل" : "Team Evaluations") : (isAr ? "سجل جميع الموظفين" : "All Employees Evaluations")}</span>
+              {employeesWithEvaluations.length > 0 && (
+                <Badge
+                  variant="secondary"
+                  className="px-1.5 py-0 text-[10px] font-mono transition-colors group-data-[state=active]:bg-white/20 group-data-[state=active]:text-white group-data-[state=active]:border-transparent"
+                >
+                  {employeesWithEvaluations.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger
+              value="scorecard"
+              className="group rounded-full px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer transition-all text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
+            >
+              <span>{isAr ? "بطاقة التقييم" : "Evaluation Scorecard"}</span>
+            </TabsTrigger>
+            {isManagerMode && returnedEvaluations.length > 0 && (
+              <TabsTrigger
+                value="pending-returns"
+                className="group rounded-full px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer transition-all text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
+              >
+                <span>{isAr ? "التقييمات المعادة" : "Pending Returns"}</span>
+                {returnedEvaluations.length > 0 && (
+                  <Badge className="bg-rose-500 text-white px-1.5 py-0 text-[10px] font-mono transition-colors group-data-[state=active]:bg-white/20 group-data-[state=active]:text-white group-data-[state=active]:border-transparent">
+                    {returnedEvaluations.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            )}
+            {!isManagerMode && (
+              <TabsTrigger
+                value="pending-approvals"
+                className="group rounded-full px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer transition-all text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
+              >
+                <span>{isAr ? "المعاملات المعلقة" : "Pending Approvals"}</span>
+                {pendingApprovals.length > 0 && (
+                  <Badge className="bg-amber-500 text-white px-1.5 py-0 text-[10px] font-mono transition-colors group-data-[state=active]:bg-white/20 group-data-[state=active]:text-white group-data-[state=active]:border-transparent">
+                    {pendingApprovals.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            )}
+            {!isManagerMode && (
+              <TabsTrigger
+                value="templates-criteria"
+                className="group rounded-full px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer transition-all text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
+              >
+                <span>{isAr ? "القوالب والمعايير" : "Templates & Criteria"}</span>
+              </TabsTrigger>
+            )}
+          </TabsList>
+
+          {/* Quick Quarter Filter on Scorecard view */}
+          {mainTab === "scorecard" && (
+            <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-xl border border-border text-xs print:hidden">
+              <span className="px-2 font-medium text-muted-foreground flex items-center gap-1">
+                <Filter className="h-3 w-3" /> {isAr ? "عرض:" : "View:"}
+              </span>
+              {(["all", "q1", "q2", "q3", "q4"] as const).map((q) => (
+                <button
+                  key={q}
+                  type="button"
+                  onClick={() => setActiveQuarterFilter(q)}
+                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all cursor-pointer ${activeQuarterFilter === q
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                    }`}
+                >
+                  {q === "all" ? (isAr ? "الكل" : "ALL") : q.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
       {/* Manager Evaluation Period Access Banner */}
       {isManagerMode && !isLoadingMyPeriods && (
         <div
@@ -2665,6 +2756,362 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
         </div>
       )}
 
+        {/* ── TAB 0: ALL EMPLOYEES EVALUATIONS DIRECTORY ── */}
+        <TabsContent value="all-employees" className="space-y-4">
+          {/* Top Metric Overview Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="rounded-2xl border border-border bg-card p-4 shadow-2xs space-y-1">
+              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+                {isAr ? "إجمالي الكادر" : "Total Employees"}
+              </span>
+              <div className="flex items-baseline justify-between">
+                <span className="font-display text-2xl font-bold text-foreground">
+                  {evaluationsStats.total}
+                </span>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-card p-4 shadow-2xs space-y-1">
+              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+                {isAr ? "تم تقييمهم" : "Evaluated"}
+              </span>
+              <div className="flex items-baseline justify-between">
+                <span className="font-display text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  {evaluationsStats.evaluated}
+                </span>
+                <span className="text-xs text-muted-foreground font-mono">
+                  {evaluationsStats.total > 0
+                    ? Math.round((evaluationsStats.evaluated / evaluationsStats.total) * 100)
+                    : 0}%
+                </span>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-card p-4 shadow-2xs space-y-1">
+              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+                {isAr ? "معتمد رسمياً" : "Officially Approved"}
+              </span>
+              <div className="flex items-baseline justify-between">
+                <span className="font-display text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                  {evaluationsStats.approved}
+                </span>
+                <ShieldCheck className="h-4 w-4 text-emerald-600" />
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-card p-4 shadow-2xs space-y-1">
+              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+                {isAr ? "متوسط الدرجة السنوية" : "Average Score"}
+              </span>
+              <div className="flex items-baseline justify-between">
+                <span className="font-display text-2xl font-bold text-brand">
+                  {evaluationsStats.avgScore ? `${evaluationsStats.avgScore}%` : "—"}
+                </span>
+                <Award className="h-4 w-4 text-brand" />
+              </div>
+            </div>
+          </div>
+
+          {/* Filters & Export Bar */}
+          <div className="rounded-3xl border border-border bg-card p-4 shadow-2xs space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="font-display text-sm font-bold text-foreground">
+                  {isManagerMode
+                    ? (isAr ? ("سجل تقييمات فريق العمل لعام " + selectedYear) : ("Team Performance Scorecards — Year " + selectedYear))
+                    : (isAr ? ("سجل تقييمات الموظفين لعام " + selectedYear) : ("Staff KPI Scorecards Directory — Year " + selectedYear))}
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  {isManagerMode
+                    ? (isAr
+                      ? "قائمة أعضاء فريقك لتقييم أدائهم ومتابعة النتائج الربع سنوية والاعتمادات."
+                      : "Direct team members directory for performance evaluations and quarterly review tracking.")
+                    : (isAr
+                      ? "قائمة شاملة بنتائج الأرباع الأربعة والدرجة الإجمالية وحالة التقييم لكل موظف."
+                      : "Complete quarterly scorecards, annual percentages, and sign-off statuses.")}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(Number(e.target.value))}
+                  className="rounded-xl border border-input bg-background px-3 py-1.5 text-xs font-semibold shadow-2xs focus:ring-1 focus:ring-brand cursor-pointer"
+                >
+                  <option value={currentYear}>{currentYear}</option>
+                  <option value={currentYear - 1}>{currentYear - 1}</option>
+                  <option value={currentYear + 1}>{currentYear + 1}</option>
+                </select>
+
+                <Button
+                  size="sm"
+                  onClick={handleExportAllToExcel}
+                  className="rounded-xl gap-1.5 text-xs h-8 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold cursor-pointer shadow-xs"
+                >
+                  <FileSpreadsheet className="h-3.5 w-3.5" />
+                  <span>{isAr ? "تصدير إكسيل" : "Export Excel"}</span>
+                </Button>
+              </div>
+            </div>
+
+            {/* Filter controls row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1 border-t border-border/60">
+              {/* Search input */}
+              <div className="relative">
+                <Search className="absolute start-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  value={empSearch}
+                  onChange={(e) => setEmpSearch(e.target.value)}
+                  placeholder={isAr ? "بحث بالاسم، الكود، الوظيفة..." : "Search name, code, position..."}
+                  className="rounded-xl ps-9 text-xs h-9"
+                />
+              </div>
+
+              {/* Department filter */}
+              <select
+                value={deptFilter}
+                onChange={(e) => setDeptFilter(e.target.value)}
+                className="rounded-xl border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-2xs focus:ring-1 focus:ring-brand h-9 cursor-pointer"
+              >
+                <option value="all">{isAr ? "جميع الأقسام" : "All Departments"}</option>
+                {uniqueDepartments.map((dept) => (
+                  <option key={dept} value={dept}>{dept}</option>
+                ))}
+              </select>
+
+              {/* Status filter */}
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="rounded-xl border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-2xs focus:ring-1 focus:ring-brand h-9 cursor-pointer"
+              >
+                <option value="all">{isAr ? "جميع الحالات" : "All Statuses"}</option>
+                <option value="approved">{isAr ? "معتمد" : "Approved"}</option>
+                <option value="submitted">{isAr ? "مقدم للمراجعة" : "Submitted"}</option>
+                <option value="draft">{isAr ? "مسودة" : "Draft"}</option>
+                <option value="not_started">{isAr ? "لم يبدأ بعد" : "Not Started"}</option>
+              </select>
+
+              {/* Tier filter */}
+              <select
+                value={tierFilter}
+                onChange={(e) => setTierFilter(e.target.value)}
+                className="rounded-xl border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-2xs focus:ring-1 focus:ring-brand h-9 cursor-pointer"
+              >
+                <option value="all">{isAr ? "جميع مستويات التقييم" : "All Rating Tiers"}</option>
+                {RATING_SCALE.map((r) => (
+                  <option key={r.tier} value={r.tier}>
+                    {isAr ? r.tier_ar : r.tier} (≥ {(r.minScore * 100).toFixed(0)}%)
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Evaluations Master Table */}
+          <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-xs">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs border-collapse">
+                <thead className="bg-muted/60 text-muted-foreground uppercase text-[10px] tracking-wider font-semibold border-b border-border">
+                  <tr>
+                    <th className="px-3 py-3 text-start w-8">#</th>
+                    <th className="px-3 py-3 text-start min-w-[200px]">{isAr ? "الموظف" : "Employee"}</th>
+                    <th className="px-3 py-3 text-start">{isAr ? "القسم والمسمى" : "Position & Dept"}</th>
+                    <th className="px-3 py-3 text-center bg-blue-500/5 text-blue-700 dark:text-blue-300 w-16">Q1</th>
+                    <th className="px-3 py-3 text-center bg-emerald-500/5 text-emerald-700 dark:text-emerald-300 w-16">Q2</th>
+                    <th className="px-3 py-3 text-center bg-amber-500/5 text-amber-700 dark:text-amber-300 w-16">Q3</th>
+                    <th className="px-3 py-3 text-center bg-purple-500/5 text-purple-700 dark:text-purple-300 w-16">Q4</th>
+                    <th className="px-3 py-3 text-center bg-muted/80 font-bold w-20">{isAr ? "المجموع" : "Total"}</th>
+                    <th className="px-3 py-3 text-center w-28">{isAr ? "التقدير" : "Rating"}</th>
+                    <th className="px-3 py-3 text-center w-24">{isAr ? "الحالة" : "Status"}</th>
+                    <th className="px-3 py-3 text-start">{isAr ? "المُقيّم" : "Evaluator"}</th>
+                    <th className="px-3 py-3 text-center w-20">{isAr ? "الإجراء" : "Action"}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {paginatedEmployees.length === 0 ? (
+                    <tr>
+                      <td colSpan={12} className="px-4 py-8 text-center text-muted-foreground text-xs">
+                        {isAr ? "لا يوجد موظفون مطابقون لشروط البحث المحددة" : "No employees match current filter criteria"}
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedEmployees.map((item) => {
+                      const isCurrent = item.id === selectedEmpId;
+                      return (
+                        <tr
+                          key={item.id}
+                          className={`hover:bg-muted/30 transition-colors ${isCurrent ? "bg-brand/5 font-medium" : ""
+                            }`}
+                        >
+                          <td className="px-3 py-3 text-muted-foreground font-mono">{item.index}</td>
+                          <td className="px-3 py-3">
+                            <div className="flex items-center gap-2">
+                              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand/10 text-brand font-bold text-[11px] shrink-0">
+                                {item.name.slice(0, 2).toUpperCase()}
+                              </div>
+                              <div className="min-w-0">
+                                <span className="font-semibold text-foreground truncate block">{item.name}</span>
+                                {item.code && (
+                                  <span className="font-mono text-[10px] text-muted-foreground">{item.code}</span>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-3 py-3 text-muted-foreground">
+                            <span className="text-foreground font-medium block">{item.position}</span>
+                            <span className="text-[10px]">{item.department}</span>
+                          </td>
+                          <td className="px-3 py-3 text-center font-mono bg-blue-500/5 text-blue-700 dark:text-blue-300">
+                            {item.q1Score !== null ? `${(item.q1Score * 100).toFixed(1)}%` : "—"}
+                          </td>
+                          <td className="px-3 py-3 text-center font-mono bg-emerald-500/5 text-emerald-700 dark:text-emerald-300">
+                            {item.q2Score !== null ? `${(item.q2Score * 100).toFixed(1)}%` : "—"}
+                          </td>
+                          <td className="px-3 py-3 text-center font-mono bg-amber-500/5 text-amber-700 dark:text-amber-300">
+                            {item.q3Score !== null ? `${(item.q3Score * 100).toFixed(1)}%` : "—"}
+                          </td>
+                          <td className="px-3 py-3 text-center font-mono bg-purple-500/5 text-purple-700 dark:text-purple-300">
+                            {item.q4Score !== null ? `${(item.q4Score * 100).toFixed(1)}%` : "—"}
+                          </td>
+                          <td className="px-3 py-3 text-center font-mono font-bold bg-muted/60 text-foreground">
+                            {item.totalScore !== null ? `${item.totalScore.toFixed(1)}%` : "—"}
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            {item.ratingTier ? (
+                              <Badge className={`text-[10px] px-2 py-0.5 font-semibold ${item.ratingTier.badgeClass}`}>
+                                {isAr ? item.ratingTier.tier_ar : item.ratingTier.tier}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground font-mono">—</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            {item.status === "approved" ? (
+                              <Badge className="bg-emerald-600 text-white text-[10px] px-2 py-0.5 font-semibold">
+                                {isAr ? "معتمد" : "Approved"}
+                              </Badge>
+                            ) : item.status === "submitted" ? (
+                              <Badge className="bg-blue-600 text-white text-[10px] px-2 py-0.5 font-semibold">
+                                {isAr ? "مقدم" : "Submitted"}
+                              </Badge>
+                            ) : item.status === "draft" ? (
+                              <Badge variant="outline" className="text-[10px] px-2 py-0.5 text-muted-foreground">
+                                {isAr ? "مسودة" : "Draft"}
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-[10px] px-2 py-0.5 text-muted-foreground">
+                                {isAr ? "لم يبدأ" : "Not Started"}
+                              </Badge>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 text-muted-foreground text-[11px]">
+                            {item.evaluator || "—"}
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            <Button
+                              variant={item.hasEvaluation ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => {
+                                setSelectedEmpId(item.id);
+                                setMainTab("scorecard");
+                              }}
+                              className={`h-7 text-xs rounded-xl px-2.5 cursor-pointer ${item.hasEvaluation ? "bg-brand text-brand-foreground hover:bg-brand/90" : ""
+                                }`}
+                            >
+                              {item.hasEvaluation ? (isAr ? "فتح" : "Open") : (isAr ? "تقييم" : "Evaluate")}
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+
+
+            {/* Pagination Controls Footer */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border/70 p-3.5 bg-muted/20 text-xs">
+              {/* Range summary */}
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <span>
+                  {isAr
+                    ? `عرض ${startIndex} إلى ${endIndex} من أصل ${totalEmployeesCount} موظف`
+                    : `Showing ${startIndex} to ${endIndex} of ${totalEmployeesCount} employees`}
+                </span>
+                <span className="text-border">|</span>
+                <div className="flex items-center gap-1.5">
+                  <span>{isAr ? "لكل صفحة:" : "Rows:"}</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => setPageSize(Number(e.target.value))}
+                    className="rounded-xl border border-input bg-background px-2.5 py-1 text-xs font-semibold shadow-2xs focus:ring-1 focus:ring-brand cursor-pointer"
+                  >
+                    {[15, 25, 50, 100].map((sz) => (
+                      <option key={sz} value={sz}>{sz}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Navigation pagination pills */}
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={safeCurrentPage <= 1}
+                  className="h-8 rounded-xl px-2.5 text-xs cursor-pointer"
+                >
+                  {isAr ? "السابق" : "Previous"}
+                </Button>
+
+                <div className="flex items-center gap-1 font-mono font-semibold">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, idx) => {
+                    let pageNum = idx + 1;
+                    if (totalPages > 5 && safeCurrentPage > 3) {
+                      pageNum = safeCurrentPage - 2 + idx;
+                      if (pageNum > totalPages) pageNum = totalPages - (4 - idx);
+                    }
+                    const isCur = pageNum === safeCurrentPage;
+                    return (
+                      <button
+                        key={pageNum}
+                        type="button"
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`h-8 w-8 rounded-xl text-xs font-bold transition-all cursor-pointer ${isCur
+                          ? "bg-brand text-white shadow-xs"
+                          : "border border-border bg-card text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+                          }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                  {totalPages > 5 && safeCurrentPage < totalPages - 2 && (
+                    <span className="px-1 text-muted-foreground">...</span>
+                  )}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safeCurrentPage >= totalPages}
+                  className="h-8 rounded-xl px-2.5 text-xs cursor-pointer"
+                >
+                  {isAr ? "التالي" : "Next"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* ── TAB 1: FULL SCORECARD TABLE ── */}
+        <TabsContent value="scorecard" className="space-y-4" id="kpi-scorecard-section">
       {/* Dedicated Quarter Governance & Approvals Bar */}
       <div className="rounded-2xl border border-border bg-card/60 p-4 shadow-xs space-y-3.5">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-border/60 pb-2.5">
@@ -3051,453 +3498,6 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
         </div>
       </div>
 
-      {/* Main Tabs Navigation */}
-      <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
-          <TabsList className="h-auto w-full sm:w-auto bg-transparent p-0 flex overflow-x-auto no-scrollbar gap-1.5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-            {!isManagerMode && (
-              <TabsTrigger
-                value="evaluation-periods"
-                className="group rounded-full px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer transition-all text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
-              >
-                <span>{isAr ? "فترات التقييم" : "Evaluation Periods"}</span>
-              </TabsTrigger>
-            )}
-            <TabsTrigger
-              value="all-employees"
-              className="group rounded-full px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer transition-all text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
-            >
-              <span>{isManagerMode ? (isAr ? "تقييمات فريق العمل" : "Team Evaluations") : (isAr ? "سجل جميع الموظفين" : "All Employees Evaluations")}</span>
-              {employeesWithEvaluations.length > 0 && (
-                <Badge
-                  variant="secondary"
-                  className="px-1.5 py-0 text-[10px] font-mono transition-colors group-data-[state=active]:bg-white/20 group-data-[state=active]:text-white group-data-[state=active]:border-transparent"
-                >
-                  {employeesWithEvaluations.length}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger
-              value="scorecard"
-              className="group rounded-full px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer transition-all text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
-            >
-              <span>{isAr ? "بطاقة التقييم" : "Evaluation Scorecard"}</span>
-            </TabsTrigger>
-            {isManagerMode && returnedEvaluations.length > 0 && (
-              <TabsTrigger
-                value="pending-returns"
-                className="group rounded-full px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer transition-all text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
-              >
-                <span>{isAr ? "التقييمات المعادة" : "Pending Returns"}</span>
-                {returnedEvaluations.length > 0 && (
-                  <Badge className="bg-rose-500 text-white px-1.5 py-0 text-[10px] font-mono transition-colors group-data-[state=active]:bg-white/20 group-data-[state=active]:text-white group-data-[state=active]:border-transparent">
-                    {returnedEvaluations.length}
-                  </Badge>
-                )}
-              </TabsTrigger>
-            )}
-            {!isManagerMode && (
-              <TabsTrigger
-                value="pending-approvals"
-                className="group rounded-full px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer transition-all text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
-              >
-                <span>{isAr ? "المعاملات المعلقة" : "Pending Approvals"}</span>
-                {pendingApprovals.length > 0 && (
-                  <Badge className="bg-amber-500 text-white px-1.5 py-0 text-[10px] font-mono transition-colors group-data-[state=active]:bg-white/20 group-data-[state=active]:text-white group-data-[state=active]:border-transparent">
-                    {pendingApprovals.length}
-                  </Badge>
-                )}
-              </TabsTrigger>
-            )}
-            {!isManagerMode && (
-              <TabsTrigger
-                value="templates-criteria"
-                className="group rounded-full px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer transition-all text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
-              >
-                <span>{isAr ? "القوالب والمعايير" : "Templates & Criteria"}</span>
-              </TabsTrigger>
-            )}
-          </TabsList>
-
-          {/* Quick Quarter Filter on Scorecard view */}
-          {mainTab === "scorecard" && (
-            <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-xl border border-border text-xs print:hidden">
-              <span className="px-2 font-medium text-muted-foreground flex items-center gap-1">
-                <Filter className="h-3 w-3" /> {isAr ? "عرض:" : "View:"}
-              </span>
-              {(["all", "q1", "q2", "q3", "q4"] as const).map((q) => (
-                <button
-                  key={q}
-                  type="button"
-                  onClick={() => setActiveQuarterFilter(q)}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all cursor-pointer ${activeQuarterFilter === q
-                    ? "bg-card text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                    }`}
-                >
-                  {q === "all" ? (isAr ? "الكل" : "ALL") : q.toUpperCase()}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* ── TAB 0: ALL EMPLOYEES EVALUATIONS DIRECTORY ── */}
-        <TabsContent value="all-employees" className="space-y-4">
-          {/* Top Metric Overview Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="rounded-2xl border border-border bg-card p-4 shadow-2xs space-y-1">
-              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
-                {isAr ? "إجمالي الكادر" : "Total Employees"}
-              </span>
-              <div className="flex items-baseline justify-between">
-                <span className="font-display text-2xl font-bold text-foreground">
-                  {evaluationsStats.total}
-                </span>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-border bg-card p-4 shadow-2xs space-y-1">
-              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
-                {isAr ? "تم تقييمهم" : "Evaluated"}
-              </span>
-              <div className="flex items-baseline justify-between">
-                <span className="font-display text-2xl font-bold text-blue-600 dark:text-blue-400">
-                  {evaluationsStats.evaluated}
-                </span>
-                <span className="text-xs text-muted-foreground font-mono">
-                  {evaluationsStats.total > 0
-                    ? Math.round((evaluationsStats.evaluated / evaluationsStats.total) * 100)
-                    : 0}%
-                </span>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-border bg-card p-4 shadow-2xs space-y-1">
-              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
-                {isAr ? "معتمد رسمياً" : "Officially Approved"}
-              </span>
-              <div className="flex items-baseline justify-between">
-                <span className="font-display text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                  {evaluationsStats.approved}
-                </span>
-                <ShieldCheck className="h-4 w-4 text-emerald-600" />
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-border bg-card p-4 shadow-2xs space-y-1">
-              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
-                {isAr ? "متوسط الدرجة السنوية" : "Average Score"}
-              </span>
-              <div className="flex items-baseline justify-between">
-                <span className="font-display text-2xl font-bold text-brand">
-                  {evaluationsStats.avgScore ? `${evaluationsStats.avgScore}%` : "—"}
-                </span>
-                <Award className="h-4 w-4 text-brand" />
-              </div>
-            </div>
-          </div>
-
-          {/* Filters & Export Bar */}
-          <div className="rounded-3xl border border-border bg-card p-4 shadow-2xs space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h3 className="font-display text-sm font-bold text-foreground">
-                  {isManagerMode
-                    ? (isAr ? ("سجل تقييمات فريق العمل لعام " + selectedYear) : ("Team Performance Scorecards — Year " + selectedYear))
-                    : (isAr ? ("سجل تقييمات الموظفين لعام " + selectedYear) : ("Staff KPI Scorecards Directory — Year " + selectedYear))}
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                  {isManagerMode
-                    ? (isAr
-                      ? "قائمة أعضاء فريقك لتقييم أدائهم ومتابعة النتائج الربع سنوية والاعتمادات."
-                      : "Direct team members directory for performance evaluations and quarterly review tracking.")
-                    : (isAr
-                      ? "قائمة شاملة بنتائج الأرباع الأربعة والدرجة الإجمالية وحالة التقييم لكل موظف."
-                      : "Complete quarterly scorecards, annual percentages, and sign-off statuses.")}
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <select
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(Number(e.target.value))}
-                  className="rounded-xl border border-input bg-background px-3 py-1.5 text-xs font-semibold shadow-2xs focus:ring-1 focus:ring-brand cursor-pointer"
-                >
-                  <option value={currentYear}>{currentYear}</option>
-                  <option value={currentYear - 1}>{currentYear - 1}</option>
-                  <option value={currentYear + 1}>{currentYear + 1}</option>
-                </select>
-
-                <Button
-                  size="sm"
-                  onClick={handleExportAllToExcel}
-                  className="rounded-xl gap-1.5 text-xs h-8 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold cursor-pointer shadow-xs"
-                >
-                  <FileSpreadsheet className="h-3.5 w-3.5" />
-                  <span>{isAr ? "تصدير إكسيل" : "Export Excel"}</span>
-                </Button>
-              </div>
-            </div>
-
-            {/* Filter controls row */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1 border-t border-border/60">
-              {/* Search input */}
-              <div className="relative">
-                <Search className="absolute start-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                <Input
-                  value={empSearch}
-                  onChange={(e) => setEmpSearch(e.target.value)}
-                  placeholder={isAr ? "بحث بالاسم، الكود، الوظيفة..." : "Search name, code, position..."}
-                  className="rounded-xl ps-9 text-xs h-9"
-                />
-              </div>
-
-              {/* Department filter */}
-              <select
-                value={deptFilter}
-                onChange={(e) => setDeptFilter(e.target.value)}
-                className="rounded-xl border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-2xs focus:ring-1 focus:ring-brand h-9 cursor-pointer"
-              >
-                <option value="all">{isAr ? "جميع الأقسام" : "All Departments"}</option>
-                {uniqueDepartments.map((dept) => (
-                  <option key={dept} value={dept}>{dept}</option>
-                ))}
-              </select>
-
-              {/* Status filter */}
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="rounded-xl border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-2xs focus:ring-1 focus:ring-brand h-9 cursor-pointer"
-              >
-                <option value="all">{isAr ? "جميع الحالات" : "All Statuses"}</option>
-                <option value="approved">{isAr ? "معتمد" : "Approved"}</option>
-                <option value="submitted">{isAr ? "مقدم للمراجعة" : "Submitted"}</option>
-                <option value="draft">{isAr ? "مسودة" : "Draft"}</option>
-                <option value="not_started">{isAr ? "لم يبدأ بعد" : "Not Started"}</option>
-              </select>
-
-              {/* Tier filter */}
-              <select
-                value={tierFilter}
-                onChange={(e) => setTierFilter(e.target.value)}
-                className="rounded-xl border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-2xs focus:ring-1 focus:ring-brand h-9 cursor-pointer"
-              >
-                <option value="all">{isAr ? "جميع مستويات التقييم" : "All Rating Tiers"}</option>
-                {RATING_SCALE.map((r) => (
-                  <option key={r.tier} value={r.tier}>
-                    {isAr ? r.tier_ar : r.tier} (≥ {(r.minScore * 100).toFixed(0)}%)
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Evaluations Master Table */}
-          <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-xs">
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs border-collapse">
-                <thead className="bg-muted/60 text-muted-foreground uppercase text-[10px] tracking-wider font-semibold border-b border-border">
-                  <tr>
-                    <th className="px-3 py-3 text-start w-8">#</th>
-                    <th className="px-3 py-3 text-start min-w-[200px]">{isAr ? "الموظف" : "Employee"}</th>
-                    <th className="px-3 py-3 text-start">{isAr ? "القسم والمسمى" : "Position & Dept"}</th>
-                    <th className="px-3 py-3 text-center bg-blue-500/5 text-blue-700 dark:text-blue-300 w-16">Q1</th>
-                    <th className="px-3 py-3 text-center bg-emerald-500/5 text-emerald-700 dark:text-emerald-300 w-16">Q2</th>
-                    <th className="px-3 py-3 text-center bg-amber-500/5 text-amber-700 dark:text-amber-300 w-16">Q3</th>
-                    <th className="px-3 py-3 text-center bg-purple-500/5 text-purple-700 dark:text-purple-300 w-16">Q4</th>
-                    <th className="px-3 py-3 text-center bg-muted/80 font-bold w-20">{isAr ? "المجموع" : "Total"}</th>
-                    <th className="px-3 py-3 text-center w-28">{isAr ? "التقدير" : "Rating"}</th>
-                    <th className="px-3 py-3 text-center w-24">{isAr ? "الحالة" : "Status"}</th>
-                    <th className="px-3 py-3 text-start">{isAr ? "المُقيّم" : "Evaluator"}</th>
-                    <th className="px-3 py-3 text-center w-20">{isAr ? "الإجراء" : "Action"}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {paginatedEmployees.length === 0 ? (
-                    <tr>
-                      <td colSpan={12} className="px-4 py-8 text-center text-muted-foreground text-xs">
-                        {isAr ? "لا يوجد موظفون مطابقون لشروط البحث المحددة" : "No employees match current filter criteria"}
-                      </td>
-                    </tr>
-                  ) : (
-                    paginatedEmployees.map((item) => {
-                      const isCurrent = item.id === selectedEmpId;
-                      return (
-                        <tr
-                          key={item.id}
-                          className={`hover:bg-muted/30 transition-colors ${isCurrent ? "bg-brand/5 font-medium" : ""
-                            }`}
-                        >
-                          <td className="px-3 py-3 text-muted-foreground font-mono">{item.index}</td>
-                          <td className="px-3 py-3">
-                            <div className="flex items-center gap-2">
-                              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand/10 text-brand font-bold text-[11px] shrink-0">
-                                {item.name.slice(0, 2).toUpperCase()}
-                              </div>
-                              <div className="min-w-0">
-                                <span className="font-semibold text-foreground truncate block">{item.name}</span>
-                                {item.code && (
-                                  <span className="font-mono text-[10px] text-muted-foreground">{item.code}</span>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-3 py-3 text-muted-foreground">
-                            <span className="text-foreground font-medium block">{item.position}</span>
-                            <span className="text-[10px]">{item.department}</span>
-                          </td>
-                          <td className="px-3 py-3 text-center font-mono bg-blue-500/5 text-blue-700 dark:text-blue-300">
-                            {item.q1Score !== null ? `${(item.q1Score * 100).toFixed(1)}%` : "—"}
-                          </td>
-                          <td className="px-3 py-3 text-center font-mono bg-emerald-500/5 text-emerald-700 dark:text-emerald-300">
-                            {item.q2Score !== null ? `${(item.q2Score * 100).toFixed(1)}%` : "—"}
-                          </td>
-                          <td className="px-3 py-3 text-center font-mono bg-amber-500/5 text-amber-700 dark:text-amber-300">
-                            {item.q3Score !== null ? `${(item.q3Score * 100).toFixed(1)}%` : "—"}
-                          </td>
-                          <td className="px-3 py-3 text-center font-mono bg-purple-500/5 text-purple-700 dark:text-purple-300">
-                            {item.q4Score !== null ? `${(item.q4Score * 100).toFixed(1)}%` : "—"}
-                          </td>
-                          <td className="px-3 py-3 text-center font-mono font-bold bg-muted/60 text-foreground">
-                            {item.totalScore !== null ? `${item.totalScore.toFixed(1)}%` : "—"}
-                          </td>
-                          <td className="px-3 py-3 text-center">
-                            {item.ratingTier ? (
-                              <Badge className={`text-[10px] px-2 py-0.5 font-semibold ${item.ratingTier.badgeClass}`}>
-                                {isAr ? item.ratingTier.tier_ar : item.ratingTier.tier}
-                              </Badge>
-                            ) : (
-                              <span className="text-muted-foreground font-mono">—</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-3 text-center">
-                            {item.status === "approved" ? (
-                              <Badge className="bg-emerald-600 text-white text-[10px] px-2 py-0.5 font-semibold">
-                                {isAr ? "معتمد" : "Approved"}
-                              </Badge>
-                            ) : item.status === "submitted" ? (
-                              <Badge className="bg-blue-600 text-white text-[10px] px-2 py-0.5 font-semibold">
-                                {isAr ? "مقدم" : "Submitted"}
-                              </Badge>
-                            ) : item.status === "draft" ? (
-                              <Badge variant="outline" className="text-[10px] px-2 py-0.5 text-muted-foreground">
-                                {isAr ? "مسودة" : "Draft"}
-                              </Badge>
-                            ) : (
-                              <Badge variant="secondary" className="text-[10px] px-2 py-0.5 text-muted-foreground">
-                                {isAr ? "لم يبدأ" : "Not Started"}
-                              </Badge>
-                            )}
-                          </td>
-                          <td className="px-3 py-3 text-muted-foreground text-[11px]">
-                            {item.evaluator || "—"}
-                          </td>
-                          <td className="px-3 py-3 text-center">
-                            <Button
-                              variant={item.hasEvaluation ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => {
-                                setSelectedEmpId(item.id);
-                                setMainTab("scorecard");
-                              }}
-                              className={`h-7 text-xs rounded-xl px-2.5 cursor-pointer ${item.hasEvaluation ? "bg-brand text-brand-foreground hover:bg-brand/90" : ""
-                                }`}
-                            >
-                              {item.hasEvaluation ? (isAr ? "فتح" : "Open") : (isAr ? "تقييم" : "Evaluate")}
-                            </Button>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-
-
-            {/* Pagination Controls Footer */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border/70 p-3.5 bg-muted/20 text-xs">
-              {/* Range summary */}
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <span>
-                  {isAr
-                    ? `عرض ${startIndex} إلى ${endIndex} من أصل ${totalEmployeesCount} موظف`
-                    : `Showing ${startIndex} to ${endIndex} of ${totalEmployeesCount} employees`}
-                </span>
-                <span className="text-border">|</span>
-                <div className="flex items-center gap-1.5">
-                  <span>{isAr ? "لكل صفحة:" : "Rows:"}</span>
-                  <select
-                    value={pageSize}
-                    onChange={(e) => setPageSize(Number(e.target.value))}
-                    className="rounded-xl border border-input bg-background px-2.5 py-1 text-xs font-semibold shadow-2xs focus:ring-1 focus:ring-brand cursor-pointer"
-                  >
-                    {[15, 25, 50, 100].map((sz) => (
-                      <option key={sz} value={sz}>{sz}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Navigation pagination pills */}
-              <div className="flex items-center gap-1.5">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={safeCurrentPage <= 1}
-                  className="h-8 rounded-xl px-2.5 text-xs cursor-pointer"
-                >
-                  {isAr ? "السابق" : "Previous"}
-                </Button>
-
-                <div className="flex items-center gap-1 font-mono font-semibold">
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, idx) => {
-                    let pageNum = idx + 1;
-                    if (totalPages > 5 && safeCurrentPage > 3) {
-                      pageNum = safeCurrentPage - 2 + idx;
-                      if (pageNum > totalPages) pageNum = totalPages - (4 - idx);
-                    }
-                    const isCur = pageNum === safeCurrentPage;
-                    return (
-                      <button
-                        key={pageNum}
-                        type="button"
-                        onClick={() => setCurrentPage(pageNum)}
-                        className={`h-8 w-8 rounded-xl text-xs font-bold transition-all cursor-pointer ${isCur
-                          ? "bg-brand text-white shadow-xs"
-                          : "border border-border bg-card text-muted-foreground hover:bg-muted/40 hover:text-foreground"
-                          }`}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
-                  {totalPages > 5 && safeCurrentPage < totalPages - 2 && (
-                    <span className="px-1 text-muted-foreground">...</span>
-                  )}
-                </div>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={safeCurrentPage >= totalPages}
-                  className="h-8 rounded-xl px-2.5 text-xs cursor-pointer"
-                >
-                  {isAr ? "التالي" : "Next"}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </TabsContent>
-
-        {/* ── TAB 1: FULL SCORECARD TABLE ── */}
-        <TabsContent value="scorecard" className="space-y-4" id="kpi-scorecard-section">
           {/* Missing Template Guard Alert */}
           {matchedTemplateData && !matchedTemplateData.matched && (
             <div className="rounded-2xl border border-amber-300 bg-amber-50/90 dark:bg-amber-950/20 p-4 flex items-start gap-3.5 shadow-xs">
