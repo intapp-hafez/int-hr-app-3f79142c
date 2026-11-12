@@ -2661,14 +2661,14 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
             {!isManagerMode && (
               <TabsTrigger
                 value="evaluation-periods"
-                className="group rounded-full px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer transition-all text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
+                className="group rounded-full px-4 py-2 text-[13px] font-bold gap-1.5 cursor-pointer transition-all text-foreground/80 hover:text-foreground hover:bg-muted/60 data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
               >
                 <span>{isAr ? "فترات التقييم" : "Evaluation Periods"}</span>
               </TabsTrigger>
             )}
             <TabsTrigger
               value="all-employees"
-              className="group rounded-full px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer transition-all text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
+              className="group rounded-full px-4 py-2 text-[13px] font-bold gap-1.5 cursor-pointer transition-all text-foreground/80 hover:text-foreground hover:bg-muted/60 data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
             >
               <span>{isManagerMode ? (isAr ? "تقييمات فريق العمل" : "Team Evaluations") : (isAr ? "سجل جميع الموظفين" : "All Employees Evaluations")}</span>
               {employeesWithEvaluations.length > 0 && (
@@ -2682,14 +2682,14 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
             </TabsTrigger>
             <TabsTrigger
               value="scorecard"
-              className="group rounded-full px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer transition-all text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
+              className="group rounded-full px-4 py-2 text-[13px] font-bold gap-1.5 cursor-pointer transition-all text-foreground/80 hover:text-foreground hover:bg-muted/60 data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
             >
               <span>{isAr ? "بطاقة التقييم" : "Evaluation Scorecard"}</span>
             </TabsTrigger>
             {isManagerMode && returnedEvaluations.length > 0 && (
               <TabsTrigger
                 value="pending-returns"
-                className="group rounded-full px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer transition-all text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
+                className="group rounded-full px-4 py-2 text-[13px] font-bold gap-1.5 cursor-pointer transition-all text-foreground/80 hover:text-foreground hover:bg-muted/60 data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
               >
                 <span>{isAr ? "التقييمات المعادة" : "Pending Returns"}</span>
                 {returnedEvaluations.length > 0 && (
@@ -2702,7 +2702,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
             {!isManagerMode && (
               <TabsTrigger
                 value="pending-approvals"
-                className="group rounded-full px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer transition-all text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
+                className="group rounded-full px-4 py-2 text-[13px] font-bold gap-1.5 cursor-pointer transition-all text-foreground/80 hover:text-foreground hover:bg-muted/60 data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
               >
                 <span>{isAr ? "المعاملات المعلقة" : "Pending Approvals"}</span>
                 {pendingApprovals.length > 0 && (
@@ -2715,7 +2715,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
             {!isManagerMode && (
               <TabsTrigger
                 value="templates-criteria"
-                className="group rounded-full px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer transition-all text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
+                className="group rounded-full px-4 py-2 text-[13px] font-bold gap-1.5 cursor-pointer transition-all text-foreground/80 hover:text-foreground hover:bg-muted/60 data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
               >
                 <span>{isAr ? "القوالب والمعايير" : "Templates & Criteria"}</span>
               </TabsTrigger>
