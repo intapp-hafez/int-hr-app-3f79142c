@@ -253,6 +253,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
   const [selectedReturnKpi, setSelectedReturnKpi] = useState<any | null>(null);
   const [metricReturnNote, setMetricReturnNote] = useState("");
   const [metricIsReturned, setMetricIsReturned] = useState(false);
+  const [managerRowReplies, setManagerRowReplies] = useState<Record<string, string>>({});
 
   // ── DYNAMIC ENGINEERING DISCIPLINES WITH LOCALSTORAGE PERSISTENCE ──
   const [disciplines, setDisciplines] = useState<KpiDiscipline[]>(() => {
@@ -470,6 +471,12 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
   });
   const [returnedQuarterFilter, setReturnedQuarterFilter] = useState<"all" | "q1" | "q2" | "q3" | "q4">("all");
   const [selectedReturnQuarter, setSelectedReturnQuarter] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (mainTab === "pending-returns" && !isLoadingReturned && returnedEvaluations.length === 0) {
+      setMainTab("all-employees");
+    }
+  }, [mainTab, isLoadingReturned, returnedEvaluations.length]);
 
   // ── CRITERIA CATALOG QUERY ──
   const { data: kpiCriteria = [], refetch: refetchCriteria, isLoading: isLoadingCriteria } = useQuery({
@@ -1023,6 +1030,87 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
 
     setMetricReturnModalOpen(false);
     setSelectedReturnKpi(null);
+  };
+
+  const handleResolveRowReturn = async (kpi: any) => {
+    const kpiId = String(kpi.id);
+    const reply = (managerRowReplies[kpiId] || "").trim();
+    const currentRow = (kpiState[kpiId] || {}) as any;
+
+    const updatedRow = {
+      ...currentRow,
+      id: kpi.id,
+      targetAnnual: kpi.target,
+      adminNotes: "",
+      notes: reply
+        ? `${currentRow.notes ? currentRow.notes + "\n" : ""}[Manager Reply]: ${reply}`
+        : currentRow.notes || "",
+      isReturned: false,
+    };
+
+    const updatedState = {
+      ...kpiState,
+      [kpiId]: updatedRow,
+    };
+
+    setKpiState(updatedState as any);
+    setManagerRowReplies((prev) => {
+      const next = { ...prev };
+      delete next[kpiId];
+      return next;
+    });
+
+    const hasRemainingReturnedRows = Object.values(updatedState).some(
+      (r: any) => Boolean(r?.isReturned || r?.adminNotes)
+    );
+
+    const targetStatus: "draft" | "submitted" =
+      !hasRemainingReturnedRows && status === "Returned" ? "submitted" : (status.toLowerCase() as any);
+
+    const updatedQuarterStatuses = { ...quarterStatuses };
+    if (targetStatus === "submitted") {
+      Object.keys(updatedQuarterStatuses).forEach((qKey) => {
+        if (updatedQuarterStatuses[qKey]?.status === "returned") {
+          updatedQuarterStatuses[qKey] = {
+            ...updatedQuarterStatuses[qKey],
+            status: "submitted",
+            return_reason: undefined,
+            returnReason: undefined,
+          };
+        }
+      });
+      setQuarterStatuses(updatedQuarterStatuses);
+    }
+
+    const updatedNotes = {
+      ...notes,
+      quarterStatuses: updatedQuarterStatuses,
+      ...(targetStatus === "submitted"
+        ? {
+            returnReason: undefined,
+            growthAreas:
+              typeof notes.growthAreas === "string"
+                ? notes.growthAreas.replace(/\[HR Return Note.*?\]:[^\n]*\n?/gi, "").trim()
+                : notes.growthAreas,
+          }
+        : {}),
+    };
+
+    if (selectedEmpId && selectedYear) {
+      await saveMutation.mutateAsync({
+        targetStatus: targetStatus === "returned" ? "draft" : targetStatus,
+        overrideKpiState: updatedState as any,
+        overrideNotes: updatedNotes,
+      });
+      queryClient.invalidateQueries({ queryKey: ["kpi-returned-evaluations"] });
+      if (refetchReturned) refetchReturned();
+    }
+
+    toast.success(
+      isAr
+        ? "تم الرد على الملاحظة وإغلاق التنبيه بنجاح"
+        : "Response saved and return notice resolved"
+    );
   };
 
   // ── CRITERIA CATALOG HANDLERS ──
@@ -1734,6 +1822,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
       overrideKpiState?: Record<string, KpiRowState>;
       overrideNotes?: any;
     }) => {
+      const isResubmitting = payload.targetStatus === "submitted" && !payload.overrideKpiState;
       const stateToUse = payload.overrideKpiState || kpiState;
       const serializedScores: Record<string, any> = {};
       Object.entries(stateToUse).forEach(([key, val]: [string, any]) => {
@@ -1744,9 +1833,9 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
           q3: val.q3,
           q4: val.q4,
           annualScore: val.annualScore,
-          adminNotes: val.adminNotes || "",
+          adminNotes: isResubmitting ? "" : (val.adminNotes || ""),
           notes: val.notes || "",
-          isReturned: val.isReturned || false,
+          isReturned: isResubmitting ? false : (val.isReturned || false),
         };
       });
 
@@ -1762,10 +1851,34 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
         })),
       };
 
+      const cleanedQuarterStatuses = { ...quarterStatuses };
+      if (payload.targetStatus === "submitted") {
+        Object.keys(cleanedQuarterStatuses).forEach((qKey) => {
+          if (cleanedQuarterStatuses[qKey]?.status === "returned") {
+            cleanedQuarterStatuses[qKey] = {
+              ...cleanedQuarterStatuses[qKey],
+              status: "submitted",
+              return_reason: undefined,
+              returnReason: undefined,
+            };
+          }
+        });
+      }
+
       const notesPayload = payload.overrideNotes || {
         ...notes,
-        quarterStatuses,
-        ...(serverRecord?.notes?.returnReason ? { returnReason: serverRecord.notes.returnReason } : {}),
+        quarterStatuses: cleanedQuarterStatuses,
+        ...(payload.targetStatus === "submitted"
+          ? {
+              returnReason: undefined,
+              growthAreas:
+                typeof notes.growthAreas === "string"
+                  ? notes.growthAreas.replace(/\[HR Return Note.*?\]:[^\n]*\n?/gi, "").trim()
+                  : notes.growthAreas,
+            }
+          : serverRecord?.notes?.returnReason
+            ? { returnReason: serverRecord.notes.returnReason }
+            : {}),
       };
 
       return saveEvalFn({
@@ -1785,6 +1898,26 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
       setHasUnsavedChanges(false);
       const capStatus = (vars.targetStatus.charAt(0).toUpperCase() + vars.targetStatus.slice(1)) as any;
       setStatus(capStatus);
+
+      if (vars.targetStatus === "submitted") {
+        setKpiState((prev) => {
+          const next: Record<string, any> = {};
+          Object.entries(prev).forEach(([k, v]: [string, any]) => {
+            next[k] = { ...v, isReturned: false, adminNotes: "" };
+          });
+          return next;
+        });
+        setQuarterStatuses((prev) => {
+          const next = { ...prev };
+          Object.keys(next).forEach((qKey) => {
+            if (next[qKey]?.status === "returned") {
+              next[qKey] = { ...next[qKey], status: "submitted", return_reason: undefined, returnReason: undefined };
+            }
+          });
+          return next;
+        });
+      }
+
       queryClient.invalidateQueries({ queryKey: ["kpi-evaluation", selectedEmpId, selectedYear] });
       queryClient.invalidateQueries({ queryKey: ["kpi-evaluations-list", selectedYear] });
       queryClient.invalidateQueries({ queryKey: ["kpi-returned-evaluations"] });
@@ -2357,7 +2490,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
             </Button>
 
             {/* Submit / Approve Workflow Buttons */}
-            {status === "Draft" && (
+            {(status === "Draft" || status === "Returned") && (
               <Button
                 size="sm"
                 onClick={() => saveMutation.mutate({ targetStatus: "submitted" })}
@@ -2365,7 +2498,11 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                 className="rounded-xl gap-1.5 bg-blue-600 hover:bg-blue-700 text-white cursor-pointer shadow-xs h-9 px-3 font-medium"
               >
                 <Send className="h-4 w-4" />
-                <span>{isAr ? "إرسال للمراجعة" : "Submit Review"}</span>
+                <span>
+                  {status === "Returned"
+                    ? (isAr ? "إعادة الإرسال للمراجعة" : "Resubmit Review")
+                    : (isAr ? "إرسال للمراجعة" : "Submit Review")}
+                </span>
               </Button>
             )}
 
@@ -2846,7 +2983,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
               <FileSpreadsheet className="h-4 w-4 transition-colors group-data-[state=active]:text-white" />
               <span>{isAr ? "بطاقة التقييم" : "Evaluation Scorecard"}</span>
             </TabsTrigger>
-            {isManagerMode && (
+            {isManagerMode && returnedEvaluations.length > 0 && (
               <TabsTrigger
                 value="pending-returns"
                 className="group rounded-xl px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer transition-all data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
@@ -3764,14 +3901,45 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                                           <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
                                         </Button>
                                       </PopoverTrigger>
-                                      <PopoverContent className="w-72 p-3 text-xs space-y-1.5 border-amber-300 bg-amber-50/95 dark:bg-amber-950/95 dark:border-amber-800 text-foreground shadow-lg" align="end">
+                                      <PopoverContent className="w-80 p-3.5 text-xs space-y-2.5 border-amber-300 bg-amber-50/95 dark:bg-amber-950/95 dark:border-amber-800 text-foreground shadow-lg" align="end">
                                         <div className="flex items-center gap-1.5 font-bold text-amber-800 dark:text-amber-300 text-xs">
                                           <AlertCircle className="h-4 w-4 text-amber-600" />
                                           <span>{isAr ? "ملاحظة الإعادة من الإدارة" : "Admin Return Instructions"}</span>
                                         </div>
-                                        <p className="text-[11px] text-foreground whitespace-pre-wrap leading-relaxed">
+                                        <p className="text-[11px] text-foreground whitespace-pre-wrap leading-relaxed bg-background/70 p-2 rounded-lg border border-amber-200 dark:border-amber-800/60">
                                           {(row as any).adminNotes || (isAr ? "يرجى مراجعة وتعديل هذا المؤشر وإعادة تقديمه." : "Please review and revise this metric before resubmitting.")}
                                         </p>
+                                        <div className="space-y-1.5 pt-1 border-t border-amber-200/70 dark:border-amber-800/60">
+                                          <Label className="text-[11px] font-semibold text-amber-900 dark:text-amber-200">
+                                            {isAr ? "الرد على الملاحظة:" : "Your Response / Action Taken:"}
+                                          </Label>
+                                          <textarea
+                                            rows={2}
+                                            value={managerRowReplies[String(kpi.id)] || ""}
+                                            onChange={(e) =>
+                                              setManagerRowReplies((prev) => ({
+                                                ...prev,
+                                                [String(kpi.id)]: e.target.value,
+                                              }))
+                                            }
+                                            placeholder={isAr ? "اكتب ردك أو التعديل الذي تم..." : "Enter your reply or revision note..."}
+                                            className="w-full rounded-lg border border-amber-300 dark:border-amber-700 bg-background px-2.5 py-1.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                          />
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            disabled={saveMutation.isPending}
+                                            onClick={() => handleResolveRowReturn(kpi)}
+                                            className="w-full h-7 text-[11px] font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer gap-1.5"
+                                          >
+                                            {saveMutation.isPending ? (
+                                              <Loader2 className="h-3 w-3 animate-spin" />
+                                            ) : (
+                                              <Check className="h-3 w-3" />
+                                            )}
+                                            <span>{isAr ? "إرسال الرد وإغلاق الملاحظة" : "Answer & Resolve"}</span>
+                                          </Button>
+                                        </div>
                                       </PopoverContent>
                                     </Popover>
                                   )}
@@ -3959,7 +4127,7 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
         </TabsContent>
 
         {/* ── TAB: PENDING RETURNS (MANAGER PANEL) ── */}
-        {isManagerMode && (
+        {isManagerMode && returnedEvaluations.length > 0 && (
           <TabsContent value="pending-returns" className="space-y-4">
             <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-sm space-y-5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">

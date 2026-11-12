@@ -1968,6 +1968,9 @@ export const listManagerReturnedEvaluations = createServerFn({ method: "POST" })
 
     if (aRes.data) {
       for (const r of aRes.data) {
+        if (r.status === "submitted" || r.status === "approved") {
+          continue;
+        }
         const notes = typeof r.notes === "object" && r.notes ? r.notes : {};
         const qStatuses = notes.quarterStatuses || {};
 
@@ -2367,6 +2370,15 @@ export const saveKpiEvaluation = createServerFn({ method: "POST" })
         .single();
       if (error) throw new Error(`Failed to create evaluation: ${error.message}`);
       resultId = inserted.id;
+    }
+
+    if (input.status === "submitted" || input.status === "approved") {
+      await (supabase as any)
+        .from("kpi_quarterly_evaluations")
+        .update({ status: input.status, updated_at: now })
+        .eq("employee_id", input.employeeId)
+        .eq("evaluation_year", input.year)
+        .eq("status", "returned");
     }
 
     return {
