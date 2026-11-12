@@ -109,7 +109,7 @@ export function NotificationsBell() {
     ? (window as any).__alertDispatched ?? ((window as any).__alertDispatched = new Set<string>())
     : new Set<string>();
   useEffect(() => {
-    if (!data?.alerts?.length) return;
+    if (!data?.alerts?.length || (data as any)?.isManagerScoped) return;
     const fresh = data.alerts.filter((a) => !dispatchedRef.has(a.id));
     if (fresh.length === 0) return;
     fresh.forEach((a) => dispatchedRef.add(a.id));
@@ -280,7 +280,10 @@ export function NotificationsBell() {
 
         <div className="border-t border-border px-4 py-2">
           <div className="flex items-center justify-between gap-2">
-            <a href="/admin" className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-brand hover:bg-muted">
+            <a
+              href={(data as any)?.isManagerScoped ? "/manager/notifications" : "/admin"}
+              className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-brand hover:bg-muted"
+            >
               Notifications center <ArrowRight className="h-3 w-3" />
             </a>
             <a href="/admin/notification-preferences" className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground">
