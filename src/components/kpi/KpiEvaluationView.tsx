@@ -15,6 +15,7 @@ import {
   Info,
   Layers,
   Lock,
+  Unlock,
   Printer,
   RefreshCw,
   Save,
@@ -937,6 +938,64 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
       return;
     }
     await handleApproveQuarter(serverRecord, quarter);
+  };
+
+  const [unlockModalOpen, setUnlockModalOpen] = useState(false);
+  const [selectedUnlockQuarter, setSelectedUnlockQuarter] = useState<string | null>(null);
+
+  const handleUnlockQuarterDirect = (quarter: string) => {
+    if (!serverRecord?.id) {
+      toast.error(isAr ? "يرجى حفظ التقييم أولاً" : "Please save the evaluation first");
+      return;
+    }
+    setSelectedUnlockQuarter(quarter);
+    setUnlockModalOpen(true);
+  };
+
+  const handleConfirmUnlock = async () => {
+    if (!serverRecord?.id || !selectedUnlockQuarter) return;
+    try {
+      setIsSubmittingReview(true);
+      await reviewQuarterlyFn({
+        data: {
+          id: serverRecord.id,
+          evaluation_id: serverRecord.id,
+          quarter: selectedUnlockQuarter as any,
+          action: "unlock",
+          reason: isAr ? "إلغاء قفل التقييم وإعادة فتح التعديل" : "Unlocked for revisions and edits",
+        },
+      });
+
+      setQuarterStatuses((prev) => ({
+        ...prev,
+        [selectedUnlockQuarter]: {
+          ...(prev[selectedUnlockQuarter] || {}),
+          status: "draft",
+          approved_at: undefined,
+        },
+      }));
+      setStatus("Draft");
+
+      const qLabel = selectedUnlockQuarter.toUpperCase();
+      toast.success(
+        isAr
+          ? `تم إلغاء قفل تقييم (${qLabel}) بنجاح. أصبحت البيانات قابلة للتعديل الآن.`
+          : `Quarter (${qLabel}) unlocked successfully. Evaluation is now reopened for editing.`
+      );
+
+      setUnlockModalOpen(false);
+      setSelectedUnlockQuarter(null);
+      refetchPending();
+      if (refetchReturned) refetchReturned();
+      queryClient.invalidateQueries({ queryKey: ["kpi-pending-approvals"] });
+      queryClient.invalidateQueries({ queryKey: ["kpi-evaluation"] });
+      queryClient.invalidateQueries({ queryKey: ["kpi-evaluations-list"] });
+      queryClient.invalidateQueries({ queryKey: ["kpi-returned-evaluations"] });
+    } catch (err: any) {
+      toast.error(err?.message || (isAr ? "تعذر إلغاء قفل التقييم" : "Failed to unlock evaluation"));
+    } finally {
+      setIsSubmittingReview(false);
+    }
   };
 
   const handleOpenReturnModal = (item: any, quarter?: string) => {
@@ -2033,12 +2092,21 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
     onSuccess: (_, targetStatus) => {
       const capStatus = (targetStatus.charAt(0).toUpperCase() + targetStatus.slice(1)) as any;
       setStatus(capStatus);
+      if (targetStatus === "draft") {
+        setQuarterStatuses((prev) => {
+          const next = { ...prev };
+          for (const q of Object.keys(next)) {
+            next[q] = { ...next[q], status: "draft", approved_at: undefined };
+          }
+          return next;
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ["kpi-evaluation", selectedEmpId, selectedYear] });
       queryClient.invalidateQueries({ queryKey: ["kpi-evaluations-list", selectedYear] });
       toast.success(
         targetStatus === "approved"
           ? isAr ? "تم اعتماد التقييم السنوي رسمياً" : "Evaluation finalized and approved"
-          : isAr ? "تم تحديث حالة التقييم" : "Evaluation status updated"
+          : isAr ? "تم إلغاء القفل وفتح التقييم للتعديل" : "Evaluation unlocked and open for editing"
       );
     },
     onError: (err: any) => {
@@ -2599,15 +2667,16 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
               </Button>
             )}
 
-            {status === "Approved" && (role === "admin" || role === "hr") && (
+            {(status === "Approved" || allQuartersApproved || isLocked) && (role === "admin" || role === "hr") && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => updateStatusMutation.mutate("draft")}
                 disabled={updateStatusMutation.isPending}
                 className="rounded-xl gap-1.5 text-amber-600 border-amber-500/30 hover:bg-amber-50 dark:hover:bg-amber-950/20 cursor-pointer h-9 px-3 font-medium"
+                title={isAr ? "إلغاء قفل كافة الأرباع وإعادة فتح التقييم للتعديل" : "Unlock all quarters and reopen evaluation for edit"}
               >
-                <Clock className="h-4 w-4" />
+                <Unlock className="h-4 w-4" />
                 <span>{isAr ? "إلغاء القفل للتعديل" : "Unlock for Edit"}</span>
               </Button>
             )}
@@ -3300,14 +3369,31 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                 {/* Bottom Action / Indicator Area */}
                 <div className="pt-2 border-t border-border/50 flex items-center justify-between text-xs">
                   {isApproved ? (
-                    <div className="w-full flex items-center justify-between">
-                      <span className="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium">
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                        {isAr ? "معتمد ومقفل" : "Approved & Locked"}
+                    <div className="w-full flex items-center justify-between gap-1.5">
+                      <span className="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium truncate">
+                        <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{isAr ? "معتمد ومقفل" : "Approved & Locked"}</span>
                       </span>
-                      <span className="text-[10px] text-brand font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                        {isAr ? "عرض السجلات ←" : "View records →"}
-                      </span>
+                      {(role === "admin" || role === "hr") && serverRecord?.id ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleUnlockQuarterDirect(q.key);
+                          }}
+                          disabled={isSubmittingReview}
+                          className="h-6 px-2 text-[10px] font-bold rounded-md border-amber-300 dark:border-amber-600/60 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 cursor-pointer gap-1 shrink-0 shadow-2xs"
+                          title={isAr ? `إلغاء قفل تقييم ${q.label} وإعادة فتح التعديل` : `Unlock ${q.label} and reopen for editing`}
+                        >
+                          <Unlock className="h-3 w-3" />
+                          <span>{isAr ? "إلغاء القفل" : "Unlock"}</span>
+                        </Button>
+                      ) : (
+                        <span className="text-[10px] text-brand font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                          {isAr ? "عرض السجلات ←" : "View records →"}
+                        </span>
+                      )}
                     </div>
                   ) : isReturned ? (
                     <div className="w-full flex items-center justify-between gap-1">
@@ -3694,9 +3780,25 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                           <div className="flex flex-col items-center justify-center gap-0.5">
                             <span>{isAr ? "Q1 الفعلي" : "Q1 Actual"}</span>
                             {isQ1Approved ? (
-                              <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                                {isAr ? "معتمد" : "Approved"}
-                              </span>
+                              <div className="flex items-center gap-1">
+                                <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                                  {isAr ? "معتمد" : "Approved"}
+                                </span>
+                                {(role === "admin" || role === "hr") && serverRecord?.id && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleUnlockQuarterDirect("q1");
+                                    }}
+                                    disabled={isSubmittingReview}
+                                    title={isAr ? "إلغاء قفل Q1 للتعديل" : "Unlock Q1 for editing"}
+                                    className="text-amber-600 hover:text-amber-700 dark:text-amber-400 p-0.5 rounded hover:bg-amber-100/50 cursor-pointer"
+                                  >
+                                    <Unlock className="h-2.5 w-2.5" />
+                                  </button>
+                                )}
+                              </div>
                             ) : quarterStatuses.q1?.status === "returned" ? (
                               <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
                                 {isAr ? "مُعاد" : "Returned"}
@@ -3720,9 +3822,25 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                           <div className="flex flex-col items-center justify-center gap-0.5">
                             <span>{isAr ? "Q2 الفعلي" : "Q2 Actual"}</span>
                             {isQ2Approved ? (
-                              <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                                {isAr ? "معتمد" : "Approved"}
-                              </span>
+                              <div className="flex items-center gap-1">
+                                <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                                  {isAr ? "معتمد" : "Approved"}
+                                </span>
+                                {(role === "admin" || role === "hr") && serverRecord?.id && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleUnlockQuarterDirect("q2");
+                                    }}
+                                    disabled={isSubmittingReview}
+                                    title={isAr ? "إلغاء قفل Q2 للتعديل" : "Unlock Q2 for editing"}
+                                    className="text-amber-600 hover:text-amber-700 dark:text-amber-400 p-0.5 rounded hover:bg-amber-100/50 cursor-pointer"
+                                  >
+                                    <Unlock className="h-2.5 w-2.5" />
+                                  </button>
+                                )}
+                              </div>
                             ) : quarterStatuses.q2?.status === "returned" ? (
                               <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
                                 {isAr ? "مُعاد" : "Returned"}
@@ -3746,9 +3864,25 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                           <div className="flex flex-col items-center justify-center gap-0.5">
                             <span>{isAr ? "Q3 الفعلي" : "Q3 Actual"}</span>
                             {isQ3Approved ? (
-                              <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                                {isAr ? "معتمد" : "Approved"}
-                              </span>
+                              <div className="flex items-center gap-1">
+                                <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                                  {isAr ? "معتمد" : "Approved"}
+                                </span>
+                                {(role === "admin" || role === "hr") && serverRecord?.id && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleUnlockQuarterDirect("q3");
+                                    }}
+                                    disabled={isSubmittingReview}
+                                    title={isAr ? "إلغاء قفل Q3 للتعديل" : "Unlock Q3 for editing"}
+                                    className="text-amber-600 hover:text-amber-700 dark:text-amber-400 p-0.5 rounded hover:bg-amber-100/50 cursor-pointer"
+                                  >
+                                    <Unlock className="h-2.5 w-2.5" />
+                                  </button>
+                                )}
+                              </div>
                             ) : quarterStatuses.q3?.status === "returned" ? (
                               <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
                                 {isAr ? "مُعاد" : "Returned"}
@@ -3772,9 +3906,25 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
                           <div className="flex flex-col items-center justify-center gap-0.5">
                             <span>{isAr ? "Q4 الفعلي" : "Q4 Actual"}</span>
                             {isQ4Approved ? (
-                              <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                                {isAr ? "معتمد" : "Approved"}
-                              </span>
+                              <div className="flex items-center gap-1">
+                                <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                                  {isAr ? "معتمد" : "Approved"}
+                                </span>
+                                {(role === "admin" || role === "hr") && serverRecord?.id && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleUnlockQuarterDirect("q4");
+                                    }}
+                                    disabled={isSubmittingReview}
+                                    title={isAr ? "إلغاء قفل Q4 للتعديل" : "Unlock Q4 for editing"}
+                                    className="text-amber-600 hover:text-amber-700 dark:text-amber-400 p-0.5 rounded hover:bg-amber-100/50 cursor-pointer"
+                                  >
+                                    <Unlock className="h-2.5 w-2.5" />
+                                  </button>
+                                )}
+                              </div>
                             ) : quarterStatuses.q4?.status === "returned" ? (
                               <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
                                 {isAr ? "مُعاد" : "Returned"}
@@ -5998,7 +6148,71 @@ export function KpiEvaluationView({ role = "admin" }: KpiEvaluationViewProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Add / Edit Criterion Dialog */}
+      {/* Unlock Quarter Modal Dialog */}
+      <Dialog open={unlockModalOpen} onOpenChange={setUnlockModalOpen}>
+        <DialogContent className="sm:max-w-md rounded-3xl" dir={dir}>
+          <DialogHeader>
+            <div className="flex items-center gap-2 text-amber-600">
+              <Unlock className="h-5 w-5" />
+              <DialogTitle className="text-base font-bold font-display">
+                {isAr ? "إلغاء قفل التقييم وإعادة فتح التعديل" : "Unlock Evaluation for Revisions"}
+              </DialogTitle>
+            </div>
+          </DialogHeader>
+
+          <div className="space-y-4 pt-2 text-xs">
+            <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 space-y-1">
+              <p className="font-semibold">
+                {isAr ? "تنبيه الصلاحية الإدارية:" : "Administrative Override Notice:"}
+              </p>
+              <p className="leading-relaxed">
+                {isAr
+                  ? "سيتم إلغاء حالة الاعتماد المقفلة لهذا الربع وتحويلها إلى مسودة، مما يتيح للمُقيّم أو إدارة الموارد البشرية تعديل الدرجات والنتائج الفعلية وإعادة الاعتماد لاحقاً."
+                  : "This will remove the approved and locked status for this quarter, returning it to draft so that actuals, scores, and evaluations can be adjusted."}
+              </p>
+            </div>
+
+            {selectedUnlockQuarter && (
+              <div className="p-3 rounded-xl border border-border bg-muted/30 text-xs flex items-center justify-between">
+                <span>
+                  <strong>{isAr ? "الربع المستهدف:" : "Target Quarter:"}</strong>{" "}
+                  <span className="font-mono uppercase font-bold text-brand">
+                    {selectedUnlockQuarter.toUpperCase()} {selectedYear}
+                  </span>
+                </span>
+                <Badge variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-400 font-semibold text-[10px]">
+                  {isAr ? "سيتم فتح التعديل" : "Reopening for edit"}
+                </Badge>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setUnlockModalOpen(false);
+                  setSelectedUnlockQuarter(null);
+                }}
+                disabled={isSubmittingReview}
+                className="rounded-xl cursor-pointer"
+              >
+                {isAr ? "إلغاء" : "Cancel"}
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleConfirmUnlock}
+                disabled={isSubmittingReview}
+                className="rounded-xl bg-amber-600 text-white hover:bg-amber-700 cursor-pointer shadow-xs gap-1.5"
+              >
+                {isSubmittingReview && <Loader2 className="h-4 w-4 animate-spin" />}
+                <Unlock className="h-3.5 w-3.5" />
+                <span>{isAr ? "تأكيد إلغاء القفل" : "Confirm Unlock"}</span>
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
       <Dialog open={criterionModalOpen} onOpenChange={setCriterionModalOpen}>
         <DialogContent className="sm:max-w-lg rounded-3xl" dir={dir}>
           <DialogHeader>

@@ -178,7 +178,7 @@ export const ReviewQuarterlyEvaluationSchema = z.object({
   id: z.string().uuid().optional(),
   evaluation_id: z.string().uuid().optional(),
   quarter: EvaluationQuarterSchema.optional(),
-  action: z.enum(["approve", "return"]),
+  action: z.enum(["approve", "return", "unlock"]),
   reason: z.string().max(1000).optional(),
   return_reason: z.string().max(1000).optional(),
 }).transform((data) => ({

@@ -1643,7 +1643,7 @@ export const reviewQuarterlyEvaluation = createServerFn({ method: "POST" })
 
     const targetId = input.id;
     const now = new Date().toISOString();
-    const newStatus = input.action === "approve" ? "approved" : "returned";
+    const newStatus = input.action === "approve" ? "approved" : input.action === "unlock" ? "draft" : "returned";
     const selectedQ = input.quarter as "q1" | "q2" | "q3" | "q4" | undefined;
 
     // 1. Try finding in kpi_quarterly_evaluations
@@ -1659,6 +1659,7 @@ export const reviewQuarterlyEvaluation = createServerFn({ method: "POST" })
         updated_at: now,
         ...(newStatus === "approved" ? { approved_at: now, return_reason: null } : {}),
         ...(newStatus === "returned" ? { returned_at: now, return_reason: input.reason } : {}),
+        ...(input.action === "unlock" ? { approved_at: null, return_reason: null } : {}),
       };
 
       const { error: updErr } = await (supabase as any)
@@ -1674,7 +1675,7 @@ export const reviewQuarterlyEvaluation = createServerFn({ method: "POST" })
         actor_id: userId,
         from_status: record.status,
         to_status: newStatus,
-        reason: input.action === "return" ? input.reason : "Approved by HR Admin",
+        reason: input.action === "return" ? input.reason : input.action === "unlock" ? (input.reason || "Unlocked by HR Admin") : "Approved by HR Admin",
         created_at: now,
       });
 
@@ -1694,13 +1695,21 @@ export const reviewQuarterlyEvaluation = createServerFn({ method: "POST" })
             updated_at: now,
             ...(newStatus === "approved" ? { approved_at: now, approved_by: userId, return_reason: null } : {}),
             ...(newStatus === "returned" ? { returned_at: now, return_reason: input.reason } : {}),
+            ...(input.action === "unlock" ? { approved_at: null, return_reason: null, unlocked_at: now, unlocked_by: userId } : {}),
           };
           if (input.action === "return") {
             pNotes.returnReason = `[${record.quarter.toUpperCase()}]: ${input.reason}`;
           }
+
+          const parentUpdates: Record<string, any> = { notes: pNotes, updated_at: now };
+          if (input.action === "unlock" && parentRecord.status === "approved") {
+            parentUpdates.status = "draft";
+            parentUpdates.approved_at = null;
+          }
+
           await (supabase as any)
             .from("kpi_evaluations")
-            .update({ notes: pNotes, updated_at: now })
+            .update(parentUpdates)
             .eq("id", parentRecord.id);
         }
       } catch (err) {
@@ -1716,6 +1725,14 @@ export const reviewQuarterlyEvaluation = createServerFn({ method: "POST" })
             body: `The ${record.quarter.toUpperCase()} evaluation has been officially approved with a score of ${record.score}%. Remaining quarters remain open for evaluation.`,
             url: "/admin/kpi-evaluations",
             severity: "success",
+          });
+        } else if (input.action === "unlock") {
+          await notifyKpiAction({
+            userIds: [record.evaluator_id],
+            title: `KPI Evaluation Unlocked (${record.quarter.toUpperCase()} ${record.evaluation_year})`,
+            body: `The ${record.quarter.toUpperCase()} evaluation has been unlocked by HR and reopened for editing.`,
+            url: "/manager/kpi-evaluations",
+            severity: "info",
           });
         } else {
           await notifyKpiAction({
@@ -1742,7 +1759,66 @@ export const reviewQuarterlyEvaluation = createServerFn({ method: "POST" })
       const notes = typeof oldRecord.notes === "object" && oldRecord.notes ? { ...oldRecord.notes } : {};
       let evalStatus = input.action === "approve" ? "approved" : "draft";
 
-      if (selectedQ) {
+      if (input.action === "unlock") {
+        if (selectedQ) {
+          notes.quarterStatuses = notes.quarterStatuses || {};
+          notes.quarterStatuses[selectedQ] = {
+            status: "draft",
+            updated_at: now,
+            approved_at: null,
+            return_reason: null,
+            unlocked_at: now,
+            unlocked_by: userId,
+          };
+          evalStatus = "draft";
+
+          try {
+            await (supabase as any)
+              .from("kpi_quarterly_evaluations")
+              .update({
+                status: "draft",
+                approved_at: null,
+                return_reason: null,
+                updated_at: now,
+              })
+              .eq("employee_id", oldRecord.employee_id)
+              .eq("evaluation_year", oldRecord.evaluation_year)
+              .eq("quarter", selectedQ);
+          } catch (err) {
+            console.error("Failed to update kpi_quarterly_evaluations on unlock:", err);
+          }
+        } else {
+          // Unlock all quarters
+          notes.quarterStatuses = notes.quarterStatuses || {};
+          for (const q of ["q1", "q2", "q3", "q4"] as const) {
+            if (notes.quarterStatuses[q]) {
+              notes.quarterStatuses[q] = {
+                ...notes.quarterStatuses[q],
+                status: "draft",
+                approved_at: null,
+                return_reason: null,
+                unlocked_at: now,
+                unlocked_by: userId,
+              };
+            }
+          }
+          evalStatus = "draft";
+          try {
+            await (supabase as any)
+              .from("kpi_quarterly_evaluations")
+              .update({
+                status: "draft",
+                approved_at: null,
+                return_reason: null,
+                updated_at: now,
+              })
+              .eq("employee_id", oldRecord.employee_id)
+              .eq("evaluation_year", oldRecord.evaluation_year);
+          } catch (err) {
+            console.error("Failed to update all kpi_quarterly_evaluations on full unlock:", err);
+          }
+        }
+      } else if (selectedQ) {
         notes.quarterStatuses = notes.quarterStatuses || {};
         notes.quarterStatuses[selectedQ] = {
           status: newStatus,
@@ -1794,7 +1870,7 @@ export const reviewQuarterlyEvaluation = createServerFn({ method: "POST" })
         status: evalStatus,
         notes,
         updated_at: now,
-        ...(evalStatus === "approved" ? { approved_at: now } : {}),
+        ...(evalStatus === "approved" ? { approved_at: now } : { approved_at: null }),
       };
 
       const { error: updErr } = await (supabase as any)
@@ -1803,6 +1879,20 @@ export const reviewQuarterlyEvaluation = createServerFn({ method: "POST" })
         .eq("id", targetId);
 
       if (updErr) throw new Error(`Failed to update evaluation status: ${updErr.message}`);
+
+      // Record audit transition
+      try {
+        await (supabase as any).from("kpi_evaluation_transitions").insert({
+          evaluation_id: targetId,
+          actor_id: userId,
+          from_status: oldRecord.status,
+          to_status: evalStatus,
+          reason: input.action === "return" ? input.reason : input.action === "unlock" ? (input.reason || "Unlocked by HR Admin") : "Approved by HR Admin",
+          created_at: now,
+        });
+      } catch (tErr) {
+        console.error("Failed to record evaluation transition:", tErr);
+      }
 
       // Notify Manager & Employee
       const evaluatorId = oldRecord.evaluator_id;
@@ -1817,6 +1907,14 @@ export const reviewQuarterlyEvaluation = createServerFn({ method: "POST" })
               : `The evaluation has been officially approved with a score of ${oldRecord.summary?.totalScore ?? 0}%.`,
             url: "/admin/kpi-evaluations",
             severity: "success",
+          });
+        } else if (input.action === "unlock") {
+          await notifyKpiAction({
+            userIds: [evaluatorId],
+            title: `KPI Evaluation ${selectedQ ? selectedQ.toUpperCase() + " " : ""}Unlocked (${oldRecord.evaluation_year})`,
+            body: `The evaluation has been unlocked by HR and reopened for editing.`,
+            url: "/manager/kpi-evaluations",
+            severity: "info",
           });
         } else {
           await notifyKpiAction({
@@ -2517,7 +2615,7 @@ export const updateKpiEvaluationStatus = createServerFn({ method: "POST" })
 
     const { data: existing, error: fetchErr } = await (supabase as any)
       .from("kpi_evaluations")
-      .select("id, employee_id, evaluation_year, status, evaluator_id, summary")
+      .select("id, employee_id, evaluation_year, status, evaluator_id, summary, notes")
       .eq("id", input.id)
       .single();
 
@@ -2540,6 +2638,29 @@ export const updateKpiEvaluationStatus = createServerFn({ method: "POST" })
     if (input.status === "submitted") updatePayload.submitted_at = now;
     else if (input.status === "reviewed") updatePayload.reviewed_at = now;
     else if (input.status === "approved") updatePayload.approved_at = now;
+    else if (input.status === "draft") {
+      updatePayload.approved_at = null;
+      if (existing.notes && typeof existing.notes === "object") {
+        const notes = { ...existing.notes };
+        if (notes.quarterStatuses) {
+          const qs = { ...notes.quarterStatuses };
+          for (const q of Object.keys(qs)) {
+            qs[q] = { ...qs[q], status: "draft", approved_at: null, unlocked_at: now, unlocked_by: userId };
+          }
+          notes.quarterStatuses = qs;
+          updatePayload.notes = notes;
+        }
+      }
+      try {
+        await (supabase as any)
+          .from("kpi_quarterly_evaluations")
+          .update({ status: "draft", approved_at: null, return_reason: null, updated_at: now })
+          .eq("employee_id", existing.employee_id)
+          .eq("evaluation_year", existing.evaluation_year);
+      } catch (qErr) {
+        console.error("Failed to reset kpi_quarterly_evaluations on draft:", qErr);
+      }
+    }
 
     const { error: updateErr } = await (supabase as any)
       .from("kpi_evaluations")
