@@ -322,10 +322,13 @@ export function EmployeeKpiPage() {
     return Array.from(map.values());
   }, [activeScorecardItems]);
 
-  // Hydrate recorded scorecard state directly from evaluation.scores
+  // Hydrate recorded scorecard state directly from evaluation.scores ONLY if approved
   const kpiState = useMemo<Record<string, KpiRowState>>(() => {
+    const rawStatus = (evaluation?.status || "draft").toLowerCase();
+    const isParentApproved = rawStatus === "approved";
+
     let scores: Record<string, any> = {};
-    if (evaluation?.scores) {
+    if (isParentApproved && evaluation?.scores) {
       if (typeof evaluation.scores === "string") {
         try {
           scores = JSON.parse(evaluation.scores);
@@ -348,22 +351,28 @@ export function EmployeeKpiPage() {
         scores[idx + 1] ||
         {};
 
+      // Individual quarters are only exposed if specifically approved by HR/Admin
+      const q1Approved = q1Eval?.status === "approved" || isParentApproved;
+      const q2Approved = q2Eval?.status === "approved" || isParentApproved;
+      const q3Approved = q3Eval?.status === "approved" || isParentApproved;
+      const q4Approved = q4Eval?.status === "approved" || isParentApproved;
+
       state[it.id] = {
         id: it.id as any,
         targetAnnual: it.target,
-        q1: saved.q1 ?? { actual: null, achievement: null, score: null },
-        q2: saved.q2 ?? { actual: null, achievement: null, score: null },
-        q3: saved.q3 ?? { actual: null, achievement: null, score: null },
-        q4: saved.q4 ?? { actual: null, achievement: null, score: null },
-        annualScore: saved.annualScore ?? null,
-        adminNotes: saved.adminNotes || saved.notes || "",
-        notes: saved.notes || "",
-        isReturned: saved.isReturned ?? false,
+        q1: q1Approved ? (saved.q1 ?? { actual: null, achievement: null, score: null }) : { actual: null, achievement: null, score: null },
+        q2: q2Approved ? (saved.q2 ?? { actual: null, achievement: null, score: null }) : { actual: null, achievement: null, score: null },
+        q3: q3Approved ? (saved.q3 ?? { actual: null, achievement: null, score: null }) : { actual: null, achievement: null, score: null },
+        q4: q4Approved ? (saved.q4 ?? { actual: null, achievement: null, score: null }) : { actual: null, achievement: null, score: null },
+        annualScore: isParentApproved ? (saved.annualScore ?? null) : null,
+        adminNotes: isParentApproved ? (saved.adminNotes || saved.notes || "") : "",
+        notes: isParentApproved ? (saved.notes || "") : "",
+        isReturned: false,
       };
     });
 
     return state;
-  }, [activeScorecardItems, evaluation]);
+  }, [activeScorecardItems, evaluation, q1Eval?.status, q2Eval?.status, q3Eval?.status, q4Eval?.status]);
 
   // Fetch official saved job description from position_job_descriptions if available
   const effectivePositionId =
@@ -677,17 +686,22 @@ export function EmployeeKpiPage() {
   const rawStatus = (evaluation?.status || "draft").toLowerCase();
 
   // Real quarterly scores from either quarterly evaluations OR annual evaluation scores
+  // STRICT PRIVACY: Scores are ONLY revealed after official HR or Admin approval, never on manager submission.
   const getQuarterData = (
     qEval: typeof q1Eval | typeof q2Eval | typeof q3Eval | typeof q4Eval,
     qScore: number
   ) => {
-    if (qEval && qEval.status !== "draft" && qEval.score !== null) {
-      return { score: qEval.score, status: qEval.status };
+    // 1. If quarter evaluation has been specifically approved by HR/Admin
+    if (qEval && qEval.status === "approved" && qEval.score !== null) {
+      return { score: qEval.score, status: "approved" };
     }
-    if (qScore > 0) {
-      return { score: Number((qScore * 100).toFixed(1)), status: rawStatus };
+    // 2. If parent evaluation is approved by HR/Admin
+    if (rawStatus === "approved" && qScore > 0) {
+      return { score: Number((qScore * 100).toFixed(1)), status: "approved" };
     }
-    return { score: null, status: qEval?.status ?? null };
+    // 3. If submitted by manager but not yet approved by HR/Admin -> keep score hidden (null)
+    const pendingStatus = qEval?.status || (rawStatus === "submitted" ? "submitted" : null);
+    return { score: null, status: pendingStatus };
   };
 
   const q1Data = getQuarterData(q1Eval, summaryTotals.q1Score);
@@ -863,19 +877,19 @@ export function EmployeeKpiPage() {
                     {isAr ? "الأداء ومؤشرات الأداء" : "Performance and KPIs"}
                   </span>
                   {rawStatus === "approved" ? (
-                    <Badge className="bg-emerald-600 text-white text-[10px] gap-1 px-2 py-0.5">
-                      <ShieldCheck className="h-3 w-3" />
-                      {isAr ? "معتمد" : "Approved"}
+                    <Badge className="bg-emerald-600 text-white text-[10px] gap-1 px-2.5 py-0.5 font-semibold">
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      {isAr ? "معتمد رسمياً من الإدارة" : "Approved by HR"}
                     </Badge>
                   ) : rawStatus === "submitted" ? (
-                    <Badge className="bg-blue-600 text-white text-[10px] gap-1 px-2 py-0.5">
-                      <Clock className="h-3 w-3" />
-                      {isAr ? "بانتظار المراجعة" : "Pending HR"}
+                    <Badge className="bg-amber-600 text-white text-[10px] gap-1 px-2.5 py-0.5 font-semibold">
+                      <Clock className="h-3.5 w-3.5" />
+                      {isAr ? "بانتظار اعتماد الموارد البشرية" : "Pending HR Approval"}
                     </Badge>
                   ) : (
                     <Badge variant="outline" className="text-[10px] text-muted-foreground gap-1 px-2 py-0.5">
                       <Clock className="h-3 w-3" />
-                      {isAr ? "مسودة" : "Draft"}
+                      {isAr ? "بانتظار التقييم" : "Pending Evaluation"}
                     </Badge>
                   )}
                 </div>
@@ -884,11 +898,30 @@ export function EmployeeKpiPage() {
                 </h2>
                 <p className="text-xs text-muted-foreground line-clamp-1">
                   {isAr
-                    ? "متابعة نتائج التقييم الفصلي والأداء السنوي وسجل المعايير"
-                    : "Quarterly and annual performance evaluation results and records"}
+                    ? "متابعة نتائج التقييم الفصلي والأداء السنوي وسجل المعايير المعتمدة"
+                    : "Quarterly and annual performance evaluation results and approved records"}
                 </p>
               </div>
             </div>
+
+            {/* Awaiting HR Approval Notice */}
+            {rawStatus === "submitted" && (
+              <div className="mt-3.5 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-3.5 flex items-start gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-700 dark:text-amber-300">
+                  <Clock className="h-4 w-4" />
+                </div>
+                <div className="space-y-0.5 text-xs">
+                  <p className="font-bold text-amber-950 dark:text-amber-200">
+                    {isAr ? "تم رفع التقييم من المدير المباشر — بانتظار اعتماد إدارة الموارد البشرية" : "Evaluation Submitted by Manager — Awaiting HR Approval"}
+                  </p>
+                  <p className="text-amber-900/80 dark:text-amber-300/80 leading-relaxed text-[11px]">
+                    {isAr
+                      ? "قام المدير المباشر بإرسال بطاقة التقييم إلى الموارد البشرية للمراجعة والتدقيق. تظهر الدرجات وسجل المعايير والنتائج التفصيلية هنا فور اعتمادها رسمياً من قبل HR / الإدارة."
+                      : "Your direct manager has submitted the scorecard, which is currently undergoing review by HR Administration. Final scores, actuals, and criteria results will be published here upon official approval."}
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Score & Progress */}
             <div className="mt-4 pt-3.5 border-t border-border/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
@@ -1025,23 +1058,23 @@ export function EmployeeKpiPage() {
             {kpiSubTab === "quarters" && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 {quartersList.map((item) => {
-                  // score is 0-100 (direct from kpi_quarterly_evaluations.score)
+                  // STRICT: Score is ONLY revealed if the quarter has been approved by HR/Admin
                   const isApproved = item.status === "approved";
                   const isSubmitted = item.status === "submitted" || item.status === "returned";
-                  const hasScore = item.score !== null;
+                  const hasScore = isApproved && item.score !== null;
                   // progress: score / target * 100 (both are 0-100)
                   const progress = hasScore ? Math.min(100, Math.round((item.score! / item.target) * 100)) : 0;
 
                   const badgeClass = isApproved
                     ? "bg-emerald-600 text-white border-transparent"
                     : isSubmitted
-                      ? "bg-blue-600 text-white border-transparent"
+                      ? "bg-amber-600 text-white border-transparent"
                       : "";
 
                   const badgeLabel = isApproved
-                    ? (isAr ? "معتمد" : "Approved")
+                    ? (isAr ? "معتمد رسمياً" : "Approved")
                     : isSubmitted
-                      ? (isAr ? "بانتظار المراجعة" : "Pending Review")
+                      ? (isAr ? "بانتظار اعتماد HR" : "Pending HR Approval")
                       : null;
 
                   return (
@@ -1083,7 +1116,7 @@ export function EmployeeKpiPage() {
                             {isAr ? "الدرجة المحققة" : "Score"}
                           </span>
                           <span className="font-mono text-xs font-bold text-brand">
-                            {hasScore ? `${item.score!.toFixed(1)}%` : "—"}
+                            {hasScore ? `${item.score!.toFixed(1)}%` : isSubmitted ? (isAr ? "قيد الاعتماد" : "Under Review") : "—"}
                           </span>
                         </div>
                         <div>
@@ -1321,19 +1354,23 @@ export function EmployeeKpiPage() {
                                   {(activeQuarterFilter === "all" || activeQuarterFilter === "q1") && (
                                     <>
                                       <td className="px-2 py-2 text-center bg-blue-500/5 font-mono">
-                                        {q1ActualStr ? (
+                                        {q1Data.status === "approved" && q1ActualStr ? (
                                           <span className="px-2 py-0.5 rounded-lg bg-background border border-blue-500/20 text-blue-900 dark:text-blue-200 font-medium">
                                             {q1ActualStr}
+                                          </span>
+                                        ) : q1Data.status === "submitted" ? (
+                                          <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium whitespace-nowrap">
+                                            {isAr ? "قيد الاعتماد" : "Pending HR"}
                                           </span>
                                         ) : (
                                           <span className="text-muted-foreground">—</span>
                                         )}
                                       </td>
                                       <td className="px-2 py-2 text-center font-mono bg-blue-500/5">
-                                        {row.q1.achievement !== null ? `${Math.round(row.q1.achievement * 100)}%` : "—"}
+                                        {q1Data.status === "approved" && row.q1.achievement !== null ? `${Math.round(row.q1.achievement * 100)}%` : "—"}
                                       </td>
                                       <td className="px-2 py-2 text-center font-mono font-bold bg-blue-500/5 text-blue-700 dark:text-blue-300">
-                                        {fmtRawScore(row.q1.score)}
+                                        {q1Data.status === "approved" ? fmtRawScore(row.q1.score) : "—"}
                                       </td>
                                     </>
                                   )}
@@ -1342,19 +1379,23 @@ export function EmployeeKpiPage() {
                                   {(activeQuarterFilter === "all" || activeQuarterFilter === "q2") && (
                                     <>
                                       <td className="px-2 py-2 text-center bg-emerald-500/5 font-mono">
-                                        {q2ActualStr ? (
+                                        {q2Data.status === "approved" && q2ActualStr ? (
                                           <span className="px-2 py-0.5 rounded-lg bg-background border border-emerald-500/20 text-emerald-900 dark:text-emerald-200 font-medium">
                                             {q2ActualStr}
+                                          </span>
+                                        ) : q2Data.status === "submitted" ? (
+                                          <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium whitespace-nowrap">
+                                            {isAr ? "قيد الاعتماد" : "Pending HR"}
                                           </span>
                                         ) : (
                                           <span className="text-muted-foreground">—</span>
                                         )}
                                       </td>
                                       <td className="px-2 py-2 text-center font-mono bg-emerald-500/5">
-                                        {row.q2.achievement !== null ? `${Math.round(row.q2.achievement * 100)}%` : "—"}
+                                        {q2Data.status === "approved" && row.q2.achievement !== null ? `${Math.round(row.q2.achievement * 100)}%` : "—"}
                                       </td>
                                       <td className="px-2 py-2 text-center font-mono font-bold bg-emerald-500/5 text-emerald-700 dark:text-emerald-300">
-                                        {fmtRawScore(row.q2.score)}
+                                        {q2Data.status === "approved" ? fmtRawScore(row.q2.score) : "—"}
                                       </td>
                                     </>
                                   )}
@@ -1363,19 +1404,23 @@ export function EmployeeKpiPage() {
                                   {(activeQuarterFilter === "all" || activeQuarterFilter === "q3") && (
                                     <>
                                       <td className="px-2 py-2 text-center bg-amber-500/5 font-mono">
-                                        {q3ActualStr ? (
+                                        {q3Data.status === "approved" && q3ActualStr ? (
                                           <span className="px-2 py-0.5 rounded-lg bg-background border border-amber-500/20 text-amber-900 dark:text-amber-200 font-medium">
                                             {q3ActualStr}
+                                          </span>
+                                        ) : q3Data.status === "submitted" ? (
+                                          <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium whitespace-nowrap">
+                                            {isAr ? "قيد الاعتماد" : "Pending HR"}
                                           </span>
                                         ) : (
                                           <span className="text-muted-foreground">—</span>
                                         )}
                                       </td>
                                       <td className="px-2 py-2 text-center font-mono bg-amber-500/5">
-                                        {row.q3.achievement !== null ? `${Math.round(row.q3.achievement * 100)}%` : "—"}
+                                        {q3Data.status === "approved" && row.q3.achievement !== null ? `${Math.round(row.q3.achievement * 100)}%` : "—"}
                                       </td>
                                       <td className="px-2 py-2 text-center font-mono font-bold bg-amber-500/5 text-amber-700 dark:text-amber-300">
-                                        {fmtRawScore(row.q3.score)}
+                                        {q3Data.status === "approved" ? fmtRawScore(row.q3.score) : "—"}
                                       </td>
                                     </>
                                   )}
@@ -1384,19 +1429,23 @@ export function EmployeeKpiPage() {
                                   {(activeQuarterFilter === "all" || activeQuarterFilter === "q4") && (
                                     <>
                                       <td className="px-2 py-2 text-center bg-purple-500/5 font-mono">
-                                        {q4ActualStr ? (
+                                        {q4Data.status === "approved" && q4ActualStr ? (
                                           <span className="px-2 py-0.5 rounded-lg bg-background border border-purple-500/20 text-purple-900 dark:text-purple-200 font-medium">
                                             {q4ActualStr}
+                                          </span>
+                                        ) : q4Data.status === "submitted" ? (
+                                          <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium whitespace-nowrap">
+                                            {isAr ? "قيد الاعتماد" : "Pending HR"}
                                           </span>
                                         ) : (
                                           <span className="text-muted-foreground">—</span>
                                         )}
                                       </td>
                                       <td className="px-2 py-2 text-center font-mono bg-purple-500/5">
-                                        {row.q4.achievement !== null ? `${Math.round(row.q4.achievement * 100)}%` : "—"}
+                                        {q4Data.status === "approved" && row.q4.achievement !== null ? `${Math.round(row.q4.achievement * 100)}%` : "—"}
                                       </td>
                                       <td className="px-2 py-2 text-center font-mono font-bold bg-purple-500/5 text-purple-700 dark:text-purple-300">
-                                        {fmtRawScore(row.q4.score)}
+                                        {q4Data.status === "approved" ? fmtRawScore(row.q4.score) : "—"}
                                       </td>
                                     </>
                                   )}
@@ -1471,35 +1520,51 @@ export function EmployeeKpiPage() {
                   </p>
                 </div>
 
-                <div className="space-y-2.5">
-                  <div className="rounded-2xl border border-border bg-muted/20 p-3.5 space-y-1">
-                    <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
-                      {isAr ? "1. نقاط القوة الفنية وأبرز الإنجازات الميدانية" : "1. Key Technical Strengths & Notable Site Deliveries"}
-                    </span>
-                    <p className="text-xs leading-relaxed text-foreground">
-                      {evaluation?.notes?.strengths || (isAr ? "لم يتم تسجيل ملاحظات بعد." : "No strengths recorded yet.")}
+                {rawStatus !== "approved" ? (
+                  <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-8 text-center space-y-2">
+                    <Clock className="h-8 w-8 text-amber-500 mx-auto" />
+                    <p className="text-xs font-semibold text-foreground">
+                      {isAr
+                        ? "الملاحظات والتوجيهات قيد المراجعة من الموارد البشرية"
+                        : "Qualitative feedback is awaiting HR approval"}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground max-w-sm mx-auto">
+                      {isAr
+                        ? "تتاح الملاحظات ونقاط القوة والدورات الموصى بها فور اعتماد تقييم الأداء رسمياً من قبل HR / الإدارة."
+                        : "Supervisor notes, strengths, and recommended training will become accessible once officially approved."}
                     </p>
                   </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    <div className="rounded-2xl border border-border bg-muted/20 p-3.5 space-y-1">
+                      <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                        {isAr ? "1. نقاط القوة الفنية وأبرز الإنجازات الميدانية" : "1. Key Technical Strengths & Notable Site Deliveries"}
+                      </span>
+                      <p className="text-xs leading-relaxed text-foreground">
+                        {evaluation?.notes?.strengths || (isAr ? "لم يتم تسجيل ملاحظات بعد." : "No strengths recorded yet.")}
+                      </p>
+                    </div>
 
-                  <div className="rounded-2xl border border-border bg-muted/20 p-3.5 space-y-1">
-                    <span className="text-xs font-bold text-amber-700 dark:text-amber-400">
-                      {isAr ? "2. مجالات التطوير الفني وتحسين كفاءة التنفيذ" : "2. Areas for Technical Development & Optimization"}
-                    </span>
-                    <p className="text-xs leading-relaxed text-foreground whitespace-pre-wrap">
-                      {(evaluation?.notes?.growthAreas || "").replace(/\[HR Return Note.*?\]:[^\n]*\n?/gi, "").trim() ||
-                        (isAr ? "لم يتم تسجيل مجالات تطوير بعد." : "No growth areas recorded yet.")}
-                    </p>
-                  </div>
+                    <div className="rounded-2xl border border-border bg-muted/20 p-3.5 space-y-1">
+                      <span className="text-xs font-bold text-amber-700 dark:text-amber-400">
+                        {isAr ? "2. مجالات التطوير الفني وتحسين كفاءة التنفيذ" : "2. Areas for Technical Development & Optimization"}
+                      </span>
+                      <p className="text-xs leading-relaxed text-foreground whitespace-pre-wrap">
+                        {(evaluation?.notes?.growthAreas || "").replace(/\[HR Return Note.*?\]:[^\n]*\n?/gi, "").trim() ||
+                          (isAr ? "لم يتم تسجيل مجالات تطوير بعد." : "No growth areas recorded yet.")}
+                      </p>
+                    </div>
 
-                  <div className="rounded-2xl border border-border bg-muted/20 p-3.5 space-y-1">
-                    <span className="text-xs font-bold text-blue-700 dark:text-blue-400">
-                      {isAr ? "3. الشهادات والدورات الموصى بها" : "3. Recommended Training & Next Milestones"}
-                    </span>
-                    <p className="text-xs leading-relaxed text-foreground">
-                      {evaluation?.notes?.recommendations || (isAr ? "لم يتم تحديد دورات إضافية بعد." : "No recommended training recorded yet.")}
-                    </p>
+                    <div className="rounded-2xl border border-border bg-muted/20 p-3.5 space-y-1">
+                      <span className="text-xs font-bold text-blue-700 dark:text-blue-400">
+                        {isAr ? "3. الشهادات والدورات الموصى بها" : "3. Recommended Training & Next Milestones"}
+                      </span>
+                      <p className="text-xs leading-relaxed text-foreground">
+                        {evaluation?.notes?.recommendations || (isAr ? "لم يتم تحديد دورات إضافية بعد." : "No recommended training recorded yet.")}
+                      </p>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             )}
           </div>

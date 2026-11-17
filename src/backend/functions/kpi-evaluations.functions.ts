@@ -1398,9 +1398,25 @@ export const getQuarterlyEvaluation = createServerFn({ method: "POST" })
 
     if (error) throw new Error(`Failed to fetch quarterly evaluation: ${error.message}`);
 
-    // Employee Privacy Boundary: Employees may view their own evaluations once submitted or approved.
-    // Draft evaluations are hidden until the manager has formally submitted them.
-    if (!isAdmin && input.employeeId === userId && evalRecord && evalRecord.status === "draft") {
+    // Employee Privacy Boundary: Employees may view their own evaluations ONLY after HR or Admin approval.
+    // Draft, submitted, and returned evaluations remain hidden until HR/Admin has officially approved them.
+    if (!isAdmin && input.employeeId === userId && evalRecord && evalRecord.status !== "approved") {
+      // If submitted, return minimal status indicator with scores/items stripped
+      if (evalRecord.status === "submitted" || evalRecord.status === "reviewed") {
+        return {
+          id: evalRecord.id,
+          employee_id: evalRecord.employee_id,
+          evaluator_id: evalRecord.evaluator_id,
+          evaluation_year: evalRecord.evaluation_year,
+          quarter: evalRecord.quarter,
+          status: "submitted",
+          score: null,
+          percentage_score: null,
+          items: [],
+          created_at: evalRecord.created_at,
+          updated_at: evalRecord.updated_at,
+        } as any;
+      }
       return null;
     }
 
@@ -2596,25 +2612,57 @@ export const getMyKpiEvaluation = createServerFn({ method: "POST" })
     if (error) throw new Error(`Failed to fetch your KPI evaluation: ${error.message}`);
     if (!records || records.length === 0) return null;
 
-    // Prioritize approved > reviewed > submitted > draft, breaking ties by updated_at desc
-    const statusWeight: Record<string, number> = {
-      approved: 4,
-      reviewed: 3,
-      submitted: 2,
-      draft: 1,
-    };
-    const sorted = [...records].sort((a: any, b: any) => {
-      const wa = statusWeight[a.status?.toLowerCase()] || 0;
-      const wb = statusWeight[b.status?.toLowerCase()] || 0;
-      if (wa !== wb) return wb - wa;
-      return new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime();
-    });
+    // 1. Prioritize approved records first — full scores and feedback are visible
+    const approvedRecord = records.find((r: any) => r.status?.toLowerCase() === "approved");
+    if (approvedRecord) {
+      return sanitizeEvaluationForEmployee(approvedRecord);
+    }
 
-    return sanitizeEvaluationForEmployee(sorted[0]);
+    // 2. If an evaluation has been submitted by manager but not yet approved by HR/Admin:
+    // Return header metadata indicating "submitted" status, but strip all scores, actuals, and notes!
+    // The employee will see the "Pending HR Approval" state without premature score disclosure.
+    const submittedRecord = records.find((r: any) =>
+      ["submitted", "reviewed", "returned"].includes(r.status?.toLowerCase())
+    );
+    if (submittedRecord) {
+      return {
+        id: submittedRecord.id,
+        employee_id: submittedRecord.employee_id,
+        evaluation_year: submittedRecord.evaluation_year,
+        template_type: submittedRecord.template_type,
+        evaluator_id: submittedRecord.evaluator_id,
+        evaluator_name: submittedRecord.evaluator_name,
+        status: "submitted",
+        scores: {}, // HIDDEN until HR/Admin approves
+        summary: null, // HIDDEN until HR/Admin approves
+        notes: { strengths: "", growthAreas: "", recommendations: "" }, // HIDDEN until HR/Admin approves
+        submitted_at: submittedRecord.submitted_at,
+        reviewed_at: null,
+        approved_at: null,
+        created_at: submittedRecord.created_at,
+        updated_at: submittedRecord.updated_at,
+        employee: submittedRecord.employee,
+      } as KpiEvaluationRecord;
+    }
+
+    return null;
   });
 
 function sanitizeEvaluationForEmployee(record: any): KpiEvaluationRecord {
   if (!record) return record;
+
+  const isApproved = record.status?.toLowerCase() === "approved";
+
+  // If not approved, strip all scores, summary, and qualitative feedback
+  if (!isApproved) {
+    return {
+      ...record,
+      status: "submitted",
+      scores: {},
+      summary: null,
+      notes: { strengths: "", growthAreas: "", recommendations: "" },
+    } as KpiEvaluationRecord;
+  }
 
   const cleanNotes =
     record.notes && typeof record.notes === "object"
@@ -2687,6 +2735,7 @@ export const listMyKpiEvaluations = createServerFn({ method: "POST" })
         updated_at
       `)
       .eq("employee_id", userId)
+      .eq("status", "approved")
       .order("evaluation_year", { ascending: false });
 
     if (error) throw new Error(`Failed to list your KPI evaluations: ${error.message}`);
