@@ -19,6 +19,7 @@ import { Switch } from "@/components/ui/switch";
 import { DeliverySettingsCard } from "@/components/admin/DeliverySettingsCard";
 import { EmailDeliveryLogCard } from "@/components/admin/EmailDeliveryLogCard";
 import { NotificationMatrixCard } from "@/components/admin/NotificationMatrixCard";
+import { DEFAULT_NOTIFICATION_MATRIX } from "@/lib/notification-matrix.types";
 import { enablePush, disablePush, isPushSubscribed, getPushSupport } from "@/lib/push-client";
 import {
   useNotificationPrefs,
@@ -134,7 +135,7 @@ function NotificationPreferencesPage() {
               activeTab === "matrix" ? "bg-white/20 text-white font-bold" : "bg-muted text-foreground"
             }`}
           >
-            13
+            {DEFAULT_NOTIFICATION_MATRIX.length}
           </span>
         </button>
 

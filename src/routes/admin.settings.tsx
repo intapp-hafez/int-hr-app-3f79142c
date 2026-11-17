@@ -50,6 +50,7 @@ import {
 import { runSchedule } from "@/lib/export-scheduler";
 import { EmailDeliveryLogCard } from "@/components/admin/EmailDeliveryLogCard";
 import { NotificationMatrixCard } from "@/components/admin/NotificationMatrixCard";
+import { DEFAULT_NOTIFICATION_MATRIX } from "@/lib/notification-matrix.types";
 
 const SecurityPanel = lazy(() => import("@/components/admin/SecurityPanel").then((mod) => ({ default: mod.SecurityPanel })));
 
@@ -1275,7 +1276,7 @@ function AdminSettings() {
                     notifSubTab === "matrix" ? "bg-white/20 text-white font-bold" : "bg-muted text-foreground"
                   }`}
                 >
-                  13
+                  {DEFAULT_NOTIFICATION_MATRIX.length}
                 </span>
               </button>
 
