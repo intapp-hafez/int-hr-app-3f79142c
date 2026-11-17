@@ -16,7 +16,7 @@ const RuleUpdateSchema = z.object({
     notifyEmployee: z.boolean(),
     notifyManager: z.boolean(),
     notifyHr: z.boolean(),
-    customEmails: z.array(z.string().email()),
+    customEmails: z.array(z.string()),
   }),
   employeeTemplate: z.object({
     subject: z.string(),
@@ -25,6 +25,39 @@ const RuleUpdateSchema = z.object({
   responsibleTemplate: z.object({
     subject: z.string(),
     body: z.string(),
+  }),
+});
+
+const CreateRuleSchema = z.object({
+  id: z
+    .string()
+    .min(2)
+    .regex(/^[a-z0-9_-]+$/, "Identifier must contain only lowercase letters, numbers, hyphens, and underscores"),
+  name: z.string().min(2, "English name is required"),
+  nameAr: z.string().min(2, "Arabic name is required"),
+  description: z.string().optional().default(""),
+  descriptionAr: z.string().optional().default(""),
+  group: z.enum(["expirations", "requests", "attendance", "onboarding", "performance", "security"]),
+  inapp: z.boolean().default(true),
+  email: z.boolean().default(true),
+  push: z.boolean().default(false),
+  sms: z.boolean().default(false),
+  receivers: z.object({
+    notifyEmployee: z.boolean().default(true),
+    notifyManager: z.boolean().default(true),
+    notifyHr: z.boolean().default(true),
+    customEmails: z.array(z.string()).default([]),
+  }),
+  triggerSchedule: z.string().default("Event-driven"),
+  triggerScheduleAr: z.string().default("عند وقوع الحدث"),
+  triggerType: z.enum(["daily_cron", "realtime", "on_action"]).default("on_action"),
+  employeeTemplate: z.object({
+    subject: z.string().default(""),
+    body: z.string().default(""),
+  }),
+  responsibleTemplate: z.object({
+    subject: z.string().default(""),
+    body: z.string().default(""),
   }),
 });
 
@@ -77,7 +110,41 @@ export const getNotificationMatrixRules = createServerFn({ method: "GET" })
         };
       });
 
-      return { rules };
+      // Include custom rules from DB that are not in DEFAULT_NOTIFICATION_MATRIX
+      const defaultIds = new Set(DEFAULT_NOTIFICATION_MATRIX.map((d) => d.id));
+      const customRules: NotificationMatrixRule[] = (dbRows as any[])
+        .filter((r) => !defaultIds.has(r.id))
+        .map((row) => ({
+          id: row.id,
+          name: row.name || row.id,
+          nameAr: row.name_ar || row.name || row.id,
+          description: row.description || "",
+          descriptionAr: row.description_ar || "",
+          group: (row.category_group || "requests") as any,
+          inapp: row.inapp ?? true,
+          email: row.email ?? true,
+          push: row.push ?? false,
+          sms: row.sms ?? false,
+          receivers: {
+            notifyEmployee: row.notify_employee ?? true,
+            notifyManager: row.notify_manager ?? true,
+            notifyHr: row.notify_hr ?? true,
+            customEmails: Array.isArray(row.custom_emails) ? row.custom_emails : [],
+          },
+          triggerSchedule: row.trigger_schedule || "Event-driven",
+          triggerScheduleAr: row.trigger_schedule_ar || "عند وقوع الحدث",
+          triggerType: (row.trigger_type || "on_action") as any,
+          employeeTemplate: {
+            subject: row.employee_subject || "",
+            body: row.employee_body || "",
+          },
+          responsibleTemplate: {
+            subject: row.responsible_subject || "",
+            body: row.responsible_body || "",
+          },
+        }));
+
+      return { rules: [...rules, ...customRules] };
     } catch {
       return { rules: DEFAULT_NOTIFICATION_MATRIX };
     }
@@ -123,6 +190,56 @@ export const saveNotificationMatrixRule = createServerFn({ method: "POST" })
     return { ok: true, rule: data };
   });
 
+export const createNotificationMatrixRule = createServerFn({ method: "POST" })
+  .middleware([requireAdminAccess])
+  .inputValidator((input) => CreateRuleSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const record = {
+      id: data.id,
+      name: data.name,
+      name_ar: data.nameAr,
+      description: data.description,
+      description_ar: data.descriptionAr,
+      category_group: data.group,
+      inapp: data.inapp,
+      email: data.email,
+      push: data.push,
+      sms: data.sms,
+      notify_employee: data.receivers.notifyEmployee,
+      notify_manager: data.receivers.notifyManager,
+      notify_hr: data.receivers.notifyHr,
+      custom_emails: data.receivers.customEmails,
+      trigger_schedule: data.triggerSchedule,
+      trigger_schedule_ar: data.triggerScheduleAr,
+      trigger_type: data.triggerType,
+      employee_subject: data.employeeTemplate.subject,
+      employee_body: data.employeeTemplate.body,
+      responsible_subject: data.responsibleTemplate.subject,
+      responsible_body: data.responsibleTemplate.body,
+      updated_at: new Date().toISOString(),
+      updated_by: context.userId,
+    };
+
+    const { error } = await supabaseAdmin.from("notification_matrix_rules" as any).upsert(record);
+    if (error) {
+      console.error("Error creating notification_matrix_rule:", error);
+      throw new Error(error.message || "Failed to create notification rule");
+    }
+
+    try {
+      await supabaseAdmin.from("security_audit_events").insert({
+        event_type: "notification_matrix_rule_created",
+        details: { ruleId: data.id, name: data.name, group: data.group, receivers: data.receivers },
+      });
+    } catch {
+      // ignore audit log error
+    }
+
+    return { ok: true, rule: data };
+  });
+
 export const sendTestMatrixNotification = createServerFn({ method: "POST" })
   .middleware([requireAdminAccess])
   .inputValidator((input) =>
@@ -139,7 +256,47 @@ export const sendTestMatrixNotification = createServerFn({ method: "POST" })
     const { sendEmail } = await import("../server/smtp-client.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const rule = DEFAULT_NOTIFICATION_MATRIX.find((r) => r.id === data.ruleId);
+    let rule: NotificationMatrixRule | undefined = DEFAULT_NOTIFICATION_MATRIX.find((r) => r.id === data.ruleId);
+    if (!rule) {
+      const { data: dbRow } = await supabaseAdmin
+        .from("notification_matrix_rules" as any)
+        .select("*")
+        .eq("id", data.ruleId)
+        .maybeSingle();
+
+      if (dbRow) {
+        rule = {
+          id: dbRow.id,
+          name: dbRow.name,
+          nameAr: dbRow.name_ar,
+          description: dbRow.description || "",
+          descriptionAr: dbRow.description_ar || "",
+          group: dbRow.category_group,
+          inapp: dbRow.inapp,
+          email: dbRow.email,
+          push: dbRow.push,
+          sms: dbRow.sms,
+          receivers: {
+            notifyEmployee: dbRow.notify_employee,
+            notifyManager: dbRow.notify_manager,
+            notifyHr: dbRow.notify_hr,
+            customEmails: dbRow.custom_emails || [],
+          },
+          triggerSchedule: dbRow.trigger_schedule || "Event-driven",
+          triggerScheduleAr: dbRow.trigger_schedule_ar || "عند وقوع الحدث",
+          triggerType: dbRow.trigger_type || "on_action",
+          employeeTemplate: {
+            subject: dbRow.employee_subject || "",
+            body: dbRow.employee_body || "",
+          },
+          responsibleTemplate: {
+            subject: dbRow.responsible_subject || "",
+            body: dbRow.responsible_body || "",
+          },
+        };
+      }
+    }
+
     if (!rule) {
       return { ok: false, error: "Notification rule not found" };
     }

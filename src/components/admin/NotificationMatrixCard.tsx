@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
@@ -24,6 +24,7 @@ import {
   RotateCcw,
   Sparkles,
   Info,
+  Plus,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import {
@@ -34,6 +35,7 @@ import {
 import {
   getNotificationMatrixRules,
   saveNotificationMatrixRule,
+  createNotificationMatrixRule,
   sendTestMatrixNotification,
 } from "@/backend/functions/notification-matrix.functions";
 
@@ -76,16 +78,61 @@ export function NotificationMatrixCard() {
   // Custom email tag input draft
   const [newCcEmail, setNewCcEmail] = useState("");
 
+  // Add Custom Notification Type Modal State
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newRuleForm, setNewRuleForm] = useState({
+    id: "",
+    name: "",
+    nameAr: "",
+    description: "",
+    descriptionAr: "",
+    group: "requests" as NotificationCategoryGroup,
+    inapp: true,
+    email: true,
+    push: false,
+    sms: false,
+    receivers: {
+      notifyEmployee: true,
+      notifyManager: true,
+      notifyHr: false,
+      customEmails: [] as string[],
+    },
+    triggerType: "on_action" as "daily_cron" | "realtime" | "on_action",
+    triggerSchedule: "Real-time on action trigger",
+    triggerScheduleAr: "فوري عند تنفيذ الإجراء",
+    employeeTemplate: {
+      subject: "Update Regarding {{request_type}}",
+      body: "Dear {{employee_name}}, your request for {{request_type}} has been processed.",
+    },
+    responsibleTemplate: {
+      subject: "[Action Notice] New {{request_type}} for {{employee_name}}",
+      body: "Employee {{employee_name}} has submitted a {{request_type}}. Please review at your earliest convenience.",
+    },
+  });
+  const [addModalTemplateTab, setAddModalTemplateTab] = useState<"employee" | "responsible">("employee");
+  const [addModalCcDraft, setAddModalCcDraft] = useState("");
+  const [isSubmittingNewRule, setIsSubmittingNewRule] = useState(false);
+
   // Local state for interactive overrides
   const [overrides, setOverrides] = useState<Record<string, Partial<NotificationMatrixRule>>>(loadLocalOverrides);
 
+  const queryClient = useQueryClient();
   const getRulesFn = useServerFn(getNotificationMatrixRules);
   const saveRuleFn = useServerFn(saveNotificationMatrixRule);
+  const createRuleFn = useServerFn(createNotificationMatrixRule);
   const sendTestFn = useServerFn(sendTestMatrixNotification);
 
-  // Merge default rules with local overrides
+  const { data: serverRulesData } = useQuery({
+    queryKey: ["notification-matrix-rules"],
+    queryFn: () => getRulesFn(),
+    staleTime: 60_000,
+  });
+
+  const baseRules = serverRulesData?.rules || DEFAULT_NOTIFICATION_MATRIX;
+
+  // Merge base rules with local overrides
   const rules = useMemo(() => {
-    return DEFAULT_NOTIFICATION_MATRIX.map((r) => {
+    return baseRules.map((r) => {
       const ov = overrides[r.id];
       if (!ov) return r;
       return {
@@ -100,7 +147,7 @@ export function NotificationMatrixCard() {
         },
       };
     });
-  }, [overrides]);
+  }, [baseRules, overrides]);
 
   // Quick channel toggle handler
   const handleToggleChannel = (ruleId: string, channel: "inapp" | "email" | "push" | "sms", currentVal: boolean) => {
@@ -315,6 +362,142 @@ export function NotificationMatrixCard() {
     });
   }, [rules, search, selectedGroup, audienceFilter]);
 
+  const slugify = (text: string) =>
+    text
+      .toLowerCase()
+      .trim()
+      .replace(/[^\w\s-]/g, "")
+      .replace(/[\s_-]+/g, "_")
+      .replace(/^-+|-+$/g, "");
+
+  const handleAddCcInNewRule = () => {
+    const email = addModalCcDraft.trim();
+    if (!email || !/.+@.+\..+/.test(email)) {
+      return toast.error(isAr ? "يرجى إدخال بريد إلكتروني صحيح" : "Please enter a valid email address");
+    }
+    if (newRuleForm.receivers.customEmails.includes(email)) {
+      return toast.error(isAr ? "البريد مضاف مسبقاً" : "Email already exists in CC list");
+    }
+    setNewRuleForm({
+      ...newRuleForm,
+      receivers: {
+        ...newRuleForm.receivers,
+        customEmails: [...newRuleForm.receivers.customEmails, email],
+      },
+    });
+    setAddModalCcDraft("");
+  };
+
+  const handleRemoveCcInNewRule = (emailToRemove: string) => {
+    setNewRuleForm({
+      ...newRuleForm,
+      receivers: {
+        ...newRuleForm.receivers,
+        customEmails: newRuleForm.receivers.customEmails.filter((e) => e !== emailToRemove),
+      },
+    });
+  };
+
+  const insertPlaceholderInNewRule = (token: string) => {
+    const isEmp = addModalTemplateTab === "employee";
+    const currentTpl = isEmp ? newRuleForm.employeeTemplate : newRuleForm.responsibleTemplate;
+    const updatedTpl = {
+      ...currentTpl,
+      body: currentTpl.body ? `${currentTpl.body} ${token}` : token,
+    };
+    setNewRuleForm({
+      ...newRuleForm,
+      [isEmp ? "employeeTemplate" : "responsibleTemplate"]: updatedTpl,
+    });
+  };
+
+  const handleCreateNewRule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const finalId = (newRuleForm.id || slugify(newRuleForm.name)).trim();
+    if (!finalId) {
+      return toast.error(isAr ? "يرجى تحديد معرّف الإشعار (Slug ID)" : "Please provide a rule ID");
+    }
+    if (!/^[a-z0-9_-]+$/.test(finalId)) {
+      return toast.error(
+        isAr
+          ? "المعرّف يجب أن يحتوي على حروف إنجليزية صغيرة وأرقام وشرطات فقط"
+          : "Rule ID must contain only lowercase alphanumeric characters, dashes, and underscores",
+      );
+    }
+    if (!newRuleForm.name.trim() || !newRuleForm.nameAr.trim()) {
+      return toast.error(isAr ? "يرجى إدخال اسم الإشعار بالإنجليزية والعربية" : "Please enter both English and Arabic names");
+    }
+    if (rules.some((r) => r.id === finalId)) {
+      return toast.error(isAr ? "معرّف الإشعار موجود بالفعل" : "A rule with this ID already exists");
+    }
+
+    setIsSubmittingNewRule(true);
+    try {
+      const payload: NotificationMatrixRule = {
+        id: finalId,
+        name: newRuleForm.name.trim(),
+        nameAr: newRuleForm.nameAr.trim(),
+        description: newRuleForm.description.trim(),
+        descriptionAr: newRuleForm.descriptionAr.trim(),
+        group: newRuleForm.group,
+        inapp: newRuleForm.inapp,
+        email: newRuleForm.email,
+        push: newRuleForm.push,
+        sms: newRuleForm.sms,
+        receivers: newRuleForm.receivers,
+        triggerSchedule: newRuleForm.triggerSchedule.trim() || "Event-driven",
+        triggerScheduleAr: newRuleForm.triggerScheduleAr.trim() || "عند وقوع الحدث",
+        triggerType: newRuleForm.triggerType,
+        employeeTemplate: newRuleForm.employeeTemplate,
+        responsibleTemplate: newRuleForm.responsibleTemplate,
+      };
+
+      await createRuleFn({ data: payload });
+      await queryClient.invalidateQueries({ queryKey: ["notification-matrix-rules"] });
+
+      toast.success(
+        isAr
+          ? `تمت إضافة وتفعيل نوع الإشعار (${payload.nameAr}) بنجاح!`
+          : `Custom notification type "${payload.name}" created and activated!`,
+      );
+
+      setIsAddModalOpen(false);
+      setNewRuleForm({
+        id: "",
+        name: "",
+        nameAr: "",
+        description: "",
+        descriptionAr: "",
+        group: "requests",
+        inapp: true,
+        email: true,
+        push: false,
+        sms: false,
+        receivers: {
+          notifyEmployee: true,
+          notifyManager: true,
+          notifyHr: false,
+          customEmails: [],
+        },
+        triggerType: "on_action",
+        triggerSchedule: "Real-time on action trigger",
+        triggerScheduleAr: "فوري عند تنفيذ الإجراء",
+        employeeTemplate: {
+          subject: "Update Regarding {{request_type}}",
+          body: "Dear {{employee_name}}, your request for {{request_type}} has been processed.",
+        },
+        responsibleTemplate: {
+          subject: "[Action Notice] New {{request_type}} for {{employee_name}}",
+          body: "Employee {{employee_name}} has submitted a {{request_type}}. Please review at your earliest convenience.",
+        },
+      });
+    } catch (err: any) {
+      toast.error(err?.message || (isAr ? "فشل إنشاء نوع الإشعار" : "Failed to create custom notification rule"));
+    } finally {
+      setIsSubmittingNewRule(false);
+    }
+  };
+
   const exportMatrixCsv = () => {
     const headers = [
       "Event ID",
@@ -404,6 +587,14 @@ export function NotificationMatrixCard() {
           >
             <Download className="h-3.5 w-3.5" />
             {isAr ? "تصدير المصفوفة CSV" : "Export Matrix CSV"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsAddModalOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-primary text-primary-foreground px-3.5 py-1.5 text-xs font-semibold hover:bg-primary/90 transition shadow-sm"
+          >
+            <Plus className="h-4 w-4" />
+            {isAr ? "إضافة نوع إشعار جديد" : "+ Add Notification Type"}
           </button>
         </div>
       </div>
@@ -1077,6 +1268,531 @@ export function NotificationMatrixCard() {
                 {testing ? (isAr ? "جاري الإرسال..." : "Sending...") : isAr ? "إرسال الآن" : "Send Test"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Custom Notification Type Modal */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="relative w-full max-w-2xl rounded-2xl border border-border bg-card p-6 shadow-2xl space-y-5 my-8 max-h-[92vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-start justify-between border-b border-border pb-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-brand text-brand-foreground shadow-brand">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-display text-base font-semibold text-foreground">
+                    {isAr ? "إضافة نوع إشعار جديد إلى المصفوفة" : "Add Custom Notification Type"}
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    {isAr
+                      ? "تعريف تنبيه مؤتمت جديد وتحديد القنوات والمستلمين المسؤولين وقوالب الرسائل"
+                      : "Define automated routing, delivery channels, responsible receivers, and message copy"}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddModalOpen(false)}
+                className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted transition"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateNewRule} className="space-y-4 text-xs">
+              {/* Row: ID & Category */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-semibold text-foreground flex items-center justify-between">
+                    <span>{isAr ? "معرّف الإشعار (Slug ID) *" : "Rule Identifier (Slug ID) *"}</span>
+                    <span className="text-[10px] text-muted-foreground font-normal">e.g. medical_checkup</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newRuleForm.id}
+                    onChange={(e) =>
+                      setNewRuleForm({
+                        ...newRuleForm,
+                        id: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ""),
+                      })
+                    }
+                    placeholder="e.g. work_permit_renewal"
+                    className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs font-mono outline-none focus:border-ring"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-semibold text-foreground">
+                    {isAr ? "مجموعة التصنيف *" : "Category Group *"}
+                  </label>
+                  <select
+                    value={newRuleForm.group}
+                    onChange={(e) =>
+                      setNewRuleForm({
+                        ...newRuleForm,
+                        group: e.target.value as NotificationCategoryGroup,
+                      })
+                    }
+                    className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs outline-none focus:border-ring"
+                  >
+                    <option value="expirations">{isAr ? "انتهاء وثائق (Expirations)" : "Expirations"}</option>
+                    <option value="requests">{isAr ? "طلبات وموافقات (Requests)" : "Requests & Approvals"}</option>
+                    <option value="attendance">{isAr ? "حضور وانضباط (Attendance)" : "Attendance & Shifts"}</option>
+                    <option value="onboarding">{isAr ? "تعيين وبيانات (Onboarding)" : "Onboarding & Records"}</option>
+                    <option value="performance">{isAr ? "تقييم أداء (Performance)" : "Performance & KPIs"}</option>
+                    <option value="security">{isAr ? "أمان وحسابات (Security)" : "Security & System"}</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Names: EN & AR */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-semibold text-foreground">
+                    {isAr ? "اسم الإشعار (بالإنجليزية) *" : "Notification Name (English) *"}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newRuleForm.name}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setNewRuleForm({
+                        ...newRuleForm,
+                        name: val,
+                        id: newRuleForm.id || slugify(val),
+                      });
+                    }}
+                    placeholder="e.g. Work Permit Expiration"
+                    className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs outline-none focus:border-ring"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-semibold text-foreground">
+                    {isAr ? "اسم الإشعار (بالعربية) *" : "Notification Name (Arabic) *"}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newRuleForm.nameAr}
+                    onChange={(e) => setNewRuleForm({ ...newRuleForm, nameAr: e.target.value })}
+                    placeholder="مثال: انتهاء تصريح العمل"
+                    dir="rtl"
+                    className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs outline-none focus:border-ring"
+                  />
+                </div>
+              </div>
+
+              {/* Descriptions: EN & AR */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-semibold text-foreground">
+                    {isAr ? "الوصف (بالإنجليزية)" : "Description (English)"}
+                  </label>
+                  <input
+                    type="text"
+                    value={newRuleForm.description}
+                    onChange={(e) => setNewRuleForm({ ...newRuleForm, description: e.target.value })}
+                    placeholder="Brief description of when this notification fires"
+                    className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs outline-none focus:border-ring"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-semibold text-foreground">
+                    {isAr ? "الوصف (بالعربية)" : "Description (Arabic)"}
+                  </label>
+                  <input
+                    type="text"
+                    value={newRuleForm.descriptionAr}
+                    onChange={(e) => setNewRuleForm({ ...newRuleForm, descriptionAr: e.target.value })}
+                    placeholder="شرح موجز لظروف إرسال هذا التنبيه"
+                    dir="rtl"
+                    className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs outline-none focus:border-ring"
+                  />
+                </div>
+              </div>
+
+              {/* Delivery Channels */}
+              <div className="space-y-2 rounded-xl border border-border bg-background/50 p-3">
+                <div className="text-[11px] font-semibold text-foreground flex items-center gap-1.5">
+                  <Sliders className="h-3.5 w-3.5 text-primary" />
+                  {isAr ? "قنوات الإرسال الافتراضية" : "Default Delivery Channels"}
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewRuleForm({ ...newRuleForm, inapp: !newRuleForm.inapp })}
+                    className={`flex items-center justify-center gap-1.5 rounded-lg border p-2 text-xs font-medium transition ${
+                      newRuleForm.inapp
+                        ? "border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold"
+                        : "border-border bg-background text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    <Smartphone className="h-3.5 w-3.5" />
+                    In-App {newRuleForm.inapp ? "✓" : ""}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewRuleForm({ ...newRuleForm, email: !newRuleForm.email })}
+                    className={`flex items-center justify-center gap-1.5 rounded-lg border p-2 text-xs font-medium transition ${
+                      newRuleForm.email
+                        ? "border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400 font-semibold"
+                        : "border-border bg-background text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    <Mail className="h-3.5 w-3.5" />
+                    Email {newRuleForm.email ? "✓" : ""}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewRuleForm({ ...newRuleForm, push: !newRuleForm.push })}
+                    className={`flex items-center justify-center gap-1.5 rounded-lg border p-2 text-xs font-medium transition ${
+                      newRuleForm.push
+                        ? "border-amber-500 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold"
+                        : "border-border bg-background text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    <Bell className="h-3.5 w-3.5" />
+                    Push {newRuleForm.push ? "✓" : ""}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewRuleForm({ ...newRuleForm, sms: !newRuleForm.sms })}
+                    className={`flex items-center justify-center gap-1.5 rounded-lg border p-2 text-xs font-medium transition ${
+                      newRuleForm.sms
+                        ? "border-purple-500 bg-purple-500/10 text-purple-600 dark:text-purple-400 font-semibold"
+                        : "border-border bg-background text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    SMS {newRuleForm.sms ? "✓" : ""}
+                  </button>
+                </div>
+              </div>
+
+              {/* Responsible Receivers */}
+              <div className="space-y-3 rounded-xl border border-border bg-background/50 p-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-[11px] font-semibold text-foreground flex items-center gap-1.5">
+                    <Users className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                    {isAr ? "جهات الاستلام المسؤولة (Dual-Audience)" : "Responsible Receiver Routing"}
+                  </div>
+                  <span className="text-[10px] text-muted-foreground">
+                    {isAr ? "من يستلم هذا الإشعار؟" : "Who receives this alert?"}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setNewRuleForm({
+                        ...newRuleForm,
+                        receivers: {
+                          ...newRuleForm.receivers,
+                          notifyEmployee: !newRuleForm.receivers.notifyEmployee,
+                        },
+                      })
+                    }
+                    className={`flex items-center justify-center gap-1.5 rounded-lg border p-2 text-xs font-medium transition ${
+                      newRuleForm.receivers.notifyEmployee
+                        ? "border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400 font-semibold"
+                        : "border-border bg-background text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    <UserCheck className="h-3.5 w-3.5" />
+                    {isAr ? "الموظف المعني" : "Affected Employee"} {newRuleForm.receivers.notifyEmployee ? "✓" : ""}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setNewRuleForm({
+                        ...newRuleForm,
+                        receivers: {
+                          ...newRuleForm.receivers,
+                          notifyManager: !newRuleForm.receivers.notifyManager,
+                        },
+                      })
+                    }
+                    className={`flex items-center justify-center gap-1.5 rounded-lg border p-2 text-xs font-medium transition ${
+                      newRuleForm.receivers.notifyManager
+                        ? "border-purple-500 bg-purple-500/10 text-purple-600 dark:text-purple-400 font-semibold"
+                        : "border-border bg-background text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    <Briefcase className="h-3.5 w-3.5" />
+                    {isAr ? "المدير المباشر" : "Direct Manager"} {newRuleForm.receivers.notifyManager ? "✓" : ""}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setNewRuleForm({
+                        ...newRuleForm,
+                        receivers: {
+                          ...newRuleForm.receivers,
+                          notifyHr: !newRuleForm.receivers.notifyHr,
+                        },
+                      })
+                    }
+                    className={`flex items-center justify-center gap-1.5 rounded-lg border p-2 text-xs font-medium transition ${
+                      newRuleForm.receivers.notifyHr
+                        ? "border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold"
+                        : "border-border bg-background text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    {isAr ? "الموارد البشرية (HR)" : "HR Admins"} {newRuleForm.receivers.notifyHr ? "✓" : ""}
+                  </button>
+                </div>
+
+                {/* Additional CC Emails */}
+                <div className="space-y-1.5 pt-1">
+                  <label className="text-[10px] font-semibold text-muted-foreground">
+                    {isAr ? "نسخ إلكترونية إضافية للمسؤولين (CC Emails):" : "Additional Responsible CC Emails:"}
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="email"
+                      value={addModalCcDraft}
+                      onChange={(e) => setAddModalCcDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddCcInNewRule();
+                        }
+                      }}
+                      placeholder="e.g. compliance@integratedtechnics.com"
+                      className="flex-1 rounded-xl border border-input bg-background px-3 py-1.5 text-xs outline-none focus:border-ring"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddCcInNewRule}
+                      className="rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted transition"
+                    >
+                      {isAr ? "+ إضافة" : "+ Add CC"}
+                    </button>
+                  </div>
+                  {newRuleForm.receivers.customEmails.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {newRuleForm.receivers.customEmails.map((email) => (
+                        <span
+                          key={email}
+                          className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[11px] font-mono text-foreground"
+                        >
+                          {email}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveCcInNewRule(email)}
+                            className="text-muted-foreground hover:text-destructive transition"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Trigger Schedule & Type */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-semibold text-foreground">
+                    {isAr ? "آلية التشغيل (Trigger Type)" : "Trigger Mechanism"}
+                  </label>
+                  <select
+                    value={newRuleForm.triggerType}
+                    onChange={(e) =>
+                      setNewRuleForm({
+                        ...newRuleForm,
+                        triggerType: e.target.value as any,
+                      })
+                    }
+                    className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs outline-none focus:border-ring"
+                  >
+                    <option value="on_action">{isAr ? "فوري عند تنفيذ الإجراء (On Action)" : "Immediate On User Action"}</option>
+                    <option value="realtime">{isAr ? "إشعار فوري لحظي (Realtime Dispatch)" : "Realtime Event Dispatch"}</option>
+                    <option value="daily_cron">{isAr ? "فحص يومي مؤتمت (Daily Cron Scan)" : "Daily Scheduled Scan"}</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-semibold text-foreground">
+                    {isAr ? "وصف موعد الإرسال (Schedule)" : "Schedule Description"}
+                  </label>
+                  <input
+                    type="text"
+                    value={newRuleForm.triggerSchedule}
+                    onChange={(e) => setNewRuleForm({ ...newRuleForm, triggerSchedule: e.target.value })}
+                    placeholder="e.g. Daily at 08:00 AM (14d before)"
+                    className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs outline-none focus:border-ring"
+                  />
+                </div>
+              </div>
+
+              {/* Dual-Audience Notification Templates */}
+              <div className="space-y-2 rounded-xl border border-border bg-background/50 p-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-[11px] font-semibold text-foreground flex items-center gap-1.5">
+                    <Mail className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                    {isAr ? "قوالب الرسائل (Dual-Audience Copy)" : "Dual-Audience Notification Copy"}
+                  </div>
+
+                  {/* Template tabs */}
+                  <div className="flex rounded-lg border border-border bg-background p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setAddModalTemplateTab("employee")}
+                      className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition ${
+                        addModalTemplateTab === "employee"
+                          ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 font-semibold"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {isAr ? "نسخة الموظف" : "Employee Copy"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAddModalTemplateTab("responsible")}
+                      className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition ${
+                        addModalTemplateTab === "responsible"
+                          ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 font-semibold"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {isAr ? "نسخة المسؤول" : "Manager/HR Copy"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Tokens bar */}
+                <div className="flex items-center gap-1.5 overflow-x-auto py-1">
+                  <span className="text-[10px] text-muted-foreground shrink-0 flex items-center gap-1">
+                    <Info className="h-3 w-3" />
+                    {isAr ? "انقر لإدراج متغير:" : "Insert token:"}
+                  </span>
+                  {[
+                    "{{employee_name}}",
+                    "{{expiry_date}}",
+                    "{{days_left}}",
+                    "{{department}}",
+                    "{{request_type}}",
+                    "{{manager_name}}",
+                  ].map((token) => (
+                    <button
+                      key={token}
+                      type="button"
+                      onClick={() => insertPlaceholderInNewRule(token)}
+                      className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-mono text-foreground hover:bg-primary/10 hover:text-primary transition"
+                    >
+                      {token}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Active template inputs */}
+                {addModalTemplateTab === "employee" ? (
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={newRuleForm.employeeTemplate.subject}
+                      onChange={(e) =>
+                        setNewRuleForm({
+                          ...newRuleForm,
+                          employeeTemplate: {
+                            ...newRuleForm.employeeTemplate,
+                            subject: e.target.value,
+                          },
+                        })
+                      }
+                      placeholder="Subject: [Action Required] Your {{request_type}} update"
+                      className="w-full rounded-xl border border-input bg-background px-3 py-1.5 text-xs outline-none focus:border-ring"
+                    />
+                    <textarea
+                      rows={3}
+                      value={newRuleForm.employeeTemplate.body}
+                      onChange={(e) =>
+                        setNewRuleForm({
+                          ...newRuleForm,
+                          employeeTemplate: {
+                            ...newRuleForm.employeeTemplate,
+                            body: e.target.value,
+                          },
+                        })
+                      }
+                      placeholder="Dear {{employee_name}}, please note that..."
+                      className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs outline-none focus:border-ring"
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={newRuleForm.responsibleTemplate.subject}
+                      onChange={(e) =>
+                        setNewRuleForm({
+                          ...newRuleForm,
+                          responsibleTemplate: {
+                            ...newRuleForm.responsibleTemplate,
+                            subject: e.target.value,
+                          },
+                        })
+                      }
+                      placeholder="Subject: [Follow-up Required] Notice for {{employee_name}}"
+                      className="w-full rounded-xl border border-input bg-background px-3 py-1.5 text-xs outline-none focus:border-ring"
+                    />
+                    <textarea
+                      rows={3}
+                      value={newRuleForm.responsibleTemplate.body}
+                      onChange={(e) =>
+                        setNewRuleForm({
+                          ...newRuleForm,
+                          responsibleTemplate: {
+                            ...newRuleForm.responsibleTemplate,
+                            body: e.target.value,
+                          },
+                        })
+                      }
+                      placeholder="Notice: Employee {{employee_name}} has an active event. Please review..."
+                      className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs outline-none focus:border-ring"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Actions */}
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="rounded-xl border border-border bg-background px-4 py-2 text-xs font-medium text-foreground hover:bg-muted transition"
+                >
+                  {isAr ? "إلغاء" : "Cancel"}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingNewRule}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-5 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition shadow-sm disabled:opacity-50"
+                >
+                  <Plus className={`h-4 w-4 ${isSubmittingNewRule ? "animate-spin" : ""}`} />
+                  {isSubmittingNewRule
+                    ? isAr
+                      ? "جاري الحفظ..."
+                      : "Saving..."
+                    : isAr
+                    ? "حفظ وتفعيل نوع الإشعار"
+                    : "Create & Activate Rule"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
