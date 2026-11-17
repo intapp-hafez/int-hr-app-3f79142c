@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { lazy, Suspense, useCallback, useEffect, useState, useRef, type ReactNode } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Save, RotateCcw, Plus, Trash2, Clock, Wallet, Target, AlertTriangle, Gauge, CalendarDays, Sparkles, Pencil, X, Check, Wifi, Building2, Briefcase, MapPin, Mail, Bell, BellRing, Send, CalendarClock, Play, Timer, Coins, Tag, ChevronRight, ChevronDown, Shield, Eye, EyeOff, Copy, KeyRound, MessageSquare, UserCog, ShieldCheck } from "lucide-react";
+import { Save, RotateCcw, Plus, Trash2, Clock, Wallet, Target, AlertTriangle, Gauge, CalendarDays, Sparkles, Pencil, X, Check, Wifi, Building2, Briefcase, MapPin, Mail, Bell, BellRing, Send, CalendarClock, Play, Timer, Coins, Tag, ChevronRight, ChevronDown, Shield, Eye, EyeOff, Copy, KeyRound, MessageSquare, UserCog, ShieldCheck, Sliders } from "lucide-react";
 import { getVapidStatus } from "@/backend/functions/vapid-status.functions";
 import { getSmtpConfig, saveSmtpConfig, sendTestEmail } from "@/backend/functions/smtp.functions";
 import { getSmsConfig, saveSmsConfig, sendSms, sendOtpSms, getLastSmsAudit, listRecentOtpAudits } from "@/backend/functions/sms.functions";
@@ -374,6 +374,7 @@ function AdminSettings() {
     }
   }
   const [prefsTarget, setPrefsTarget] = useState<string>("hr"); // "hr" | "manager:<id>"
+  const [notifSubTab, setNotifSubTab] = useState<"matrix" | "logs" | "preferences">("matrix");
   const currentPrefs = notifPrefsMap[prefsTarget] ?? getNotifPrefs(prefsTarget);
   const [prefsDraft, setPrefsDraft] = useState<NotifPrefs>(currentPrefs);
   const [draft, setDraft] = useState<Policy>(policy);
@@ -1255,66 +1256,128 @@ function AdminSettings() {
         )}
 
         {section === "notifPrefs" && (
-          <div className="space-y-4">
-            <p className="text-xs text-muted-foreground">{t("notifPrefsSubtitle")}</p>
-            <Field label={t("notifTarget")}>
-              <select
-                value={prefsTarget}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setPrefsTarget(v);
-                  setPrefsDraft(notifPrefsMap[v] ?? getNotifPrefs(v));
-                }}
-                className={inputCls}
-              >
-                <option value="hr">{t("hrAudience")}</option>
-                {managers.map((m) => (
-                  <option key={m.id} value={`manager:${m.id}`}>{m.name} — {m.dept}</option>
-                ))}
-              </select>
-            </Field>
-            <div className="grid gap-2 rounded-2xl border border-border bg-background/40 p-4 md:grid-cols-3">
-              <label className="inline-flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={prefsDraft.channels.push} onChange={(e) => setPrefsDraft({ ...prefsDraft, channels: { ...prefsDraft.channels, push: e.target.checked } })} />
-                {t("channelPush")}
-              </label>
-              <label className="inline-flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={prefsDraft.channels.email} onChange={(e) => setPrefsDraft({ ...prefsDraft, channels: { ...prefsDraft.channels, email: e.target.checked } })} />
-                {t("channelEmail")}
-              </label>
-              <label className="inline-flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={prefsDraft.channels.inApp} onChange={(e) => setPrefsDraft({ ...prefsDraft, channels: { ...prefsDraft.channels, inApp: e.target.checked } })} />
-                {t("channelInApp")}
-              </label>
-            </div>
-            <div className="rounded-2xl border border-border bg-background/40 p-4">
-              <label className="mb-3 inline-flex items-center gap-2 text-sm font-semibold">
-                <input type="checkbox" checked={prefsDraft.quietHours.enabled} onChange={(e) => setPrefsDraft({ ...prefsDraft, quietHours: { ...prefsDraft.quietHours, enabled: e.target.checked } })} />
-                {t("quietHoursEnabled")}
-              </label>
-              <div className="grid gap-3 md:grid-cols-2">
-                <Field label={t("quietStart")}>
-                  <input type="time" value={prefsDraft.quietHours.start} onChange={(e) => setPrefsDraft({ ...prefsDraft, quietHours: { ...prefsDraft.quietHours, start: e.target.value } })} className={inputCls} disabled={!prefsDraft.quietHours.enabled} />
-                </Field>
-                <Field label={t("quietEnd")}>
-                  <input type="time" value={prefsDraft.quietHours.end} onChange={(e) => setPrefsDraft({ ...prefsDraft, quietHours: { ...prefsDraft.quietHours, end: e.target.value } })} className={inputCls} disabled={!prefsDraft.quietHours.enabled} />
-                </Field>
-              </div>
-              <p className="mt-2 text-[11px] text-muted-foreground">{t("quietHint")}</p>
-            </div>
-            <div>
+          <div className="space-y-5">
+            {/* Notifications Subtab Navigation Bar */}
+            <div className="flex flex-wrap items-center gap-2 border-b border-border pb-3">
               <button
-                onClick={() => { updateNotifPrefs(prefsTarget, prefsDraft); toast.success(t("prefsSaved")); }}
-                className="inline-flex items-center gap-1.5 rounded-full bg-gradient-brand px-4 py-2 text-sm font-semibold text-brand-foreground shadow-brand"
+                type="button"
+                onClick={() => setNotifSubTab("matrix")}
+                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition ${
+                  notifSubTab === "matrix"
+                    ? "bg-gradient-brand text-brand-foreground shadow-brand"
+                    : "border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}
               >
-                <Save className="h-4 w-4" /> {t("save")}
+                <Bell className="h-3.5 w-3.5" />
+                <span>{lang === "ar" ? "دليل ومصفوفة الإشعارات" : "Notification Types & Matrix"}</span>
+                <span
+                  className={`rounded-full px-1.5 py-0.2 text-[10px] ${
+                    notifSubTab === "matrix" ? "bg-white/20 text-white font-bold" : "bg-muted text-foreground"
+                  }`}
+                >
+                  13
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setNotifSubTab("logs")}
+                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition ${
+                  notifSubTab === "logs"
+                    ? "bg-gradient-brand text-brand-foreground shadow-brand"
+                    : "border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}
+              >
+                <Mail className="h-3.5 w-3.5" />
+                <span>{lang === "ar" ? "سجل رسائل البريد المرسلة" : "Sent Emails Log"}</span>
+                <span
+                  className={`rounded-full px-1.5 py-0.2 text-[10px] ${
+                    notifSubTab === "logs" ? "bg-white/20 text-white font-bold" : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                  }`}
+                >
+                  Live
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setNotifSubTab("preferences")}
+                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition ${
+                  notifSubTab === "preferences"
+                    ? "bg-gradient-brand text-brand-foreground shadow-brand"
+                    : "border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}
+              >
+                <Sliders className="h-3.5 w-3.5" />
+                <span>{lang === "ar" ? "إعدادات التسليم وساعات الهدوء" : "Delivery Channels & Quiet Hours"}</span>
               </button>
             </div>
 
-            <div className="pt-4 border-t border-border space-y-6">
-              <NotificationMatrixCard />
-              <EmailDeliveryLogCard />
-            </div>
+            {/* Subtab 1: Notification Types & Dispatch Matrix */}
+            {notifSubTab === "matrix" && <NotificationMatrixCard />}
+
+            {/* Subtab 2: Sent Emails Log */}
+            {notifSubTab === "logs" && <EmailDeliveryLogCard />}
+
+            {/* Subtab 3: Preferences & Quiet Hours */}
+            {notifSubTab === "preferences" && (
+              <div className="space-y-4">
+                <p className="text-xs text-muted-foreground">{t("notifPrefsSubtitle")}</p>
+                <Field label={t("notifTarget")}>
+                  <select
+                    value={prefsTarget}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setPrefsTarget(v);
+                      setPrefsDraft(notifPrefsMap[v] ?? getNotifPrefs(v));
+                    }}
+                    className={inputCls}
+                  >
+                    <option value="hr">{t("hrAudience")}</option>
+                    {managers.map((m) => (
+                      <option key={m.id} value={`manager:${m.id}`}>{m.name} — {m.dept}</option>
+                    ))}
+                  </select>
+                </Field>
+                <div className="grid gap-2 rounded-2xl border border-border bg-background/40 p-4 md:grid-cols-3">
+                  <label className="inline-flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={prefsDraft.channels.push} onChange={(e) => setPrefsDraft({ ...prefsDraft, channels: { ...prefsDraft.channels, push: e.target.checked } })} />
+                    {t("channelPush")}
+                  </label>
+                  <label className="inline-flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={prefsDraft.channels.email} onChange={(e) => setPrefsDraft({ ...prefsDraft, channels: { ...prefsDraft.channels, email: e.target.checked } })} />
+                    {t("channelEmail")}
+                  </label>
+                  <label className="inline-flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={prefsDraft.channels.inApp} onChange={(e) => setPrefsDraft({ ...prefsDraft, channels: { ...prefsDraft.channels, inApp: e.target.checked } })} />
+                    {t("channelInApp")}
+                  </label>
+                </div>
+                <div className="rounded-2xl border border-border bg-background/40 p-4">
+                  <label className="mb-3 inline-flex items-center gap-2 text-sm font-semibold">
+                    <input type="checkbox" checked={prefsDraft.quietHours.enabled} onChange={(e) => setPrefsDraft({ ...prefsDraft, quietHours: { ...prefsDraft.quietHours, enabled: e.target.checked } })} />
+                    {t("quietHoursEnabled")}
+                  </label>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <Field label={t("quietStart")}>
+                      <input type="time" value={prefsDraft.quietHours.start} onChange={(e) => setPrefsDraft({ ...prefsDraft, quietHours: { ...prefsDraft.quietHours, start: e.target.value } })} className={inputCls} disabled={!prefsDraft.quietHours.enabled} />
+                    </Field>
+                    <Field label={t("quietEnd")}>
+                      <input type="time" value={prefsDraft.quietHours.end} onChange={(e) => setPrefsDraft({ ...prefsDraft, quietHours: { ...prefsDraft.quietHours, end: e.target.value } })} className={inputCls} disabled={!prefsDraft.quietHours.enabled} />
+                    </Field>
+                  </div>
+                  <p className="mt-2 text-[11px] text-muted-foreground">{t("quietHint")}</p>
+                </div>
+                <div>
+                  <button
+                    onClick={() => { updateNotifPrefs(prefsTarget, prefsDraft); toast.success(t("prefsSaved")); }}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-gradient-brand px-4 py-2 text-sm font-semibold text-brand-foreground shadow-brand"
+                  >
+                    <Save className="h-4 w-4" /> {t("save")}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
