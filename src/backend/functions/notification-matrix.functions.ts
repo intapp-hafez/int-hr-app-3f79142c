@@ -31,16 +31,86 @@ const RuleUpdateSchema = z.object({
 export const getNotificationMatrixRules = createServerFn({ method: "GET" })
   .middleware([requireAdminAccess])
   .handler(async (): Promise<{ rules: NotificationMatrixRule[] }> => {
-    // In server environment, we return the comprehensive default matrix
-    return { rules: DEFAULT_NOTIFICATION_MATRIX };
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: dbRows, error } = await supabaseAdmin
+        .from("notification_matrix_rules" as any)
+        .select("*");
+
+      if (error || !dbRows || dbRows.length === 0) {
+        return { rules: DEFAULT_NOTIFICATION_MATRIX };
+      }
+
+      const rowMap = new Map((dbRows as any[]).map((r) => [r.id, r]));
+
+      const rules: NotificationMatrixRule[] = DEFAULT_NOTIFICATION_MATRIX.map((def) => {
+        const row = rowMap.get(def.id);
+        if (!row) return def;
+        return {
+          id: row.id,
+          name: row.name || def.name,
+          nameAr: row.name_ar || def.nameAr,
+          description: row.description || def.description,
+          descriptionAr: row.description_ar || def.descriptionAr,
+          group: (row.category_group || def.group) as any,
+          inapp: row.inapp ?? def.inapp,
+          email: row.email ?? def.email,
+          push: row.push ?? def.push,
+          sms: row.sms ?? def.sms,
+          receivers: {
+            notifyEmployee: row.notify_employee ?? def.receivers.notifyEmployee,
+            notifyManager: row.notify_manager ?? def.receivers.notifyManager,
+            notifyHr: row.notify_hr ?? def.receivers.notifyHr,
+            customEmails: Array.isArray(row.custom_emails) ? row.custom_emails : def.receivers.customEmails,
+          },
+          triggerSchedule: row.trigger_schedule || def.triggerSchedule,
+          triggerScheduleAr: row.trigger_schedule_ar || def.triggerScheduleAr,
+          triggerType: (row.trigger_type || def.triggerType) as any,
+          employeeTemplate: {
+            subject: row.employee_subject || def.employeeTemplate.subject,
+            body: row.employee_body || def.employeeTemplate.body,
+          },
+          responsibleTemplate: {
+            subject: row.responsible_subject || def.responsibleTemplate.subject,
+            body: row.responsible_body || def.responsibleTemplate.body,
+          },
+        };
+      });
+
+      return { rules };
+    } catch {
+      return { rules: DEFAULT_NOTIFICATION_MATRIX };
+    }
   });
 
 export const saveNotificationMatrixRule = createServerFn({ method: "POST" })
   .middleware([requireAdminAccess])
   .inputValidator((input) => RuleUpdateSchema.parse(input))
-  .handler(async ({ data }) => {
-    // Audit the update into notif_deliveries or security log
+  .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    try {
+      await supabaseAdmin.from("notification_matrix_rules" as any).upsert({
+        id: data.id,
+        inapp: data.inapp,
+        email: data.email,
+        push: data.push,
+        sms: data.sms,
+        notify_employee: data.receivers.notifyEmployee,
+        notify_manager: data.receivers.notifyManager,
+        notify_hr: data.receivers.notifyHr,
+        custom_emails: data.receivers.customEmails,
+        employee_subject: data.employeeTemplate.subject,
+        employee_body: data.employeeTemplate.body,
+        responsible_subject: data.responsibleTemplate.subject,
+        responsible_body: data.responsibleTemplate.body,
+        updated_at: new Date().toISOString(),
+        updated_by: context.userId,
+      });
+    } catch (dbErr) {
+      console.warn("Could not upsert notification_matrix_rules in DB:", dbErr);
+    }
+
     try {
       await supabaseAdmin.from("security_audit_events").insert({
         event_type: "notification_matrix_rule_updated",
@@ -49,6 +119,7 @@ export const saveNotificationMatrixRule = createServerFn({ method: "POST" })
     } catch {
       // ignore audit logging error
     }
+
     return { ok: true, rule: data };
   });
 
