@@ -18,6 +18,7 @@ import { useEffect, useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import { DeliverySettingsCard } from "@/components/admin/DeliverySettingsCard";
 import { EmailDeliveryLogCard } from "@/components/admin/EmailDeliveryLogCard";
+import { NotificationMatrixCard } from "@/components/admin/NotificationMatrixCard";
 import { enablePush, disablePush, isPushSubscribed, getPushSupport } from "@/lib/push-client";
 import {
   useNotificationPrefs,
@@ -243,6 +244,8 @@ function NotificationPreferencesPage() {
       </div>
 
       <DeliverySettingsCard />
+
+      <NotificationMatrixCard />
 
       <EmailDeliveryLogCard />
 

@@ -27,6 +27,10 @@ export type AlertDispatchInput = {
   title: string;
   body: string;
   url?: string;
+  employeeId?: string; // Optional target employee being alerted about
+  responsibleEmails?: string[]; // Optional extra responsible CC emails
+  notifyEmployee?: boolean;
+  notifyManager?: boolean;
 };
 
 const ADMIN_ROLES: string[] = ["admin", "hr", "manager"];
@@ -47,6 +51,44 @@ function renderEmail(input: AlertDispatchInput) {
     <h2 style="margin:0 0 10px;font-size:18px;color:#0f172a">${escapeHtml(input.title)}</h2>
     <p style="margin:0 0 16px;color:#334155;font-size:14px;line-height:1.5">${escapeHtml(input.body)}</p>
     ${input.url ? `<a href="${escapeHtml(input.url)}" style="display:inline-block;padding:8px 16px;border-radius:8px;background:#2563eb;color:#ffffff;text-decoration:none;font-size:13px;font-weight:500">Review in Dashboard</a>` : ""}
+  </div>`;
+  return { subject, html, text };
+}
+
+function renderEmployeeEmail(input: AlertDispatchInput, employeeName: string) {
+  const isExp = input.category.includes("expiry") || input.category === "probation_end";
+  const badgeColor = isExp ? "#dc2626" : "#2563eb";
+  const subject = isExp ? `[Action Required] ${input.title}` : `[HR Notice] ${input.title}`;
+  const text = `Dear ${employeeName},\n\n${input.body}\n\nPlease take the necessary action before the deadline.${input.url ? `\n\nLink: ${input.url}` : ""}`;
+  const html = `<div style="font-family:system-ui,sans-serif;padding:20px;border-radius:12px;border:1px solid #e2e8f0;background:#ffffff;max-width:560px;margin:0 auto">
+    <div style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:${badgeColor}15;color:${badgeColor};margin-bottom:12px">
+      ${isExp ? "ACTION REQUIRED FOR YOUR ATTENTION" : "PERSONAL HR NOTIFICATION"}
+    </div>
+    <h2 style="margin:0 0 10px;font-size:18px;color:#0f172a">${escapeHtml(input.title)}</h2>
+    <p style="margin:0 0 12px;color:#0f172a;font-weight:600;font-size:14px">Dear ${escapeHtml(employeeName)},</p>
+    <p style="margin:0 0 16px;color:#334155;font-size:14px;line-height:1.5">${escapeHtml(input.body)}</p>
+    ${input.url ? `<a href="${escapeHtml(input.url)}" style="display:inline-block;padding:8px 16px;border-radius:8px;background:#2563eb;color:#ffffff;text-decoration:none;font-size:13px;font-weight:500">Access Employee Portal</a>` : ""}
+  </div>`;
+  return { subject, html, text };
+}
+
+function renderResponsibleManagerEmail(input: AlertDispatchInput, employeeName: string, managerName: string) {
+  const isExp = input.category.includes("expiry") || input.category === "probation_end";
+  const badgeColor = isExp ? "#ea580c" : "#7c3aed";
+  const subject = `[Follow-up Required] ${employeeName}: ${input.title}`;
+  const text = `Dear ${managerName},\n\nThis is a supervisory notification regarding your team member ${employeeName}.\n${input.body}\n\nThe employee has been notified directly. Please ensure required follow-up is completed before the deadline.${input.url ? `\n\nLink: ${input.url}` : ""}`;
+  const html = `<div style="font-family:system-ui,sans-serif;padding:20px;border-radius:12px;border:1px solid #e2e8f0;background:#ffffff;max-width:560px;margin:0 auto">
+    <div style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:${badgeColor}15;color:${badgeColor};margin-bottom:12px">
+      SUPERVISORY & RESPONSIBLE FOLLOW-UP
+    </div>
+    <h2 style="margin:0 0 10px;font-size:18px;color:#0f172a">${escapeHtml(input.title)}</h2>
+    <p style="margin:0 0 12px;color:#0f172a;font-weight:600;font-size:14px">Dear ${escapeHtml(managerName)},</p>
+    <p style="margin:0 0 16px;color:#334155;font-size:14px;line-height:1.5">${escapeHtml(input.body)}</p>
+    <div style="background:#f8fafc;padding:12px;border-radius:8px;font-size:13px;color:#475569;margin-bottom:16px;">
+      Target Employee: <strong>${escapeHtml(employeeName)}</strong><br/>
+      Status: Employee has been notified directly. Follow-up is required.
+    </div>
+    ${input.url ? `<a href="${escapeHtml(input.url)}" style="display:inline-block;padding:8px 16px;border-radius:8px;background:#2563eb;color:#ffffff;text-decoration:none;font-size:13px;font-weight:500">Review Team Record</a>` : ""}
   </div>`;
   return { subject, html, text };
 }
@@ -192,5 +234,145 @@ export async function dispatchAlert(input: AlertDispatchInput) {
       }
     }
   }
+
+  // -------------------------------------------------------------
+  // Dual-Audience Dispatch: Affected Employee & Responsible Manager
+  // -------------------------------------------------------------
+  if (input.employeeId) {
+    try {
+      const { data: empProf } = await supabaseAdmin
+        .from("profiles")
+        .select("id, email, full_name, manager_id")
+        .eq("id", input.employeeId)
+        .maybeSingle();
+
+      if (empProf) {
+        const empName = empProf.full_name || "Employee";
+
+        // 1. Direct Employee Dispatch (if enabled)
+        if (input.notifyEmployee !== false && empProf.email && smtp?.host && smtp?.password) {
+          const empAlertId = `${input.alertId}-emp`;
+          if (!(await alreadyDelivered(empProf.id, "email", empAlertId))) {
+            const empEmailData = renderEmployeeEmail(input, empName);
+            const empRes = await sendEmail(
+              { host: smtp.host, port: smtp.port, secure: smtp.secure, username: smtp.username, password: smtp.password },
+              {
+                from: smtp.from_name ? `${smtp.from_name} <${smtp.from_email}>` : smtp.from_email,
+                fromEmail: smtp.from_email,
+                to: [empProf.email],
+                subject: empEmailData.subject,
+                html: empEmailData.html,
+                text: empEmailData.text,
+              },
+            );
+            await supabaseAdmin.from("notif_deliveries").insert({
+              user_id: empProf.id,
+              recipient: empProf.email,
+              channel: "email",
+              status: empRes.ok ? "sent" : "failed",
+              subject: empEmailData.subject,
+              error: empRes.ok ? null : empRes.message,
+              payload: {
+                alert_id: empAlertId,
+                category: input.category,
+                target_audience: "employee",
+                body: empEmailData.text,
+                html: empEmailData.html,
+              },
+            });
+            if (empRes.ok) sent++;
+          }
+        }
+
+        // 2. Direct Line Manager Dispatch (if enabled and manager exists)
+        if (input.notifyManager !== false && empProf.manager_id && smtp?.host && smtp?.password) {
+          const { data: mgrProf } = await supabaseAdmin
+            .from("profiles")
+            .select("id, email, full_name")
+            .eq("id", empProf.manager_id)
+            .maybeSingle();
+
+          if (mgrProf?.email) {
+            const mgrAlertId = `${input.alertId}-mgr`;
+            if (!(await alreadyDelivered(mgrProf.id, "email", mgrAlertId))) {
+              const mgrName = mgrProf.full_name || "Manager";
+              const mgrEmailData = renderResponsibleManagerEmail(input, empName, mgrName);
+              const mgrRes = await sendEmail(
+                { host: smtp.host, port: smtp.port, secure: smtp.secure, username: smtp.username, password: smtp.password },
+                {
+                  from: smtp.from_name ? `${smtp.from_name} <${smtp.from_email}>` : smtp.from_email,
+                  fromEmail: smtp.from_email,
+                  to: [mgrProf.email],
+                  subject: mgrEmailData.subject,
+                  html: mgrEmailData.html,
+                  text: mgrEmailData.text,
+                },
+              );
+              await supabaseAdmin.from("notif_deliveries").insert({
+                user_id: mgrProf.id,
+                recipient: mgrProf.email,
+                channel: "email",
+                status: mgrRes.ok ? "sent" : "failed",
+                subject: mgrEmailData.subject,
+                error: mgrRes.ok ? null : mgrRes.message,
+                payload: {
+                  alert_id: mgrAlertId,
+                  category: input.category,
+                  target_audience: "manager",
+                  employee_name: empName,
+                  body: mgrEmailData.text,
+                  html: mgrEmailData.html,
+                },
+              });
+              if (mgrRes.ok) sent++;
+            }
+          }
+        }
+      }
+    } catch (dualErr) {
+      console.warn("Dual-audience alert dispatch failed:", dualErr);
+    }
+  }
+
+  // 3. Additional Responsible CC Emails
+  if (Array.isArray(input.responsibleEmails) && input.responsibleEmails.length > 0 && smtp?.host && smtp?.password) {
+    for (const ccEmail of input.responsibleEmails) {
+      if (/.+@.+\..+/.test(ccEmail)) {
+        try {
+          const ccAlertId = `${input.alertId}-cc-${ccEmail}`;
+          const ccEmailData = renderEmail(input);
+          const ccRes = await sendEmail(
+            { host: smtp.host, port: smtp.port, secure: smtp.secure, username: smtp.username, password: smtp.password },
+            {
+              from: smtp.from_name ? `${smtp.from_name} <${smtp.from_email}>` : smtp.from_email,
+              fromEmail: smtp.from_email,
+              to: [ccEmail],
+              subject: `[CC] ${ccEmailData.subject}`,
+              html: ccEmailData.html,
+              text: ccEmailData.text,
+            },
+          );
+          await supabaseAdmin.from("notif_deliveries").insert({
+            recipient: ccEmail,
+            channel: "email",
+            status: ccRes.ok ? "sent" : "failed",
+            subject: `[CC] ${ccEmailData.subject}`,
+            error: ccRes.ok ? null : ccRes.message,
+            payload: {
+              alert_id: ccAlertId,
+              category: input.category,
+              target_audience: "responsible_cc",
+              body: ccEmailData.text,
+              html: ccEmailData.html,
+            },
+          });
+          if (ccRes.ok) sent++;
+        } catch (ccErr) {
+          console.warn("Responsible CC send error:", ccErr);
+        }
+      }
+    }
+  }
+
   return { recipients: recipients.length, sent };
 }

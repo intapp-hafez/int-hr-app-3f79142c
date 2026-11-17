@@ -49,6 +49,7 @@ import {
 } from "@/lib/store";
 import { runSchedule } from "@/lib/export-scheduler";
 import { EmailDeliveryLogCard } from "@/components/admin/EmailDeliveryLogCard";
+import { NotificationMatrixCard } from "@/components/admin/NotificationMatrixCard";
 
 const SecurityPanel = lazy(() => import("@/components/admin/SecurityPanel").then((mod) => ({ default: mod.SecurityPanel })));
 
@@ -1310,7 +1311,8 @@ function AdminSettings() {
               </button>
             </div>
 
-            <div className="pt-4 border-t border-border">
+            <div className="pt-4 border-t border-border space-y-6">
+              <NotificationMatrixCard />
               <EmailDeliveryLogCard />
             </div>
           </div>
