@@ -50,5 +50,24 @@ export const sendTestEmail = createServerFn({ method: "POST" })
         html: `<p>If you received this, SMTP is wired correctly.</p>`,
       },
     );
+
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await supabaseAdmin.from("notif_deliveries").insert({
+        recipient: data.to,
+        channel: "email",
+        status: res.ok ? "sent" : "failed",
+        subject: "Test email from HR backend",
+        error: res.ok ? null : res.message,
+        payload: {
+          category: "system_test",
+          body: "If you received this, SMTP is wired correctly.",
+          html: `<p>If you received this, SMTP is wired correctly.</p>`,
+        },
+      });
+    } catch (logErr) {
+      console.warn("Could not write test email log:", logErr);
+    }
+
     return { ok: res.ok, error: res.ok ? null : res.message };
   });

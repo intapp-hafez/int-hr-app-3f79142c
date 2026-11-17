@@ -151,7 +151,7 @@ export async function dispatchAlert(input: AlertDispatchInput) {
           user_id: rec.id, recipient: rec.email, channel: "email",
           status: res.ok ? "sent" : "failed",
           subject, error: res.ok ? null : res.message,
-          payload: { alert_id: input.alertId, category: input.category },
+          payload: { alert_id: input.alertId, category: input.category, body: input.body, url: input.url, html },
         });
         if (res.ok) sent++;
       }

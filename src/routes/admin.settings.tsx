@@ -48,6 +48,7 @@ import {
   type ExportSchedule,
 } from "@/lib/store";
 import { runSchedule } from "@/lib/export-scheduler";
+import { EmailDeliveryLogCard } from "@/components/admin/EmailDeliveryLogCard";
 
 const SecurityPanel = lazy(() => import("@/components/admin/SecurityPanel").then((mod) => ({ default: mod.SecurityPanel })));
 
@@ -918,25 +919,8 @@ function AdminSettings() {
                 <Mail className="h-4 w-4" /> {smtpTesting ? "…" : t("smtpTest")}
               </button>
             </div>
-            <div className="rounded-2xl border border-border bg-background/40 p-4">
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("recentDeliveries")}</h3>
-              {deliveries.length === 0 ? (
-                <p className="text-xs text-muted-foreground">{t("noDeliveries")}</p>
-              ) : (
-                <ul className="max-h-64 space-y-1.5 overflow-auto text-xs">
-                  {deliveries.filter((d) => d.channel === "email").slice(0, 30).map((d) => (
-                    <li key={d.id} className="flex items-start justify-between gap-2 border-b border-border/50 pb-1 last:border-b-0">
-                      <div className="min-w-0">
-                        <p className="truncate font-medium">{d.title}</p>
-                        <p className="truncate text-muted-foreground">→ {d.recipientLabel} · {d.body}</p>
-                      </div>
-                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${d.status === "sent" ? "bg-success/15 text-success" : d.status === "skipped_smtp" ? "bg-warning/20 text-warning-foreground" : "bg-muted text-muted-foreground"}`}>
-                        {d.status === "sent" ? t("deliveryStatusSent") : d.status === "skipped_smtp" ? t("deliveryStatusSkipped") : t("deliveryStatusSuppressed")}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
+            <div className="pt-2">
+              <EmailDeliveryLogCard />
             </div>
           </div>
         )}
@@ -1317,12 +1301,18 @@ function AdminSettings() {
               </div>
               <p className="mt-2 text-[11px] text-muted-foreground">{t("quietHint")}</p>
             </div>
-            <button
-              onClick={() => { updateNotifPrefs(prefsTarget, prefsDraft); toast.success(t("prefsSaved")); }}
-              className="inline-flex items-center gap-1.5 rounded-full bg-gradient-brand px-4 py-2 text-sm font-semibold text-brand-foreground shadow-brand"
-            >
-              <Save className="h-4 w-4" /> {t("save")}
-            </button>
+            <div>
+              <button
+                onClick={() => { updateNotifPrefs(prefsTarget, prefsDraft); toast.success(t("prefsSaved")); }}
+                className="inline-flex items-center gap-1.5 rounded-full bg-gradient-brand px-4 py-2 text-sm font-semibold text-brand-foreground shadow-brand"
+              >
+                <Save className="h-4 w-4" /> {t("save")}
+              </button>
+            </div>
+
+            <div className="pt-4 border-t border-border">
+              <EmailDeliveryLogCard />
+            </div>
           </div>
         )}
 

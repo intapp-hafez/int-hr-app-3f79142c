@@ -41,6 +41,27 @@ export async function sendWelcomeEmail(opts: {
         html,
       },
     );
+
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await supabaseAdmin.from("notif_deliveries").insert({
+        recipient: opts.to,
+        channel: "email",
+        status: res.ok ? "sent" : "failed",
+        subject,
+        error: res.ok ? null : res.message,
+        payload: {
+          category: "welcome_onboarding",
+          employee_name: opts.employeeName,
+          username: opts.username,
+          body: text,
+          html,
+        },
+      });
+    } catch (logErr) {
+      console.warn("Could not write welcome email log to notif_deliveries:", logErr);
+    }
+
     return { ok: res.ok, error: res.ok ? undefined : res.message };
   } catch (e: any) {
     return { ok: false, error: e?.message ?? "send failed" };

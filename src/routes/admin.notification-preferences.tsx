@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import { DeliverySettingsCard } from "@/components/admin/DeliverySettingsCard";
+import { EmailDeliveryLogCard } from "@/components/admin/EmailDeliveryLogCard";
 import { enablePush, disablePush, isPushSubscribed, getPushSupport } from "@/lib/push-client";
 import {
   useNotificationPrefs,
@@ -242,6 +243,8 @@ function NotificationPreferencesPage() {
       </div>
 
       <DeliverySettingsCard />
+
+      <EmailDeliveryLogCard />
 
       <p className="text-[11px] text-muted-foreground">
         The In-app column controls which HR alert categories appear in your notification bell. Email and push delivery require those channels to be configured for your account.
