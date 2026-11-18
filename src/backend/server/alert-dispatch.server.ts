@@ -33,7 +33,7 @@ export type AlertDispatchInput = {
   notifyManager?: boolean;
 };
 
-const ADMIN_ROLES: string[] = ["admin", "hr", "manager"];
+const ADMIN_ROLES: string[] = ["admin", "hr"];
 
 function escapeHtml(s: string) {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));

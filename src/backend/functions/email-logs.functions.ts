@@ -29,7 +29,7 @@ export const listEmailLogs = createServerFn({ method: "GET" })
   .inputValidator((i) =>
     z
       .object({
-        days: z.number().int().min(1).max(180).default(30),
+        days: z.number().int().min(1).max(365).default(30),
       })
       .parse(i ?? {}),
   )
@@ -55,6 +55,7 @@ export const listEmailLogs = createServerFn({ method: "GET" })
     // Collect profile user IDs
     const userIds = Array.from(new Set(rawRows.map((r) => r.user_id).filter(Boolean))) as string[];
     const nameMap = new Map<string, string>();
+    const emailMap = new Map<string, string>();
 
     if (userIds.length > 0) {
       const { data: profs } = await supabaseAdmin
@@ -64,6 +65,7 @@ export const listEmailLogs = createServerFn({ method: "GET" })
 
       for (const p of (profs ?? []) as any[]) {
         nameMap.set(p.id, p.full_name || p.email || "—");
+        if (p.email) emailMap.set(p.id, p.email);
       }
     }
 
@@ -84,7 +86,7 @@ export const listEmailLogs = createServerFn({ method: "GET" })
         created_at: r.created_at,
         user_id: r.user_id,
         user_name: r.user_id ? nameMap.get(r.user_id) ?? "—" : "—",
-        recipient: r.recipient || (r.user_id ? nameMap.get(r.user_id) : null) || null,
+        recipient: r.recipient || (r.user_id ? emailMap.get(r.user_id) : null) || p.recipient || p.to || null,
         channel: r.channel,
         status: r.status,
         subject: r.subject || p.title || p.subject || "(No Subject)",

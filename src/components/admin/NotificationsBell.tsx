@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -175,6 +175,20 @@ function saveSeen(ids: Set<string>) {
   localStorage.setItem(SEEN_KEY, JSON.stringify([...ids].slice(-200)));
 }
 
+const DISPATCHED_KEY = "admin-alerts-dispatched-ids";
+function loadDispatched(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    return new Set(JSON.parse(localStorage.getItem(DISPATCHED_KEY) ?? "[]"));
+  } catch {
+    return new Set();
+  }
+}
+function saveDispatched(ids: Set<string>) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(DISPATCHED_KEY, JSON.stringify([...ids].slice(-500)));
+}
+
 interface AlertGroup {
   kind: AdminAlert["kind"];
   title: string;
@@ -245,16 +259,18 @@ export function NotificationsBell() {
   });
 
   // Fan newly arriving alerts out to email/push/in-app on the backend (once each).
-  const dispatchedRef =
-    typeof window !== "undefined"
-      ? (window as any).__alertDispatched ?? ((window as any).__alertDispatched = new Set<string>())
-      : new Set<string>();
+  const dispatchedRef = useRef<Set<string> | null>(null);
+  if (!dispatchedRef.current) {
+    dispatchedRef.current = loadDispatched();
+  }
 
   useEffect(() => {
     if (!data?.alerts?.length || (data as any)?.isManagerScoped) return;
-    const fresh = data.alerts.filter((a) => !dispatchedRef.has(a.id));
+    const currentDispatched = dispatchedRef.current || loadDispatched();
+    const fresh = data.alerts.filter((a) => !currentDispatched.has(a.id));
     if (fresh.length === 0) return;
-    fresh.forEach((a) => dispatchedRef.add(a.id));
+    fresh.forEach((a) => currentDispatched.add(a.id));
+    saveDispatched(currentDispatched);
     const payload = fresh.slice(0, 25).map((a) => ({
       alertId: a.id,
       category: a.kind,
@@ -265,7 +281,7 @@ export function NotificationsBell() {
     dispatchFn({ data: { alerts: payload } }).catch(() => {
       /* noop */
     });
-  }, [data?.alerts, dispatchFn, dispatchedRef]);
+  }, [data?.alerts, dispatchFn]);
 
   useEffect(() => {
     const refresh = () => {

@@ -413,6 +413,8 @@ export function EmailDeliveryLogCard() {
           <option value={14}>{isAr ? "آخر 14 يوماً" : "Last 14 Days"}</option>
           <option value={30}>{isAr ? "آخر 30 يوماً" : "Last 30 Days"}</option>
           <option value={90}>{isAr ? "آخر 90 يوماً" : "Last 90 Days"}</option>
+          <option value={180}>{isAr ? "آخر 180 يوماً" : "Last 180 Days"}</option>
+          <option value={365}>{isAr ? "آخر سنة (365 يوماً)" : "All / Last 365 Days"}</option>
         </select>
       </div>
 
