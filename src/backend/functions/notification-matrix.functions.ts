@@ -28,6 +28,12 @@ const RuleUpdateSchema = z.object({
   }),
 });
 
+const BulkChannelUpdateSchema = z.object({
+  channel: z.enum(["inapp", "email", "push", "sms"]),
+  enabled: z.boolean(),
+  ruleIds: z.array(z.string()).optional(),
+});
+
 const CreateRuleSchema = z.object({
   id: z
     .string()
@@ -188,6 +194,94 @@ export const saveNotificationMatrixRule = createServerFn({ method: "POST" })
     }
 
     return { ok: true, rule: data };
+  });
+
+export const bulkUpdateChannelMatrixRules = createServerFn({ method: "POST" })
+  .middleware([requireAdminAccess])
+  .inputValidator((input) => BulkChannelUpdateSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Get current rows from DB
+    const { data: dbRows } = await supabaseAdmin
+      .from("notification_matrix_rules" as any)
+      .select("*");
+
+    const rowMap = new Map((dbRows ?? []).map((r: any) => [r.id, r]));
+
+    // All rule definitions from defaults + custom db rows
+    const allDefs = [...DEFAULT_NOTIFICATION_MATRIX];
+    const defaultIds = new Set(allDefs.map((d) => d.id));
+    for (const r of (dbRows ?? []) as any[]) {
+      if (!defaultIds.has(r.id)) {
+        allDefs.push({
+          id: r.id,
+          name: r.name || r.id,
+          nameAr: r.name_ar || r.name || r.id,
+          description: r.description || "",
+          descriptionAr: r.description_ar || "",
+          group: (r.category_group || "requests") as any,
+          inapp: r.inapp ?? true,
+          email: r.email ?? true,
+          push: r.push ?? false,
+          sms: r.sms ?? false,
+          receivers: {
+            notifyEmployee: r.notify_employee ?? true,
+            notifyManager: r.notify_manager ?? true,
+            notifyHr: r.notify_hr ?? true,
+            customEmails: Array.isArray(r.custom_emails) ? r.custom_emails : [],
+          },
+          triggerSchedule: r.trigger_schedule || "Event-driven",
+          triggerScheduleAr: r.trigger_schedule_ar || "عند وقوع الحدث",
+          triggerType: (r.trigger_type || "on_action") as any,
+          employeeTemplate: { subject: r.employee_subject || "", body: r.employee_body || "" },
+          responsibleTemplate: { subject: r.responsible_subject || "", body: r.responsible_body || "" },
+        });
+      }
+    }
+
+    const targetDefs = data.ruleIds && data.ruleIds.length > 0
+      ? allDefs.filter((d) => data.ruleIds!.includes(d.id))
+      : allDefs;
+
+    const upsertRows = targetDefs.map((def) => {
+      const existing = rowMap.get(def.id) ?? {};
+      return {
+        id: def.id,
+        name: existing.name || def.name,
+        name_ar: existing.name_ar || def.nameAr,
+        description: existing.description || def.description,
+        description_ar: existing.description_ar || def.descriptionAr,
+        category_group: existing.category_group || def.group,
+        inapp: data.channel === "inapp" ? data.enabled : (existing.inapp ?? def.inapp),
+        email: data.channel === "email" ? data.enabled : (existing.email ?? def.email),
+        push: data.channel === "push" ? data.enabled : (existing.push ?? def.push),
+        sms: data.channel === "sms" ? data.enabled : (existing.sms ?? def.sms),
+        notify_employee: existing.notify_employee ?? def.receivers.notifyEmployee,
+        notify_manager: existing.notify_manager ?? def.receivers.notifyManager,
+        notify_hr: existing.notify_hr ?? def.receivers.notifyHr,
+        custom_emails: existing.custom_emails ?? def.receivers.customEmails,
+        employee_subject: existing.employee_subject ?? def.employeeTemplate.subject,
+        employee_body: existing.employee_body ?? def.employeeTemplate.body,
+        responsible_subject: existing.responsible_subject ?? def.responsibleTemplate.subject,
+        responsible_body: existing.responsible_body ?? def.responsibleTemplate.body,
+        updated_at: new Date().toISOString(),
+        updated_by: context.userId,
+      };
+    });
+
+    if (upsertRows.length > 0) {
+      await supabaseAdmin.from("notification_matrix_rules" as any).upsert(upsertRows);
+    }
+
+    try {
+      await supabaseAdmin.from("security_audit_events").insert({
+        event_type: "notification_matrix_bulk_channel_updated",
+        details: { channel: data.channel, enabled: data.enabled, count: upsertRows.length },
+      });
+    } catch { /* ignore */ }
+
+    return { ok: true, channel: data.channel, enabled: data.enabled, count: upsertRows.length };
   });
 
 export const createNotificationMatrixRule = createServerFn({ method: "POST" })

@@ -36,6 +36,7 @@ import {
   getNotificationMatrixRules,
   saveNotificationMatrixRule,
   createNotificationMatrixRule,
+  bulkUpdateChannelMatrixRules,
   sendTestMatrixNotification,
 } from "@/backend/functions/notification-matrix.functions";
 
@@ -120,7 +121,10 @@ export function NotificationMatrixCard() {
   const getRulesFn = useServerFn(getNotificationMatrixRules);
   const saveRuleFn = useServerFn(saveNotificationMatrixRule);
   const createRuleFn = useServerFn(createNotificationMatrixRule);
+  const bulkChannelFn = useServerFn(bulkUpdateChannelMatrixRules);
   const sendTestFn = useServerFn(sendTestMatrixNotification);
+
+  const [isBulkUpdating, setIsBulkUpdating] = useState<string | null>(null);
 
   const { data: serverRulesData } = useQuery({
     queryKey: ["notification-matrix-rules"],
@@ -148,6 +152,62 @@ export function NotificationMatrixCard() {
       };
     });
   }, [baseRules, overrides]);
+
+  // Bulk channel state calculations
+  const allInAppOn = rules.length > 0 && rules.every((r) => r.inapp);
+  const someInAppOn = rules.some((r) => r.inapp);
+
+  const allEmailOn = rules.length > 0 && rules.every((r) => r.email);
+  const someEmailOn = rules.some((r) => r.email);
+
+  const allPushOn = rules.length > 0 && rules.every((r) => r.push);
+  const somePushOn = rules.some((r) => r.push);
+
+  const allSmsOn = rules.length > 0 && rules.every((r) => r.sms);
+  const someSmsOn = rules.some((r) => r.sms);
+
+  // Master channel toggle handler (turn all ON or all OFF for this channel across all rules)
+  const handleToggleAllChannel = async (channel: "inapp" | "email" | "push" | "sms") => {
+    const isAllOn = rules.length > 0 && rules.every((r) => r[channel]);
+    const nextVal = !isAllOn;
+
+    setIsBulkUpdating(channel);
+
+    // Optimistically update local state & overrides
+    const nextOverrides: Record<string, Partial<NotificationMatrixRule>> = { ...overrides };
+    for (const r of rules) {
+      nextOverrides[r.id] = {
+        ...(nextOverrides[r.id] ?? {}),
+        [channel]: nextVal,
+      };
+    }
+    setOverrides(nextOverrides);
+    saveLocalOverrides(nextOverrides);
+
+    try {
+      await bulkChannelFn({
+        data: {
+          channel,
+          enabled: nextVal,
+        },
+      });
+      queryClient.invalidateQueries({ queryKey: ["notification-matrix-rules"] });
+      toast.success(
+        isAr
+          ? `تم ${nextVal ? "تفعيل" : "تعطيل"} قناة (${channel.toUpperCase()}) لجميع الأحداث بنجاح`
+          : `Successfully ${nextVal ? "enabled" : "disabled"} ${channel.toUpperCase()} for all events`,
+      );
+    } catch (err) {
+      console.error(err);
+      toast.error(
+        isAr
+          ? `تعذر تحديث قناة (${channel.toUpperCase()}) للجميع`
+          : `Failed to update ${channel.toUpperCase()} for all events`,
+      );
+    } finally {
+      setIsBulkUpdating(null);
+    }
+  };
 
   // Quick channel toggle handler
   const handleToggleChannel = (ruleId: string, channel: "inapp" | "email" | "push" | "sms", currentVal: boolean) => {
@@ -727,6 +787,85 @@ export function NotificationMatrixCard() {
         </div>
       </div>
 
+      {/* Quick Master Bulk Actions Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/80 bg-muted/20 px-3.5 py-2 text-xs">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-primary" />
+          <span className="font-semibold text-foreground">
+            {isAr ? "التحكم السريع في القنوات لجميع الأحداث:" : "Master Channel Controls (All Events):"}
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* In-App Toggle */}
+          <button
+            type="button"
+            disabled={isBulkUpdating === "inapp"}
+            onClick={() => handleToggleAllChannel("inapp")}
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-medium transition ${
+              allInAppOn
+                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold"
+                : "border-border bg-background text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            <span>🔔 {isAr ? "إشعار" : "In-App"}</span>
+            <span className={`rounded px-1 text-[10px] ${allInAppOn ? "bg-emerald-500 text-white" : "bg-muted text-muted-foreground"}`}>
+              {allInAppOn ? "ON" : "OFF"}
+            </span>
+          </button>
+
+          {/* Email Toggle */}
+          <button
+            type="button"
+            disabled={isBulkUpdating === "email"}
+            onClick={() => handleToggleAllChannel("email")}
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-medium transition ${
+              allEmailOn
+                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold"
+                : "border-border bg-background text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            <span>✉️ {isAr ? "بريد" : "Email"}</span>
+            <span className={`rounded px-1 text-[10px] ${allEmailOn ? "bg-emerald-500 text-white" : "bg-muted text-muted-foreground"}`}>
+              {allEmailOn ? "ON" : "OFF"}
+            </span>
+          </button>
+
+          {/* Push Toggle */}
+          <button
+            type="button"
+            disabled={isBulkUpdating === "push"}
+            onClick={() => handleToggleAllChannel("push")}
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-medium transition ${
+              allPushOn
+                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold"
+                : "border-border bg-background text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            <span>📱 {isAr ? "بوش" : "Push"}</span>
+            <span className={`rounded px-1 text-[10px] ${allPushOn ? "bg-emerald-500 text-white" : "bg-muted text-muted-foreground"}`}>
+              {allPushOn ? "ON" : "OFF"}
+            </span>
+          </button>
+
+          {/* SMS Toggle */}
+          <button
+            type="button"
+            disabled={isBulkUpdating === "sms"}
+            onClick={() => handleToggleAllChannel("sms")}
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-medium transition ${
+              allSmsOn
+                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold"
+                : "border-border bg-background text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            <span>💬 SMS</span>
+            <span className={`rounded px-1 text-[10px] ${allSmsOn ? "bg-emerald-500 text-white" : "bg-muted text-muted-foreground"}`}>
+              {allSmsOn ? "ON" : "OFF"}
+            </span>
+          </button>
+        </div>
+      </div>
+
       {/* The Central Matrix Table */}
       <div className="overflow-hidden rounded-xl border border-border bg-card">
         <div className="overflow-x-auto">
@@ -741,10 +880,117 @@ export function NotificationMatrixCard() {
                     <span>{isAr ? "جهات الاستلام المسؤولة" : "Responsible Receivers"}</span>
                   </div>
                 </th>
-                <th className="px-2.5 py-2.5 text-center font-semibold" title="In-App Notification Bell">🔔 {isAr ? "إشعار" : "In-App"}</th>
-                <th className="px-2.5 py-2.5 text-center font-semibold" title="Email Delivery via SMTP">📧 {isAr ? "بريد" : "Email"}</th>
-                <th className="px-2.5 py-2.5 text-center font-semibold" title="Browser Web Push">📱 {isAr ? "بوش" : "Push"}</th>
-                <th className="px-2.5 py-2.5 text-center font-semibold" title="SMS Message via ePush">💬 SMS</th>
+                {/* Channel 1: In-App with Master Column Toggle */}
+                <th className="px-2.5 py-2 text-center font-semibold bg-muted/30" title={isAr ? "إشعار النظام (In-App)" : "In-App Notification Bell"}>
+                  <div className="flex flex-col items-center justify-center gap-1">
+                    <span className="whitespace-nowrap flex items-center gap-1 text-[11px] font-bold">
+                      🔔 {isAr ? "إشعار" : "IN-APP"}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={isBulkUpdating === "inapp"}
+                      onClick={() => handleToggleAllChannel("inapp")}
+                      title={allInAppOn ? (isAr ? "تعطيل الكل" : "Turn all OFF") : (isAr ? "تفعيل الكل" : "Turn all ON")}
+                      className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 ${
+                        allInAppOn ? "bg-emerald-500" : someInAppOn ? "bg-emerald-500/50" : "bg-muted-foreground/30"
+                      }`}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          allInAppOn ? "translate-x-3 rtl:-translate-x-3" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                    <span className="text-[9px] font-medium text-muted-foreground">
+                      {allInAppOn ? (isAr ? "الكل ON" : "All ON") : someInAppOn ? (isAr ? "جزئي" : "Mixed") : (isAr ? "الكل OFF" : "All OFF")}
+                    </span>
+                  </div>
+                </th>
+
+                {/* Channel 2: Email with Master Column Toggle */}
+                <th className="px-2.5 py-2 text-center font-semibold bg-muted/30" title={isAr ? "البريد الإلكتروني عبر SMTP" : "Email Delivery via SMTP"}>
+                  <div className="flex flex-col items-center justify-center gap-1">
+                    <span className="whitespace-nowrap flex items-center gap-1 text-[11px] font-bold">
+                      ✉️ {isAr ? "بريد" : "EMAIL"}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={isBulkUpdating === "email"}
+                      onClick={() => handleToggleAllChannel("email")}
+                      title={allEmailOn ? (isAr ? "تعطيل الكل" : "Turn all OFF") : (isAr ? "تفعيل الكل" : "Turn all ON")}
+                      className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 ${
+                        allEmailOn ? "bg-emerald-500" : someEmailOn ? "bg-emerald-500/50" : "bg-muted-foreground/30"
+                      }`}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          allEmailOn ? "translate-x-3 rtl:-translate-x-3" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                    <span className="text-[9px] font-medium text-muted-foreground">
+                      {allEmailOn ? (isAr ? "الكل ON" : "All ON") : someEmailOn ? (isAr ? "جزئي" : "Mixed") : (isAr ? "الكل OFF" : "All OFF")}
+                    </span>
+                  </div>
+                </th>
+
+                {/* Channel 3: Push with Master Column Toggle */}
+                <th className="px-2.5 py-2 text-center font-semibold bg-muted/30" title={isAr ? "إشعارات المتصفح (Web Push)" : "Browser Web Push"}>
+                  <div className="flex flex-col items-center justify-center gap-1">
+                    <span className="whitespace-nowrap flex items-center gap-1 text-[11px] font-bold">
+                      📱 {isAr ? "بوش" : "PUSH"}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={isBulkUpdating === "push"}
+                      onClick={() => handleToggleAllChannel("push")}
+                      title={allPushOn ? (isAr ? "تعطيل الكل" : "Turn all OFF") : (isAr ? "تفعيل الكل" : "Turn all ON")}
+                      className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 ${
+                        allPushOn ? "bg-emerald-500" : somePushOn ? "bg-emerald-500/50" : "bg-muted-foreground/30"
+                      }`}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          allPushOn ? "translate-x-3 rtl:-translate-x-3" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                    <span className="text-[9px] font-medium text-muted-foreground">
+                      {allPushOn ? (isAr ? "الكل ON" : "All ON") : somePushOn ? (isAr ? "جزئي" : "Mixed") : (isAr ? "الكل OFF" : "All OFF")}
+                    </span>
+                  </div>
+                </th>
+
+                {/* Channel 4: SMS with Master Column Toggle */}
+                <th className="px-2.5 py-2 text-center font-semibold bg-muted/30" title={isAr ? "رسائل SMS القصيرة" : "SMS Message via ePush"}>
+                  <div className="flex flex-col items-center justify-center gap-1">
+                    <span className="whitespace-nowrap flex items-center gap-1 text-[11px] font-bold">
+                      💬 SMS
+                    </span>
+                    <button
+                      type="button"
+                      disabled={isBulkUpdating === "sms"}
+                      onClick={() => handleToggleAllChannel("sms")}
+                      title={allSmsOn ? (isAr ? "تعطيل الكل" : "Turn all OFF") : (isAr ? "تفعيل الكل" : "Turn all ON")}
+                      className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 ${
+                        allSmsOn ? "bg-emerald-500" : someSmsOn ? "bg-emerald-500/50" : "bg-muted-foreground/30"
+                      }`}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          allSmsOn ? "translate-x-3 rtl:-translate-x-3" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                    <span className="text-[9px] font-medium text-muted-foreground">
+                      {allSmsOn ? (isAr ? "الكل ON" : "All ON") : someSmsOn ? (isAr ? "جزئي" : "Mixed") : (isAr ? "الكل OFF" : "All OFF")}
+                    </span>
+                  </div>
+                </th>
                 <th className="px-3.5 py-2.5 text-start font-semibold">{isAr ? "وقت ومحفز الإرسال" : "Trigger / Schedule"}</th>
                 <th className="px-3.5 py-2.5 text-end font-semibold">{isAr ? "إجراءات" : "Actions"}</th>
               </tr>
