@@ -139,6 +139,28 @@ async function loadPrefs(userIds: string[], category: AlertCategory) {
   return map;
 }
 
+async function loadMatrixRule(category: string) {
+  try {
+    const { data } = await (supabaseAdmin as any)
+      .from("notification_matrix_rules")
+      .select("id, inapp, email, push, notify_employee, notify_manager, notify_hr, custom_emails")
+      .eq("id", category)
+      .maybeSingle();
+    return data as {
+      id: string;
+      inapp?: boolean;
+      email?: boolean;
+      push?: boolean;
+      notify_employee?: boolean;
+      notify_manager?: boolean;
+      notify_hr?: boolean;
+      custom_emails?: string[];
+    } | null;
+  } catch {
+    return null;
+  }
+}
+
 async function alreadyDelivered(userId: string, channel: "inapp" | "email" | "push", alertId: string) {
   const { data } = await supabaseAdmin
     .from("notif_deliveries")
@@ -152,8 +174,19 @@ async function alreadyDelivered(userId: string, channel: "inapp" | "email" | "pu
 }
 
 export async function dispatchAlert(input: AlertDispatchInput) {
-  const recipients = await listAdminRecipients();
-  if (recipients.length === 0) return { recipients: 0, sent: 0 };
+  // 1. Check company Notification Matrix rule for this category
+  const matrixRule = await loadMatrixRule(input.category);
+
+  // If a channel is disabled in the company matrix, it is suppressed for all recipients
+  const isEmailGloballyEnabled = matrixRule ? matrixRule.email !== false : true;
+  const isInAppGloballyEnabled = matrixRule ? matrixRule.inapp !== false : true;
+  const isPushGloballyEnabled = matrixRule ? matrixRule.push !== false : true;
+  const isHrEnabled = matrixRule ? matrixRule.notify_hr !== false : true;
+  const isManagerEnabled = matrixRule ? matrixRule.notify_manager !== false : true;
+  const isEmployeeEnabled = matrixRule ? matrixRule.notify_employee !== false : true;
+
+  // Recipients for enterprise/company-wide alerts (Admin & HR only! Line managers never get enterprise alerts)
+  const recipients = isHrEnabled ? await listAdminRecipients() : [];
   const prefMap = await loadPrefs(recipients.map((r) => r.id), input.category);
   const smtp = await loadSmtpConfig();
   const { subject, html, text } = renderEmail(input);
@@ -162,8 +195,8 @@ export async function dispatchAlert(input: AlertDispatchInput) {
   for (const rec of recipients) {
     const pref = prefMap.get(rec.id)!;
 
-    // In-app
-    if (pref.inapp && !(await alreadyDelivered(rec.id, "inapp", input.alertId))) {
+    // In-app (HR/Admin)
+    if (isInAppGloballyEnabled && pref.inapp && !(await alreadyDelivered(rec.id, "inapp", input.alertId))) {
       await supabaseAdmin.from("notif_deliveries").insert({
         user_id: rec.id, channel: "inapp", status: "sent",
         subject: input.title,
@@ -172,8 +205,8 @@ export async function dispatchAlert(input: AlertDispatchInput) {
       sent++;
     }
 
-    // Email
-    if (pref.email && rec.email && !(await alreadyDelivered(rec.id, "email", input.alertId))) {
+    // Email (HR/Admin) - Requires BOTH matrix rule email === true AND user pref email === true
+    if (isEmailGloballyEnabled && pref.email && rec.email && !(await alreadyDelivered(rec.id, "email", input.alertId))) {
       if (!smtp || !smtp.host || !smtp.password) {
         await supabaseAdmin.from("notif_deliveries").insert({
           user_id: rec.id, recipient: rec.email, channel: "email", status: "skipped_smtp",
@@ -199,8 +232,8 @@ export async function dispatchAlert(input: AlertDispatchInput) {
       }
     }
 
-    // Push
-    if (pref.push && !(await alreadyDelivered(rec.id, "push", input.alertId))) {
+    // Push (HR/Admin)
+    if (isPushGloballyEnabled && pref.push && !(await alreadyDelivered(rec.id, "push", input.alertId))) {
       const { data: subs } = await (supabaseAdmin as any)
         .from("push_subscriptions")
         .select("endpoint, p256dh, auth_secret")
@@ -249,8 +282,8 @@ export async function dispatchAlert(input: AlertDispatchInput) {
       if (empProf) {
         const empName = empProf.full_name || "Employee";
 
-        // 1. Direct Employee Dispatch (if enabled)
-        if (input.notifyEmployee !== false && empProf.email && smtp?.host && smtp?.password) {
+        // 1. Direct Employee Dispatch (if enabled in matrix and input)
+        if (isEmployeeEnabled && input.notifyEmployee !== false && isEmailGloballyEnabled && empProf.email && smtp?.host && smtp?.password) {
           const empAlertId = `${input.alertId}-emp`;
           if (!(await alreadyDelivered(empProf.id, "email", empAlertId))) {
             const empEmailData = renderEmployeeEmail(input, empName);
@@ -284,8 +317,8 @@ export async function dispatchAlert(input: AlertDispatchInput) {
           }
         }
 
-        // 2. Direct Line Manager Dispatch (if enabled and manager exists)
-        if (input.notifyManager !== false && empProf.manager_id && smtp?.host && smtp?.password) {
+        // 2. Direct Line Manager Dispatch (STRICTLY scoped to this employee's direct line manager)
+        if (isManagerEnabled && input.notifyManager !== false && isEmailGloballyEnabled && empProf.manager_id && smtp?.host && smtp?.password) {
           const { data: mgrProf } = await supabaseAdmin
             .from("profiles")
             .select("id, email, full_name")
@@ -334,9 +367,16 @@ export async function dispatchAlert(input: AlertDispatchInput) {
     }
   }
 
-  // 3. Additional Responsible CC Emails
-  if (Array.isArray(input.responsibleEmails) && input.responsibleEmails.length > 0 && smtp?.host && smtp?.password) {
-    for (const ccEmail of input.responsibleEmails) {
+  // 3. Additional Responsible CC Emails (only if email is enabled in matrix)
+  const ccEmails = Array.from(
+    new Set([
+      ...(Array.isArray(input.responsibleEmails) ? input.responsibleEmails : []),
+      ...(Array.isArray(matrixRule?.custom_emails) ? matrixRule.custom_emails : []),
+    ].filter(Boolean))
+  );
+
+  if (isEmailGloballyEnabled && ccEmails.length > 0 && smtp?.host && smtp?.password) {
+    for (const ccEmail of ccEmails) {
       if (/.+@.+\..+/.test(ccEmail)) {
         try {
           const ccAlertId = `${input.alertId}-cc-${ccEmail}`;

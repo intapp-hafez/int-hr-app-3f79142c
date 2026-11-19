@@ -54,17 +54,33 @@ export async function notifyUsers(input: NotifyInput): Promise<void> {
     const email = renderEmail(input);
     let smtp: Awaited<ReturnType<typeof loadSmtpConfig>> | undefined;
 
+    // Check company Notification Matrix rule if defined
+    let matrixRule: any = null;
+    if (input.category) {
+      try {
+        const { data: mr } = await (supabaseAdmin as any)
+          .from("notification_matrix_rules")
+          .select("inapp, email, push")
+          .eq("id", input.category)
+          .maybeSingle();
+        matrixRule = mr;
+      } catch { /* ignore */ }
+    }
+    const isEmailGloballyEnabled = matrixRule ? matrixRule.email !== false : true;
+    const isInAppGloballyEnabled = matrixRule ? matrixRule.inapp !== false : true;
+    const isPushGloballyEnabled = matrixRule ? matrixRule.push !== false : true;
+
     for (const prof of profs ?? []) {
       const p: any = prefMap.get(prof.id) ?? { push_enabled: true, email_enabled: true, inapp_enabled: true, quiet_start: null, quiet_end: null, timezone: "UTC" };
       const quiet = isQuietNow(p.quiet_start, p.quiet_end, p.timezone);
 
-      // In-app always recorded unless user disabled it
-      if (p.inapp_enabled !== false) {
+      // In-app always recorded unless user or matrix disabled it
+      if (isInAppGloballyEnabled && p.inapp_enabled !== false) {
         await log({ user_id: prof.id, channel: "inapp", status: "sent", subject: input.title, payload });
       }
 
       // Email
-      if (!input.inAppOnly && p.email_enabled !== false && prof.email) {
+      if (!input.inAppOnly && isEmailGloballyEnabled && p.email_enabled !== false && prof.email) {
         if (quiet) {
           await log({ user_id: prof.id, recipient: prof.email, channel: "email", status: "suppressed", subject: input.title, error: "quiet hours", payload });
         } else {
@@ -82,7 +98,7 @@ export async function notifyUsers(input: NotifyInput): Promise<void> {
       }
 
       // Push
-      if (p.push_enabled !== false && !quiet) {
+      if (isPushGloballyEnabled && p.push_enabled !== false && !quiet) {
         await pushToUser(prof.id, input, payload);
       }
     }
