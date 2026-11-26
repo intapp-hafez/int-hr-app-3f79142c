@@ -55,6 +55,7 @@ import { Route as AdminShiftsRouteImport } from './routes/admin.shifts'
 import { Route as AdminSmsRouteImport } from './routes/admin.sms'
 import { Route as AdminStickyNotesRouteImport } from './routes/admin.sticky-notes'
 import { Route as AdminTargetsOvertimeRouteImport } from './routes/admin.targets-overtime'
+import { Route as AdminTrackingRouteImport } from './routes/admin.tracking'
 import { Route as AdminWorkLocationsRouteImport } from './routes/admin.work-locations'
 import { Route as EmployeeIndexRouteImport } from './routes/employee.index'
 import { Route as EmployeeAdvancesRouteImport } from './routes/employee.advances'
@@ -338,6 +339,11 @@ const AdminStickyNotesRoute = AdminStickyNotesRouteImport.update({
 const AdminTargetsOvertimeRoute = AdminTargetsOvertimeRouteImport.update({
   id: '/targets-overtime',
   path: '/targets-overtime',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminTrackingRoute = AdminTrackingRouteImport.update({
+  id: '/tracking',
+  path: '/tracking',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminWorkLocationsRoute = AdminWorkLocationsRouteImport.update({
@@ -645,6 +651,7 @@ export interface FileRoutesByFullPath {
   '/admin/sms': typeof AdminSmsRoute
   '/admin/sticky-notes': typeof AdminStickyNotesRoute
   '/admin/targets-overtime': typeof AdminTargetsOvertimeRoute
+  '/admin/tracking': typeof AdminTrackingRoute
   '/admin/work-locations': typeof AdminWorkLocationsRoute
   '/employee/advances': typeof EmployeeAdvancesRoute
   '/employee/attendance': typeof EmployeeAttendanceRoute
@@ -737,6 +744,7 @@ export interface FileRoutesByTo {
   '/admin/sms': typeof AdminSmsRoute
   '/admin/sticky-notes': typeof AdminStickyNotesRoute
   '/admin/targets-overtime': typeof AdminTargetsOvertimeRoute
+  '/admin/tracking': typeof AdminTrackingRoute
   '/admin/work-locations': typeof AdminWorkLocationsRoute
   '/employee/advances': typeof EmployeeAdvancesRoute
   '/employee/attendance': typeof EmployeeAttendanceRoute
@@ -837,6 +845,7 @@ export interface FileRoutesById {
   '/admin/sms': typeof AdminSmsRoute
   '/admin/sticky-notes': typeof AdminStickyNotesRoute
   '/admin/targets-overtime': typeof AdminTargetsOvertimeRoute
+  '/admin/tracking': typeof AdminTrackingRoute
   '/admin/work-locations': typeof AdminWorkLocationsRoute
   '/employee/advances': typeof EmployeeAdvancesRoute
   '/employee/attendance': typeof EmployeeAttendanceRoute
@@ -938,6 +947,7 @@ export interface FileRouteTypes {
     | '/admin/sms'
     | '/admin/sticky-notes'
     | '/admin/targets-overtime'
+    | '/admin/tracking'
     | '/admin/work-locations'
     | '/employee/advances'
     | '/employee/attendance'
@@ -1030,6 +1040,7 @@ export interface FileRouteTypes {
     | '/admin/sms'
     | '/admin/sticky-notes'
     | '/admin/targets-overtime'
+    | '/admin/tracking'
     | '/admin/work-locations'
     | '/employee/advances'
     | '/employee/attendance'
@@ -1129,6 +1140,7 @@ export interface FileRouteTypes {
     | '/admin/sms'
     | '/admin/sticky-notes'
     | '/admin/targets-overtime'
+    | '/admin/tracking'
     | '/admin/work-locations'
     | '/employee/advances'
     | '/employee/attendance'
@@ -1517,6 +1529,13 @@ declare module '@tanstack/react-router' {
       path: '/targets-overtime'
       fullPath: '/admin/targets-overtime'
       preLoaderRoute: typeof AdminTargetsOvertimeRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/tracking': {
+      id: '/admin/tracking'
+      path: '/tracking'
+      fullPath: '/admin/tracking'
+      preLoaderRoute: typeof AdminTrackingRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/work-locations': {
@@ -1957,6 +1976,7 @@ interface AdminRouteChildren {
   AdminSmsRoute: typeof AdminSmsRoute
   AdminStickyNotesRoute: typeof AdminStickyNotesRoute
   AdminTargetsOvertimeRoute: typeof AdminTargetsOvertimeRoute
+  AdminTrackingRoute: typeof AdminTrackingRoute
   AdminWorkLocationsRoute: typeof AdminWorkLocationsRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminActivityTimelineIdRoute: typeof AdminActivityTimelineIdRoute
@@ -2002,6 +2022,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminSmsRoute: AdminSmsRoute,
   AdminStickyNotesRoute: AdminStickyNotesRoute,
   AdminTargetsOvertimeRoute: AdminTargetsOvertimeRoute,
+  AdminTrackingRoute: AdminTrackingRoute,
   AdminWorkLocationsRoute: AdminWorkLocationsRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminActivityTimelineIdRoute: AdminActivityTimelineIdRoute,

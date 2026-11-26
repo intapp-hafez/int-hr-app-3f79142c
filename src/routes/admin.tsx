@@ -149,6 +149,7 @@ function AdminLayout() {
         icon: Sliders,
         items: [
           { to: "/admin/attendance", icon: Clock, label: t("attendance") || "Attendance", page: "attendance" },
+          { to: "/admin/tracking", icon: Navigation, label: "Live Tracking", page: "geofencing" },
           { to: "/admin/geofencing", icon: MapPin, label: t("geofencing") || "Geo-Fencing", page: "geofencing" },
           { to: "/admin/applied-trip-allowances", icon: Navigation, label: "Applied Trip Allowances", page: "attendance" },
           { to: "/admin/leaves", icon: CalendarDays, label: t("leaves") || "Leaves", page: "leaves" },
@@ -566,7 +567,7 @@ function getPageSlugForPath(path: string): string | null {
   if (path.startsWith("/admin/leaves")) return "leaves";
   if (path.startsWith("/admin/payroll")) return "payroll";
   if (path.startsWith("/admin/advances")) return "advances";
-  if (path.startsWith("/admin/geofencing") || path.startsWith("/admin/work-locations")) return "geofencing";
+  if (path.startsWith("/admin/geofencing") || path.startsWith("/admin/work-locations") || path.startsWith("/admin/tracking")) return "geofencing";
   if (path.startsWith("/admin/networks") || path.startsWith("/admin/devices")) return "networks";
   if (path.startsWith("/admin/shifts")) return "shifts";
   if (path.startsWith("/admin/holiday-types")) return "holiday-types";
