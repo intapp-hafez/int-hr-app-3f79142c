@@ -1,12 +1,16 @@
 import { Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { MapPin, Wifi, Clock, Search, ListChecks, Settings2, Loader2, UserCheck } from "lucide-react";
+import { MapPin, Wifi, Clock, Search, ListChecks, Settings2, Loader2, UserCheck, Moon } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { EmployeeAvatar } from "@/components/EmployeeAvatar";
 import { useI18n } from "@/lib/i18n";
+import {
+  getAutoCheckoutSettings,
+  updateAutoCheckoutSettings,
+} from "@/backend/functions/auto-checkout.functions";
 import {
   listEmployeesForAccess,
   listAllGeofences,
@@ -31,8 +35,89 @@ export function AttendanceRulesView() {
   }, [empQ.data, q]);
   const current = (empQ.data ?? []).find((e: any) => e.id === sel);
 
+  const qc = useQueryClient();
+  const autoCheckoutQ = useQuery({
+    queryKey: ["auto-checkout-settings"],
+    queryFn: () => getAutoCheckoutSettings(),
+  });
+  const autoCheckoutMut = useMutation({
+    mutationFn: (payload: { auto_checkout_at_midnight: boolean; timezone: string }) =>
+      updateAutoCheckoutSettings({ data: payload }),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["auto-checkout-settings"] });
+      toast.success(
+        res.auto_checkout_at_midnight
+          ? "Auto checkout at midnight enabled"
+          : "Auto checkout at midnight disabled",
+      );
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
   return (
     <div className="space-y-5">
+      {/* Global Automation Toggle: Auto checkout at midnight */}
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-xs flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <div className="h-10 w-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
+            <Moon className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-foreground">Auto checkout at midnight</h3>
+              <span
+                className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                  autoCheckoutQ.data?.auto_checkout_at_midnight
+                    ? "bg-emerald-500/15 text-emerald-600"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {autoCheckoutQ.data?.auto_checkout_at_midnight ? "ON" : "OFF"}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              When enabled, at 12:00 AM local time any employee still checked in without a check-out is automatically checked out and tagged as{" "}
+              <span className="font-medium text-foreground">System Midnight Checkout</span> in the audit log.
+            </p>
+            {autoCheckoutQ.data?.last_run_date && (
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Last run: {autoCheckoutQ.data.last_run_date} ({autoCheckoutQ.data.last_run_count} employee(s) checked out)
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <select
+            aria-label="Timezone"
+            value={autoCheckoutQ.data?.timezone ?? "Africa/Cairo"}
+            disabled={autoCheckoutMut.isPending}
+            onChange={(e) =>
+              autoCheckoutMut.mutate({
+                auto_checkout_at_midnight: autoCheckoutQ.data?.auto_checkout_at_midnight ?? false,
+                timezone: e.target.value,
+              })
+            }
+            className="rounded-xl border border-input bg-background px-2.5 py-1.5 text-xs font-medium"
+          >
+            <option value="Africa/Cairo">Africa/Cairo (UTC+2)</option>
+            <option value="Asia/Riyadh">Asia/Riyadh (UTC+3)</option>
+            <option value="Asia/Dubai">Asia/Dubai (UTC+4)</option>
+            <option value="UTC">UTC</option>
+          </select>
+
+          <Switch
+            checked={autoCheckoutQ.data?.auto_checkout_at_midnight ?? false}
+            disabled={autoCheckoutQ.isLoading || autoCheckoutMut.isPending}
+            onCheckedChange={(checked) =>
+              autoCheckoutMut.mutate({
+                auto_checkout_at_midnight: checked,
+                timezone: autoCheckoutQ.data?.timezone ?? "Africa/Cairo",
+              })
+            }
+          />
+        </div>
+      </div>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="flex items-center gap-2 font-display text-xl font-semibold">
@@ -136,6 +221,23 @@ function RulesEditor({ employeeId, name, avatarUrl }: { employeeId: string; name
   const nM = useQuery({ queryKey: ["rules-net", employeeId], queryFn: () => netMine({ data: { profileId: employeeId } }) });
   const aM = useQuery({ queryKey: ["rules-asg", employeeId], queryFn: () => asgMine({ data: { employee_id: employeeId } }) });
   const [busy, setBusy] = useState<string | null>(null);
+  const [locPage, setLocPage] = useState(1);
+  const [locSearch, setLocSearch] = useState("");
+  const LOCS_PER_PAGE = 50;
+
+  const activeLocations = useMemo(() => {
+    const q = locSearch.trim().toLowerCase();
+    return ((gA.data ?? []) as any[]).filter(
+      (l) => l.active && (!q || String(l.name ?? "").toLowerCase().includes(q)),
+    );
+  }, [gA.data, locSearch]);
+
+  const totalLocPages = Math.max(1, Math.ceil(activeLocations.length / LOCS_PER_PAGE));
+  const safeLocPage = Math.min(locPage, totalLocPages);
+  const pagedLocations = activeLocations.slice(
+    (safeLocPage - 1) * LOCS_PER_PAGE,
+    safeLocPage * LOCS_PER_PAGE,
+  );
 
   const geoMap = new Map(((gM.data ?? []) as any[]).map((g) => [g.id, g]));
   const netSet = new Set(((nM.data ?? []) as any[]).map((n) => n.id));
@@ -166,10 +268,30 @@ function RulesEditor({ employeeId, name, avatarUrl }: { employeeId: string; name
 
       <Card
         icon={<MapPin className="h-4 w-4 text-brand" />}
-        title="Allowed work locations"
-        hint="If none are chosen, the employee can check in from anywhere."
+        title={`Allowed work locations (${activeLocations.length})`}
+        hint="If none are chosen, the employee can check in from anywhere. Showing 50 per page."
       >
-        {((gA.data ?? []) as any[]).filter((l) => l.active).map((l) => {
+        {((gA.data ?? []) as any[]).filter((l) => l.active).length > 10 && (
+          <div className="py-2.5 flex flex-wrap items-center justify-between gap-2">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute start-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+              <input
+                value={locSearch}
+                onChange={(e) => {
+                  setLocSearch(e.target.value);
+                  setLocPage(1);
+                }}
+                placeholder="Filter work locations…"
+                className="w-full rounded-xl border border-input bg-background py-1.5 ps-8 pe-3 text-xs focus:outline-hidden focus:ring-1 focus:ring-brand"
+              />
+            </div>
+            <span className="text-[11px] text-muted-foreground">
+              Showing {activeLocations.length === 0 ? 0 : (safeLocPage - 1) * LOCS_PER_PAGE + 1}–
+              {Math.min(safeLocPage * LOCS_PER_PAGE, activeLocations.length)} of {activeLocations.length}
+            </span>
+          </div>
+        )}
+        {pagedLocations.map((l) => {
           const mine = geoMap.get(l.id) as any;
           return (
             <div key={l.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
@@ -217,6 +339,31 @@ function RulesEditor({ employeeId, name, avatarUrl }: { employeeId: string; name
             </div>
           );
         })}
+        {totalLocPages > 1 && (
+          <div className="pt-3 flex items-center justify-between gap-2 text-xs">
+            <span className="text-muted-foreground">
+              Page {safeLocPage} of {totalLocPages}
+            </span>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                disabled={safeLocPage <= 1}
+                onClick={() => setLocPage((p) => Math.max(1, p - 1))}
+                className="rounded-lg border border-border px-2.5 py-1 font-medium hover:bg-muted disabled:opacity-40"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                disabled={safeLocPage >= totalLocPages}
+                onClick={() => setLocPage((p) => Math.min(totalLocPages, p + 1))}
+                className="rounded-lg border border-border px-2.5 py-1 font-medium hover:bg-muted disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
         {(gA.data ?? []).length === 0 && (
           <Empty to="/admin/work-locations" label="No work locations yet — add one first." />
         )}

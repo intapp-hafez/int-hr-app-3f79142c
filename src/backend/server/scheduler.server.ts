@@ -163,6 +163,10 @@ export async function runDueSchedules(now: Date = new Date()): Promise<RunSummar
   // Check contract expirations (idempotent, skips if already processed)
   await processContractNotifications().catch(e => console.error("Error in processContractNotifications:", e));
 
+  // Auto checkout at midnight (idempotent, only runs if enabled & within 00:00-00:15 local time)
+  const { runAutoCheckoutAtMidnight } = await import("./auto-checkout.server");
+  await runAutoCheckoutAtMidnight(now).catch(e => console.error("Error in runAutoCheckoutAtMidnight:", e));
+
   const { data: schedules, error } = await supabaseAdmin
     .from("export_schedules")
     .select("*")

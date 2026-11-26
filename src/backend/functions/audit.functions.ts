@@ -62,6 +62,7 @@ export const getAuditEvents = createServerFn({ method: "GET" })
         });
       }
       if (r.out_time) {
+        const isMidnightAuto = typeof r.note === "string" && r.note.includes("System Midnight Checkout");
         rows.push({
           id: `${r.id}-out`,
           ts: new Date(r.out_time).getTime(),
@@ -74,8 +75,10 @@ export const getAuditEvents = createServerFn({ method: "GET" })
           network,
           ssid: null,
           distanceM: null,
-          reason: `Checked out at ${new Date(r.out_time).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`,
-          device: null,
+          reason: isMidnightAuto
+            ? r.note
+            : `Checked out at ${new Date(r.out_time).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`,
+          device: isMidnightAuto ? "System Scheduler" : null,
         });
       }
     }

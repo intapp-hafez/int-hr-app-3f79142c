@@ -203,10 +203,11 @@ export const checkIn = createServerFn({ method: "POST" })
     {
       const { data: faceRow, error: faceErr } = await (supabase as any)
         .from("profiles")
-        .select("face_required")
+        .select("face_required, fingerprint_enabled")
         .eq("id", userId)
         .maybeSingle();
       const faceRequired = faceErr ? true : faceRow?.face_required !== false;
+      const fingerprintEnabled = faceErr ? true : faceRow?.fingerprint_enabled !== false;
       const res = await validateAndConsumeBioToken(
         supabase,
         userId,
@@ -216,6 +217,9 @@ export const checkIn = createServerFn({ method: "POST" })
       );
       if (!res.ok) {
         return block(res.code, res.reason);
+      }
+      if (res.method === "fingerprint" && !fingerprintEnabled) {
+        return block("fingerprint_disabled", "Check-in blocked · fingerprint verification is disabled for your account.");
       }
       bioCheck = res;
     }
@@ -549,10 +553,11 @@ export const checkOut = createServerFn({ method: "POST" })
     {
       const { data: faceRow, error: faceErr } = await (supabase as any)
         .from("profiles")
-        .select("face_required")
+        .select("face_required, fingerprint_enabled")
         .eq("id", userId)
         .maybeSingle();
       const faceRequired = faceErr ? true : faceRow?.face_required !== false;
+      const fingerprintEnabled = faceErr ? true : faceRow?.fingerprint_enabled !== false;
       const res = await validateAndConsumeBioToken(
         supabase,
         userId,
@@ -562,6 +567,9 @@ export const checkOut = createServerFn({ method: "POST" })
       );
       if (!res.ok) {
         return block(res.code, res.reason);
+      }
+      if (res.method === "fingerprint" && !fingerprintEnabled) {
+        return block("fingerprint_disabled", "Check-out blocked · fingerprint verification is disabled for your account.");
       }
       bioCheckOut = res;
     }

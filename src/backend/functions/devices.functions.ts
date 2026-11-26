@@ -124,6 +124,53 @@ export const setDeviceRequirement = createServerFn({ method: "POST" })
     return { ok: true, required: data.required };
   });
 
+// ── Per-employee fingerprint toggle (on by default) ──────────
+export const getFingerprintEnabled = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { user_id: string }) => z.object({ user_id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: row, error } = await (context.supabase as any)
+      .from("profiles")
+      .select("fingerprint_enabled")
+      .eq("id", data.user_id)
+      .maybeSingle();
+    if (error) return { enabled: true, available: false };
+    return { enabled: row?.fingerprint_enabled !== false, available: true };
+  });
+
+export const setFingerprintEnabled = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { user_id: string; enabled: boolean }) =>
+    z.object({ user_id: z.string().uuid(), enabled: z.boolean() }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.supabase, context.userId);
+    const { error } = await (context.supabase as any)
+      .from("profiles")
+      .update({ fingerprint_enabled: data.enabled })
+      .eq("id", data.user_id);
+    if (error) throw new Error(error.message);
+
+    // Log change to security_audit_events (best-effort)
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await supabaseAdmin.from("security_audit_events").insert({
+        kind: "employee_fingerprint_toggle",
+        severity: "info",
+        path: `/admin/employees/${data.user_id}`,
+        detail: {
+          actor_id: context.userId,
+          employee_id: data.user_id,
+          fingerprint_enabled: data.enabled,
+        },
+      } as never);
+    } catch {
+      // Ignore audit error if table unavailable
+    }
+
+    return { ok: true, enabled: data.enabled };
+  });
+
 // ── Per-employee face-recognition requirement (on by default) ──
 export const getFaceRequirement = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

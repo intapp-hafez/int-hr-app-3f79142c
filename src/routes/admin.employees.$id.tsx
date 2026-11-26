@@ -40,6 +40,8 @@ import {
   setDeviceRequirement,
   getFaceRequirement,
   setFaceRequirement,
+  getFingerprintEnabled,
+  setFingerprintEnabled,
   getFaceReenroll,
   setFaceReenroll,
 } from "@/backend/functions/devices.functions";
@@ -4480,6 +4482,54 @@ function FaceRequirementToggle({ userId, canManage }: { userId: string; canManag
   );
 }
 
+function FingerprintEnabledToggle({ userId, canManage }: { userId: string; canManage: boolean }) {
+  const { t } = useI18n();
+  const getFn = useServerFn(getFingerprintEnabled);
+  const setFn = useServerFn(setFingerprintEnabled);
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["employee-fingerprint-enabled", userId],
+    queryFn: () => getFn({ data: { user_id: userId } }),
+  });
+  const enabled = data?.enabled !== false;
+
+  async function toggle() {
+    try {
+      await setFn({ data: { user_id: userId, enabled: !enabled } });
+      toast.success(
+        !enabled
+          ? (t("fingerprintEnabledOnToast") || "Fingerprint verification is now enabled")
+          : (t("fingerprintEnabledOffToast") || "Fingerprint verification is now disabled"),
+      );
+      qc.invalidateQueries({ queryKey: ["employee-fingerprint-enabled", userId] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed");
+    }
+  }
+
+  return (
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-muted/40 p-3">
+      <div className="min-w-0">
+        <p className="text-sm font-semibold">{t("enableFingerprintTitle") || "Enable fingerprint"}</p>
+        <p className="text-xs text-muted-foreground">
+          {t("enableFingerprintDesc") || "When disabled, the mobile app will not prompt this employee for fingerprint during check-in or check-out."}
+        </p>
+      </div>
+      <button
+        type="button"
+        disabled={!canManage}
+        onClick={toggle}
+        aria-pressed={enabled}
+        className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-50 ${enabled ? "bg-gradient-brand" : "bg-border"}`}
+      >
+        <span
+          className={`absolute top-1 h-5 w-5 rounded-full bg-card shadow transition-all ${enabled ? "left-6 rtl:right-6 rtl:left-auto" : "left-1 rtl:right-1 rtl:left-auto"}`}
+        />
+      </button>
+    </div>
+  );
+}
+
 function EmployeeDevicesPanel({ userId, canManage }: { userId: string; canManage: boolean }) {
   const { t, lang } = useI18n();
   const listFn = useServerFn(listEmployeeDevices);
@@ -4518,6 +4568,7 @@ function EmployeeDevicesPanel({ userId, canManage }: { userId: string; canManage
       </div>
 
       <DeviceRequirementToggle userId={userId} canManage={canManage} />
+      <FingerprintEnabledToggle userId={userId} canManage={canManage} />
       <FaceRequirementToggle userId={userId} canManage={canManage} />
       <FaceReenrollToggle userId={userId} canManage={canManage} />
       {isLoading ? (

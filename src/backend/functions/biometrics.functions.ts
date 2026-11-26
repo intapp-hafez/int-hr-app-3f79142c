@@ -503,8 +503,11 @@ export const webauthnAuthOptionsForSelf = createServerFn({ method: "POST" })
     const { rpID } = getOrigin();
     const [{ data: creds }, { data: profile }] = await Promise.all([
       context.supabase.from("webauthn_credentials").select("credential_id, transports").eq("user_id", context.userId),
-      context.supabase.from("profiles").select("email").eq("id", context.userId).maybeSingle(),
+      (context.supabase as any).from("profiles").select("email, fingerprint_enabled").eq("id", context.userId).maybeSingle(),
     ]);
+    if (profile?.fingerprint_enabled === false) {
+      throw new Error("Fingerprint verification is disabled for your account.");
+    }
     if (!creds?.length) throw new Error("No fingerprint registered");
     const options = await generateAuthenticationOptions({
       rpID,
@@ -544,6 +547,15 @@ export const webauthnAuthVerifyForSelf = createServerFn({ method: "POST" })
       });
       throw new Error(reason);
     };
+
+    const { data: fpProfile } = await (context.supabase as any)
+      .from("profiles")
+      .select("fingerprint_enabled")
+      .eq("id", context.userId)
+      .maybeSingle();
+    if (fpProfile?.fingerprint_enabled === false) {
+      return await fail("Fingerprint verification is disabled for your account.");
+    }
 
     const { data: cred } = await context.supabase
       .from("webauthn_credentials")
